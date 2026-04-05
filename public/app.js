@@ -15,11 +15,13 @@ const state = {
   chatLoading: false,
   keys: { anthropicConfigured: false, unsplashConfigured: false },
   isPlanning: false,
+  profilesStore: null,
   profile: null,
   profileEditMode: false
 };
 
-const PROFILE_KEY = 'travelplanner_profile_v1';
+const PROFILES_KEY = 'travelplanner_profiles_v1';
+const LEGACY_PROFILE_KEY = 'travelplanner_profile_v1';
 const USER_ID_KEY = 'travelplanner_user_id';
 const PROFILE_QUESTIONS = [
   { key: 'museumPerson', label: 'Are you a museum person?', summary: 'Museum person' },
@@ -54,6 +56,10 @@ const els = {
   preferencesLink: document.getElementById('preferencesLink'),
   prefsModal: document.getElementById('prefsModal'),
   prefsClose: document.getElementById('prefsClose'),
+  profileSelector: document.getElementById('profileSelector'),
+  profileNameInput: document.getElementById('profileNameInput'),
+  newProfileBtn: document.getElementById('newProfileBtn'),
+  deleteProfileBtn: document.getElementById('deleteProfileBtn'),
   profileQuestions: document.getElementById('profileQuestions'),
   profileTravelNotes: document.getElementById('profileTravelNotes'),
   profileDislikes: document.getElementById('profileDislikes'),
@@ -89,6 +95,91 @@ function defaultProfile() {
   };
 }
 
+function createProfileId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `profile-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeProfileName(name, fallback = 'My Profile') {
+  const cleaned = String(name || '').trim().slice(0, 32);
+  return cleaned || fallback;
+}
+
+function defaultProfilesStore() {
+  const id = createProfileId();
+  return {
+    activeId: id,
+    profiles: [{ id, name: 'My Profile', ...defaultProfile() }]
+  };
+}
+
+function normalizeProfilesStore(store) {
+  if (!store || typeof store !== 'object') return defaultProfilesStore();
+
+  const incomingProfiles = Array.isArray(store.profiles) ? store.profiles : [];
+  const normalizedProfiles = incomingProfiles
+    .slice(0, 3)
+    .map((p, index) => {
+      const normalized = normalizeProfile(p);
+      return {
+        id: String(p?.id || createProfileId()),
+        name: normalizeProfileName(p?.name, `Profile ${index + 1}`),
+        ...normalized
+      };
+    });
+
+  if (!normalizedProfiles.length) {
+    return defaultProfilesStore();
+  }
+
+  const activeId = String(store.activeId || '');
+  const hasActive = normalizedProfiles.some((p) => p.id === activeId);
+  return {
+    activeId: hasActive ? activeId : normalizedProfiles[0].id,
+    profiles: normalizedProfiles
+  };
+}
+
+function saveProfiles(store) {
+  const normalized = normalizeProfilesStore(store);
+  localStorage.setItem(PROFILES_KEY, JSON.stringify(normalized));
+  state.profilesStore = normalized;
+  return normalized;
+}
+
+function loadProfiles() {
+  try {
+    const raw = localStorage.getItem(PROFILES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return saveProfiles(parsed);
+    }
+
+    const legacyRaw = localStorage.getItem(LEGACY_PROFILE_KEY);
+    if (legacyRaw) {
+      const legacyProfile = normalizeProfile(JSON.parse(legacyRaw));
+      const migrated = {
+        activeId: createProfileId(),
+        profiles: [{
+          id: '',
+          name: 'My Profile',
+          ...legacyProfile
+        }]
+      };
+      migrated.profiles[0].id = migrated.activeId;
+      localStorage.removeItem(LEGACY_PROFILE_KEY);
+      return saveProfiles(migrated);
+    }
+  } catch {}
+
+  return saveProfiles(defaultProfilesStore());
+}
+
+function getActiveProfile(store) {
+  const normalized = normalizeProfilesStore(store);
+  return normalized.profiles.find((p) => p.id === normalized.activeId) || normalized.profiles[0];
+}
+
 function normalizeProfile(profile) {
   const base = defaultProfile();
   if (!profile || typeof profile !== 'object') return base;
@@ -103,19 +194,22 @@ function normalizeProfile(profile) {
 }
 
 function loadProfile() {
-  try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    if (!raw) return defaultProfile();
-    return normalizeProfile(JSON.parse(raw));
-  } catch {
-    return defaultProfile();
-  }
+  return normalizeProfile(getActiveProfile(loadProfiles()));
 }
 
 function saveProfile(profile) {
   const normalized = normalizeProfile(profile);
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(normalized));
-  state.profile = normalized;
+  const store = state.profilesStore || loadProfiles();
+  const nextStore = {
+    ...store,
+    profiles: store.profiles.map((p) => (
+      p.id === store.activeId
+        ? { ...p, ...normalized }
+        : p
+    ))
+  };
+  state.profilesStore = saveProfiles(nextStore);
+  state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   return normalized;
 }
 
@@ -256,8 +350,43 @@ function renderTags(container, values, kind) {
     : '<span class="muted-text">None yet</span>';
 }
 
-function renderProfileEditor() {
+function renderPreferencesModal() {
   if (!els.profileQuestions) return;
+  const store = state.profilesStore || loadProfiles();
+  const activeProfileRaw = getActiveProfile(store);
+  const activeProfile = {
+    ...activeProfileRaw,
+    ...normalizeProfile(activeProfileRaw)
+  };
+  state.profile = normalizeProfile(activeProfile);
+
+  const canCreateProfile = store.profiles.length < 3;
+  const canDeleteProfile = store.profiles.length > 1;
+
+  if (els.profileSelector) {
+    els.profileSelector.innerHTML = store.profiles
+      .map((p) => `<option value="${esc(p.id)}" ${p.id === store.activeId ? 'selected' : ''}>${esc(p.name)}</option>`)
+      .join('');
+    els.profileSelector.classList.toggle('hidden', state.profileEditMode);
+  }
+
+  if (els.profileNameInput) {
+    if (state.profileEditMode) {
+      els.profileNameInput.value = activeProfile.name || 'My Profile';
+    }
+    els.profileNameInput.classList.toggle('hidden', !state.profileEditMode);
+    els.profileNameInput.maxLength = 32;
+  }
+
+  if (els.newProfileBtn) {
+    els.newProfileBtn.disabled = !canCreateProfile;
+  }
+
+  if (els.deleteProfileBtn) {
+    els.deleteProfileBtn.classList.toggle('hidden', !state.profileEditMode);
+    els.deleteProfileBtn.disabled = !canDeleteProfile;
+  }
+
   const profile = state.profile || defaultProfile();
   const disabled = !state.profileEditMode ? 'disabled' : '';
 
@@ -292,7 +421,7 @@ function renderProfileEditor() {
         ...(state.profile || defaultProfile()),
         answers: { ...(state.profile?.answers || {}), [key]: answer }
       });
-      renderProfileEditor();
+      renderPreferencesModal();
     });
   });
 }
@@ -305,10 +434,57 @@ function getProfilePayload() {
   });
 }
 
-async function openPreferencesModal() {
-  state.profile = loadProfile();
+function switchActiveProfile(profileId) {
+  const store = state.profilesStore || loadProfiles();
+  if (!store.profiles.some((p) => p.id === profileId)) return;
+  state.profilesStore = saveProfiles({ ...store, activeId: profileId });
+  state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   state.profileEditMode = false;
-  renderProfileEditor();
+  renderPreferencesModal();
+}
+
+function createNewProfile() {
+  const store = state.profilesStore || loadProfiles();
+  if (store.profiles.length >= 3) return;
+  const suggested = `Profile ${store.profiles.length + 1}`;
+  const prompted = window.prompt('Profile name:', suggested);
+  if (prompted === null) return;
+
+  const id = createProfileId();
+  const profile = {
+    id,
+    name: normalizeProfileName(prompted, suggested),
+    ...defaultProfile()
+  };
+  const nextStore = {
+    activeId: id,
+    profiles: [...store.profiles, profile]
+  };
+  state.profilesStore = saveProfiles(nextStore);
+  state.profile = normalizeProfile(profile);
+  state.profileEditMode = false;
+  renderPreferencesModal();
+}
+
+function deleteActiveProfile() {
+  const store = state.profilesStore || loadProfiles();
+  if (store.profiles.length <= 1) return;
+  const remaining = store.profiles.filter((p) => p.id !== store.activeId);
+  const nextStore = {
+    activeId: remaining[0].id,
+    profiles: remaining
+  };
+  state.profilesStore = saveProfiles(nextStore);
+  state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
+  state.profileEditMode = false;
+  renderPreferencesModal();
+}
+
+async function openPreferencesModal() {
+  state.profilesStore = loadProfiles();
+  state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
+  state.profileEditMode = false;
+  renderPreferencesModal();
 
   try {
     const res = await fetch(`/api/preferences?userId=${encodeURIComponent(ensureUserId())}`);
@@ -328,7 +504,7 @@ async function openPreferencesModal() {
 
 function closePreferencesModal() {
   state.profileEditMode = false;
-  renderProfileEditor();
+  renderPreferencesModal();
   els.prefsModal.classList.add('hidden');
 }
 
@@ -1101,15 +1277,34 @@ els.prefsModal.addEventListener('click', (e) => {
 els.profileEditBtn.addEventListener('click', () => {
   if (!state.profileEditMode) {
     state.profileEditMode = true;
-    renderProfileEditor();
+    renderPreferencesModal();
     return;
   }
 
   const next = getProfilePayload();
   saveProfile(next);
+
+  const store = state.profilesStore || loadProfiles();
+  const active = getActiveProfile(store);
+  const nextName = normalizeProfileName(els.profileNameInput?.value, active?.name || 'My Profile');
+  state.profilesStore = saveProfiles({
+    ...store,
+    profiles: store.profiles.map((p) => (p.id === store.activeId ? { ...p, name: nextName } : p))
+  });
+  state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
+
   state.profileEditMode = false;
-  renderProfileEditor();
+  renderPreferencesModal();
 });
+
+els.profileSelector?.addEventListener('change', (e) => {
+  const nextId = e.target.value;
+  if (!nextId) return;
+  switchActiveProfile(nextId);
+});
+
+els.newProfileBtn?.addEventListener('click', createNewProfile);
+els.deleteProfileBtn?.addEventListener('click', deleteActiveProfile);
 
 els.activitiesGrid.addEventListener('change', () => {
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
@@ -1122,7 +1317,8 @@ els.activitiesGrid.addEventListener('change', () => {
 });
 
 (async function init() {
-  state.profile = loadProfile();
+  state.profilesStore = loadProfiles();
+  state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   mountPlanningOverlay();
   bindChatEvents();
   ensureUserId();

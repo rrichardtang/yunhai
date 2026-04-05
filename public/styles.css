@@ -236,6 +236,45 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .prefs-divider { border: 0; border-top: 1px solid #e5eaf2; margin: 18px 0; }
 .profile-section h4, .learned-section h4 { margin: 0 0 12px; }
 .profile-label { margin-bottom: 8px; }
+.profile-selector-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.profile-dropdown,
+.profile-name-input {
+  width: auto;
+  min-width: 220px;
+  margin-top: 0;
+  background: var(--navy);
+  color: var(--cream);
+  border: 1px solid rgba(255,255,255,.18);
+}
+
+.profile-name-input::placeholder {
+  color: rgba(248, 243, 232, 0.75);
+}
+
+#newProfileBtn:disabled {
+  background: #d6dce7;
+  color: #6d7b90;
+  border: 1px solid #c7d0de;
+}
+
+#deleteProfileBtn {
+  background: #f7e7e7;
+  color: #8f2422;
+  border: 1px solid #e7c3c3;
+}
+
+#deleteProfileBtn:disabled {
+  background: #efe9e9;
+  color: #9d8c8c;
+  border-color: #e0d4d4;
+}
+
 .prefs-subsection h5 { margin: 8px 0; font-size: 0.95rem; }
 .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .tag { padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }

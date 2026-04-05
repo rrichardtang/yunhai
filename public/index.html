@@ -87,6 +87,12 @@
 
     <div id="prefsModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Traveler Profile">
       <div class="modal-card">
+        <div class="profile-selector-row">
+          <select id="profileSelector" class="profile-dropdown" aria-label="Select profile"></select>
+          <input id="profileNameInput" class="profile-name-input hidden" type="text" maxlength="32" aria-label="Profile name" />
+          <button id="newProfileBtn" class="secondary" type="button">+ New Profile</button>
+          <button id="deleteProfileBtn" class="secondary" type="button">🗑 Delete</button>
+        </div>
         <div class="between">
           <h3>Traveler Profile</h3>
           <button id="prefsClose" class="secondary" type="button">Close</button>
