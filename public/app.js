@@ -16,13 +16,13 @@ const state = {
   keys: { anthropicConfigured: false, unsplashConfigured: false },
   isPlanning: false,
   profilesStore: null,
-  profile: null,
-  profileEditMode: false
+  profile: null
 };
 
 const PROFILES_KEY = 'travelplanner_profiles_v1';
 const LEGACY_PROFILE_KEY = 'travelplanner_profile_v1';
 const USER_ID_KEY = 'travelplanner_user_id';
+const LEARNED_PREFS_REMOVED_KEY = 'travelplanner_learned_removed_v1';
 const PROFILE_QUESTIONS = [
   { key: 'museumPerson', label: 'Are you a museum person?', summary: 'Museum person' },
   { key: 'foodTravel', label: 'Do you travel for food?', summary: 'Travels for food' },
@@ -31,7 +31,18 @@ const PROFILE_QUESTIONS = [
   { key: 'nightlifeBars', label: 'Are you into nightlife and bars?', summary: 'Nightlife and bars' },
   { key: 'structuredTours', label: 'Do you like structured tours?', summary: 'Structured tours' }
 ];
-const PROFILE_OPTIONS = ['Yes', 'Meh', 'No'];
+const PROFILE_MIN = 1;
+const PROFILE_MAX = 5;
+const PROFILE_DEFAULT = 3;
+
+function profileLabel(value) {
+  const rating = Number(value);
+  if (rating <= 1) return 'Not interested at all';
+  if (rating === 2) return 'Slightly interested';
+  if (rating === 3) return 'Neutral';
+  if (rating === 4) return 'Very interested';
+  return 'Love this';
+}
 
 const els = {
   steps: [...document.querySelectorAll('#stepIndicator .step')],
@@ -62,15 +73,10 @@ const els = {
   deleteProfileBtn: document.getElementById('deleteProfileBtn'),
   profileQuestions: document.getElementById('profileQuestions'),
   profileTravelNotes: document.getElementById('profileTravelNotes'),
-  profileDislikes: document.getElementById('profileDislikes'),
   profileEditBtn: document.getElementById('profileEditBtn'),
   prefsSignalCount: document.getElementById('prefsSignalCount'),
-  prefsLikedTypes: document.getElementById('prefsLikedTypes'),
-  prefsLikedKeywords: document.getElementById('prefsLikedKeywords'),
-  prefsDislikedTypes: document.getElementById('prefsDislikedTypes'),
-  prefsDislikedKeywords: document.getElementById('prefsDislikedKeywords'),
+  prefsLearnedRows: document.getElementById('prefsLearnedRows'),
   saveProgressBtn: document.getElementById('saveProgressBtn'),
-  saveToast: document.getElementById('saveToast'),
   resumeModal: document.getElementById('resumeModal'),
   resumeTripBtn: document.getElementById('resumeTripBtn'),
   startFreshBtn: document.getElementById('startFreshBtn'),
@@ -87,11 +93,155 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s='') => s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalizeCity = (str = '') => String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
+const CITY_AUTOCOMPLETE_MIN_CHARS = 2;
+const CITY_AUTOCOMPLETE_DEBOUNCE_MS = 300;
+const CITY_AUTOCOMPLETE_LIMIT = 5;
+
+const cityAutocomplete = {
+  activeCityId: null,
+  suggestions: [],
+  highlightIndex: -1,
+  debounceTimer: null,
+  requestSeq: 0,
+  abortController: null
+};
+
+function formatCitySuggestion(feature) {
+  const props = feature?.properties || {};
+  const name = String(props.name || '').trim();
+  const stateName = String(props.state || '').trim();
+  const country = String(props.country || '').trim();
+  if (!name) return null;
+  const detail = [stateName, country].filter(Boolean).join(', ');
+  return {
+    name,
+    label: detail ? `${name}, ${detail}` : name
+  };
+}
+
+function closeCityAutocomplete() {
+  cityAutocomplete.activeCityId = null;
+  cityAutocomplete.suggestions = [];
+  cityAutocomplete.highlightIndex = -1;
+
+  if (cityAutocomplete.debounceTimer) {
+    clearTimeout(cityAutocomplete.debounceTimer);
+    cityAutocomplete.debounceTimer = null;
+  }
+  if (cityAutocomplete.abortController) {
+    cityAutocomplete.abortController.abort();
+    cityAutocomplete.abortController = null;
+  }
+
+  document.querySelectorAll('.city-suggestions').forEach((list) => {
+    list.classList.add('hidden');
+    list.innerHTML = '';
+  });
+}
+
+function renderCitySuggestions(row, city, suggestions) {
+  const list = row.querySelector('.city-suggestions');
+  if (!list) return;
+
+  cityAutocomplete.activeCityId = city.id;
+  cityAutocomplete.suggestions = suggestions;
+
+  if (!suggestions.length) {
+    cityAutocomplete.highlightIndex = -1;
+    list.classList.add('hidden');
+    list.innerHTML = '';
+    return;
+  }
+
+  if (cityAutocomplete.highlightIndex >= suggestions.length) {
+    cityAutocomplete.highlightIndex = 0;
+  }
+
+  list.innerHTML = suggestions.map((item, index) => `
+    <button
+      type="button"
+      class="city-suggestion-item ${index === cityAutocomplete.highlightIndex ? 'active' : ''}"
+      data-index="${index}"
+    >${esc(item.label)}</button>
+  `).join('');
+
+  list.classList.remove('hidden');
+
+  // Use event delegation on the list — avoids handlers being wiped by innerHTML re-renders.
+  list.onmousedown = (e) => {
+    const btn = e.target.closest('.city-suggestion-item');
+    if (!btn) return;
+    // Prevent blur on input before value is set.
+    e.preventDefault();
+    const index = Number(btn.dataset.index);
+    const selected = cityAutocomplete.suggestions[index];
+    if (!selected) return;
+    city.name = selected.name;
+    const input = row.querySelector('input[data-field="name"]');
+    if (input) {
+      input.value = selected.name;
+      input.focus();
+    }
+    closeCityAutocomplete();
+  };
+
+  list.querySelectorAll('.city-suggestion-item').forEach((btn) => {
+    btn.addEventListener('mouseenter', () => {
+      cityAutocomplete.highlightIndex = Number(btn.dataset.index);
+      // Update active class without rebuilding — avoids wiping the onmousedown handler.
+      list.querySelectorAll('.city-suggestion-item').forEach((b, i) => {
+        b.classList.toggle('active', i === cityAutocomplete.highlightIndex);
+      });
+    });
+  });
+}
+
+async function fetchCitySuggestions(query, row, city) {
+  const requestId = ++cityAutocomplete.requestSeq;
+
+  if (cityAutocomplete.abortController) {
+    cityAutocomplete.abortController.abort();
+  }
+  cityAutocomplete.abortController = new AbortController();
+
+  try {
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=${CITY_AUTOCOMPLETE_LIMIT}&layer=city&layer=state`;
+    const res = await fetch(url, { signal: cityAutocomplete.abortController.signal });
+    if (!res.ok) throw new Error('Failed city lookup');
+    const data = await res.json();
+
+    if (requestId !== cityAutocomplete.requestSeq || cityAutocomplete.activeCityId !== city.id) return;
+
+    const suggestions = (data?.features || [])
+      .map(formatCitySuggestion)
+      .filter(Boolean)
+      .slice(0, CITY_AUTOCOMPLETE_LIMIT);
+
+    cityAutocomplete.highlightIndex = suggestions.length ? 0 : -1;
+    renderCitySuggestions(row, city, suggestions);
+  } catch (err) {
+    if (err?.name === 'AbortError') return;
+    renderCitySuggestions(row, city, []);
+  }
+}
+
+let cityAutocompleteOutsideBound = false;
+
+function bindCityAutocompleteOutsideClick() {
+  if (cityAutocompleteOutsideBound) return;
+  cityAutocompleteOutsideBound = true;
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.city-autocomplete')) return;
+    closeCityAutocomplete();
+  });
+}
+
 function defaultProfile() {
   return {
-    answers: Object.fromEntries(PROFILE_QUESTIONS.map((q) => [q.key, 'Meh'])),
-    travelNotes: '',
-    activityDislikes: ''
+    answers: Object.fromEntries(PROFILE_QUESTIONS.map((q) => [q.key, PROFILE_DEFAULT])),
+    aboutMe: '',
+    profileInstruction: ''
   };
 }
 
@@ -184,13 +334,99 @@ function normalizeProfile(profile) {
   const base = defaultProfile();
   if (!profile || typeof profile !== 'object') return base;
   const incomingAnswers = profile.answers && typeof profile.answers === 'object' ? profile.answers : {};
+  const legacyMap = { No: 1, Meh: 3, Yes: 5 };
   for (const q of PROFILE_QUESTIONS) {
-    const val = incomingAnswers[q.key];
-    base.answers[q.key] = PROFILE_OPTIONS.includes(val) ? val : 'Meh';
+    const raw = incomingAnswers[q.key];
+    const legacy = typeof raw === 'string' ? legacyMap[raw] : undefined;
+    const numeric = Number(raw);
+    const resolved = Number.isFinite(numeric) ? numeric : legacy;
+    const clamped = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Math.round(Number(resolved || PROFILE_DEFAULT))));
+    base.answers[q.key] = clamped;
   }
-  base.travelNotes = String(profile.travelNotes || '').trim();
-  base.activityDislikes = String(profile.activityDislikes || '').trim();
+  // Keep aboutMe and profileInstruction strictly separated.
+  // Only use legacy travelNotes when aboutMe is missing and no instruction exists.
+  const hasAboutMe = profile.aboutMe !== undefined && profile.aboutMe !== null;
+  const canUseLegacyTravelNotes = !hasAboutMe && !profile.profileInstruction;
+  const aboutSource = hasAboutMe ? profile.aboutMe : (canUseLegacyTravelNotes ? profile.travelNotes : '');
+
+  base.aboutMe = String(aboutSource ?? '').trim();
+  base.profileInstruction = String(profile.profileInstruction || '').trim();
   return base;
+}
+
+function loadLearnedRemovals() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LEARNED_PREFS_REMOVED_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getLearnedRemovalsForUser(userId = ensureUserId()) {
+  const all = loadLearnedRemovals();
+  const current = all[userId] || { liked: [], disliked: [] };
+  return {
+    liked: Array.isArray(current.liked) ? current.liked : [],
+    disliked: Array.isArray(current.disliked) ? current.disliked : []
+  };
+}
+
+function saveLearnedRemovalsForUser(side, value, userId = ensureUserId()) {
+  const all = loadLearnedRemovals();
+  const current = getLearnedRemovalsForUser(userId);
+  current[side] = [...new Set([...(current[side] || []), value])];
+  all[userId] = current;
+  localStorage.setItem(LEARNED_PREFS_REMOVED_KEY, JSON.stringify(all));
+}
+
+function toLearnedList(values = []) {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map((v) => String(v || '').trim())
+    .filter(Boolean))];
+}
+
+function filterLearnedList(values = [], removed = []) {
+  const removedSet = new Set((removed || []).map((v) => String(v || '').trim().toLowerCase()));
+  return values.filter((v) => !removedSet.has(String(v).toLowerCase()));
+}
+
+function renderLearnedTable(likedValues = [], dislikedValues = []) {
+  if (!els.prefsLearnedRows) return;
+  const rowCount = Math.max(likedValues.length, dislikedValues.length, 1);
+
+  const rowHtml = Array.from({ length: rowCount }, (_, i) => {
+    const liked = likedValues[i] || '';
+    const disliked = dislikedValues[i] || '';
+    const makeCell = (value, side) => {
+      if (!value) return '<span class="muted-text">—</span>';
+      return `
+        <div class="learned-cell-item">
+          <span>${esc(value)}</span>
+          <button type="button" class="learned-remove-btn" data-remove-side="${side}" data-remove-value="${esc(value)}" aria-label="Remove ${esc(value)}">×</button>
+        </div>
+      `;
+    };
+
+    return `
+      <tr>
+        <td>${makeCell(liked, 'liked')}</td>
+        <td>${makeCell(disliked, 'disliked')}</td>
+      </tr>
+    `;
+  }).join('');
+
+  els.prefsLearnedRows.innerHTML = rowHtml;
+  els.prefsLearnedRows.querySelectorAll('.learned-remove-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const side = btn.dataset.removeSide;
+      const value = btn.dataset.removeValue;
+      if (!side || !value) return;
+      saveLearnedRemovalsForUser(side, value);
+      btn.closest('tr')?.classList.add('learned-row-fade');
+      openPreferencesModal();
+    });
+  });
 }
 
 function loadProfile() {
@@ -225,6 +461,47 @@ const LOADING_MESSAGES = [
 
 let loadingInterval = null;
 let loadingMessageIndex = 0;
+let activeSavingToastId = null;
+
+function showToast(message, type = 'info') {
+  const safeType = ['success', 'error', 'info'].includes(type) ? type : 'info';
+  const host = document.getElementById('toastHost');
+  if (!host || !message) return null;
+
+  const iconMap = {
+    success: '✓',
+    error: '×',
+    info: 'ℹ'
+  };
+  const duration = safeType === 'error' ? 4000 : 2500;
+  const toast = document.createElement('div');
+  const toastId = `toast-${uid()}`;
+  toast.dataset.toastId = toastId;
+  toast.className = `toast toast-${safeType}`;
+  toast.setAttribute('role', 'status');
+  toast.setAttribute('aria-live', safeType === 'error' ? 'assertive' : 'polite');
+  toast.innerHTML = `
+    <span class="toast-icon" aria-hidden="true">${iconMap[safeType]}</span>
+    <span class="toast-message">${esc(String(message))}</span>
+  `;
+
+  host.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+
+  const dismiss = () => {
+    toast.classList.remove('show');
+    toast.classList.add('hide');
+    setTimeout(() => toast.remove(), 280);
+  };
+
+  const timer = setTimeout(dismiss, duration);
+  toast.addEventListener('click', () => {
+    clearTimeout(timer);
+    dismiss();
+  });
+
+  return toastId;
+}
 
 function updatePlanningStatus(status = '', progress = '') {
   const overlay = document.getElementById('planningOverlay');
@@ -279,12 +556,16 @@ function addCityRow(city = { id: uid(), name: '', startDate: '', endDate: '', no
 }
 
 function renderCities() {
+  bindCityAutocompleteOutsideClick();
   els.citiesContainer.innerHTML = '';
   state.cities.forEach((city) => {
     const row = document.createElement('div');
     row.className = 'city-row';
     row.innerHTML = `
-      <input placeholder="City" value="${esc(city.name)}" data-field="name" />
+      <div class="city-autocomplete">
+        <input placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off" />
+        <div class="city-suggestions hidden"></div>
+      </div>
       <input type="date" value="${esc(city.startDate)}" data-field="startDate" />
       <input type="date" value="${esc(city.endDate)}" data-field="endDate" />
       <input type="text" placeholder="Notes for this city (e.g. want to see FC Barcelona game)" value="${esc(city.notes || '')}" data-field="notes" />
@@ -296,7 +577,70 @@ function renderCities() {
         city[input.dataset.field] = input.value;
       });
     });
+
+    const cityNameInput = row.querySelector('input[data-field="name"]');
+    if (cityNameInput) {
+      cityNameInput.addEventListener('input', () => {
+        const query = cityNameInput.value.trim();
+        cityAutocomplete.activeCityId = city.id;
+
+        if (cityAutocomplete.debounceTimer) clearTimeout(cityAutocomplete.debounceTimer);
+
+        if (query.length < CITY_AUTOCOMPLETE_MIN_CHARS) {
+          renderCitySuggestions(row, city, []);
+          return;
+        }
+
+        cityAutocomplete.debounceTimer = setTimeout(() => {
+          fetchCitySuggestions(query, row, city);
+        }, CITY_AUTOCOMPLETE_DEBOUNCE_MS);
+      });
+
+      cityNameInput.addEventListener('keydown', (e) => {
+        if (cityAutocomplete.activeCityId !== city.id) return;
+        const hasSuggestions = cityAutocomplete.suggestions.length > 0;
+
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeCityAutocomplete();
+          return;
+        }
+
+        if (!hasSuggestions) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          cityAutocomplete.highlightIndex = (cityAutocomplete.highlightIndex + 1) % cityAutocomplete.suggestions.length;
+          renderCitySuggestions(row, city, cityAutocomplete.suggestions);
+          return;
+        }
+
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          cityAutocomplete.highlightIndex = (cityAutocomplete.highlightIndex - 1 + cityAutocomplete.suggestions.length) % cityAutocomplete.suggestions.length;
+          renderCitySuggestions(row, city, cityAutocomplete.suggestions);
+          return;
+        }
+
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const selected = cityAutocomplete.suggestions[cityAutocomplete.highlightIndex];
+          if (!selected) return;
+          city.name = selected.name;
+          cityNameInput.value = selected.name;
+          closeCityAutocomplete();
+        }
+      });
+
+      cityNameInput.addEventListener('focus', () => {
+        if (cityAutocomplete.activeCityId === city.id && cityAutocomplete.suggestions.length) {
+          renderCitySuggestions(row, city, cityAutocomplete.suggestions);
+        }
+      });
+    }
+
     row.querySelector('button').addEventListener('click', () => {
+      if (cityAutocomplete.activeCityId === city.id) closeCityAutocomplete();
       state.cities = state.cities.filter((c) => c.id !== city.id);
       renderCities();
     });
@@ -344,12 +688,6 @@ function postPreferenceSignal(activity, verdict) {
   }).catch(() => {});
 }
 
-function renderTags(container, values, kind) {
-  container.innerHTML = values?.length
-    ? values.map((v) => `<span class="tag ${kind === 'like' ? 'tag-like' : 'tag-dislike'}">${esc(v)}</span>`).join('')
-    : '<span class="muted-text">None yet</span>';
-}
-
 function renderPreferencesModal() {
   if (!els.profileQuestions) return;
   const store = state.profilesStore || loadProfiles();
@@ -358,6 +696,8 @@ function renderPreferencesModal() {
     ...activeProfileRaw,
     ...normalizeProfile(activeProfileRaw)
   };
+  // Always sync UI state from the active profile so profile switching/loading
+  // cannot leak values between profiles.
   state.profile = normalizeProfile(activeProfile);
 
   const canCreateProfile = store.profiles.length < 3;
@@ -367,14 +707,11 @@ function renderPreferencesModal() {
     els.profileSelector.innerHTML = store.profiles
       .map((p) => `<option value="${esc(p.id)}" ${p.id === store.activeId ? 'selected' : ''}>${esc(p.name)}</option>`)
       .join('');
-    els.profileSelector.classList.toggle('hidden', state.profileEditMode);
   }
 
   if (els.profileNameInput) {
-    if (state.profileEditMode) {
-      els.profileNameInput.value = activeProfile.name || 'My Profile';
-    }
-    els.profileNameInput.classList.toggle('hidden', !state.profileEditMode);
+    els.profileNameInput.value = activeProfile.name || 'My Profile';
+    els.profileNameInput.classList.add('hidden');
     els.profileNameInput.maxLength = 32;
   }
 
@@ -383,54 +720,67 @@ function renderPreferencesModal() {
   }
 
   if (els.deleteProfileBtn) {
-    els.deleteProfileBtn.classList.toggle('hidden', !state.profileEditMode);
     els.deleteProfileBtn.disabled = !canDeleteProfile;
   }
 
-  const profile = state.profile || defaultProfile();
-  const disabled = !state.profileEditMode ? 'disabled' : '';
+  const profile = state.profile;
 
   els.profileQuestions.innerHTML = PROFILE_QUESTIONS.map((q) => {
-    const active = profile.answers[q.key] || 'Meh';
+    const active = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Number(profile.answers[q.key] || PROFILE_DEFAULT)));
+    const label = profileLabel(active);
     return `
       <div class="profile-question" data-question="${esc(q.key)}">
         <p>${esc(q.label)}</p>
-        <div class="pill-toggle" role="group" aria-label="${esc(q.label)}">
-          ${PROFILE_OPTIONS.map((option) => `
-            <button type="button" class="pill-btn ${active === option ? 'active' : ''}" data-answer="${esc(option)}" ${disabled}>${esc(option)}</button>
-          `).join('')}
+        <div class="rating-slider-wrap">
+          <input
+            type="range"
+            class="rating-slider"
+            min="${PROFILE_MIN}"
+            max="${PROFILE_MAX}"
+            step="1"
+            value="${active}"
+            data-rating
+            aria-label="${esc(q.label)} rating"
+          />
+          <div class="rating-meta">
+            <span class="rating-value">${active}/5</span>
+            <span class="rating-label">${esc(label)}</span>
+          </div>
         </div>
       </div>
     `;
   }).join('');
 
-  els.profileTravelNotes.value = profile.travelNotes || '';
-  els.profileDislikes.value = profile.activityDislikes || '';
-  els.profileTravelNotes.disabled = !state.profileEditMode;
-  els.profileDislikes.disabled = !state.profileEditMode;
-  els.profileEditBtn.textContent = state.profileEditMode ? 'Save Profile' : 'Edit Profile';
+  els.profileTravelNotes.value = profile.aboutMe || '';
+  els.profileTravelNotes.disabled = false;
+  els.profileEditBtn.textContent = 'Save';
 
-  if (!state.profileEditMode) return;
+  els.profileQuestions.querySelectorAll('[data-rating]').forEach((slider) => {
+    slider.addEventListener('input', () => {
+      const key = slider.closest('.profile-question')?.dataset.question;
+      if (!key) return;
 
-  els.profileQuestions.querySelectorAll('.pill-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const key = btn.closest('.profile-question')?.dataset.question;
-      const answer = btn.dataset.answer;
-      if (!key || !answer) return;
+      const nextAnswer = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Number(slider.value || PROFILE_DEFAULT)));
       state.profile = normalizeProfile({
         ...(state.profile || defaultProfile()),
-        answers: { ...(state.profile?.answers || {}), [key]: answer }
+        answers: { ...(state.profile?.answers || {}), [key]: nextAnswer }
       });
-      renderPreferencesModal();
+
+      const question = slider.closest('.profile-question');
+      if (!question) return;
+      const valueEl = question.querySelector('.rating-value');
+      const labelEl = question.querySelector('.rating-label');
+      if (valueEl) valueEl.textContent = `${nextAnswer}/5`;
+      if (labelEl) labelEl.textContent = profileLabel(nextAnswer);
     });
   });
 }
 
 function getProfilePayload() {
+  const aboutMeValue = els.profileTravelNotes ? els.profileTravelNotes.value : (state.profile?.aboutMe ?? '');
   return normalizeProfile({
     ...(state.profile || defaultProfile()),
-    travelNotes: els.profileTravelNotes?.value || state.profile?.travelNotes || '',
-    activityDislikes: els.profileDislikes?.value || state.profile?.activityDislikes || ''
+    aboutMe: aboutMeValue
   });
 }
 
@@ -439,13 +789,15 @@ function switchActiveProfile(profileId) {
   if (!store.profiles.some((p) => p.id === profileId)) return;
   state.profilesStore = saveProfiles({ ...store, activeId: profileId });
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
-  state.profileEditMode = false;
   renderPreferencesModal();
 }
 
 function createNewProfile() {
   const store = state.profilesStore || loadProfiles();
-  if (store.profiles.length >= 3) return;
+  if (store.profiles.length >= 3) {
+    showToast('You can create up to 3 profiles.', 'info');
+    return;
+  }
   const suggested = `Profile ${store.profiles.length + 1}`;
   const prompted = window.prompt('Profile name:', suggested);
   if (prompted === null) return;
@@ -462,13 +814,16 @@ function createNewProfile() {
   };
   state.profilesStore = saveProfiles(nextStore);
   state.profile = normalizeProfile(profile);
-  state.profileEditMode = false;
   renderPreferencesModal();
+  showToast('Profile created.', 'success');
 }
 
 function deleteActiveProfile() {
   const store = state.profilesStore || loadProfiles();
-  if (store.profiles.length <= 1) return;
+  if (store.profiles.length <= 1) {
+    showToast('At least one profile is required.', 'info');
+    return;
+  }
   const remaining = store.profiles.filter((p) => p.id !== store.activeId);
   const nextStore = {
     activeId: remaining[0].id,
@@ -476,26 +831,27 @@ function deleteActiveProfile() {
   };
   state.profilesStore = saveProfiles(nextStore);
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
-  state.profileEditMode = false;
   renderPreferencesModal();
+  showToast('Profile deleted.', 'success');
 }
 
 async function openPreferencesModal() {
   state.profilesStore = loadProfiles();
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
-  state.profileEditMode = false;
   renderPreferencesModal();
 
   try {
     const res = await fetch(`/api/preferences?userId=${encodeURIComponent(ensureUserId())}`);
     const data = await res.json();
     const prefs = data.preferences || { liked: { types: [], keywords: [] }, disliked: { types: [], keywords: [] }, signals: [] };
+    const removals = getLearnedRemovalsForUser();
+    const likedAll = toLearnedList([...(prefs.liked?.types || []), ...(prefs.liked?.keywords || [])]);
+    const dislikedAll = toLearnedList([...(prefs.disliked?.types || []), ...(prefs.disliked?.keywords || [])]);
+    const liked = filterLearnedList(likedAll, removals.liked);
+    const disliked = filterLearnedList(dislikedAll, removals.disliked);
 
     els.prefsSignalCount.textContent = `Based on ${prefs.signals?.length || 0} past activities`;
-    renderTags(els.prefsLikedTypes, prefs.liked?.types || [], 'like');
-    renderTags(els.prefsLikedKeywords, prefs.liked?.keywords || [], 'like');
-    renderTags(els.prefsDislikedTypes, prefs.disliked?.types || [], 'dislike');
-    renderTags(els.prefsDislikedKeywords, prefs.disliked?.keywords || [], 'dislike');
+    renderLearnedTable(liked, disliked);
   } catch {
     els.prefsSignalCount.textContent = 'Unable to load preferences';
   }
@@ -503,7 +859,6 @@ async function openPreferencesModal() {
 }
 
 function closePreferencesModal() {
-  state.profileEditMode = false;
   renderPreferencesModal();
   els.prefsModal.classList.add('hidden');
 }
@@ -514,7 +869,6 @@ async function fetchStatus() {
   state.keys = data.keys || state.keys;
   const msgs = [];
   if (!state.keys.anthropicConfigured) msgs.push('Anthropic API key not configured: planning disabled.');
-  if (!state.keys.unsplashConfigured) msgs.push('Unsplash API key not configured: images may be blank.');
   if (msgs.length) {
     els.apiBanner.textContent = msgs.join(' ');
     els.apiBanner.classList.remove('hidden');
@@ -523,17 +877,22 @@ async function fetchStatus() {
   }
 }
 
-async function enrichImages(items) {
-  await Promise.all(items.map(async (item) => {
-    if (item.imageUrl) return;
-    try {
-      const res = await fetch(`/api/image?q=${encodeURIComponent(item.name)}&city=${encodeURIComponent(item.city || '')}`);
-      const data = await res.json();
-      item.imageUrl = data.imageUrl || '';
-    } catch {
-      item.imageUrl = '';
-    }
-  }));
+function getActivityStyle(type = '') {
+  const normalized = String(type || '').toLowerCase().trim();
+  const map = {
+    food: { icon: '🍴', colorClass: 'activity-food' },
+    breakfast: { icon: '☕', colorClass: 'activity-breakfast' },
+    lunch: { icon: '🥗', colorClass: 'activity-lunch' },
+    dinner: { icon: '🍷', colorClass: 'activity-dinner' },
+    show: { icon: '🎭', colorClass: 'activity-show' },
+    tour: { icon: '🗺️', colorClass: 'activity-tour' },
+    cultural: { icon: '🏛️', colorClass: 'activity-cultural' },
+    walk: { icon: '🚶', colorClass: 'activity-walk' },
+    neighborhood: { icon: '🚶', colorClass: 'activity-neighborhood' },
+    sports: { icon: '⚽', colorClass: 'activity-sports' },
+    sunset: { icon: '🌅', colorClass: 'activity-sunset' }
+  };
+  return map[normalized] || { icon: '📍', colorClass: 'activity-default' };
 }
 
 function renderBudget() {
@@ -643,12 +1002,6 @@ function formatDuration(hours = 1) {
   return Number.isInteger(h) ? `${h}h` : `${h}h`;
 }
 
-function verdictColor(verdict = '') {
-  if (/skip/i.test(verdict)) return '#ef4444';
-  if (/caveat/i.test(verdict)) return '#f59e0b';
-  return '#22c55e';
-}
-
 function parseTimeTo24(raw = '') {
   if (!raw) return '09:00';
   const t = raw.trim().toLowerCase();
@@ -737,11 +1090,10 @@ function renderArrangeCityNav(cityGroups) {
 }
 
 function makeStagingCard(item) {
-  const color = verdictColor(item.verdict);
+  const { icon, colorClass } = getActivityStyle(item.type);
   return `
-    <div class="item staging-card" data-id="${item.id}" style="border-left-color:${color}">
-      <span class="verdict-dot" style="background:${color}"></span>
-      <h4>${esc(item.name)}</h4>
+    <div class="item staging-card ${colorClass}" data-id="${item.id}">
+      <h4><span class="activity-icon" aria-hidden="true">${icon}</span> ${esc(item.name)}</h4>
       <span class="badge">${esc(item.type)}</span>
       <span class="badge">${esc(formatDuration(item.duration_hours || 1))}</span>
     </div>
@@ -749,15 +1101,15 @@ function makeStagingCard(item) {
 }
 
 function makePlacedCard(item) {
+  const { icon, colorClass } = getActivityStyle(item.type);
   const placement = state.placements[item.id] || {};
   const time = parseTimeTo24(placement.time || item.suggested_time || typeToTime(item.type));
   const h = Math.max(60, Number(item.duration_hours || 1) * PX_PER_HOUR);
   const y = yFromTime(time);
   return `
-    <article class="placed-card" data-id="${item.id}" style="height:${h}px;top:${y}px;">
-      ${item.imageUrl ? `<div class="placed-image-wrap"><img src="${esc(item.imageUrl)}" alt="${esc(item.name)}" class="placed-image" /></div>` : ''}
+    <article class="placed-card ${colorClass}" data-id="${item.id}" style="height:${h}px;top:${y}px;">
       <div class="placed-body">
-        <h4>${esc(item.name)}</h4>
+        <h4><span class="activity-icon" aria-hidden="true">${icon}</span> ${esc(item.name)}</h4>
         <div class="placed-meta">
           <label>Time <input data-time type="time" value="${esc(time)}" /></label>
           <span class="badge">${esc(formatDuration(item.duration_hours || 1))}</span>
@@ -939,7 +1291,6 @@ async function planTrip() {
 
       state.activities.push(...cityActivities);
       renderActivities();
-      enrichImages(cityActivities).then(() => renderActivities());
 
       completedCities += 1;
       const nextCity = cities[completedCities]?.name;
@@ -1045,10 +1396,10 @@ async function restoreChatHistory() {
       ? data.history.filter((msg) => msg.role === 'user' || msg.role === 'assistant')
       : [];
     renderChatMessages();
-  } catch {
-    state.chatHistory = [];
-    renderChatMessages();
-  }
+    } catch {
+      state.chatHistory = [];
+      renderChatMessages();
+    }
 }
 
 async function sendChatMessage() {
@@ -1132,10 +1483,11 @@ function mountPlanningOverlay() {
   document.body.appendChild(overlay);
 }
 
-function showSavedToast() {
-  if (!els.saveToast) return;
-  els.saveToast.classList.add('show');
-  setTimeout(() => els.saveToast.classList.remove('show'), 2000);
+function mountToastHost() {
+  const host = document.createElement('div');
+  host.id = 'toastHost';
+  host.className = 'toast-host';
+  document.body.appendChild(host);
 }
 
 function getSnapshot() {
@@ -1164,7 +1516,7 @@ function saveSnapshot() {
     currentStep: 3
   };
   localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(payload));
-  showSavedToast();
+  showToast('Saved!', 'success');
 }
 
 function resetToFresh() {
@@ -1247,7 +1599,7 @@ els.planBtn.addEventListener('click', async () => {
   clearPlannedResultsKeepSetup();
   setPlanningLoading(true);
   try { await planTrip(); }
-  catch (e) { alert(e.message); }
+  catch (e) { showToast(e?.message || 'Failed to plan trip.', 'error'); }
   finally { setPlanningLoading(false); }
 });
 els.backToSetupBtn.addEventListener('click', () => {
@@ -1267,33 +1619,63 @@ els.continueArrangeBtn.addEventListener('click', () => {
 });
 els.saveProgressBtn.addEventListener('click', saveSnapshot);
 els.backToReviewBtn.addEventListener('click', () => setStep(2));
-els.generateBtn.addEventListener('click', generateItinerary);
+els.generateBtn.addEventListener('click', async () => {
+  try {
+    await generateItinerary();
+  } catch (e) {
+    showToast(e?.message || 'Failed to generate itinerary.', 'error');
+  }
+});
 els.editBtn.addEventListener('click', () => { renderArrange(); setStep(3); });
 els.preferencesLink.addEventListener('click', openPreferencesModal);
 els.prefsClose.addEventListener('click', closePreferencesModal);
 els.prefsModal.addEventListener('click', (e) => {
   if (e.target === els.prefsModal) closePreferencesModal();
 });
-els.profileEditBtn.addEventListener('click', () => {
-  if (!state.profileEditMode) {
-    state.profileEditMode = true;
-    renderPreferencesModal();
-    return;
-  }
-
+els.profileEditBtn.addEventListener('click', async () => {
   const next = getProfilePayload();
+  if (activeSavingToastId) {
+    const stale = document.querySelector(`[data-toast-id="${activeSavingToastId}"]`);
+    stale?.click();
+  }
+  activeSavingToastId = showToast('Saving...', 'info');
   saveProfile(next);
 
-  const store = state.profilesStore || loadProfiles();
-  const active = getActiveProfile(store);
-  const nextName = normalizeProfileName(els.profileNameInput?.value, active?.name || 'My Profile');
-  state.profilesStore = saveProfiles({
-    ...store,
-    profiles: store.profiles.map((p) => (p.id === store.activeId ? { ...p, name: nextName } : p))
-  });
-  state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
+  try {
+    console.log('[profile enrich] request payload', next);
 
-  state.profileEditMode = false;
+    const res = await fetch('/api/profile/enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(next)
+    });
+    const data = await res.json();
+    console.log('[profile enrich] response', { status: res.status, ok: res.ok, data });
+
+    const instruction = String(
+      data?.instruction
+      ?? data?.profileInstruction
+      ?? ''
+    ).trim();
+
+    if (res.ok && instruction) {
+      saveProfile({ ...next, profileInstruction: instruction });
+      showToast('Profile saved!', 'success');
+    } else {
+      console.warn('[profile enrich] missing instruction or non-ok response', {
+        status: res.status,
+        ok: res.ok,
+        data
+      });
+      showToast('Profile saved (enrichment failed)', 'info');
+    }
+  } catch (enrichErr) {
+    console.error('[profile enrich] catch error', enrichErr);
+    showToast('Profile saved (enrichment failed)', 'info');
+  } finally {
+    activeSavingToastId = null;
+  }
+
   renderPreferencesModal();
 });
 
@@ -1320,6 +1702,7 @@ els.activitiesGrid.addEventListener('change', () => {
   state.profilesStore = loadProfiles();
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   mountPlanningOverlay();
+  mountToastHost();
   bindChatEvents();
   ensureUserId();
   ensureChatSessionId();
