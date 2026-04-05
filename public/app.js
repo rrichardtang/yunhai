@@ -179,8 +179,8 @@ function setPlanningLoading(isLoading) {
   }, 2400);
 }
 
-function addCityRow(city = { id: uid(), name: '', startDate: '', endDate: '' }) {
-  state.cities.push(city);
+function addCityRow(city = { id: uid(), name: '', startDate: '', endDate: '', notes: '' }) {
+  state.cities.push({ ...city, notes: city.notes || '' });
   renderCities();
 }
 
@@ -193,6 +193,7 @@ function renderCities() {
       <input placeholder="City" value="${esc(city.name)}" data-field="name" />
       <input type="date" value="${esc(city.startDate)}" data-field="startDate" />
       <input type="date" value="${esc(city.endDate)}" data-field="endDate" />
+      <input type="text" placeholder="Notes for this city (e.g. want to see FC Barcelona game)" value="${esc(city.notes || '')}" data-field="notes" />
       <button class="secondary" type="button">Remove</button>
     `;
     const inputs = row.querySelectorAll('input');
@@ -719,7 +720,7 @@ function renderItinerary() {
 
 async function planTrip() {
   state.tripName = els.tripName.value.trim();
-  const cities = state.cities.map(({name,startDate,endDate}) => ({ name, startDate, endDate }));
+  const cities = state.cities.map(({name,startDate,endDate,notes}) => ({ name, startDate, endDate, notes }));
   const payload = { cities, profile: state.profile || loadProfile(), userId: ensureUserId() };
 
   state.activities = [];
@@ -1016,7 +1017,7 @@ function resetToFresh() {
 
 function hydrateFromSnapshot(snapshot) {
   state.tripName = snapshot.tripName || '';
-  state.cities = snapshot.cities || [];
+  state.cities = (snapshot.cities || []).map((city) => ({ ...city, notes: city.notes || '' }));
   state.activities = snapshot.activities || [];
   state.placements = snapshot.placements || {};
   state.reviewed = snapshot.reviewed || {};

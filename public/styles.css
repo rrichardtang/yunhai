@@ -38,7 +38,12 @@ button { border: 0; padding: 10px 14px; border-radius: 10px; cursor: pointer; fo
 button.primary { background: var(--accent); color: white; }
 button.secondary { background: #e8edf5; color: #1f2f47; }
 button:disabled { opacity: .6; cursor: not-allowed; }
-.city-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 8px; margin-bottom: 10px; }
+.city-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(130px, auto) minmax(130px, auto) minmax(260px, 0.8fr) auto;
+  gap: 8px;
+  margin-bottom: 10px;
+}
 .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .card { border: 1px solid #d9dce3; border-radius: 14px; background: var(--card); overflow: hidden; display: flex; flex-direction: column; }
 .activity-card { transition: background .2s ease, border-left-color .2s ease; }
