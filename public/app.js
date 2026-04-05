@@ -8,6 +8,7 @@ const state = {
   days: [],
   placements: {},
   itinerary: null,
+  commutes: {},
   arrangeCity: null,
   chatSessionId: '',
   chatHistory: [],
@@ -77,6 +78,7 @@ const els = {
   prefsSignalCount: document.getElementById('prefsSignalCount'),
   prefsLearnedRows: document.getElementById('prefsLearnedRows'),
   saveProgressBtn: document.getElementById('saveProgressBtn'),
+  autoArrangeBtn: document.getElementById('autoArrangeBtn'),
   resumeModal: document.getElementById('resumeModal'),
   resumeTripBtn: document.getElementById('resumeTripBtn'),
   startFreshBtn: document.getElementById('startFreshBtn'),
@@ -881,9 +883,9 @@ function getActivityStyle(type = '') {
   const normalized = String(type || '').toLowerCase().trim();
   const map = {
     food: { icon: '🍴', colorClass: 'activity-food' },
-    breakfast: { icon: '☕', colorClass: 'activity-breakfast' },
-    lunch: { icon: '🥗', colorClass: 'activity-lunch' },
-    dinner: { icon: '🍷', colorClass: 'activity-dinner' },
+    breakfast: { icon: '🍴', colorClass: 'activity-food' },
+    lunch: { icon: '🍴', colorClass: 'activity-food' },
+    dinner: { icon: '🍴', colorClass: 'activity-food' },
     show: { icon: '🎭', colorClass: 'activity-show' },
     tour: { icon: '🗺️', colorClass: 'activity-tour' },
     cultural: { icon: '🏛️', colorClass: 'activity-cultural' },
@@ -1022,6 +1024,40 @@ function minutesFromTime(time = '09:00') {
   return (h * 60) + m;
 }
 
+function timeFromMinutes(totalMinutes = 0) {
+  const clamped = Math.max(0, Math.min((24 * 60) - 1, Number(totalMinutes || 0)));
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function commutePairKey(fromId, toId) {
+  return `${fromId}->${toId}`;
+}
+
+function getIncomingCommuteForActivity(activityId) {
+  const activity = state.activities.find((a) => a.id === activityId);
+  if (!activity) return null;
+  const placement = state.placements[activityId];
+  if (!placement?.dayId) return null;
+
+  const activitiesInDay = state.activities
+    .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === placement.dayId)
+    .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+
+  const index = activitiesInDay.findIndex((a) => a.id === activityId);
+  if (index <= 0) return null;
+
+  const prev = activitiesInDay[index - 1];
+  return state.commutes[commutePairKey(prev.id, activityId)] || null;
+}
+
+function formatCommuteBadge(commute) {
+  if (!commute) return '';
+  const suffix = commute.mode === 'walking' ? ' walk' : '';
+  return `${commute.modeIcon || '🚇'} ${commute.durationMinutes} min${suffix}`;
+}
+
 function timeFromY(yPx = 0) {
   const clamped = Math.max(0, Math.min(GRID_HEIGHT, yPx));
   const minsFromStart = Math.round(clamped / 30) * 30;
@@ -1106,10 +1142,15 @@ function makePlacedCard(item) {
   const time = parseTimeTo24(placement.time || item.suggested_time || typeToTime(item.type));
   const h = Math.max(60, Number(item.duration_hours || 1) * PX_PER_HOUR);
   const y = yFromTime(time);
+  const incomingCommute = getIncomingCommuteForActivity(item.id);
+  const commuteBadge = incomingCommute
+    ? `<span class="commute-badge">${esc(formatCommuteBadge(incomingCommute))}</span>`
+    : '';
   return `
     <article class="placed-card ${colorClass}" data-id="${item.id}" style="height:${h}px;top:${y}px;">
       <div class="placed-body">
         <h4><span class="activity-icon" aria-hidden="true">${icon}</span> ${esc(item.name)}</h4>
+        ${commuteBadge}
         <div class="placed-meta">
           <label>Time <input data-time type="time" value="${esc(time)}" /></label>
           <span class="badge">${esc(formatDuration(item.duration_hours || 1))}</span>
@@ -1184,6 +1225,141 @@ function renderArrange() {
   });
 
   bindPlacedCardInteractions();
+}
+
+async function fetchCommutesForActivities(activities = []) {
+  if (!Array.isArray(activities) || activities.length < 2) return [];
+  try {
+    const res = await fetch('/api/commute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activities })
+    });
+    const data = await res.json();
+    return Array.isArray(data?.commutes) ? data.commutes : [];
+  } catch {
+    return [];
+  }
+}
+
+function applyCommuteTimeAdjustments(dayId, orderedActivities = [], commutes = []) {
+  if (!dayId || orderedActivities.length < 2 || !commutes.length) return;
+  const commuteMap = new Map(commutes.map((c) => [commutePairKey(c.fromId, c.toId), c]));
+
+  for (let i = 1; i < orderedActivities.length; i += 1) {
+    const current = orderedActivities[i];
+    const previous = orderedActivities[i - 1];
+    const commute = commuteMap.get(commutePairKey(previous.id, current.id));
+    if (!commute) continue;
+
+    const prevPlacement = state.placements[previous.id] || {};
+    const currentPlacement = state.placements[current.id] || {};
+    const prevStart = minutesFromTime(parseTimeTo24(prevPlacement.time || previous.suggested_time || typeToTime(previous.type)));
+    const prevDurationMinutes = Number(previous.duration_hours || 1) * 60;
+    const currentStart = minutesFromTime(parseTimeTo24(currentPlacement.time || current.suggested_time || typeToTime(current.type)));
+    const commuteMinutes = Number(commute.durationMinutes || 0);
+
+    const minByTravel = prevStart + prevDurationMinutes + commuteMinutes;
+    const shiftedCurrent = currentStart + commuteMinutes;
+    const adjustedStart = Math.max(currentStart, shiftedCurrent, minByTravel);
+
+    state.placements[current.id] = {
+      ...currentPlacement,
+      dayId,
+      time: timeFromMinutes(adjustedStart)
+    };
+  }
+}
+
+async function updateCommutesForCityDays(dayIds = []) {
+  for (const dayId of dayIds) {
+    const orderedActivities = state.activities
+      .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === dayId)
+      .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+
+    const dayIdsSet = new Set(orderedActivities.map((a) => a.id));
+    Object.keys(state.commutes).forEach((key) => {
+      const [fromId, toId] = key.split('->');
+      if (dayIdsSet.has(fromId) && dayIdsSet.has(toId)) delete state.commutes[key];
+    });
+
+    if (orderedActivities.length < 2) continue;
+
+    const payloadActivities = orderedActivities.map((a) => ({
+      id: a.id,
+      name: a.name,
+      city: a.city,
+      suggested_time: state.placements[a.id]?.time || parseTimeTo24(a.suggested_time || typeToTime(a.type))
+    }));
+
+    const commutes = await fetchCommutesForActivities(payloadActivities);
+    commutes.forEach((c) => {
+      state.commutes[commutePairKey(c.fromId, c.toId)] = c;
+    });
+
+    applyCommuteTimeAdjustments(dayId, orderedActivities, commutes);
+  }
+}
+
+async function autoArrangeActiveCity() {
+  const activeCity = state.arrangeCity;
+  if (!activeCity) return;
+
+  const activeDays = state.days
+    .filter((d) => normalizeCity(d.city) === normalizeCity(activeCity))
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  if (!activeDays.length) return;
+
+  const approvedInCity = state.activities.filter((a) => (
+    state.reviewed[a.id]?.approved
+    && normalizeCity(a.city) === normalizeCity(activeCity)
+  ));
+
+  const hasExistingPlacements = approvedInCity.some((a) => state.placements[a.id]?.dayId);
+  if (hasExistingPlacements) {
+    const shouldContinue = window.confirm('This will replace your current arrangement. Continue?');
+    if (!shouldContinue) return;
+  }
+
+  approvedInCity.forEach((a) => {
+    if (state.placements[a.id]?.dayId && activeDays.some((d) => d.id === state.placements[a.id].dayId)) {
+      state.placements[a.id] = {
+        ...(state.placements[a.id] || {}),
+        dayId: null,
+        time: parseTimeTo24(a.suggested_time || typeToTime(a.type))
+      };
+    }
+  });
+
+  const unplaced = approvedInCity
+    .filter((a) => !state.placements[a.id]?.dayId)
+    .map((a) => ({
+      activity: a,
+      normalizedTime: parseTimeTo24(a.suggested_time || typeToTime(a.type))
+    }))
+    .sort((a, b) => minutesFromTime(a.normalizedTime) - minutesFromTime(b.normalizedTime));
+
+  if (!unplaced.length) {
+    renderArrange();
+    return;
+  }
+
+  const perDay = Math.ceil(unplaced.length / activeDays.length);
+
+  unplaced.forEach((entry, index) => {
+    const dayIndex = Math.min(Math.floor(index / perDay), activeDays.length - 1);
+    const day = activeDays[dayIndex];
+    state.placements[entry.activity.id] = {
+      dayId: day.id,
+      time: parseTimeTo24(entry.activity.suggested_time || typeToTime(entry.activity.type))
+    };
+  });
+
+  const activeDayIds = activeDays.map((d) => d.id);
+  await updateCommutesForCityDays(activeDayIds);
+
+  renderArrange();
 }
 
 function bindPlacedCardInteractions() {
@@ -1509,6 +1685,7 @@ function saveSnapshot() {
     cities: state.cities,
     activities: state.activities,
     placements: state.placements,
+    commutes: state.commutes,
     reviewed: state.reviewed,
     tripName: state.tripName,
     days: state.days,
@@ -1528,6 +1705,7 @@ function resetToFresh() {
   state.days = [];
   state.placements = {};
   state.itinerary = null;
+  state.commutes = {};
   state.arrangeCity = null;
   state.chatHistory = [];
   state.chatLoading = false;
@@ -1548,6 +1726,7 @@ function hydrateFromSnapshot(snapshot) {
   state.cities = (snapshot.cities || []).map((city) => ({ ...city, notes: city.notes || '' }));
   state.activities = snapshot.activities || [];
   state.placements = snapshot.placements || {};
+  state.commutes = snapshot.commutes || {};
   state.reviewed = snapshot.reviewed || {};
   state.days = snapshot.days || expandDays(state.cities);
   state.arrangeCity = snapshot.arrangeCity || state.days[0]?.city || null;
@@ -1585,6 +1764,7 @@ function clearPlannedResultsKeepSetup() {
   state.days = [];
   state.placements = {};
   state.itinerary = null;
+  state.commutes = {};
   state.arrangeCity = null;
   renderActivities();
   els.dayColumns.innerHTML = '';
@@ -1609,6 +1789,7 @@ els.backToSetupBtn.addEventListener('click', () => {
 els.continueArrangeBtn.addEventListener('click', () => {
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
   if (!approved.length) return;
+  state.commutes = {};
   state.days = expandDays(state.cities);
   state.arrangeCity = state.days[0]?.city || null;
   approved.forEach((a) => {
@@ -1618,6 +1799,7 @@ els.continueArrangeBtn.addEventListener('click', () => {
   setStep(3);
 });
 els.saveProgressBtn.addEventListener('click', saveSnapshot);
+els.autoArrangeBtn?.addEventListener('click', autoArrangeActiveCity);
 els.backToReviewBtn.addEventListener('click', () => setStep(2));
 els.generateBtn.addEventListener('click', async () => {
   try {

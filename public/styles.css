@@ -116,6 +116,14 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .arrange-city-nav { display: flex; align-items: center; gap: 8px; margin: 8px 0 14px; }
 .arrange-header { margin-bottom: 4px; }
 .arrange-actions { display: flex; align-items: center; gap: 8px; }
+.auto-arrange-btn {
+  background: transparent !important;
+  border: 1px solid #cfd8e6;
+  color: #2f3f56 !important;
+}
+.auto-arrange-btn:hover {
+  background: #f4f7fc !important;
+}
 .arrange-city-tabs { display: flex; gap: 8px; overflow-x: auto; flex: 1; }
 .arrange-city-tab { white-space: nowrap; background: #e8edf5; color: #1f2f47; border: 1px solid #cfd8e6; }
 .arrange-city-tab.active { background: var(--navy); color: var(--cream); border-color: var(--navy); }
@@ -172,14 +180,23 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 }
 .placed-body { padding: 8px; }
 .placed-body h4 { margin: 0 0 6px; font-size: 13px; line-height: 1.2; }
+.commute-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #5f6f86;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px dashed rgba(95, 111, 134, 0.35);
+  border-radius: 999px;
+  padding: 2px 7px;
+  margin-bottom: 6px;
+}
 .placed-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .placed-meta label { margin: 0; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
 .placed-meta input[type="time"] { margin: 0; width: 98px; padding: 4px 6px; font-size: 12px; }
 
 .activity-food { --activity-bg: #fff7ed; --activity-border: #f59e0b; --activity-text: #9a3412; }
-.activity-breakfast { --activity-bg: #fffbeb; --activity-border: #facc15; --activity-text: #854d0e; }
-.activity-lunch { --activity-bg: #fff3e8; --activity-border: #fb923c; --activity-text: #9a3412; }
-.activity-dinner { --activity-bg: #fff1f2; --activity-border: #f97316; --activity-text: #9f1239; }
 .activity-show { --activity-bg: #faf5ff; --activity-border: #a855f7; --activity-text: #6b21a8; }
 .activity-tour { --activity-bg: #f0fdfa; --activity-border: #14b8a6; --activity-text: #0f766e; }
 .activity-cultural { --activity-bg: #eef2ff; --activity-border: #6366f1; --activity-text: #3730a3; }

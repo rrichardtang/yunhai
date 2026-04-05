@@ -21,6 +21,71 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 let latestItinerary = null;
 
+const DIRECTIONS_BASE_URL = 'https://maps.googleapis.com/maps/api/directions/json';
+const COMMUTE_MODE_ICON = {
+  transit: '🚇',
+  walking: '🚶',
+  driving: '🚗',
+  bicycling: '🚴'
+};
+
+function normalizeTravelMode(mode = '') {
+  const m = String(mode || '').toLowerCase();
+  if (m === 'transit' || m === 'walking' || m === 'driving' || m === 'bicycling') return m;
+  return 'transit';
+}
+
+function buildDirectionsQuery(activity = {}) {
+  return [activity.name, activity.city].filter(Boolean).join(', ').trim();
+}
+
+async function fetchDirectionsRoute({ origin, destination, mode }) {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return null;
+
+  const params = new URLSearchParams({
+    origin,
+    destination,
+    mode,
+    key: apiKey
+  });
+
+  const response = await fetch(`${DIRECTIONS_BASE_URL}?${params.toString()}`);
+  if (!response.ok) return null;
+
+  const data = await response.json();
+  if (data?.status !== 'OK' || !Array.isArray(data?.routes) || !data.routes.length) return null;
+
+  const route = data.routes[0];
+  const leg = Array.isArray(route.legs) && route.legs.length ? route.legs[0] : null;
+  const durationSeconds = Number(leg?.duration?.value || 0);
+  if (!durationSeconds) return null;
+
+  const dominantStepMode = Array.isArray(leg?.steps) && leg.steps.length
+    ? normalizeTravelMode(leg.steps[0]?.travel_mode)
+    : normalizeTravelMode(mode);
+
+  return {
+    durationMinutes: Math.max(1, Math.round(durationSeconds / 60)),
+    mode: dominantStepMode,
+    modeIcon: COMMUTE_MODE_ICON[dominantStepMode] || COMMUTE_MODE_ICON.transit
+  };
+}
+
+async function getCommuteBetweenActivities(fromActivity, toActivity) {
+  const origin = buildDirectionsQuery(fromActivity);
+  const destination = buildDirectionsQuery(toActivity);
+  if (!origin || !destination) return null;
+
+  const transitRoute = await fetchDirectionsRoute({ origin, destination, mode: 'transit' });
+  if (transitRoute) return transitRoute;
+
+  const walkingRoute = await fetchDirectionsRoute({ origin, destination, mode: 'walking' });
+  if (walkingRoute) return walkingRoute;
+
+  return null;
+}
+
 function parseUserId(rawUserId) {
   return resolveUserId(rawUserId == null ? DEFAULT_USER_ID : rawUserId);
 }
@@ -49,6 +114,40 @@ function toAnthropicMessages(history = []) {
       content: msg.content
     };
   });
+}
+
+function sliderInterestLabel(value) {
+  const rating = Math.max(1, Math.min(5, Math.round(Number(value) || 3)));
+  if (rating === 1) return 'Not interested';
+  if (rating === 2) return 'Slightly interested';
+  if (rating === 3) return 'Neutral';
+  if (rating === 4) return 'Very interested';
+  return 'Loves this';
+}
+
+function extractText(content = []) {
+  if (!Array.isArray(content)) return '';
+  return content
+    .filter((c) => c?.type === 'text')
+    .map((c) => c.text)
+    .join('\n')
+    .trim();
+}
+
+function formatProfileForEnrichment(profile = {}) {
+  const answers = profile?.answers && typeof profile.answers === 'object' ? profile.answers : {};
+  const questionMap = [
+    ['museumPerson', 'Museum person'],
+    ['foodTravel', 'Travels for food'],
+    ['livePerformances', 'Live performances'],
+    ['outdoorNature', 'Outdoor / nature activities'],
+    ['nightlifeBars', 'Nightlife and bars'],
+    ['structuredTours', 'Structured tours']
+  ];
+
+  const lines = questionMap.map(([key, label]) => `- ${label}: ${sliderInterestLabel(answers[key])}`);
+  const aboutMe = String(profile?.aboutMe || '').trim() || '(none provided)';
+  return `${lines.join('\n')}\n- About me: ${aboutMe}`;
 }
 
 app.get('/api/status', (_req, res) => {
@@ -122,6 +221,33 @@ app.get('/api/image', async (req, res) => {
   }
 });
 
+app.post('/api/commute', async (req, res) => {
+  try {
+    const activities = Array.isArray(req.body?.activities) ? req.body.activities : [];
+    if (activities.length < 2) return res.json({ commutes: [] });
+
+    const commutes = [];
+    for (let i = 0; i < activities.length - 1; i += 1) {
+      const fromActivity = activities[i];
+      const toActivity = activities[i + 1];
+      const commute = await getCommuteBetweenActivities(fromActivity, toActivity);
+      if (!commute) continue;
+
+      commutes.push({
+        fromId: fromActivity.id,
+        toId: toActivity.id,
+        durationMinutes: commute.durationMinutes,
+        mode: commute.mode,
+        modeIcon: commute.modeIcon
+      });
+    }
+
+    return res.json({ commutes });
+  } catch {
+    return res.json({ commutes: [] });
+  }
+});
+
 app.post('/api/preferences/signal', (req, res) => {
   try {
     const { userId, name, type, verdict, city, why_it_fits } = req.body || {};
@@ -148,6 +274,37 @@ app.post('/api/preferences/reset', (req, res) => {
     return res.json({ ok: true, preferences });
   } catch (error) {
     return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid userId' });
+  }
+});
+
+app.post('/api/profile/enrich', async (req, res) => {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: 'Anthropic API key not configured' });
+  }
+
+  try {
+    const profile = req.body || {};
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const prompt = `You are writing traveler instructions for a travel planning AI agent. Based on this traveler's self-reported preferences below, write a concise 2-4 sentence instruction paragraph in second person (e.g. "This traveler...") that tells the agent how to tailor recommendations specifically for them. Be specific and direct — this is an instruction, not a summary. Focus on what they love, what to avoid, and any quirks. Output ONLY the instruction paragraph, nothing else.\n\nTraveler profile:\n${formatProfileForEnrichment(profile)}`;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 220,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    const instruction = extractText(response.content);
+    if (!instruction) {
+      return res.status(500).json({ error: 'Failed to generate profile instruction' });
+    }
+
+    return res.json({
+      instruction,
+      profileInstruction: instruction
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Failed to enrich profile' });
   }
 });
 
