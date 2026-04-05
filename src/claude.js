@@ -105,7 +105,7 @@ function extractTextBlock(content) {
   return content.filter((c) => c.type === 'text').map((c) => c.text).join('\n');
 }
 
-async function planCity({ name, startDate, endDate }, profile = null) {
+async function planCity({ name, startDate, endDate }, profile = null, userId = 'default') {
   const client = getClient();
   if (!client) {
     const err = new Error('Anthropic API key not configured');
@@ -115,7 +115,7 @@ async function planCity({ name, startDate, endDate }, profile = null) {
 
   const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\nReturn a maximum of 6-8 activities. Be concise.\n\nReturn JSON only.`;
 
-  const learnedSummary = getSummary(profile);
+  const learnedSummary = getSummary(profile, userId);
   const effectiveSystemPrompt = learnedSummary
     ? `${SYSTEM_PROMPT}\n\n${learnedSummary}`
     : SYSTEM_PROMPT;

@@ -2,8 +2,9 @@ const fs = require('fs');
 const path = require('path');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
-const PREFS_PATH = path.join(DATA_DIR, 'preferences.json');
+const USERS_DIR = path.join(DATA_DIR, 'users');
 const MAX_SIGNALS = 100;
+const DEFAULT_USER_ID = 'default';
 
 const STOPWORDS = new Set([
   'a','an','the','and','or','but','if','then','than','to','of','for','in','on','at','by','with','from','as','is','are','was','were','be','been','being','it','its','this','that','these','those','their','there','here','into','over','under','about','after','before','during','through','around','across','you','your','they','them','will','would','can','could','should','very','more','most','high','low','great','good','nice','best','trip','travel','activity','experience','city'
@@ -18,7 +19,26 @@ function defaults() {
 }
 
 function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.mkdirSync(USERS_DIR, { recursive: true });
+}
+
+function resolveUserId(userId) {
+  const resolved = userId == null ? DEFAULT_USER_ID : String(userId).trim();
+  if (!resolved) {
+    const err = new Error('userId must be a non-empty string');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (resolved.length > 64 || !/^[A-Za-z0-9-]+$/.test(resolved)) {
+    const err = new Error('userId must be <= 64 chars and contain only letters, numbers, and hyphens');
+    err.statusCode = 400;
+    throw err;
+  }
+  return resolved;
+}
+
+function userPrefsPath(userId) {
+  return path.join(USERS_DIR, `${resolveUserId(userId)}.json`);
 }
 
 function normalize(prefs) {
@@ -36,28 +56,31 @@ function normalize(prefs) {
   return safe;
 }
 
-function load() {
+function load(userId = DEFAULT_USER_ID) {
   ensureDataDir();
+  const resolvedUserId = resolveUserId(userId);
+  const prefsPath = userPrefsPath(resolvedUserId);
   try {
-    if (!fs.existsSync(PREFS_PATH)) {
+    if (!fs.existsSync(prefsPath)) {
       const initial = defaults();
-      save(initial);
+      save(initial, resolvedUserId);
       return initial;
     }
-    const raw = fs.readFileSync(PREFS_PATH, 'utf8');
+    const raw = fs.readFileSync(prefsPath, 'utf8');
     return normalize(JSON.parse(raw));
   } catch {
     const fresh = defaults();
-    save(fresh);
+    save(fresh, resolvedUserId);
     return fresh;
   }
 }
 
-function save(prefs) {
+function save(prefs, userId = DEFAULT_USER_ID) {
   ensureDataDir();
-  const tmpPath = `${PREFS_PATH}.tmp`;
+  const prefsPath = userPrefsPath(userId);
+  const tmpPath = `${prefsPath}.tmp`;
   fs.writeFileSync(tmpPath, JSON.stringify(normalize(prefs), null, 2));
-  fs.renameSync(tmpPath, PREFS_PATH);
+  fs.renameSync(tmpPath, prefsPath);
 }
 
 function tokenize(text = '') {
@@ -112,8 +135,8 @@ function deriveSummaries(signals) {
   };
 }
 
-function recordSignal({ name, type, verdict, city, why_it_fits }) {
-  const prefs = load();
+function recordSignal({ userId = DEFAULT_USER_ID, name, type, verdict, city, why_it_fits }) {
+  const prefs = load(userId);
   const signal = {
     name: String(name || '').trim(),
     type: String(type || '').trim().toLowerCase(),
@@ -130,12 +153,12 @@ function recordSignal({ name, type, verdict, city, why_it_fits }) {
   prefs.liked = summaries.liked;
   prefs.disliked = summaries.disliked;
 
-  save(prefs);
+  save(prefs, userId);
   return prefs;
 }
 
-function getSummary(profile = null) {
-  const prefs = load();
+function getSummary(profile = null, userId = DEFAULT_USER_ID) {
+  const prefs = load(userId);
   const liked = [...prefs.liked.types, ...prefs.liked.keywords].slice(0, 8);
   const disliked = [...prefs.disliked.types, ...prefs.disliked.keywords].slice(0, 8);
 
@@ -178,10 +201,10 @@ function getSummary(profile = null) {
   return parts.join('\n\n');
 }
 
-function reset() {
+function reset(userId = DEFAULT_USER_ID) {
   const fresh = defaults();
-  save(fresh);
+  save(fresh, userId);
   return fresh;
 }
 
-module.exports = { load, save, recordSignal, getSummary, reset };
+module.exports = { load, save, recordSignal, getSummary, reset, resolveUserId, DEFAULT_USER_ID };

@@ -4,7 +4,13 @@ const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const { planCity } = require('./claude');
 const { fetchUnsplashImage } = require('./unsplash');
-const { recordSignal, load: loadPreferences, reset: resetPreferences } = require('./preferences');
+const {
+  recordSignal,
+  load: loadPreferences,
+  reset: resetPreferences,
+  resolveUserId,
+  DEFAULT_USER_ID
+} = require('./preferences');
 const { getSession, setTripContext, addMessage, getHistory, compactHistory, clearSession } = require('./chat');
 
 const app = express();
@@ -14,6 +20,10 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 let latestItinerary = null;
+
+function parseUserId(rawUserId) {
+  return resolveUserId(rawUserId == null ? DEFAULT_USER_ID : rawUserId);
+}
 
 function buildChatSystemPrompt(tripContext = {}) {
   const cities = Array.isArray(tripContext.cities) && tripContext.cities.length
@@ -52,9 +62,16 @@ app.get('/api/status', (_req, res) => {
 });
 
 app.post('/api/plan', async (req, res) => {
-  const { cities, profile } = req.body || {};
+  const { cities, profile, userId } = req.body || {};
   if (!Array.isArray(cities) || cities.length === 0) {
     return res.status(400).json({ error: 'cities must be a non-empty array' });
+  }
+
+  let resolvedUserId;
+  try {
+    resolvedUserId = parseUserId(userId);
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid userId' });
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -68,7 +85,7 @@ app.post('/api/plan', async (req, res) => {
 
   try {
     for (const city of cities) {
-      const activities = await planCity(city, profile);
+      const activities = await planCity(city, profile, resolvedUserId);
       sendEvent({ type: 'city', city: city.name, activities });
     }
     sendEvent({ type: 'done' });
@@ -106,18 +123,32 @@ app.get('/api/image', async (req, res) => {
 });
 
 app.post('/api/preferences/signal', (req, res) => {
-  const { name, type, verdict, city, why_it_fits } = req.body || {};
-  recordSignal({ name, type, verdict, city, why_it_fits });
-  return res.json({ ok: true });
+  try {
+    const { userId, name, type, verdict, city, why_it_fits } = req.body || {};
+    recordSignal({ userId: parseUserId(userId), name, type, verdict, city, why_it_fits });
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid preferences signal payload' });
+  }
 });
 
-app.get('/api/preferences', (_req, res) => {
-  return res.json({ preferences: loadPreferences() });
+app.get('/api/preferences', (req, res) => {
+  try {
+    const userId = parseUserId(req.query?.userId);
+    return res.json({ preferences: loadPreferences(userId) });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid userId' });
+  }
 });
 
-app.post('/api/preferences/reset', (_req, res) => {
-  const preferences = resetPreferences();
-  return res.json({ ok: true, preferences });
+app.post('/api/preferences/reset', (req, res) => {
+  try {
+    const userId = parseUserId(req.body?.userId);
+    const preferences = resetPreferences(userId);
+    return res.json({ ok: true, preferences });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid userId' });
+  }
 });
 
 app.post('/api/chat/message', async (req, res) => {

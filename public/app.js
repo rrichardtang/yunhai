@@ -20,6 +20,7 @@ const state = {
 };
 
 const PROFILE_KEY = 'travelplanner_profile_v1';
+const USER_ID_KEY = 'travelplanner_user_id';
 const PROFILE_QUESTIONS = [
   { key: 'museumPerson', label: 'Are you a museum person?', summary: 'Museum person' },
   { key: 'foodTravel', label: 'Do you travel for food?', summary: 'Travels for food' },
@@ -225,11 +226,20 @@ function typeToTime(type) {
   return map[type] || 'TBD';
 }
 
+function ensureUserId() {
+  const existing = localStorage.getItem(USER_ID_KEY);
+  if (existing) return existing;
+  const next = crypto.randomUUID();
+  localStorage.setItem(USER_ID_KEY, next);
+  return next;
+}
+
 function postPreferenceSignal(activity, verdict) {
   fetch('/api/preferences/signal', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      userId: ensureUserId(),
       name: activity.name,
       type: activity.type,
       verdict,
@@ -300,7 +310,7 @@ async function openPreferencesModal() {
   renderProfileEditor();
 
   try {
-    const res = await fetch('/api/preferences');
+    const res = await fetch(`/api/preferences?userId=${encodeURIComponent(ensureUserId())}`);
     const data = await res.json();
     const prefs = data.preferences || { liked: { types: [], keywords: [] }, disliked: { types: [], keywords: [] }, signals: [] };
 
@@ -710,7 +720,7 @@ function renderItinerary() {
 async function planTrip() {
   state.tripName = els.tripName.value.trim();
   const cities = state.cities.map(({name,startDate,endDate}) => ({ name, startDate, endDate }));
-  const payload = { cities, profile: state.profile || loadProfile() };
+  const payload = { cities, profile: state.profile || loadProfile(), userId: ensureUserId() };
 
   state.activities = [];
   state.reviewed = {};
@@ -1114,6 +1124,7 @@ els.activitiesGrid.addEventListener('change', () => {
   state.profile = loadProfile();
   mountPlanningOverlay();
   bindChatEvents();
+  ensureUserId();
   ensureChatSessionId();
   await restoreChatHistory();
   await fetchStatus();
