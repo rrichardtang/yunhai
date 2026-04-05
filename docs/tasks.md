@@ -1,0 +1,13 @@
+# Tasks
+
+- [x] Scaffold project structure
+- [x] Implement Express backend and APIs
+- [x] Add Claude wrapper with exact system prompt
+- [x] Add Unsplash proxy endpoint
+- [x] Build 4-step frontend UI/UX
+- [x] Add Sortable.js drag/drop flow
+- [x] Add cultural budget tracker and verdict badges
+- [x] Add localStorage persistence
+- [x] Handle missing API keys gracefully
+- [x] Add deployment compose file
+- [x] Add README and env example

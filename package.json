@@ -1,0 +1,15 @@
+{
+  "name": "travelplanner",
+  "version": "1.0.0",
+  "description": "Personal AI itinerary builder",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "openai": "^4.104.0"
+  }
+}
