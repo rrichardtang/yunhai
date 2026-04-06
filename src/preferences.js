@@ -173,20 +173,34 @@ function getSummary(profile = null, userId = DEFAULT_USER_ID) {
     ['nightlifeBars', 'Nightlife and bars'],
     ['structuredTours', 'Structured tours']
   ];
+
+  const sliderToLabel = {
+    1: 'Not interested',
+    2: 'Slightly interested',
+    3: 'Neutral',
+    4: 'Very interested',
+    5: 'Loves this'
+  };
+
+  const profileInstruction = String(profile?.profileInstruction || '').trim();
+  if (profileInstruction) {
+    parts.push(`## Traveler Instruction\n${profileInstruction}`);
+  }
+
   const profileLines = questionMap
     .map(([key, label]) => {
-      const value = answers[key];
-      if (!['Yes', 'Meh', 'No'].includes(value)) return null;
-      return `- ${label}: ${value}`;
+      const raw = Number(answers[key]);
+      const value = Number.isFinite(raw) ? Math.max(1, Math.min(5, Math.round(raw))) : null;
+      if (!value || !sliderToLabel[value]) return null;
+      return `- ${label}: ${sliderToLabel[value]}`;
     })
     .filter(Boolean);
-  const notes = String(profile?.travelNotes || '').trim();
-  const activityDislikes = String(profile?.activityDislikes || '').trim();
-  if (profileLines.length || notes || activityDislikes) {
+
+  const notes = String(profile?.aboutMe || '').trim();
+  if (!profileInstruction && (profileLines.length || notes)) {
     parts.push('## User Traveler Profile (self-reported)');
     if (profileLines.length) parts.push(profileLines.join('\n'));
-    if (notes) parts.push(`Travel notes: ${notes}`);
-    if (activityDislikes) parts.push(`Activity dislikes: ${activityDislikes}`);
+    if (notes) parts.push(`About me: ${notes}`);
   }
 
   if (liked.length || disliked.length) {
