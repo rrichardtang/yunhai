@@ -33,20 +33,27 @@
       <section id="step1" class="panel step-panel active">
         <h2>Trip Setup</h2>
         <label>Trip Name <input id="tripName" placeholder="Spain Spring Escape" /></label>
-        <div id="citiesContainer"></div>
         <div class="setup-actions">
           <button id="addCityBtn" class="secondary">+ Add City</button>
           <button id="sortCitiesBtn" class="secondary" type="button">↕ Sort cities by date</button>
         </div>
-        <div class="accommodations-panel">
-          <h3>Accommodations &amp; Travel</h3>
-          <p class="muted-text">Add accommodations for each city above, then capture your trip entry details here.</p>
-          <div class="travel-list-head">
-            <h4>Travel Entry</h4>
-            <button id="addTravelBtn" class="secondary" type="button">+ Add travel entry</button>
+        <div id="citiesContainer"></div>
+
+        <section class="accommodations-panel">
+          <h3>Accommodations</h3>
+          <p class="muted-text">Add accommodations for each city.</p>
+          <div id="accommodationsContainer"></div>
+        </section>
+
+        <section class="accommodations-panel">
+          <h3>Travel</h3>
+          <p class="muted-text">Trip entry details auto-populate from your earliest city start date.</p>
+          <div class="travel-row">
+            <input id="travelEntryPoint" type="text" placeholder="Entry point location (e.g. JFK, Grand Central Terminal)" />
+            <input id="travelEntryDateTime" type="datetime-local" readonly title="Auto-populated from trip start date" />
           </div>
-          <div id="travelsContainer"></div>
-        </div>
+        </section>
+
         <div id="setupInsights" class="setup-insights muted-text"></div>
         <button id="planBtn" class="primary">Plan My Trip</button>
       </section>
