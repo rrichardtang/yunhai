@@ -1,0 +1,39 @@
+:root {
+  color-scheme: light;
+}
+
+* {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body {
+  min-height: 100vh;
+}
+
+.hero-bg {
+  position: fixed;
+  inset: -10% -10% auto;
+  height: 560px;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 25%, rgba(191, 219, 254, 0.5), transparent 45%),
+    radial-gradient(circle at 85% 15%, rgba(186, 230, 253, 0.35), transparent 40%),
+    linear-gradient(180deg, #f8fafc 0%, #ffffff 72%);
+}
+
+.hero-card,
+.step-card {
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.hero-card:hover,
+.step-card:hover {
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .hero-bg {
+    height: 420px;
+  }
+}

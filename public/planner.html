@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TravelPlanner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-row">
+        <div>
+          <h1>TravelPlanner</h1>
+          <p>Personal AI itinerary builder</p>
+        </div>
+        <button id="preferencesLink" class="link-btn" type="button">My Profile</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <div id="apiBanner" class="api-banner hidden"></div>
+
+      <nav class="steps" id="stepIndicator">
+        <div class="step active">1. Setup</div>
+        <div class="step">2. Review</div>
+        <div class="step">3. Arrange</div>
+        <div class="step">4. Itinerary</div>
+      </nav>
+
+      <section id="step1" class="panel step-panel active">
+        <h2>Trip Setup</h2>
+        <label>Trip Name <input id="tripName" placeholder="Spain Spring Escape" /></label>
+        <div id="citiesContainer"></div>
+        <div class="setup-actions">
+          <button id="addCityBtn" class="secondary">+ Add City</button>
+          <button id="sortCitiesBtn" class="secondary" type="button">↕ Sort cities by date</button>
+        </div>
+        <div class="accommodations-panel">
+          <h3>Accommodations &amp; Travel</h3>
+          <p class="muted-text">Add hotels for each city above, then capture flights/trains for the full trip here.</p>
+          <div class="travel-list-head">
+            <h4>Flights &amp; Trains</h4>
+            <button id="addTravelBtn" class="secondary" type="button">+ Add flight/train</button>
+          </div>
+          <div id="travelsContainer"></div>
+        </div>
+        <div id="setupInsights" class="setup-insights muted-text"></div>
+        <button id="planBtn" class="primary">Plan My Trip</button>
+      </section>
+
+      <section id="step2" class="panel step-panel">
+        <div class="between">
+          <h2>Review Activities</h2>
+          <div class="budget" id="budgetTracker"></div>
+        </div>
+        <div class="review-toolbar">
+          <input id="reviewSearch" type="search" placeholder="Search activities, neighborhoods, cuisines..." />
+          <select id="reviewCityFilter" aria-label="Filter by city">
+            <option value="">All cities</option>
+          </select>
+          <select id="reviewVerdictFilter" aria-label="Filter by review state">
+            <option value="">All states</option>
+            <option value="unreviewed">Unreviewed</option>
+            <option value="approved">Approved</option>
+            <option value="declined">Declined</option>
+          </select>
+          <button id="approveVisibleBtn" class="secondary" type="button">✅ Approve visible</button>
+          <button id="clearVisibleBtn" class="secondary" type="button">↺ Clear visible</button>
+        </div>
+        <div id="activitiesGrid" class="cards-grid"></div>
+        <div class="step-nav sticky-nav step-nav-split">
+          <button id="backToSetupBtn" class="secondary nav-secondary" type="button">← Back to Setup</button>
+          <button id="continueArrangeBtn" class="primary nav-primary" type="button" title="Approve at least one activity to continue">
+            Continue to Arrange →
+          </button>
+          <p id="continueArrangeHint" class="nav-hint muted-text">Approve at least one activity to continue</p>
+        </div>
+      </section>
+
+      <section id="step3" class="panel step-panel">
+        <div class="between arrange-header">
+          <h2>Arrange Approved Activities</h2>
+          <div class="arrange-actions">
+            <button id="autoArrangeBtn" class="secondary auto-arrange-btn" type="button">✨ Auto-arrange</button>
+          </div>
+        </div>
+        <div id="arrangeCityNav" class="arrange-city-nav"></div>
+        <div>
+          <h3>Staging</h3>
+          <div id="stagingArea" class="staging list"></div>
+        </div>
+        <h3>Days</h3>
+        <div id="dayColumns" class="day-columns"></div>
+        <div class="step-nav sticky-nav step-nav-split">
+          <button id="backToReviewBtn" class="secondary nav-secondary" type="button">← Back</button>
+          <button id="saveProgressBtn" class="secondary" type="button">💾 Save Progress</button>
+          <button id="generateBtn" class="primary nav-primary" type="button">Generate Itinerary →</button>
+        </div>
+      </section>
+
+      <section id="step4" class="panel step-panel">
+        <div class="between">
+          <h2>Final Itinerary</h2>
+          <button id="downloadCalendarBtn" class="secondary" type="button" disabled>📅 Export to Calendar (.ics)</button>
+        </div>
+        <div id="itineraryInsights" class="itinerary-insights"></div>
+        <div id="itineraryGrid" class="day-columns"></div>
+        <section class="saved-itineraries-panel">
+          <div class="between">
+            <h3>Saved Itineraries</h3>
+          </div>
+          <div id="savedItineraries" class="saved-itineraries-list"></div>
+        </section>
+        <div class="step-nav sticky-nav">
+          <button id="editBtn" class="secondary nav-secondary" type="button">← Edit</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="prefsModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Traveler Profile">
+      <div class="modal-card">
+        <div class="profile-selector-row">
+          <select id="profileSelector" class="profile-dropdown" aria-label="Select profile"></select>
+          <input id="profileNameInput" class="profile-name-input hidden" type="text" maxlength="32" aria-label="Profile name" />
+          <button id="newProfileBtn" class="secondary" type="button">+ New Profile</button>
+          <button id="profileEditBtn" class="primary" type="button">Save</button>
+        </div>
+        <div class="between">
+          <h3>Traveler Profile</h3>
+          <button id="prefsClose" class="secondary" type="button">Close</button>
+        </div>
+
+        <section class="prefs-section profile-section">
+          <h4>Your self-reported preferences</h4>
+          <div id="profileQuestions" class="profile-questions"></div>
+
+          <label class="profile-label" for="profileTravelNotes">About me</label>
+          <textarea id="profileTravelNotes" rows="3" placeholder="e.g. I'm not a morning person, I have a smaller budget, avoid things with lots of walking..."></textarea>
+        </section>
+
+        <button id="deleteProfileBtn" class="secondary profile-delete-bottom" type="button">🗑 Delete</button>
+      </div>
+    </div>
+
+    <div id="resumeModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Resume saved trip">
+      <div class="modal-card resume-card">
+        <h3>You have a saved trip. Resume or start fresh?</h3>
+        <div class="resume-actions">
+          <button id="resumeTripBtn" class="primary" type="button">Resume</button>
+          <button id="startFreshBtn" class="secondary" type="button">Start Fresh</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="chatWidget">
+      <div id="chatBubble">💬</div>
+      <div id="chatPanel" class="hidden">
+        <div id="chatHeader">
+          <span>Travel Assistant</span>
+          <button id="chatClose" type="button">✕</button>
+        </div>
+        <div id="chatMessages"></div>
+        <div id="chatInputArea">
+          <input id="chatInput" type="text" placeholder="Ask anything about your trip...">
+          <button id="chatSend" type="button">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
