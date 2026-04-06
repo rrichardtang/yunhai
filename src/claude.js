@@ -184,17 +184,11 @@ async function planCity(city, profile = null, userId = 'default', travels = []) 
     ? accommodations.map((accommodation) => `${accommodation.type || 'Accommodation'}: ${accommodation.name || 'Unnamed accommodation'} | ${accommodation.address || 'Address missing'} | ${accommodation.checkIn || '?'} → ${accommodation.checkOut || '?'}`).join('\n')
     : 'No accommodations provided for this city yet.';
 
-  const relatedTravels = Array.isArray(travels)
-    ? travels.filter((travel) => {
-      const entryPoint = String(travel?.entryPoint || '').trim().toLowerCase();
-      const cityName = String(name || '').trim().toLowerCase();
-      return entryPoint.includes(cityName);
-    })
-    : [];
+  const relatedTravels = Array.isArray(travels) ? travels.slice(0, 1) : [];
 
   const travelContext = relatedTravels.length
-    ? relatedTravels.map((travel) => `Entry via ${travel.entryPoint || '?'} @ ${travel.dateTime || '?'}`).join('\n')
-    : 'No trip entry details explicitly tied to this city.';
+    ? relatedTravels.map((travel) => `Trip entry via ${travel.entryPoint || '?'} @ ${travel.dateTime || '?'}`).join('\n')
+    : 'No trip entry details provided yet.';
 
   const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nUse accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Return a maximum of 6-8 activities. Be concise.\n\nReturn JSON only.`;
 
