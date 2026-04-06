@@ -130,6 +130,8 @@ function normalizeTravelMode(mode = '') {
 }
 
 function buildDistanceMatrixQuery(activity = {}) {
+  const hotelLocation = String(activity.hotel_location || '').trim();
+  if (hotelLocation) return hotelLocation;
   return [activity.name, activity.city].filter(Boolean).join(', ').trim();
 }
 
@@ -177,8 +179,8 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
 }
 
 async function getCommuteBetweenActivities(fromActivity, toActivity) {
-  const origin = resolveCommuteQuery(fromActivity, 'start_location');
-  const destination = resolveCommuteQuery(toActivity, 'end_location');
+  const origin = resolveCommuteQuery(fromActivity, 'end_location');
+  const destination = resolveCommuteQuery(toActivity, 'start_location');
 
   const defaultModes = {
     transit: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.transit },
@@ -242,7 +244,15 @@ function parseUserId(rawUserId) {
 
 function buildChatSystemPrompt(tripContext = {}) {
   const cities = Array.isArray(tripContext.cities) && tripContext.cities.length
-    ? tripContext.cities.map((city) => `${city.name} (${city.startDate} → ${city.endDate})`).join(', ')
+    ? tripContext.cities.map((city) => {
+      const hotels = Array.isArray(city.hotels) && city.hotels.length
+        ? city.hotels.map((hotel) => `${hotel.name || 'Hotel'} (${hotel.checkIn || '?'} → ${hotel.checkOut || '?'})`).join('; ')
+        : 'No hotels listed';
+      return `${city.name} (${city.startDate} → ${city.endDate}) | Hotels: ${hotels}`;
+    }).join(' | ')
+    : 'None yet';
+  const travels = Array.isArray(tripContext.travels) && tripContext.travels.length
+    ? tripContext.travels.map((travel) => `${travel.type || 'travel'}: ${travel.departureCity || '?'} → ${travel.arrivalCity || '?'} at ${travel.dateTime || '?'} (${travel.duration || 'duration unknown'})`).join(' | ')
     : 'None yet';
   const approved = Array.isArray(tripContext.approvedActivities) && tripContext.approvedActivities.length
     ? tripContext.approvedActivities.join(', ')
@@ -251,7 +261,7 @@ function buildChatSystemPrompt(tripContext = {}) {
     ? tripContext.declinedActivities.join(', ')
     : 'None yet';
 
-  return `You are a concise, opinionated travel advisor helping plan a trip. You have full context of the user's itinerary and preferences. Answer questions directly in 2-4 sentences. Be honest about downsides. Remember everything discussed in this conversation.\n\nCurrent trip context:\n- Cities: ${cities}\n- Current planning step: ${tripContext.step ?? 'Unknown'}\n- Approved activities: ${approved}\n- Declined activities: ${declined}`;
+  return `You are a concise, opinionated travel advisor helping plan a trip. You have full context of the user's itinerary and preferences. Answer questions directly in 2-4 sentences. Be honest about downsides. Remember everything discussed in this conversation.\n\nCurrent trip context:\n- Cities: ${cities}\n- Flights/trains: ${travels}\n- Current planning step: ${tripContext.step ?? 'Unknown'}\n- Approved activities: ${approved}\n- Declined activities: ${declined}`;
 }
 
 function toAnthropicMessages(history = []) {
@@ -367,7 +377,7 @@ app.get('/api/status', (_req, res) => {
 });
 
 app.post('/api/plan', async (req, res) => {
-  const { cities, profile, userId } = req.body || {};
+  const { cities, travels, profile, userId } = req.body || {};
   if (!Array.isArray(cities) || cities.length === 0) {
     return res.status(400).json({ error: 'cities must be a non-empty array' });
   }
@@ -390,7 +400,7 @@ app.post('/api/plan', async (req, res) => {
 
   try {
     for (const city of cities) {
-      const activities = await planCity(city, profile, resolvedUserId);
+      const activities = await planCity(city, profile, resolvedUserId, travels);
       sendEvent({ type: 'city', city: city.name, activities });
     }
     sendEvent({ type: 'done' });
