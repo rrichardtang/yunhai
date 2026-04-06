@@ -4,7 +4,7 @@ const { getSummary } = require('./preferences');
 const MODEL = 'claude-sonnet-4-6';
 
 const SYSTEM_PROMPT = `## Role
-You are a blunt, opinionated travel planning agent. Your job is to design itineraries for a specific traveler type — someone who wants high-energy, interactive, and viscerally satisfying experiences, balanced with genuine downtime and atmosphere. You are not a generalist travel agent. You filter everything through this traveler's preferences and give honest assessments, including when something is likely to disappoint them. Be concise with your responses. I need at most 3 sentences for each activity.
+You are a blunt, opinionated travel planning agent. Your job is to design itineraries tailored to the specific traveler's preferences and profile. You are not a generalist — you filter everything through what this specific user actually enjoys. Be concise. At most 3 sentences per activity.
 
 ---
 
@@ -26,7 +26,7 @@ Evaluate every activity across five dimensions before recommending it:
 - Flag with warning if: Disappointment Risk is HIGH but the traveler may still want it
 - Do not recommend if: Fun Factor is LOW, regardless of cultural or historical prestige
 
-When in doubt between two activities, recommend the one with higher energy and lower cognitive overhead.
+When in doubt between two activities, recommend the one that better fits the traveler's stated preferences.
 
 ---
 
@@ -36,6 +36,8 @@ Return a JSON array of activity objects. Each object must have these fields:
 - name (string)
 - type (string: show / tour / food / sports / cultural / walk / sunset / neighborhood / breakfast / lunch / dinner)
 - city (string)
+- start_location (string)
+- end_location (string)
 - why_it_fits (string, 1-2 sentences)
 - pitfall (string, 1 sentence)
 - booking_advice (string, 1 sentence)
@@ -44,6 +46,18 @@ Return a JSON array of activity objects. Each object must have these fields:
 - dedicated_time_block (boolean — true if this requires 2+ hours of committed time)
 - suggested_time (string — e.g. "9:00am", "2:00pm", "sunset")
 - duration_hours (number)
+
+For each activity, provide realistic start and end locations based on the activity description and the city. Use recognizable landmarks, neighborhoods, or points of interest.
+
+Example object:
+{
+  "name": "Wander Alfama at Dawn",
+  "type": "walk",
+  "city": "Lisbon",
+  "start_location": "Alfama neighborhood, Lisbon",
+  "end_location": "Miradouro da Graça, Lisbon",
+  "why_it_fits": "..."
+}
 
 Return ONLY the JSON array, no markdown, no explanation.`;
 
@@ -55,6 +69,106 @@ function getClient() {
 function extractTextBlock(content) {
   if (!Array.isArray(content)) return '';
   return content.filter((c) => c.type === 'text').map((c) => c.text).join('\n');
+}
+
+function stripCodeFences(raw = '') {
+  let cleaned = String(raw || '').trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  }
+  return cleaned.trim();
+}
+
+function extractLikelyJsonArray(raw = '') {
+  const text = String(raw || '');
+  const start = text.indexOf('[');
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i += 1) {
+    const ch = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (ch === '"') inString = false;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (ch === '[') depth += 1;
+    if (ch === ']') {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+
+  return null;
+}
+
+function tryParseJsonArray(raw = '') {
+  const attempts = [];
+  const stripped = stripCodeFences(raw);
+  attempts.push(stripped);
+
+  const extracted = extractLikelyJsonArray(stripped);
+  if (extracted && extracted !== stripped) attempts.push(extracted);
+
+  const relaxed = extracted
+    ? extracted
+      .replace(/,\s*([}\]])/g, '$1')
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/[\u2018\u2019]/g, "'")
+    : null;
+  if (relaxed && !attempts.includes(relaxed)) attempts.push(relaxed);
+
+  for (const candidate of attempts) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // try next strategy
+    }
+  }
+
+  return null;
+}
+
+function normalizeActivity(raw = {}, fallbackCity = '') {
+  const verdictRaw = String(raw.verdict || '').trim();
+  const verdict = ['Recommend', 'Recommend with caveats', 'Skip'].includes(verdictRaw)
+    ? verdictRaw
+    : 'Recommend';
+
+  const duration = Number(raw.duration_hours);
+  return {
+    name: String(raw.name || 'Untitled activity').trim(),
+    type: String(raw.type || 'tour').trim().toLowerCase(),
+    city: String(raw.city || fallbackCity).trim(),
+    start_location: String(raw.start_location || '').trim(),
+    end_location: String(raw.end_location || '').trim(),
+    why_it_fits: String(raw.why_it_fits || '').trim(),
+    pitfall: String(raw.pitfall || '').trim(),
+    booking_advice: String(raw.booking_advice || '').trim(),
+    smarter_alternative: raw.smarter_alternative == null ? null : String(raw.smarter_alternative).trim(),
+    verdict,
+    dedicated_time_block: Boolean(raw.dedicated_time_block),
+    suggested_time: String(raw.suggested_time || '').trim() || '10:00am',
+    duration_hours: Number.isFinite(duration) && duration > 0 ? duration : 1.5
+  };
 }
 
 async function planCity(city, profile = null, userId = 'default') {
@@ -81,22 +195,14 @@ async function planCity(city, profile = null, userId = 'default') {
   });
 
   const response = extractTextBlock(res.content);
-  // Strip markdown code fences if present
-  let cleaned = response.trim();
-  if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-  }
+  const parsed = tryParseJsonArray(response);
 
-  let parsed;
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch (error) {
-    console.error('Failed to parse Claude JSON response:', error);
+  if (!parsed) {
+    console.error('Failed to parse Claude JSON response (all parse strategies failed).');
     throw new Error(`Claude returned invalid JSON for ${name}.`);
   }
 
-  if (!Array.isArray(parsed)) throw new Error('Claude did not return an array');
-  return parsed;
+  return parsed.map((item) => normalizeActivity(item, name));
 }
 
 module.exports = { planCity };
