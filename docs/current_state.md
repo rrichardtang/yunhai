@@ -15,8 +15,18 @@
   - Step 3 drag/drop arranging in day columns with editable time
   - Step 4 final printable itinerary grid + edit back button
 - Local persistence via localStorage.
+- Resilient Claude output parsing with recovery strategies (code fence stripping, JSON array extraction, trailing-comma cleanup) plus activity normalization defaults.
+- Persistent itinerary storage on server (`data/itineraries.json`) with history endpoints:
+  - `GET /api/itineraries`
+  - `GET /api/itinerary/:id`
+  - `DELETE /api/itinerary/:id`
+- Calendar export endpoint for saved itineraries:
+  - `GET /api/itinerary/:id/calendar.ics`
+- Step 4 enhancements:
+  - One-click `.ics` calendar export button
+  - Saved itineraries panel with open/delete actions
 - Deployment compose file in `deployment/docker-compose.yml`.
 
 ## Known Limitations
-- Claude output parsing expects valid pure JSON array.
-- Itinerary storage is volatile (in-memory only).
+- Calendar export uses floating local times (no timezone conversion).
+- Saved itinerary storage is file-based JSON (single-node, not multi-writer safe).

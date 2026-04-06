@@ -11,3 +11,7 @@
 - [x] Handle missing API keys gracefully
 - [x] Add deployment compose file
 - [x] Add README and env example
+- [x] Harden Claude response parsing + normalize malformed activity payloads
+- [x] Persist itineraries server-side with list/load/delete APIs
+- [x] Add final-step saved itinerary manager UI (open/delete)
+- [x] Add one-click `.ics` export for calendar import

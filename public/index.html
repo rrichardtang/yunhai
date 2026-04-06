@@ -57,8 +57,7 @@
         <div class="between arrange-header">
           <h2>Arrange Approved Activities</h2>
           <div class="arrange-actions">
-            <button id="saveProgressBtn" class="secondary" type="button">💾 Save Progress</button>
-            <span id="saveToast" class="save-toast" aria-live="polite">Saved!</span>
+            <button id="autoArrangeBtn" class="secondary auto-arrange-btn" type="button">✨ Auto-arrange</button>
           </div>
         </div>
         <div id="arrangeCityNav" class="arrange-city-nav"></div>
@@ -70,6 +69,7 @@
         <div id="dayColumns" class="day-columns"></div>
         <div class="step-nav sticky-nav step-nav-split">
           <button id="backToReviewBtn" class="secondary nav-secondary" type="button">← Back</button>
+          <button id="saveProgressBtn" class="secondary" type="button">💾 Save Progress</button>
           <button id="generateBtn" class="primary nav-primary" type="button">Generate Itinerary →</button>
         </div>
       </section>
@@ -77,8 +77,15 @@
       <section id="step4" class="panel step-panel">
         <div class="between">
           <h2>Final Itinerary</h2>
+          <button id="downloadCalendarBtn" class="secondary" type="button" disabled>📅 Export to Calendar (.ics)</button>
         </div>
         <div id="itineraryGrid" class="day-columns"></div>
+        <section class="saved-itineraries-panel">
+          <div class="between">
+            <h3>Saved Itineraries</h3>
+          </div>
+          <div id="savedItineraries" class="saved-itineraries-list"></div>
+        </section>
         <div class="step-nav sticky-nav">
           <button id="editBtn" class="secondary nav-secondary" type="button">← Edit</button>
         </div>
@@ -91,7 +98,7 @@
           <select id="profileSelector" class="profile-dropdown" aria-label="Select profile"></select>
           <input id="profileNameInput" class="profile-name-input hidden" type="text" maxlength="32" aria-label="Profile name" />
           <button id="newProfileBtn" class="secondary" type="button">+ New Profile</button>
-          <button id="deleteProfileBtn" class="secondary" type="button">🗑 Delete</button>
+          <button id="profileEditBtn" class="primary" type="button">Save</button>
         </div>
         <div class="between">
           <h3>Traveler Profile</h3>
@@ -102,31 +109,11 @@
           <h4>Your self-reported preferences</h4>
           <div id="profileQuestions" class="profile-questions"></div>
 
-          <label class="profile-label" for="profileTravelNotes">Travel notes</label>
-          <textarea id="profileTravelNotes" rows="3" placeholder="e.g. Going to Spain and want to see an FC Barcelona game, avoid long queues..."></textarea>
-
-          <label class="profile-label" for="profileDislikes">Activity dislikes</label>
-          <textarea id="profileDislikes" rows="3" placeholder="e.g. No extreme sports, avoid anything with lots of walking..."></textarea>
-
-          <button id="profileEditBtn" class="primary" type="button">Edit Profile</button>
+          <label class="profile-label" for="profileTravelNotes">About me</label>
+          <textarea id="profileTravelNotes" rows="3" placeholder="e.g. I'm not a morning person, I have a smaller budget, avoid things with lots of walking..."></textarea>
         </section>
 
-        <hr class="prefs-divider" />
-
-        <section class="prefs-section learned-section">
-          <h4>Learned from past trips</h4>
-          <p id="prefsSignalCount" class="muted-text"></p>
-          <div class="prefs-subsection">
-            <h5>Liked</h5>
-            <div id="prefsLikedTypes" class="tags"></div>
-            <div id="prefsLikedKeywords" class="tags"></div>
-          </div>
-          <div class="prefs-subsection">
-            <h5>Disliked</h5>
-            <div id="prefsDislikedTypes" class="tags"></div>
-            <div id="prefsDislikedKeywords" class="tags"></div>
-          </div>
-        </section>
+        <button id="deleteProfileBtn" class="secondary profile-delete-bottom" type="button">🗑 Delete</button>
       </div>
     </div>
 

@@ -8,6 +8,8 @@ const state = {
   days: [],
   placements: {},
   itinerary: null,
+  currentItineraryId: null,
+  savedItineraries: [],
   commutes: {},
   arrangeCity: null,
   chatSessionId: '',
@@ -23,7 +25,6 @@ const state = {
 const PROFILES_KEY = 'travelplanner_profiles_v1';
 const LEGACY_PROFILE_KEY = 'travelplanner_profile_v1';
 const USER_ID_KEY = 'travelplanner_user_id';
-const LEARNED_PREFS_REMOVED_KEY = 'travelplanner_learned_removed_v1';
 const PROFILE_QUESTIONS = [
   { key: 'museumPerson', label: 'Are you a museum person?', summary: 'Museum person' },
   { key: 'foodTravel', label: 'Do you travel for food?', summary: 'Travels for food' },
@@ -63,6 +64,8 @@ const els = {
   backToReviewBtn: document.getElementById('backToReviewBtn'),
   generateBtn: document.getElementById('generateBtn'),
   itineraryGrid: document.getElementById('itineraryGrid'),
+  downloadCalendarBtn: document.getElementById('downloadCalendarBtn'),
+  savedItineraries: document.getElementById('savedItineraries'),
   editBtn: document.getElementById('editBtn'),
   apiBanner: document.getElementById('apiBanner'),
   preferencesLink: document.getElementById('preferencesLink'),
@@ -75,8 +78,6 @@ const els = {
   profileQuestions: document.getElementById('profileQuestions'),
   profileTravelNotes: document.getElementById('profileTravelNotes'),
   profileEditBtn: document.getElementById('profileEditBtn'),
-  prefsSignalCount: document.getElementById('prefsSignalCount'),
-  prefsLearnedRows: document.getElementById('prefsLearnedRows'),
   saveProgressBtn: document.getElementById('saveProgressBtn'),
   autoArrangeBtn: document.getElementById('autoArrangeBtn'),
   resumeModal: document.getElementById('resumeModal'),
@@ -354,81 +355,6 @@ function normalizeProfile(profile) {
   base.aboutMe = String(aboutSource ?? '').trim();
   base.profileInstruction = String(profile.profileInstruction || '').trim();
   return base;
-}
-
-function loadLearnedRemovals() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(LEARNED_PREFS_REMOVED_KEY) || '{}');
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function getLearnedRemovalsForUser(userId = ensureUserId()) {
-  const all = loadLearnedRemovals();
-  const current = all[userId] || { liked: [], disliked: [] };
-  return {
-    liked: Array.isArray(current.liked) ? current.liked : [],
-    disliked: Array.isArray(current.disliked) ? current.disliked : []
-  };
-}
-
-function saveLearnedRemovalsForUser(side, value, userId = ensureUserId()) {
-  const all = loadLearnedRemovals();
-  const current = getLearnedRemovalsForUser(userId);
-  current[side] = [...new Set([...(current[side] || []), value])];
-  all[userId] = current;
-  localStorage.setItem(LEARNED_PREFS_REMOVED_KEY, JSON.stringify(all));
-}
-
-function toLearnedList(values = []) {
-  return [...new Set((Array.isArray(values) ? values : [])
-    .map((v) => String(v || '').trim())
-    .filter(Boolean))];
-}
-
-function filterLearnedList(values = [], removed = []) {
-  const removedSet = new Set((removed || []).map((v) => String(v || '').trim().toLowerCase()));
-  return values.filter((v) => !removedSet.has(String(v).toLowerCase()));
-}
-
-function renderLearnedTable(likedValues = [], dislikedValues = []) {
-  if (!els.prefsLearnedRows) return;
-  const rowCount = Math.max(likedValues.length, dislikedValues.length, 1);
-
-  const rowHtml = Array.from({ length: rowCount }, (_, i) => {
-    const liked = likedValues[i] || '';
-    const disliked = dislikedValues[i] || '';
-    const makeCell = (value, side) => {
-      if (!value) return '<span class="muted-text">—</span>';
-      return `
-        <div class="learned-cell-item">
-          <span>${esc(value)}</span>
-          <button type="button" class="learned-remove-btn" data-remove-side="${side}" data-remove-value="${esc(value)}" aria-label="Remove ${esc(value)}">×</button>
-        </div>
-      `;
-    };
-
-    return `
-      <tr>
-        <td>${makeCell(liked, 'liked')}</td>
-        <td>${makeCell(disliked, 'disliked')}</td>
-      </tr>
-    `;
-  }).join('');
-
-  els.prefsLearnedRows.innerHTML = rowHtml;
-  els.prefsLearnedRows.querySelectorAll('.learned-remove-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const side = btn.dataset.removeSide;
-      const value = btn.dataset.removeValue;
-      if (!side || !value) return;
-      saveLearnedRemovalsForUser(side, value);
-      btn.closest('tr')?.classList.add('learned-row-fade');
-      openPreferencesModal();
-    });
-  });
 }
 
 function loadProfile() {
@@ -841,22 +767,6 @@ async function openPreferencesModal() {
   state.profilesStore = loadProfiles();
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   renderPreferencesModal();
-
-  try {
-    const res = await fetch(`/api/preferences?userId=${encodeURIComponent(ensureUserId())}`);
-    const data = await res.json();
-    const prefs = data.preferences || { liked: { types: [], keywords: [] }, disliked: { types: [], keywords: [] }, signals: [] };
-    const removals = getLearnedRemovalsForUser();
-    const likedAll = toLearnedList([...(prefs.liked?.types || []), ...(prefs.liked?.keywords || [])]);
-    const dislikedAll = toLearnedList([...(prefs.disliked?.types || []), ...(prefs.disliked?.keywords || [])]);
-    const liked = filterLearnedList(likedAll, removals.liked);
-    const disliked = filterLearnedList(dislikedAll, removals.disliked);
-
-    els.prefsSignalCount.textContent = `Based on ${prefs.signals?.length || 0} past activities`;
-    renderLearnedTable(liked, disliked);
-  } catch {
-    els.prefsSignalCount.textContent = 'Unable to load preferences';
-  }
   els.prefsModal.classList.remove('hidden');
 }
 
@@ -920,9 +830,86 @@ function updateReviewNav() {
   }
 }
 
+let reviewImageEnrichInFlight = false;
+
+function enrichImages(items = []) {
+  console.log('[enrichImages] starting with', items.length, 'items');
+
+  if (!Array.isArray(items) || !items.length) {
+    const immediatePromise = Promise.resolve();
+    console.log('[enrichImages] no items; created/returning immediate Promise:', immediatePromise);
+    immediatePromise.then(() => {
+      console.log('[enrichImages] immediate Promise resolved (no items)');
+      console.log('[enrichImages] done');
+    });
+    return immediatePromise;
+  }
+
+  const itemsToFetch = items.filter((item) => item && !item.imageUrl && item.name);
+  console.log('[enrichImages] items needing images:', itemsToFetch.map((i) => i.name));
+
+  if (!itemsToFetch.length) {
+    const immediatePromise = Promise.resolve();
+    console.log('[enrichImages] no images to fetch; created/returning immediate Promise:', immediatePromise);
+    immediatePromise.then(() => {
+      console.log('[enrichImages] immediate Promise resolved (nothing to fetch)');
+      console.log('[enrichImages] done');
+    });
+    return immediatePromise;
+  }
+
+  const enrichmentPromise = Promise.all(itemsToFetch.map(async (item) => {
+    try {
+      const name = String(item.name || '');
+      const city = String(item.city || '');
+      console.log('[enrichImages] fetching image for:', name, city);
+      const params = new URLSearchParams({ q: name, city });
+      const url = `/api/image?${params.toString()}`;
+      console.log('[image fetch] url=', url);
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+      console.log('[enrichImages] got response:', data);
+      if (data?.imageUrl) item.imageUrl = data.imageUrl;
+    } catch (err) {
+      console.error('[image fetch error]', err);
+    }
+  }));
+
+  console.log('[enrichImages] created/returning Promise:', enrichmentPromise);
+  return enrichmentPromise.then((result) => {
+    console.log('[enrichImages] Promise resolved');
+    console.log('[enrichImages] done');
+    return result;
+  }).catch((err) => {
+    console.error('[enrichImages] Promise rejected', err);
+    throw err;
+  });
+}
+
 function renderActivities() {
+  console.log('[renderActivities] step=', state.step, 'activity count=', state.activities.length);
   renderBudget();
   updateReviewNav();
+
+  if (state.step === 2 && !reviewImageEnrichInFlight) {
+    console.log('[renderActivities] step 2 detected, calling enrichImages');
+    reviewImageEnrichInFlight = true;
+    console.log('[renderActivities] enrichment start');
+    const enrichPromise = enrichImages(state.activities);
+    console.log('[renderActivities] enrichPromise returned:', enrichPromise);
+    enrichPromise.then(() => {
+      console.log('[renderActivities] enrichPromise.then() fired!');
+      if (state.step === 2) {
+        renderActivities(); // Re-render cards to display loaded images
+      }
+    }).catch((err) => {
+      console.error('[renderActivities] enrichPromise rejected:', err);
+    }).finally(() => {
+      reviewImageEnrichInFlight = false;
+    });
+  }
+
   els.activitiesGrid.innerHTML = '';
   state.activities.forEach((a) => {
     const review = state.reviewed[a.id] || { approved: null, notes: '' };
@@ -994,8 +981,8 @@ function expandDays(cities) {
   return days;
 }
 
-const DAY_START_HOUR = 8;
-const DAY_END_HOUR = 22;
+const DAY_START_HOUR = 6;
+const DAY_END_HOUR = 24;
 const PX_PER_HOUR = 60;
 const GRID_HEIGHT = (DAY_END_HOUR - DAY_START_HOUR) * PX_PER_HOUR;
 
@@ -1052,10 +1039,62 @@ function getIncomingCommuteForActivity(activityId) {
   return state.commutes[commutePairKey(prev.id, activityId)] || null;
 }
 
+function normalizeCommuteStateMap(commuteMap = {}) {
+  const normalized = {};
+  Object.entries(commuteMap || {}).forEach(([key, commute]) => {
+    if (!commute || typeof commute !== 'object') return;
+
+    const modes = commute.modes && typeof commute.modes === 'object'
+      ? commute.modes
+      : {
+        transit: commute.mode === 'transit' ? { durationMinutes: commute.durationMinutes, modeIcon: commute.modeIcon || '🚇' } : { durationMinutes: null, modeIcon: '🚇' },
+        driving: commute.mode === 'driving' ? { durationMinutes: commute.durationMinutes, modeIcon: commute.modeIcon || '🚗' } : { durationMinutes: null, modeIcon: '🚗' },
+        walking: commute.mode === 'walking' ? { durationMinutes: commute.durationMinutes, modeIcon: commute.modeIcon || '🚶' } : { durationMinutes: null, modeIcon: '🚶' }
+      };
+
+    const selectedMode = resolveSelectedCommuteMode({ ...commute, modes });
+    const selected = modes[selectedMode] || {};
+
+    normalized[key] = {
+      ...commute,
+      modes,
+      selectedMode,
+      durationMinutes: Number.isFinite(Number(selected.durationMinutes)) ? Number(selected.durationMinutes) : null,
+      modeIcon: selected.modeIcon || '🚇'
+    };
+  });
+
+  return normalized;
+}
+
+const COMMUTE_MODE_ORDER = ['transit', 'driving', 'walking'];
+const COMMUTE_MODE_LABEL = {
+  transit: 'Transit',
+  driving: 'Driving',
+  walking: 'Walking'
+};
+
+function resolveSelectedCommuteMode(commute) {
+  if (!commute || typeof commute !== 'object') return null;
+  const selectedMode = commute.selectedMode && commute.modes?.[commute.selectedMode]
+    ? commute.selectedMode
+    : COMMUTE_MODE_ORDER.find((mode) => Number.isFinite(commute.modes?.[mode]?.durationMinutes));
+  return selectedMode || COMMUTE_MODE_ORDER[0];
+}
+
+function resolveSelectedCommuteDetails(commute) {
+  if (!commute) return null;
+  const selectedMode = resolveSelectedCommuteMode(commute);
+  const selected = commute.modes?.[selectedMode] || {};
+  const durationMinutes = Number.isFinite(Number(selected.durationMinutes)) ? Number(selected.durationMinutes) : null;
+  const modeIcon = selected.modeIcon || '🚇';
+  return { selectedMode, durationMinutes, modeIcon };
+}
+
 function formatCommuteBadge(commute) {
-  if (!commute) return '';
-  const suffix = commute.mode === 'walking' ? ' walk' : '';
-  return `${commute.modeIcon || '🚇'} ${commute.durationMinutes} min${suffix}`;
+  const selected = resolveSelectedCommuteDetails(commute);
+  if (!selected || !Number.isFinite(selected.durationMinutes)) return '';
+  return `${selected.modeIcon} ${selected.durationMinutes} min`;
 }
 
 function timeFromY(yPx = 0) {
@@ -1129,39 +1168,199 @@ function makeStagingCard(item) {
   const { icon, colorClass } = getActivityStyle(item.type);
   return `
     <div class="item staging-card ${colorClass}" data-id="${item.id}">
-      <h4><span class="activity-icon" aria-hidden="true">${icon}</span> ${esc(item.name)}</h4>
-      <span class="badge">${esc(item.type)}</span>
-      <span class="badge">${esc(formatDuration(item.duration_hours || 1))}</span>
+      <h4><span class="activity-icon" aria-hidden="true">${icon}</span><span class="activity-name">${esc(item.name)}</span></h4>
     </div>
   `;
+}
+
+function formatTypeLabel(type = '') {
+  const normalized = String(type || '').trim().toLowerCase();
+  if (!normalized) return 'Activity';
+  return normalized
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function formatDurationHoursLong(hours = 1) {
+  const value = Number(hours || 1);
+  const safe = Number.isFinite(value) ? value : 1;
+  return `${safe % 1 === 0 ? safe.toFixed(0) : safe.toFixed(1)} hours`;
 }
 
 function makePlacedCard(item) {
   const { icon, colorClass } = getActivityStyle(item.type);
   const placement = state.placements[item.id] || {};
   const time = parseTimeTo24(placement.time || item.suggested_time || typeToTime(item.type));
-  const h = Math.max(60, Number(item.duration_hours || 1) * PX_PER_HOUR);
+  const h = Math.max(28, Number(item.duration_hours || 1) * PX_PER_HOUR);
   const y = yFromTime(time);
-  const incomingCommute = getIncomingCommuteForActivity(item.id);
-  const commuteBadge = incomingCommute
-    ? `<span class="commute-badge">${esc(formatCommuteBadge(incomingCommute))}</span>`
-    : '';
+  const typeLabel = formatTypeLabel(item.type);
+  const durationLabel = formatDurationHoursLong(item.duration_hours || 1);
   return `
     <article class="placed-card ${colorClass}" data-id="${item.id}" style="height:${h}px;top:${y}px;">
       <div class="placed-body">
-        <h4><span class="activity-icon" aria-hidden="true">${icon}</span> ${esc(item.name)}</h4>
-        ${commuteBadge}
-        <div class="placed-meta">
-          <label>Time <input data-time type="time" value="${esc(time)}" /></label>
-          <span class="badge">${esc(formatDuration(item.duration_hours || 1))}</span>
-          <span class="badge">${esc(item.type)}</span>
+        <div class="placed-head-row">
+          <h4>
+            <span class="activity-icon activity-icon-wrap" aria-hidden="true">
+              ${icon}
+              <button
+                type="button"
+                class="placed-info-wrap"
+                aria-label="Activity details"
+                data-tooltip-name="${esc(item.name)}"
+                data-tooltip-type-icon="${esc(icon)}"
+                data-tooltip-type="${esc(typeLabel)}"
+                data-tooltip-duration="${esc(durationLabel)}"
+                data-tooltip-verdict="${esc(item.verdict || 'N/A')}"
+                data-tooltip-why="${esc(item.why_it_fits || '')}"
+                data-tooltip-start-location="${esc(item.start_location || '')}"
+                data-tooltip-end-location="${esc(item.end_location || '')}"
+              >
+                <span class="placed-info-icon" aria-hidden="true">ℹ</span>
+              </button>
+            </span>
+            <span class="activity-name">${esc(item.name)}</span>
+          </h4>
         </div>
       </div>
     </article>
   `;
 }
 
+function makeCommuteIndicator(currentItem, nextItem) {
+  const placement = state.placements[currentItem.id] || {};
+  const time = parseTimeTo24(placement.time || currentItem.suggested_time || typeToTime(currentItem.type));
+  const h = Math.max(28, Number(currentItem.duration_hours || 1) * PX_PER_HOUR);
+  const y = yFromTime(time) + h + 6;
+  const commute = state.commutes[commutePairKey(currentItem.id, nextItem.id)] || null;
+  const selected = resolveSelectedCommuteDetails(commute);
+  if (!selected || !Number.isFinite(selected.durationMinutes)) return '';
+
+  const options = COMMUTE_MODE_ORDER
+    .map((mode) => {
+      const option = commute?.modes?.[mode];
+      if (!option || !Number.isFinite(Number(option.durationMinutes))) return '';
+      const isActive = selected.selectedMode === mode;
+      return `
+        <button type="button" class="commute-option ${isActive ? 'active' : ''}" data-mode="${mode}">
+          <span>${esc(option.modeIcon || '🚇')} ${esc(COMMUTE_MODE_LABEL[mode] || mode)} - ${Number(option.durationMinutes)} min</span>
+          ${isActive ? '<span class="commute-option-check">✓</span>' : ''}
+        </button>
+      `;
+    })
+    .filter(Boolean)
+    .join('');
+
+  if (!options) return '';
+
+  return `
+    <div class="commute-indicator" style="top:${y}px;">
+      <div class="commute-selector" data-from-id="${esc(currentItem.id)}" data-to-id="${esc(nextItem.id)}">
+        <button type="button" class="commute-selector-trigger" aria-expanded="false">
+          <span class="commute-selected-label">${esc(formatCommuteBadge(commute))}</span>
+          <span class="commute-selector-arrow" aria-hidden="true">▾</span>
+        </button>
+        <div class="commute-selector-menu" role="menu">${options}</div>
+      </div>
+    </div>
+  `;
+}
+
+function getPlacementTimeRange(activity, placementOverride = null) {
+  const placement = placementOverride || state.placements[activity.id] || {};
+  const startTime = parseTimeTo24(placement.time || activity.suggested_time || typeToTime(activity.type));
+  const startMinutes = minutesFromTime(startTime);
+  const durationMinutes = Math.max(30, Number(activity.duration_hours || 1) * 60);
+  return {
+    startMinutes,
+    endMinutes: startMinutes + durationMinutes
+  };
+}
+
+function rangesOverlap(a, b) {
+  return a.startMinutes < b.endMinutes && b.startMinutes < a.endMinutes;
+}
+
+function hasOverlapInDay(activityId, dayId, placementOverride = null) {
+  const dropped = state.activities.find((a) => a.id === activityId);
+  if (!dropped || !dayId) return false;
+
+  const droppedRange = getPlacementTimeRange(dropped, placementOverride);
+
+  const dayActivities = state.activities.filter((a) => (
+    a.id !== activityId
+    && state.reviewed[a.id]?.approved
+    && state.placements[a.id]?.dayId === dayId
+  ));
+
+  return dayActivities.some((other) => rangesOverlap(droppedRange, getPlacementTimeRange(other)));
+}
+
+function closeAllCommuteMenus(except = null) {
+  document.querySelectorAll('.commute-selector.open').forEach((selector) => {
+    if (except && selector === except) return;
+    selector.classList.remove('open');
+    const trigger = selector.querySelector('.commute-selector-trigger');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function bindCommuteInteractions() {
+  document.querySelectorAll('.commute-selector').forEach((selector) => {
+    const fromId = selector.dataset.fromId;
+    const toId = selector.dataset.toId;
+    if (!fromId || !toId) return;
+
+    const trigger = selector.querySelector('.commute-selector-trigger');
+    if (trigger) {
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const willOpen = !selector.classList.contains('open');
+        closeAllCommuteMenus(selector);
+        selector.classList.toggle('open', willOpen);
+        trigger.setAttribute('aria-expanded', String(willOpen));
+      });
+    }
+
+    selector.querySelectorAll('.commute-option').forEach((optionBtn) => {
+      optionBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mode = optionBtn.dataset.mode;
+        const key = commutePairKey(fromId, toId);
+        const commute = state.commutes[key];
+        if (!commute || !mode || !commute.modes?.[mode]) return;
+
+        const selected = commute.modes[mode];
+        if (!Number.isFinite(Number(selected.durationMinutes))) return;
+
+        state.commutes[key] = {
+          ...commute,
+          selectedMode: mode,
+          durationMinutes: Number(selected.durationMinutes),
+          modeIcon: selected.modeIcon || commute.modeIcon || '🚇'
+        };
+
+        const toPlacement = state.placements[toId] || {};
+        const dayId = toPlacement.dayId;
+        if (dayId) {
+          const orderedActivities = state.activities
+            .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === dayId)
+            .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+          const pairIndex = orderedActivities.findIndex((a, index) => index > 0 && orderedActivities[index - 1].id === fromId && a.id === toId);
+          recalculateDayFromIndex(dayId, pairIndex === -1 ? 1 : pairIndex);
+        }
+
+        renderArrange();
+      });
+    });
+  });
+
+  document.addEventListener('click', closeAllCommuteMenus, { once: true });
+}
+
 function renderArrange() {
+  console.log('[render] state.commutes=', state.commutes);
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
   const cityGroups = getArrangeCities();
   renderArrangeCityNav(cityGroups);
@@ -1200,25 +1399,105 @@ function renderArrange() {
     const items = approved
       .filter((a) => state.placements[a.id]?.dayId === d.id)
       .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
-    schedule.innerHTML = items.map(makePlacedCard).join('');
+
+    let html = '';
+    items.forEach((item, index) => {
+      html += makePlacedCard(item);
+      if (index < items.length - 1) {
+        html += makeCommuteIndicator(item, items[index + 1]);
+      }
+    });
+
+    schedule.innerHTML = html;
   });
 
-  new Sortable(els.stagingArea, { group: 'itinerary', sort: false, animation: 120 });
+  bindCommuteInteractions();
+
+  new Sortable(els.stagingArea, {
+    group: 'itinerary',
+    sort: false,
+    animation: 120,
+    onStart: (evt) => {
+      const id = evt.item?.dataset.id;
+      if (!id) return;
+      evt.item.dataset.dragActivityId = id;
+      evt.item.dataset.prevPlacement = JSON.stringify(state.placements[id] || { dayId: null, time: null });
+    }
+  });
+
   document.querySelectorAll('.day-schedule').forEach((zone) => {
     new Sortable(zone, {
       group: 'itinerary',
       sort: false,
       animation: 120,
-      onAdd: (evt) => {
+      onStart: (evt) => {
         const id = evt.item?.dataset.id;
         if (!id) return;
+        evt.item.dataset.dragActivityId = id;
+        evt.item.dataset.prevPlacement = JSON.stringify(state.placements[id] || { dayId: null, time: null });
+      },
+      onEnd: (evt) => {
+        if (evt.item) {
+          if (Sortable?.utils?.deselect) Sortable.utils.deselect(evt.item);
+          evt.item.style.transform = '';
+          evt.item.style.opacity = '';
+        }
+
+        clearActivePlacedCardDrag();
+
+        const id = evt.item?.dataset.id;
+        if (!id) return;
+
+        if (evt.to !== zone || evt.item?.parentElement !== zone) {
+          delete evt.item.dataset.prevPlacement;
+          return;
+        }
+
+        if (evt.item.dataset.dropHandled === '1') {
+          delete evt.item.dataset.prevPlacement;
+          return;
+        }
+        evt.item.dataset.dropHandled = '1';
+        setTimeout(() => {
+          if (evt.item) delete evt.item.dataset.dropHandled;
+        }, 0);
+
         const dayId = zone.id.replace('schedule-', '');
-        const y = (evt.originalEvent?.clientY || 0) - zone.getBoundingClientRect().top;
-        state.placements[id] = {
+        const prevPlacement = (() => {
+          try {
+            return JSON.parse(evt.item.dataset.prevPlacement || 'null');
+          } catch {
+            return null;
+          }
+        })() || { ...(state.placements[id] || {}), dayId: null, time: null };
+
+        const y = (evt.originalEvent?.clientY || evt.item.getBoundingClientRect().top) - zone.getBoundingClientRect().top;
+        const nextPlacement = {
           ...(state.placements[id] || {}),
           dayId,
           time: timeFromY(y)
         };
+
+        if (hasOverlapInDay(id, dayId, nextPlacement)) {
+          state.placements[id] = {
+            ...(state.placements[id] || {}),
+            dayId: prevPlacement.dayId || null,
+            time: prevPlacement.time || parseTimeTo24(state.activities.find((a) => a.id === id)?.suggested_time || typeToTime(state.activities.find((a) => a.id === id)?.type))
+          };
+          showToast('Overlap detected, placement reverted', 'info');
+          delete evt.item.dataset.prevPlacement;
+          renderArrange();
+          return;
+        }
+
+        const previousDayId = state.placements[id]?.dayId || null;
+        const previousTime = state.placements[id]?.time || null;
+
+        state.placements[id] = nextPlacement;
+        delete evt.item.dataset.prevPlacement;
+
+        if (previousDayId === nextPlacement.dayId && previousTime === nextPlacement.time) return;
+
         renderArrange();
       }
     });
@@ -1236,8 +1515,10 @@ async function fetchCommutesForActivities(activities = []) {
       body: JSON.stringify({ activities })
     });
     const data = await res.json();
+    console.log('[commute response]', data);
     return Array.isArray(data?.commutes) ? data.commutes : [];
-  } catch {
+  } catch (err) {
+    console.error('[commute error]', err);
     return [];
   }
 }
@@ -1257,16 +1538,42 @@ function applyCommuteTimeAdjustments(dayId, orderedActivities = [], commutes = [
     const prevStart = minutesFromTime(parseTimeTo24(prevPlacement.time || previous.suggested_time || typeToTime(previous.type)));
     const prevDurationMinutes = Number(previous.duration_hours || 1) * 60;
     const currentStart = minutesFromTime(parseTimeTo24(currentPlacement.time || current.suggested_time || typeToTime(current.type)));
-    const commuteMinutes = Number(commute.durationMinutes || 0);
+    const selected = resolveSelectedCommuteDetails(commute);
+    const commuteMinutes = Number(selected?.durationMinutes || 0);
 
     const minByTravel = prevStart + prevDurationMinutes + commuteMinutes;
-    const shiftedCurrent = currentStart + commuteMinutes;
-    const adjustedStart = Math.max(currentStart, shiftedCurrent, minByTravel);
+    const adjustedStart = Math.max(currentStart, minByTravel);
 
     state.placements[current.id] = {
       ...currentPlacement,
       dayId,
       time: timeFromMinutes(adjustedStart)
+    };
+  }
+}
+
+function recalculateDayFromIndex(dayId, startIndex = 1) {
+  if (!dayId) return;
+  const orderedActivities = state.activities
+    .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === dayId)
+    .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+
+  for (let i = Math.max(1, startIndex); i < orderedActivities.length; i += 1) {
+    const previous = orderedActivities[i - 1];
+    const current = orderedActivities[i];
+    const commute = state.commutes[commutePairKey(previous.id, current.id)];
+    const selected = resolveSelectedCommuteDetails(commute);
+    if (!selected || !Number.isFinite(selected.durationMinutes)) continue;
+
+    const prevStart = minutesFromTime(parseTimeTo24(state.placements[previous.id]?.time || previous.suggested_time || typeToTime(previous.type)));
+    const prevDurationMinutes = Number(previous.duration_hours || 1) * 60;
+    const currentStart = minutesFromTime(parseTimeTo24(state.placements[current.id]?.time || current.suggested_time || typeToTime(current.type)));
+    const minByTravel = prevStart + prevDurationMinutes + selected.durationMinutes;
+
+    state.placements[current.id] = {
+      ...(state.placements[current.id] || {}),
+      dayId,
+      time: timeFromMinutes(Math.max(currentStart, minByTravel))
     };
   }
 }
@@ -1289,12 +1596,21 @@ async function updateCommutesForCityDays(dayIds = []) {
       id: a.id,
       name: a.name,
       city: a.city,
+      start_location: a.start_location,
+      end_location: a.end_location,
       suggested_time: state.placements[a.id]?.time || parseTimeTo24(a.suggested_time || typeToTime(a.type))
     }));
 
     const commutes = await fetchCommutesForActivities(payloadActivities);
     commutes.forEach((c) => {
-      state.commutes[commutePairKey(c.fromId, c.toId)] = c;
+      const selectedMode = resolveSelectedCommuteMode(c);
+      const selected = c?.modes?.[selectedMode] || {};
+      state.commutes[commutePairKey(c.fromId, c.toId)] = {
+        ...c,
+        selectedMode,
+        durationMinutes: Number.isFinite(Number(selected.durationMinutes)) ? Number(selected.durationMinutes) : null,
+        modeIcon: selected.modeIcon || '🚇'
+      };
     });
 
     applyCommuteTimeAdjustments(dayId, orderedActivities, commutes);
@@ -1358,42 +1674,205 @@ async function autoArrangeActiveCity() {
 
   const activeDayIds = activeDays.map((d) => d.id);
   await updateCommutesForCityDays(activeDayIds);
+  console.log('[auto-arrange] state.commutes', state.commutes);
 
   renderArrange();
 }
 
+let activePlacedCardDragCleanup = null;
+let placedCardDragMouseupFallbackBound = false;
+let placedTooltipLayer = null;
+let currentDragMode = null;
+
+function ensurePlacedTooltipLayer() {
+  if (placedTooltipLayer && document.body.contains(placedTooltipLayer)) return placedTooltipLayer;
+  placedTooltipLayer = document.createElement('div');
+  placedTooltipLayer.className = 'placed-tooltip-layer';
+  placedTooltipLayer.setAttribute('role', 'tooltip');
+  document.body.appendChild(placedTooltipLayer);
+  window.addEventListener('scroll', hidePlacedTooltip, true);
+  window.addEventListener('resize', hidePlacedTooltip);
+  return placedTooltipLayer;
+}
+
+function positionPlacedTooltip(anchorEl) {
+  if (!placedTooltipLayer || !anchorEl) return;
+  const spacing = 8;
+  const rect = anchorEl.getBoundingClientRect();
+  const tooltipRect = placedTooltipLayer.getBoundingClientRect();
+
+  let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+  let top = rect.top - tooltipRect.height - spacing;
+
+  if (left < 8) left = 8;
+  if (left + tooltipRect.width > window.innerWidth - 8) {
+    left = window.innerWidth - tooltipRect.width - 8;
+  }
+
+  if (top < 8) {
+    top = rect.bottom + spacing;
+  }
+
+  placedTooltipLayer.style.left = `${left}px`;
+  placedTooltipLayer.style.top = `${top}px`;
+}
+
+function showPlacedTooltip(anchorEl) {
+  if (!anchorEl) return;
+  const layer = ensurePlacedTooltipLayer();
+  layer.innerHTML = `
+    <div class="placed-tooltip-title">${anchorEl.dataset.tooltipName || ''}</div>
+    <div class="placed-tooltip-row"><strong>Type:</strong> ${anchorEl.dataset.tooltipTypeIcon || ''} ${anchorEl.dataset.tooltipType || ''}</div>
+    <div class="placed-tooltip-row"><strong>Duration:</strong> ${anchorEl.dataset.tooltipDuration || ''}</div>
+    <div class="placed-tooltip-row"><strong>Verdict:</strong> ${anchorEl.dataset.tooltipVerdict || 'N/A'}</div>
+    <div class="placed-tooltip-row"><strong>Start:</strong> ${anchorEl.dataset.tooltipStartLocation || '—'}</div>
+    <div class="placed-tooltip-row"><strong>End:</strong> ${anchorEl.dataset.tooltipEndLocation || '—'}</div>
+    <div class="placed-tooltip-row"><strong>Why it fits:</strong> ${anchorEl.dataset.tooltipWhy || ''}</div>
+  `;
+  layer.classList.add('visible');
+  positionPlacedTooltip(anchorEl);
+}
+
+function hidePlacedTooltip() {
+  if (!placedTooltipLayer) return;
+  placedTooltipLayer.classList.remove('visible');
+}
+
+function clearActivePlacedCardDrag() {
+  if (typeof activePlacedCardDragCleanup === 'function') {
+    activePlacedCardDragCleanup();
+  }
+  activePlacedCardDragCleanup = null;
+}
+
 function bindPlacedCardInteractions() {
-  document.querySelectorAll('.placed-card [data-time]').forEach((inp) => {
-    inp.addEventListener('input', () => {
-      const id = inp.closest('.placed-card')?.dataset.id;
-      if (!id) return;
-      state.placements[id] = state.placements[id] || {};
-      state.placements[id].time = inp.value;
-      renderArrange();
+  if (!placedCardDragMouseupFallbackBound) {
+    document.addEventListener('mouseup', () => {
+      clearActivePlacedCardDrag();
     });
-  });
+    placedCardDragMouseupFallbackBound = true;
+  }
+
+  const HOLD_DELAY_MS = 100;
+  const MOVE_THRESHOLD_PX = 5;
+  const RESIZE_EDGE_PX = 14;
 
   document.querySelectorAll('.placed-card').forEach((card) => {
-    card.addEventListener('mousedown', (e) => {
-      if (e.target.matches('input, label')) return;
-      const id = card.dataset.id;
-      const schedule = card.closest('.day-schedule');
-      const dayId = schedule?.id.replace('schedule-', '');
-      if (!id || !schedule || !dayId) return;
-      const rect = schedule.getBoundingClientRect();
+    const id = card.dataset.id;
+    const schedule = card.closest('.day-schedule');
+    const dayId = schedule?.id.replace('schedule-', '');
+    if (!id || !schedule || !dayId) return;
 
-      const move = (ev) => {
+    const inResizeEdge = (clientY) => {
+      const cardRect = card.getBoundingClientRect();
+      const isNearBottom = clientY >= (cardRect.bottom - RESIZE_EDGE_PX) && clientY <= cardRect.bottom;
+      const isNearTop = clientY >= cardRect.top && clientY <= (cardRect.top + RESIZE_EDGE_PX);
+      return isNearBottom || isNearTop;
+    };
+
+    const onHoverMove = (ev) => {
+      card.classList.toggle('resize-hover', inResizeEdge(ev.clientY));
+    };
+
+    card.addEventListener('mousemove', onHoverMove);
+    card.addEventListener('mouseleave', () => {
+      card.classList.remove('resize-hover');
+    });
+
+    const infoWrap = card.querySelector('.placed-info-wrap');
+    if (infoWrap) {
+      infoWrap.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+      });
+      infoWrap.addEventListener('mouseenter', () => showPlacedTooltip(infoWrap));
+      infoWrap.addEventListener('focus', () => showPlacedTooltip(infoWrap));
+      infoWrap.addEventListener('mouseleave', hidePlacedTooltip);
+      infoWrap.addEventListener('blur', hidePlacedTooltip);
+    }
+
+    card.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      if (e.button !== 0) return;
+      e.preventDefault();
+      hidePlacedTooltip();
+
+      clearActivePlacedCardDrag();
+
+      const cardRect = card.getBoundingClientRect();
+      const clickY = e.clientY;
+      const isNearBottom = clickY > (cardRect.bottom - RESIZE_EDGE_PX);
+      const isNearTop = clickY < (cardRect.top + RESIZE_EDGE_PX);
+      currentDragMode = (isNearBottom || isNearTop) ? 'resize' : 'move';
+
+      const rect = schedule.getBoundingClientRect();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startHeight = card.offsetHeight;
+      const currentTop = Number.parseFloat(card.style.top) || yFromTime(state.placements[id]?.time);
+      const maxHeight = Math.max(28, GRID_HEIGHT - currentTop);
+      let holdReady = false;
+      let isDragging = false;
+
+      const holdTimer = setTimeout(() => {
+        holdReady = true;
+      }, HOLD_DELAY_MS);
+
+      const updateCardPosition = (ev) => {
         const y = ev.clientY - rect.top;
         state.placements[id] = { ...(state.placements[id] || {}), dayId, time: timeFromY(y) };
         const nextY = yFromTime(state.placements[id].time);
         card.style.top = `${nextY}px`;
-        const input = card.querySelector('[data-time]');
-        if (input) input.value = state.placements[id].time;
       };
-      const up = () => {
+
+      const updateCardDuration = (ev) => {
+        const rawHeight = startHeight + (ev.clientY - startY);
+        const clampedHeight = Math.max(28, Math.min(maxHeight, rawHeight));
+        const roundedMinutes = Math.max(30, Math.round((clampedHeight / PX_PER_HOUR) * 2) * 30);
+        const snappedHeight = (roundedMinutes / 60) * PX_PER_HOUR;
+        const nextDurationHours = roundedMinutes / 60;
+
+        card.style.height = `${snappedHeight}px`;
+
+        const activity = state.activities.find((a) => a.id === id);
+        if (activity) activity.duration_hours = nextDurationHours;
+      };
+
+      const move = (ev) => {
+        ev.stopPropagation();
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        const movedDistance = Math.hypot(dx, dy);
+
+        if (!isDragging) {
+          if (!holdReady || movedDistance < MOVE_THRESHOLD_PX) return;
+          isDragging = true;
+        }
+
+        if (currentDragMode === 'resize') {
+          updateCardDuration(ev);
+        } else {
+          updateCardPosition(ev);
+        }
+      };
+
+      const up = (ev) => {
+        ev.stopPropagation();
+        clearTimeout(holdTimer);
         document.removeEventListener('mousemove', move);
         document.removeEventListener('mouseup', up);
-        renderArrange();
+        activePlacedCardDragCleanup = null;
+
+        card.classList.remove('resize-hover');
+        currentDragMode = null;
+        if (isDragging) renderArrange();
+      };
+
+      activePlacedCardDragCleanup = () => {
+        clearTimeout(holdTimer);
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        card.classList.remove('resize-hover');
+        currentDragMode = null;
       };
 
       document.addEventListener('mousemove', move);
@@ -1420,6 +1899,114 @@ function renderItinerary() {
       .join('');
     return `<section class="day-col"><div class="day-head">${d.date} • ${esc(d.city)}</div><div class="list">${items || '<em>No activities assigned.</em>'}</div></section>`;
   }).join('');
+}
+
+async function fetchSavedItineraries() {
+  try {
+    const res = await fetch('/api/itineraries');
+    const data = await res.json();
+    state.savedItineraries = Array.isArray(data?.itineraries) ? data.itineraries : [];
+  } catch {
+    state.savedItineraries = [];
+  }
+}
+
+function renderSavedItineraries() {
+  if (!els.savedItineraries) return;
+  if (!state.savedItineraries.length) {
+    els.savedItineraries.innerHTML = '<p class="muted-text">No saved itineraries yet.</p>';
+    return;
+  }
+
+  els.savedItineraries.innerHTML = state.savedItineraries.map((item) => {
+    const generatedDate = item.generatedAt
+      ? new Date(item.generatedAt).toLocaleString()
+      : 'Unknown date';
+    const isCurrent = item.id === state.currentItineraryId;
+    return `
+      <article class="saved-itinerary-item ${isCurrent ? 'active' : ''}">
+        <div>
+          <h4>${esc(item.tripName || 'Untitled Trip')}</h4>
+          <p>${esc(generatedDate)} • ${Number(item.days || 0)} days • ${Number(item.activityCount || 0)} activities</p>
+        </div>
+        <div class="saved-itinerary-actions">
+          <button type="button" class="secondary" data-load-itinerary="${esc(item.id)}">Open</button>
+          <button type="button" class="secondary" data-delete-itinerary="${esc(item.id)}">Delete</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  els.savedItineraries.querySelectorAll('[data-load-itinerary]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      loadItineraryById(btn.dataset.loadItinerary);
+    });
+  });
+
+  els.savedItineraries.querySelectorAll('[data-delete-itinerary]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.deleteItinerary;
+      if (!id) return;
+      const confirmed = window.confirm('Delete this saved itinerary?');
+      if (!confirmed) return;
+
+      try {
+        const res = await fetch(`/api/itinerary/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed to delete itinerary');
+        if (state.currentItineraryId === id) {
+          state.currentItineraryId = null;
+          state.itinerary = null;
+          els.itineraryGrid.innerHTML = '';
+          if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = true;
+        }
+        await fetchSavedItineraries();
+        renderSavedItineraries();
+        showToast('Itinerary deleted.', 'success');
+      } catch {
+        showToast('Could not delete itinerary.', 'error');
+      }
+    });
+  });
+}
+
+async function loadItineraryById(id) {
+  if (!id) return;
+  try {
+    const res = await fetch(`/api/itinerary/${encodeURIComponent(id)}`);
+    const data = await res.json();
+    if (!res.ok || !data?.itinerary) throw new Error('Failed to load itinerary');
+
+    const itinerary = data.itinerary;
+    state.itinerary = itinerary;
+    state.currentItineraryId = itinerary.id || null;
+    state.tripName = itinerary.tripName || state.tripName;
+    state.days = Array.isArray(itinerary.days)
+      ? itinerary.days.map((day) => ({ id: day.id || `${day.city}-${day.date}`, city: day.city, date: day.date }))
+      : [];
+
+    const activities = [];
+    const reviewed = {};
+    const placements = {};
+    (itinerary.days || []).forEach((day) => {
+      (day.activities || []).forEach((activity) => {
+        const idValue = activity.id || uid();
+        activities.push({ ...activity, id: idValue });
+        reviewed[idValue] = { approved: true, notes: activity.notes || '' };
+        placements[idValue] = { dayId: day.id || `${day.city}-${day.date}`, time: parseTimeTo24(activity.time || activity.suggested_time || typeToTime(activity.type)) };
+      });
+    });
+
+    state.activities = activities;
+    state.reviewed = reviewed;
+    state.placements = placements;
+    if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = !state.currentItineraryId;
+    renderItinerary();
+    await fetchSavedItineraries();
+    renderSavedItineraries();
+    setStep(4);
+  } catch {
+    showToast('Could not load itinerary.', 'error');
+  }
 }
 
 async function planTrip() {
@@ -1462,7 +2049,9 @@ async function planTrip() {
       const cityActivities = (evt.activities || []).map((a, i) => ({
         id: a.id || `${evt.city}-${i}-${uid()}`,
         ...a,
-        city: a.city || evt.city
+        city: a.city || evt.city,
+        start_location: String(a.start_location || '').trim(),
+        end_location: String(a.end_location || '').trim()
       }));
 
       state.activities.push(...cityActivities);
@@ -1530,7 +2119,11 @@ async function generateItinerary() {
   });
   const data = await res.json();
   state.itinerary = data.itinerary;
+  state.currentItineraryId = data?.itinerary?.id || null;
+  if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = !state.currentItineraryId;
   renderItinerary();
+  await fetchSavedItineraries();
+  renderSavedItineraries();
   setStep(4);
 }
 
@@ -1705,6 +2298,7 @@ function resetToFresh() {
   state.days = [];
   state.placements = {};
   state.itinerary = null;
+  state.currentItineraryId = null;
   state.commutes = {};
   state.arrangeCity = null;
   state.chatHistory = [];
@@ -1717,6 +2311,7 @@ function resetToFresh() {
   els.dayColumns.innerHTML = '';
   els.stagingArea.innerHTML = '';
   els.itineraryGrid.innerHTML = '';
+  if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = true;
   renderChatMessages();
   setStep(1);
 }
@@ -1726,7 +2321,7 @@ function hydrateFromSnapshot(snapshot) {
   state.cities = (snapshot.cities || []).map((city) => ({ ...city, notes: city.notes || '' }));
   state.activities = snapshot.activities || [];
   state.placements = snapshot.placements || {};
-  state.commutes = snapshot.commutes || {};
+  state.commutes = normalizeCommuteStateMap(snapshot.commutes || {});
   state.reviewed = snapshot.reviewed || {};
   state.days = snapshot.days || expandDays(state.cities);
   state.arrangeCity = snapshot.arrangeCity || state.days[0]?.city || null;
@@ -1764,12 +2359,14 @@ function clearPlannedResultsKeepSetup() {
   state.days = [];
   state.placements = {};
   state.itinerary = null;
+  state.currentItineraryId = null;
   state.commutes = {};
   state.arrangeCity = null;
   renderActivities();
   els.dayColumns.innerHTML = '';
   els.stagingArea.innerHTML = '';
   els.itineraryGrid.innerHTML = '';
+  if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = true;
 }
 
 els.addCityBtn.addEventListener('click', () => { addCityRow(); });
@@ -1809,6 +2406,10 @@ els.generateBtn.addEventListener('click', async () => {
   }
 });
 els.editBtn.addEventListener('click', () => { renderArrange(); setStep(3); });
+els.downloadCalendarBtn?.addEventListener('click', () => {
+  if (!state.currentItineraryId) return;
+  window.open(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/calendar.ics`, '_blank');
+});
 els.preferencesLink.addEventListener('click', openPreferencesModal);
 els.prefsClose.addEventListener('click', closePreferencesModal);
 els.prefsModal.addEventListener('click', (e) => {
@@ -1890,5 +2491,7 @@ els.activitiesGrid.addEventListener('change', () => {
   ensureChatSessionId();
   await restoreChatHistory();
   await fetchStatus();
+  await fetchSavedItineraries();
+  renderSavedItineraries();
   maybePromptSnapshot();
 })();
