@@ -50,8 +50,12 @@
           <p class="muted-text">Trip entry details auto-populate from your earliest city start date.</p>
           <div class="travel-row">
             <input id="travelEntryPoint" type="text" placeholder="Entry point location (e.g. JFK, Grand Central Terminal)" />
+            <input id="travelEntryPointLat" type="hidden" />
+            <input id="travelEntryPointLng" type="hidden" />
             <input id="travelEntryDateTime" type="datetime-local" readonly title="Auto-populated from trip start date" />
           </div>
+          <div id="travelEntryPointResolved" class="muted-text"></div>
+          <div id="locationValidationError" class="muted-text warn hidden"></div>
         </section>
 
         <div id="setupInsights" class="setup-insights muted-text"></div>
@@ -178,6 +182,9 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script>
+      window.TRAVELPLANNER_GOOGLE_MAPS_SDK_BASE_URL = 'https://maps.googleapis.com/maps/api/js?libraries=places';
+    </script>
     <script src="/app.js"></script>
   </body>
 </html>
