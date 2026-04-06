@@ -12,6 +12,13 @@ const {
   DEFAULT_USER_ID
 } = require('./preferences');
 const { getSession, setTripContext, addMessage, getHistory, compactHistory, clearSession } = require('./chat');
+const {
+  saveItinerary,
+  getLatestItinerary,
+  getItineraryById,
+  listItineraries,
+  deleteItinerary
+} = require('./itineraryStore');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3457);
@@ -19,71 +26,214 @@ const PORT = Number(process.env.PORT || 3457);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-let latestItinerary = null;
+function parseTimeForCalendar(raw = '') {
+  const normalized = String(raw || '').trim().toLowerCase();
+  const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+  if (!match) return { hours: 9, minutes: 0 };
 
-const DIRECTIONS_BASE_URL = 'https://maps.googleapis.com/maps/api/directions/json';
+  let hours = Number(match[1] || 9);
+  const minutes = Number(match[2] || 0);
+  const meridiem = match[3];
+
+  if (meridiem === 'pm' && hours < 12) hours += 12;
+  if (meridiem === 'am' && hours === 12) hours = 0;
+
+  return {
+    hours: Math.max(0, Math.min(23, hours)),
+    minutes: Math.max(0, Math.min(59, minutes))
+  };
+}
+
+function toIcsDate(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}T${pad(date.getHours())}${pad(date.getMinutes())}00`;
+}
+
+function escapeIcsText(value = '') {
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n');
+}
+
+function buildItineraryIcs(itinerary = {}) {
+  const now = new Date();
+  const timestamp = `${now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}`;
+  const events = [];
+
+  const days = Array.isArray(itinerary.days) ? itinerary.days : [];
+  for (const day of days) {
+    const baseDate = String(day?.date || '').slice(0, 10);
+    if (!baseDate) continue;
+
+    const activities = Array.isArray(day?.activities) ? day.activities : [];
+    for (const activity of activities) {
+      const [year, month, date] = baseDate.split('-').map((n) => Number(n));
+      if (!year || !month || !date) continue;
+
+      const start = parseTimeForCalendar(activity?.time || activity?.suggested_time || '09:00');
+      const durationHours = Math.max(0.5, Number(activity?.duration_hours || 1.5));
+      const durationMinutes = Math.round(durationHours * 60);
+
+      const startDate = new Date(year, month - 1, date, start.hours, start.minutes, 0);
+      const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+
+      const summary = activity?.name || 'Travel activity';
+      const location = [activity?.start_location, activity?.end_location].filter(Boolean).join(' → ') || day?.city || '';
+      const description = [
+        `Type: ${activity?.type || 'activity'}`,
+        activity?.why_it_fits ? `Why: ${activity.why_it_fits}` : '',
+        activity?.booking_advice ? `Booking advice: ${activity.booking_advice}` : '',
+        activity?.pitfall ? `Pitfall: ${activity.pitfall}` : ''
+      ].filter(Boolean).join('\n');
+
+      events.push([
+        'BEGIN:VEVENT',
+        `UID:${escapeIcsText(`${itinerary.id || 'trip'}-${activity?.id || summary}-${toIcsDate(startDate)}@travelplanner.local`)}`,
+        `DTSTAMP:${timestamp}`,
+        `DTSTART:${toIcsDate(startDate)}`,
+        `DTEND:${toIcsDate(endDate)}`,
+        `SUMMARY:${escapeIcsText(summary)}`,
+        location ? `LOCATION:${escapeIcsText(location)}` : '',
+        description ? `DESCRIPTION:${escapeIcsText(description)}` : '',
+        'END:VEVENT'
+      ].filter(Boolean).join('\r\n'));
+    }
+  }
+
+  const calendarName = itinerary.tripName || 'TravelPlanner Itinerary';
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//TravelPlanner//EN',
+    'CALSCALE:GREGORIAN',
+    `X-WR-CALNAME:${escapeIcsText(calendarName)}`,
+    ...events,
+    'END:VCALENDAR'
+  ].join('\r\n');
+}
+
+const DISTANCE_MATRIX_BASE_URL = 'https://maps.googleapis.com/maps/api/distancematrix/json';
 const COMMUTE_MODE_ICON = {
   transit: '🚇',
   walking: '🚶',
   driving: '🚗',
   bicycling: '🚴'
 };
+const COMMUTE_MODE_PRIORITY = ['transit', 'driving', 'walking'];
 
 function normalizeTravelMode(mode = '') {
   const m = String(mode || '').toLowerCase();
   if (m === 'transit' || m === 'walking' || m === 'driving' || m === 'bicycling') return m;
-  return 'transit';
+  return 'walking';
 }
 
-function buildDirectionsQuery(activity = {}) {
+function buildDistanceMatrixQuery(activity = {}) {
   return [activity.name, activity.city].filter(Boolean).join(', ').trim();
 }
 
-async function fetchDirectionsRoute({ origin, destination, mode }) {
+function isUsableLocation(value = '') {
+  const normalized = String(value || '').trim();
+  if (!normalized) return false;
+  if (normalized.length < 3) return false;
+  const invalidValues = new Set(['unknown', 'n/a', 'na', 'none', 'tbd', '-', 'null']);
+  return !invalidValues.has(normalized.toLowerCase());
+}
+
+function resolveCommuteQuery(activity = {}, locationField) {
+  const location = activity?.[locationField];
+  if (isUsableLocation(location)) return String(location).trim();
+  return buildDistanceMatrixQuery(activity);
+}
+
+async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) return null;
 
   const params = new URLSearchParams({
-    origin,
-    destination,
+    origins: origin,
+    destinations: destination,
     mode,
     key: apiKey
   });
 
-  const response = await fetch(`${DIRECTIONS_BASE_URL}?${params.toString()}`);
+  const response = await fetch(`${DISTANCE_MATRIX_BASE_URL}?${params.toString()}`);
   if (!response.ok) return null;
 
   const data = await response.json();
-  if (data?.status !== 'OK' || !Array.isArray(data?.routes) || !data.routes.length) return null;
+  if (data?.status !== 'OK' || !Array.isArray(data?.rows) || !data.rows.length) return null;
 
-  const route = data.routes[0];
-  const leg = Array.isArray(route.legs) && route.legs.length ? route.legs[0] : null;
-  const durationSeconds = Number(leg?.duration?.value || 0);
+  const element = Array.isArray(data.rows[0]?.elements) && data.rows[0].elements.length
+    ? data.rows[0].elements[0]
+    : null;
+
+  if (!element || element.status !== 'OK') return null;
+
+  const durationSeconds = Number(element?.duration?.value || 0);
   if (!durationSeconds) return null;
 
-  const dominantStepMode = Array.isArray(leg?.steps) && leg.steps.length
-    ? normalizeTravelMode(leg.steps[0]?.travel_mode)
-    : normalizeTravelMode(mode);
-
-  return {
-    durationMinutes: Math.max(1, Math.round(durationSeconds / 60)),
-    mode: dominantStepMode,
-    modeIcon: COMMUTE_MODE_ICON[dominantStepMode] || COMMUTE_MODE_ICON.transit
-  };
+  return Math.max(1, Math.round(durationSeconds / 60));
 }
 
 async function getCommuteBetweenActivities(fromActivity, toActivity) {
-  const origin = buildDirectionsQuery(fromActivity);
-  const destination = buildDirectionsQuery(toActivity);
-  if (!origin || !destination) return null;
+  const origin = resolveCommuteQuery(fromActivity, 'start_location');
+  const destination = resolveCommuteQuery(toActivity, 'end_location');
 
-  const transitRoute = await fetchDirectionsRoute({ origin, destination, mode: 'transit' });
-  if (transitRoute) return transitRoute;
+  const defaultModes = {
+    transit: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.transit },
+    driving: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.driving },
+    walking: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.walking }
+  };
 
-  const walkingRoute = await fetchDirectionsRoute({ origin, destination, mode: 'walking' });
-  if (walkingRoute) return walkingRoute;
+  if (!origin || !destination) {
+    return {
+      modes: defaultModes,
+      selectedMode: 'transit',
+      durationMinutes: null,
+      modeIcon: COMMUTE_MODE_ICON.transit
+    };
+  }
 
-  return null;
+  const modeResults = await Promise.all(
+    COMMUTE_MODE_PRIORITY.map(async (mode) => {
+      try {
+        const durationMinutes = await fetchDistanceMatrixDuration({ origin, destination, mode });
+        return { mode, durationMinutes };
+      } catch {
+        return { mode, durationMinutes: null };
+      }
+    })
+  );
+
+  const modes = {
+    transit: {
+      durationMinutes: modeResults.find((r) => r.mode === 'transit')?.durationMinutes ?? null,
+      modeIcon: COMMUTE_MODE_ICON.transit
+    },
+    driving: {
+      durationMinutes: modeResults.find((r) => r.mode === 'driving')?.durationMinutes ?? null,
+      modeIcon: COMMUTE_MODE_ICON.driving
+    },
+    walking: {
+      durationMinutes: modeResults.find((r) => r.mode === 'walking')?.durationMinutes ?? null,
+      modeIcon: COMMUTE_MODE_ICON.walking
+    }
+  };
+
+  const fastest = COMMUTE_MODE_PRIORITY
+    .map((mode) => ({ mode, durationMinutes: modes[mode]?.durationMinutes }))
+    .filter((result) => Number.isFinite(result.durationMinutes))
+    .sort((a, b) => a.durationMinutes - b.durationMinutes)[0];
+
+  const selectedMode = fastest?.mode || 'transit';
+
+  return {
+    modes,
+    selectedMode,
+    durationMinutes: modes[selectedMode]?.durationMinutes ?? null,
+    modeIcon: modes[selectedMode]?.modeIcon || COMMUTE_MODE_ICON.transit
+  };
 }
 
 function parseUserId(rawUserId) {
@@ -150,6 +300,62 @@ function formatProfileForEnrichment(profile = {}) {
   return `${lines.join('\n')}\n- About me: ${aboutMe}`;
 }
 
+const IMAGE_QUERY_STOPWORDS = new Set([
+  'the', 'a', 'an', 'and', 'or', 'at', 'in', 'for', 'on', 'with', 'from', 'to'
+]);
+
+function extractImageKeywords(name = '', city = '') {
+  const cityWords = new Set(
+    String(city || '')
+      .toLowerCase()
+      .split(/\s+/)
+      .map((w) => w.replace(/[^a-z0-9]/g, ''))
+      .filter(Boolean)
+  );
+
+  const words = String(name || '')
+    .replace(/\([^)]*\)|\[[^\]]*\]|\{[^}]*\}/g, ' ')
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter(Boolean)
+    .map((w) => w.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, ''))
+    .filter(Boolean);
+
+  const keywords = [];
+  for (const word of words) {
+    const normalized = word.toLowerCase();
+    if (IMAGE_QUERY_STOPWORDS.has(normalized)) continue;
+    if (cityWords.has(normalized)) continue;
+    if (normalized.length <= 1) continue;
+    if (keywords.some((k) => k.toLowerCase() === normalized)) continue;
+    keywords.push(word);
+  }
+
+  return keywords;
+}
+
+function buildImageSearchQuery({ name = '', type = '', city = '' } = {}) {
+  const normalizedType = String(type || '').trim().toLowerCase();
+  const normalizedCity = String(city || '').trim();
+  const keywords = extractImageKeywords(name, normalizedCity);
+  const typeWords = new Set(
+    normalizedType
+      .split(/\s+/)
+      .map((w) => w.replace(/[^a-z0-9]/g, ''))
+      .filter(Boolean)
+  );
+
+  const filteredKeywords = keywords.filter((word) => !typeWords.has(word.toLowerCase()));
+  const preciseQuery = [filteredKeywords.join(' '), normalizedType, normalizedCity]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+
+  if (preciseQuery) return preciseQuery;
+  if (normalizedType && normalizedCity) return `${normalizedType} ${normalizedCity}`.trim();
+  return String(name || '').trim() || normalizedCity;
+}
+
 app.get('/api/status', (_req, res) => {
   res.json({
     ok: true,
@@ -205,11 +411,12 @@ app.post('/api/plan', async (req, res) => {
 
 app.get('/api/image', async (req, res) => {
   try {
-    const { q, city } = req.query;
+    const { q, city, type } = req.query;
     if (!q) return res.status(400).json({ error: 'q query param is required' });
 
-    const imageUrl = await fetchUnsplashImage(q, city);
-    return res.json({ imageUrl });
+    const searchQuery = buildImageSearchQuery({ name: q, type, city });
+    const imageUrl = await fetchUnsplashImage(searchQuery, city, type);
+    return res.json({ imageUrl, searchQuery });
   } catch (error) {
     if (error.code === 'UNSPLASH_KEY_MISSING') {
       return res.status(503).json({
@@ -231,13 +438,13 @@ app.post('/api/commute', async (req, res) => {
       const fromActivity = activities[i];
       const toActivity = activities[i + 1];
       const commute = await getCommuteBetweenActivities(fromActivity, toActivity);
-      if (!commute) continue;
 
       commutes.push({
         fromId: fromActivity.id,
         toId: toActivity.id,
+        modes: commute.modes,
+        selectedMode: commute.selectedMode,
         durationMinutes: commute.durationMinutes,
-        mode: commute.mode,
         modeIcon: commute.modeIcon
       });
     }
@@ -366,13 +573,39 @@ app.delete('/api/chat/session/:sessionId', (req, res) => {
 
 app.post('/api/itinerary', (req, res) => {
   const payload = req.body || {};
-  const generatedAt = new Date().toISOString();
-  latestItinerary = { ...payload, generatedAt };
-  res.json({ itinerary: latestItinerary });
+  const itinerary = saveItinerary(payload);
+  res.json({ itinerary });
 });
 
 app.get('/api/itinerary', (_req, res) => {
-  res.json({ itinerary: latestItinerary });
+  res.json({ itinerary: getLatestItinerary() });
+});
+
+app.get('/api/itineraries', (_req, res) => {
+  res.json({ itineraries: listItineraries() });
+});
+
+app.get('/api/itinerary/:id', (req, res) => {
+  const itinerary = getItineraryById(req.params.id);
+  if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
+  return res.json({ itinerary });
+});
+
+app.delete('/api/itinerary/:id', (req, res) => {
+  const deleted = deleteItinerary(req.params.id);
+  if (!deleted) return res.status(404).json({ error: 'Itinerary not found' });
+  return res.json({ ok: true });
+});
+
+app.get('/api/itinerary/:id/calendar.ics', (req, res) => {
+  const itinerary = getItineraryById(req.params.id);
+  if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
+
+  const ics = buildItineraryIcs(itinerary);
+  const safeName = String(itinerary.tripName || 'itinerary').replace(/[^a-z0-9-_]+/gi, '-').replace(/-+/g, '-').toLowerCase();
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeName || 'itinerary'}.ics"`);
+  return res.send(ics);
 });
 
 app.get('*', (_req, res) => {
