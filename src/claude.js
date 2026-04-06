@@ -181,13 +181,23 @@ async function planCity(city, profile = null, userId = 'default', travels = []) 
   }
 
   const cityAccommodations = Array.isArray(accommodations) && accommodations.length
-    ? accommodations.map((accommodation) => `${accommodation.type || 'Accommodation'}: ${accommodation.name || 'Unnamed accommodation'} | ${accommodation.address || 'Address missing'} | ${accommodation.checkIn || '?'} → ${accommodation.checkOut || '?'}`).join('\n')
+    ? accommodations.map((accommodation) => {
+      const coordText = (Number.isFinite(Number(accommodation.latitude)) && Number.isFinite(Number(accommodation.longitude)))
+        ? ` [${Number(accommodation.latitude)}, ${Number(accommodation.longitude)}]`
+        : '';
+      return `${accommodation.type || 'Accommodation'}: ${accommodation.name || 'Unnamed accommodation'} | ${accommodation.address || 'Address missing'}${coordText} | ${accommodation.checkIn || '?'} → ${accommodation.checkOut || '?'}`;
+    }).join('\n')
     : 'No accommodations provided for this city yet.';
 
   const relatedTravels = Array.isArray(travels) ? travels.slice(0, 1) : [];
 
   const travelContext = relatedTravels.length
-    ? relatedTravels.map((travel) => `Trip entry via ${travel.entryPoint || '?'} @ ${travel.dateTime || '?'}`).join('\n')
+    ? relatedTravels.map((travel) => {
+      const coordText = (Number.isFinite(Number(travel.entryPointLat)) && Number.isFinite(Number(travel.entryPointLng)))
+        ? ` at [${Number(travel.entryPointLat)}, ${Number(travel.entryPointLng)}]`
+        : '';
+      return `Trip entry via ${travel.entryPoint || '?'} @ ${travel.dateTime || '?'}${coordText}`;
+    }).join('\n')
     : 'No trip entry details provided yet.';
 
   const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nUse accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Return a maximum of 6-8 activities. Be concise.\n\nReturn JSON only.`;

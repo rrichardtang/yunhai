@@ -130,9 +130,22 @@ function normalizeTravelMode(mode = '') {
 }
 
 function buildDistanceMatrixQuery(activity = {}) {
+  const hotelLat = Number(activity.hotel_latitude);
+  const hotelLng = Number(activity.hotel_longitude);
+  if (Number.isFinite(hotelLat) && Number.isFinite(hotelLng)) {
+    return `${hotelLat},${hotelLng}`;
+  }
+
   const hotelLocation = String(activity.hotel_location || '').trim();
   if (hotelLocation) return hotelLocation;
   return [activity.name, activity.city].filter(Boolean).join(', ').trim();
+}
+
+function formatLatLng(lat, lng) {
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return '';
+  return `${latitude},${longitude}`;
 }
 
 function isUsableLocation(value = '') {
@@ -144,6 +157,11 @@ function isUsableLocation(value = '') {
 }
 
 function resolveCommuteQuery(activity = {}, locationField) {
+  const preferredCoords = locationField === 'end_location'
+    ? formatLatLng(activity.end_latitude, activity.end_longitude)
+    : formatLatLng(activity.start_latitude, activity.start_longitude);
+  if (preferredCoords) return preferredCoords;
+
   const location = activity?.[locationField];
   if (isUsableLocation(location)) return String(location).trim();
   return buildDistanceMatrixQuery(activity);
@@ -371,8 +389,10 @@ app.get('/api/status', (_req, res) => {
     ok: true,
     keys: {
       anthropicConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
-      unsplashConfigured: Boolean(process.env.UNSPLASH_ACCESS_KEY)
-    }
+      unsplashConfigured: Boolean(process.env.UNSPLASH_ACCESS_KEY),
+      googleMapsConfigured: Boolean(process.env.GOOGLE_MAPS_API_KEY)
+    },
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
   });
 });
 
