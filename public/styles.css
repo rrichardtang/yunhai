@@ -60,6 +60,68 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   margin-bottom: 10px;
 }
 
+.city-hotels {
+  grid-column: 1 / -1;
+  border: 1px solid #e2e8f2;
+  border-radius: 10px;
+  background: #f8fbff;
+  padding: 10px;
+}
+
+.city-hotels-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.city-hotels-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hotel-row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr repeat(2, minmax(140px, auto)) auto;
+  gap: 8px;
+}
+
+.accommodations-panel {
+  border: 1px solid #dce4ef;
+  border-radius: 12px;
+  background: #fdfefe;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.accommodations-panel h3 {
+  margin: 0 0 4px;
+}
+
+.travel-list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 12px 0 8px;
+}
+
+.travel-list-head h4 {
+  margin: 0;
+}
+
+.travel-row {
+  display: grid;
+  grid-template-columns: minmax(110px, auto) repeat(2, minmax(150px, 1fr)) minmax(180px, auto) minmax(150px, auto) minmax(160px, auto) auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.travel-row input,
+.travel-row select {
+  margin-top: 0;
+}
+
 .city-autocomplete {
   position: relative;
 }
@@ -929,6 +991,8 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   .setup-actions { flex-direction: column; }
   .review-toolbar { grid-template-columns: 1fr; }
   .city-row { grid-template-columns: 1fr; }
+  .hotel-row,
+  .travel-row { grid-template-columns: 1fr; }
   .topbar-row { flex-direction: column; align-items: flex-start; }
   .step-nav-split { flex-direction: column; }
   .step-nav-split .nav-secondary,

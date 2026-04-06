@@ -2,6 +2,7 @@ const state = {
   step: 1,
   tripName: '',
   cities: [],
+  travels: [],
   activities: [],
   reviewed: {},
   approvedIds: [],
@@ -56,6 +57,8 @@ const els = {
   panels: [1,2,3,4].map((n) => document.getElementById(`step${n}`)),
   tripName: document.getElementById('tripName'),
   citiesContainer: document.getElementById('citiesContainer'),
+  addTravelBtn: document.getElementById('addTravelBtn'),
+  travelsContainer: document.getElementById('travelsContainer'),
   addCityBtn: document.getElementById('addCityBtn'),
   sortCitiesBtn: document.getElementById('sortCitiesBtn'),
   setupInsights: document.getElementById('setupInsights'),
@@ -492,8 +495,89 @@ function setPlanningLoading(isLoading) {
 }
 
 function addCityRow(city = { id: uid(), name: '', startDate: '', endDate: '', notes: '' }) {
-  state.cities.push({ ...city, notes: city.notes || '' });
+  state.cities.push({
+    ...city,
+    notes: city.notes || '',
+    hotels: Array.isArray(city.hotels) ? city.hotels : []
+  });
   renderCities();
+}
+
+function addHotelRow(city) {
+  if (!city) return;
+  city.hotels = Array.isArray(city.hotels) ? city.hotels : [];
+  city.hotels.push({
+    id: uid(),
+    name: '',
+    address: '',
+    checkIn: city.startDate || '',
+    checkOut: city.endDate || ''
+  });
+  renderCities();
+}
+
+function addTravelRow(travel = null) {
+  const entry = travel && typeof travel === 'object'
+    ? {
+      id: travel.id || uid(),
+      type: travel.type || 'flight',
+      departureCity: travel.departureCity || '',
+      arrivalCity: travel.arrivalCity || '',
+      dateTime: travel.dateTime || '',
+      duration: travel.duration || '',
+      confirmationNumber: travel.confirmationNumber || ''
+    }
+    : {
+      id: uid(),
+      type: 'flight',
+      departureCity: '',
+      arrivalCity: '',
+      dateTime: '',
+      duration: '',
+      confirmationNumber: ''
+    };
+  state.travels.push(entry);
+  renderTravels();
+}
+
+function renderTravels() {
+  if (!els.travelsContainer) return;
+  els.travelsContainer.innerHTML = '';
+
+  if (!state.travels.length) {
+    els.travelsContainer.innerHTML = '<p class="muted-text">No flights or trains added yet.</p>';
+    return;
+  }
+
+  state.travels.forEach((travel) => {
+    const row = document.createElement('div');
+    row.className = 'travel-row';
+    row.innerHTML = `
+      <select data-field="type">
+        <option value="flight" ${travel.type === 'flight' ? 'selected' : ''}>Flight</option>
+        <option value="train" ${travel.type === 'train' ? 'selected' : ''}>Train</option>
+      </select>
+      <input type="text" placeholder="Departure city" value="${esc(travel.departureCity)}" data-field="departureCity" />
+      <input type="text" placeholder="Arrival city" value="${esc(travel.arrivalCity)}" data-field="arrivalCity" />
+      <input type="datetime-local" value="${esc(travel.dateTime)}" data-field="dateTime" />
+      <input type="text" placeholder="Duration (e.g. 2h 15m)" value="${esc(travel.duration)}" data-field="duration" />
+      <input type="text" placeholder="Confirmation # (optional)" value="${esc(travel.confirmationNumber || '')}" data-field="confirmationNumber" />
+      <button class="secondary" type="button" data-remove-city>Remove</button>
+    `;
+
+    row.querySelectorAll('input, select').forEach((input) => {
+      input.addEventListener('input', () => {
+        travel[input.dataset.field] = input.value;
+      });
+    });
+
+    row.querySelector('button')?.addEventListener('click', () => {
+      state.travels = state.travels.filter((t) => t.id !== travel.id);
+      renderTravels();
+    });
+
+    els.travelsContainer.appendChild(row);
+  });
 }
 
 function daysBetween(startDate, endDate) {
@@ -563,6 +647,25 @@ function renderCities() {
       <input type="date" value="${esc(city.endDate)}" data-field="endDate" />
       <input type="text" placeholder="Notes for this city (e.g. want to see FC Barcelona game)" value="${esc(city.notes || '')}" data-field="notes" />
       <button class="secondary" type="button">Remove</button>
+      <div class="city-hotels">
+        <div class="city-hotels-head">
+          <strong>Hotels</strong>
+          <button class="secondary" type="button" data-add-hotel>+ Add hotel</button>
+        </div>
+        <div class="city-hotels-list">
+          ${(Array.isArray(city.hotels) && city.hotels.length)
+            ? city.hotels.map((hotel) => `
+              <div class="hotel-row" data-hotel-id="${esc(hotel.id || '')}">
+                <input type="text" placeholder="Hotel name" value="${esc(hotel.name || '')}" data-hotel-field="name" />
+                <input type="text" placeholder="Hotel address" value="${esc(hotel.address || '')}" data-hotel-field="address" />
+                <input type="date" value="${esc(hotel.checkIn || '')}" data-hotel-field="checkIn" />
+                <input type="date" value="${esc(hotel.checkOut || '')}" data-hotel-field="checkOut" />
+                <button class="secondary" type="button" data-remove-hotel>Remove</button>
+              </div>
+            `).join('')
+            : '<p class="muted-text">No hotels added for this city yet.</p>'}
+        </div>
+      </div>
     `;
     const inputs = row.querySelectorAll('input');
     inputs.forEach((input) => {
@@ -633,11 +736,30 @@ function renderCities() {
       });
     }
 
-    row.querySelector('button').addEventListener('click', () => {
+    row.querySelector('[data-remove-city]')?.addEventListener('click', () => {
       if (cityAutocomplete.activeCityId === city.id) closeCityAutocomplete();
       state.cities = state.cities.filter((c) => c.id !== city.id);
       renderCities();
     });
+
+    row.querySelector('[data-add-hotel]')?.addEventListener('click', () => addHotelRow(city));
+    row.querySelectorAll('.hotel-row').forEach((hotelRow) => {
+      const hotelId = hotelRow.dataset.hotelId;
+      const hotel = (city.hotels || []).find((h) => h.id === hotelId);
+      if (!hotel) return;
+
+      hotelRow.querySelectorAll('input[data-hotel-field]').forEach((input) => {
+        input.addEventListener('input', () => {
+          hotel[input.dataset.hotelField] = input.value;
+        });
+      });
+
+      hotelRow.querySelector('[data-remove-hotel]')?.addEventListener('click', () => {
+        city.hotels = (city.hotels || []).filter((h) => h.id !== hotelId);
+        renderCities();
+      });
+    });
+
     els.citiesContainer.appendChild(row);
   });
 
@@ -1674,6 +1796,21 @@ function applyCommuteTimeAdjustments(dayId, orderedActivities = [], commutes = [
   }
 }
 
+function getHotelForDay(cityName, date) {
+  const city = state.cities.find((c) => normalizeCity(c.name) === normalizeCity(cityName));
+  if (!city || !Array.isArray(city.hotels) || !city.hotels.length) return null;
+
+  const dayDate = String(date || '').slice(0, 10);
+  const inRange = city.hotels.find((hotel) => {
+    const checkIn = String(hotel.checkIn || '').slice(0, 10);
+    const checkOut = String(hotel.checkOut || '').slice(0, 10);
+    if (!checkIn || !checkOut || !dayDate) return false;
+    return dayDate >= checkIn && dayDate <= checkOut;
+  });
+
+  return inRange || city.hotels[0] || null;
+}
+
 function recalculateDayFromIndex(dayId, startIndex = 1) {
   if (!dayId) return;
   const orderedActivities = state.activities
@@ -1702,6 +1839,9 @@ function recalculateDayFromIndex(dayId, startIndex = 1) {
 
 async function updateCommutesForCityDays(dayIds = []) {
   for (const dayId of dayIds) {
+    const day = state.days.find((d) => d.id === dayId);
+    const hotel = day ? getHotelForDay(day.city, day.date) : null;
+    const hotelLocation = [hotel?.name, hotel?.address].filter(Boolean).join(', ').trim();
     const orderedActivities = state.activities
       .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === dayId)
       .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
@@ -1720,6 +1860,7 @@ async function updateCommutesForCityDays(dayIds = []) {
       city: a.city,
       start_location: a.start_location,
       end_location: a.end_location,
+      hotel_location: hotelLocation,
       suggested_time: state.placements[a.id]?.time || parseTimeTo24(a.suggested_time || typeToTime(a.type))
     }));
 
@@ -2061,7 +2202,11 @@ function renderItinerary() {
         </div>
       `)
       .join('');
-    return `<section class="day-col"><div class="day-head">${d.date} • ${esc(d.city)}</div><div class="list">${items || '<em>No activities assigned.</em>'}</div></section>`;
+    const hotel = getHotelForDay(d.city, d.date);
+    const hotelInfo = hotel
+      ? `<p class="muted-text"><strong>Hotel:</strong> ${esc(hotel.name || 'Unnamed hotel')}${hotel.address ? ` · ${esc(hotel.address)}` : ''}</p>`
+      : '';
+    return `<section class="day-col"><div class="day-head">${d.date} • ${esc(d.city)}</div><div class="list">${hotelInfo}${items || '<em>No activities assigned.</em>'}</div></section>`;
   }).join('');
 }
 
@@ -2145,6 +2290,13 @@ async function loadItineraryById(id) {
     state.itinerary = itinerary;
     state.currentItineraryId = itinerary.id || null;
     state.tripName = itinerary.tripName || state.tripName;
+    state.cities = Array.isArray(itinerary.cities)
+      ? itinerary.cities.map((city) => ({
+        ...city,
+        hotels: Array.isArray(city.hotels) ? city.hotels : []
+      }))
+      : state.cities;
+    state.travels = Array.isArray(itinerary.travels) ? itinerary.travels : state.travels;
     state.days = Array.isArray(itinerary.days)
       ? itinerary.days.map((day) => ({ id: day.id || `${day.city}-${day.date}`, city: day.city, date: day.date }))
       : [];
@@ -2164,6 +2316,8 @@ async function loadItineraryById(id) {
     state.activities = activities;
     state.reviewed = reviewed;
     state.placements = placements;
+    renderCities();
+    renderTravels();
     if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = !state.currentItineraryId;
     renderItinerary();
     await fetchSavedItineraries();
@@ -2176,8 +2330,15 @@ async function loadItineraryById(id) {
 
 async function planTrip() {
   state.tripName = els.tripName.value.trim();
-  const cities = state.cities.map(({name,startDate,endDate,notes}) => ({ name, startDate, endDate, notes }));
-  const payload = { cities, profile: state.profile || loadProfile(), userId: ensureUserId() };
+  const cities = state.cities.map(({name,startDate,endDate,notes,hotels}) => ({
+    name,
+    startDate,
+    endDate,
+    notes,
+    hotels: Array.isArray(hotels) ? hotels : []
+  }));
+  const travels = state.travels.map((travel) => ({ ...travel }));
+  const payload = { cities, travels, profile: state.profile || loadProfile(), userId: ensureUserId() };
 
   state.activities = [];
   state.reviewed = {};
@@ -2276,7 +2437,12 @@ async function generateItinerary() {
     activities: arranged.filter((a) => a.dayId === d.id).sort((x,y) => x.order - y.order)
   }));
 
-  const payload = { tripName: state.tripName, days: byDay };
+  const payload = {
+    tripName: state.tripName,
+    cities: state.cities,
+    travels: state.travels,
+    days: byDay
+  };
   const res = await fetch('/api/itinerary', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -2296,6 +2462,7 @@ function getTripContext() {
   return {
     step: state.step,
     cities: state.cities,
+    travels: state.travels,
     approvedActivities: state.activities.filter((a) => state.reviewed[a.id]?.approved).map((a) => a.name),
     declinedActivities: state.activities.filter((a) => state.reviewed[a.id]?.approved === false).map((a) => a.name)
   };
@@ -2441,6 +2608,7 @@ function clearSnapshot() {
 function saveSnapshot() {
   const payload = {
     cities: state.cities,
+    travels: state.travels,
     activities: state.activities,
     placements: state.placements,
     commutes: state.commutes,
@@ -2458,6 +2626,7 @@ function resetToFresh() {
   state.step = 1;
   state.tripName = '';
   state.cities = [];
+  state.travels = [];
   state.activities = [];
   state.reviewed = {};
   state.days = [];
@@ -2475,6 +2644,7 @@ function resetToFresh() {
   if (els.reviewCityFilter) els.reviewCityFilter.value = '';
   if (els.reviewVerdictFilter) els.reviewVerdictFilter.value = '';
   renderCities();
+  renderTravels();
   addCityRow();
   renderActivities();
   els.dayColumns.innerHTML = '';
@@ -2488,7 +2658,12 @@ function resetToFresh() {
 
 function hydrateFromSnapshot(snapshot) {
   state.tripName = snapshot.tripName || '';
-  state.cities = (snapshot.cities || []).map((city) => ({ ...city, notes: city.notes || '' }));
+  state.cities = (snapshot.cities || []).map((city) => ({
+    ...city,
+    notes: city.notes || '',
+    hotels: Array.isArray(city.hotels) ? city.hotels : []
+  }));
+  state.travels = Array.isArray(snapshot.travels) ? snapshot.travels : [];
   state.activities = snapshot.activities || [];
   state.placements = snapshot.placements || {};
   state.commutes = normalizeCommuteStateMap(snapshot.commutes || {});
@@ -2498,6 +2673,7 @@ function hydrateFromSnapshot(snapshot) {
 
   els.tripName.value = state.tripName;
   renderCities();
+  renderTravels();
   renderActivities();
   renderArrange();
   setStep(3);
@@ -2541,6 +2717,7 @@ function clearPlannedResultsKeepSetup() {
 }
 
 els.addCityBtn.addEventListener('click', () => { addCityRow(); });
+els.addTravelBtn?.addEventListener('click', () => { addTravelRow(); });
 els.sortCitiesBtn?.addEventListener('click', sortCitiesByDate);
 els.planBtn.addEventListener('click', async () => {
   if (state.isPlanning) return;
