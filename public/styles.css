@@ -787,6 +787,33 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   font-size: .9rem;
 }
 
+.itinerary-insights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.itinerary-insight-card {
+  border: 1px solid #dce4ef;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 10px;
+}
+.itinerary-insight-card h4 { margin: 0 0 6px; }
+.itinerary-insight-card p { margin: 0 0 4px; font-size: .92rem; }
+.pace-pill {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: .78rem;
+  font-weight: 700;
+  background: #e6eefb;
+  color: #27467d;
+}
+.pace-pill.pace-light { background: #e7f6ee; color: #12653f; }
+.pace-pill.pace-balanced { background: #fff3df; color: #7b4f09; }
+.pace-pill.pace-packed { background: #fde8e8; color: #8f2422; }
+
 .saved-itineraries-panel {
   margin-top: 14px;
   border: 1px solid #e1e7f0;

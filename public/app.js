@@ -75,6 +75,7 @@ const els = {
   stagingArea: document.getElementById('stagingArea'),
   backToReviewBtn: document.getElementById('backToReviewBtn'),
   generateBtn: document.getElementById('generateBtn'),
+  itineraryInsights: document.getElementById('itineraryInsights'),
   itineraryGrid: document.getElementById('itineraryGrid'),
   downloadCalendarBtn: document.getElementById('downloadCalendarBtn'),
   savedItineraries: document.getElementById('savedItineraries'),
@@ -2002,8 +2003,50 @@ function bindPlacedCardInteractions() {
   });
 }
 
+function paceLabel(totalHours) {
+  if (totalHours < 4) return { label: 'Light day', className: 'pace-light' };
+  if (totalHours <= 7) return { label: 'Balanced day', className: 'pace-balanced' };
+  return { label: 'Packed day', className: 'pace-packed' };
+}
+
+function renderItineraryInsights(approvedActivities) {
+  if (!els.itineraryInsights) return;
+  if (!state.days.length) {
+    els.itineraryInsights.innerHTML = '';
+    return;
+  }
+
+  const cards = state.days.map((day) => {
+    const items = approvedActivities
+      .filter((a) => state.placements[a.id]?.dayId === day.id)
+      .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+
+    const activityHours = items.reduce((sum, item) => sum + Number(item.duration_hours || 1), 0);
+    let commuteMinutes = 0;
+    for (let i = 1; i < items.length; i += 1) {
+      const commute = state.commutes[commutePairKey(items[i - 1].id, items[i].id)] || getIncomingCommuteForActivity(items[i].id);
+      const selected = resolveSelectedCommuteDetails(commute);
+      if (selected?.durationMinutes) commuteMinutes += Number(selected.durationMinutes);
+    }
+
+    const pace = paceLabel(activityHours);
+    return `
+      <article class="itinerary-insight-card">
+        <h4>${esc(day.date)} • ${esc(day.city)}</h4>
+        <p><strong>${items.length}</strong> activities</p>
+        <p><strong>${activityHours.toFixed(1)}h</strong> planned activity time</p>
+        <p><strong>${commuteMinutes} min</strong> commute time</p>
+        <span class="pace-pill ${pace.className}">${pace.label}</span>
+      </article>
+    `;
+  });
+
+  els.itineraryInsights.innerHTML = cards.join('');
+}
+
 function renderItinerary() {
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
+  renderItineraryInsights(approved);
   els.itineraryGrid.innerHTML = state.days.map((d) => {
     const items = approved
       .filter((a) => state.placements[a.id]?.dayId === d.id)
@@ -2078,6 +2121,7 @@ function renderSavedItineraries() {
           state.currentItineraryId = null;
           state.itinerary = null;
           els.itineraryGrid.innerHTML = '';
+          if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
           if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = true;
         }
         await fetchSavedItineraries();
@@ -2436,6 +2480,7 @@ function resetToFresh() {
   els.dayColumns.innerHTML = '';
   els.stagingArea.innerHTML = '';
   els.itineraryGrid.innerHTML = '';
+  if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
   if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = true;
   renderChatMessages();
   setStep(1);
@@ -2491,6 +2536,7 @@ function clearPlannedResultsKeepSetup() {
   els.dayColumns.innerHTML = '';
   els.stagingArea.innerHTML = '';
   els.itineraryGrid.innerHTML = '';
+  if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
   if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = true;
 }
 
