@@ -252,7 +252,7 @@ function buildChatSystemPrompt(tripContext = {}) {
     }).join(' | ')
     : 'None yet';
   const travels = Array.isArray(tripContext.travels) && tripContext.travels.length
-    ? tripContext.travels.map((travel) => `Entry: ${travel.entryPoint || '?'} at ${travel.dateTime || '?'}`).join(' | ')
+    ? tripContext.travels.slice(0, 1).map((travel) => `Entry point: ${travel.entryPoint || '?'} at ${travel.dateTime || '?'}`).join(' | ')
     : 'None yet';
   const approved = Array.isArray(tripContext.approvedActivities) && tripContext.approvedActivities.length
     ? tripContext.approvedActivities.join(', ')
@@ -261,7 +261,7 @@ function buildChatSystemPrompt(tripContext = {}) {
     ? tripContext.declinedActivities.join(', ')
     : 'None yet';
 
-  return `You are a concise, opinionated travel advisor helping plan a trip. You have full context of the user's itinerary and preferences. Answer questions directly in 2-4 sentences. Be honest about downsides. Remember everything discussed in this conversation.\n\nCurrent trip context:\n- Cities: ${cities}\n- Flights/trains: ${travels}\n- Current planning step: ${tripContext.step ?? 'Unknown'}\n- Approved activities: ${approved}\n- Declined activities: ${declined}`;
+  return `You are a concise, opinionated travel advisor helping plan a trip. You have full context of the user's itinerary and preferences. Answer questions directly in 2-4 sentences. Be honest about downsides. Remember everything discussed in this conversation.\n\nCurrent trip context:\n- Cities: ${cities}\n- Travel entry: ${travels}\n- Current planning step: ${tripContext.step ?? 'Unknown'}\n- Approved activities: ${approved}\n- Declined activities: ${declined}`;
 }
 
 function toAnthropicMessages(history = []) {
@@ -399,8 +399,9 @@ app.post('/api/plan', async (req, res) => {
   };
 
   try {
+    const tripTravels = Array.isArray(travels) ? travels.slice(0, 1) : [];
     for (const city of cities) {
-      const activities = await planCity(city, profile, resolvedUserId, travels);
+      const activities = await planCity(city, profile, resolvedUserId, tripTravels);
       sendEvent({ type: 'city', city: city.name, activities });
     }
     sendEvent({ type: 'done' });
