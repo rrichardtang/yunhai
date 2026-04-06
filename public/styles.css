@@ -38,6 +38,21 @@ button { border: 0; padding: 10px 14px; border-radius: 10px; cursor: pointer; fo
 button.primary { background: var(--accent); color: white; }
 button.secondary { background: #e8edf5; color: #1f2f47; }
 button:disabled { opacity: .6; cursor: not-allowed; }
+.setup-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.setup-insights {
+  border: 1px dashed #d6deea;
+  border-radius: 10px;
+  background: #f7f9fc;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  min-height: 44px;
+}
+.setup-insights strong { color: #2a3b55; }
+.setup-insights .warn { color: #8f2422; font-weight: 700; }
 .city-row {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(130px, auto) minmax(130px, auto) minmax(260px, 0.8fr) auto;
@@ -874,6 +889,7 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .toast-info .toast-icon { background: #e8f0ff; color: #27467d; }
 
 @media (max-width: 900px) {
+  .setup-actions { flex-direction: column; }
   .city-row { grid-template-columns: 1fr; }
   .topbar-row { flex-direction: column; align-items: flex-start; }
   .step-nav-split { flex-direction: column; }

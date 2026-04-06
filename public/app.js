@@ -52,6 +52,8 @@ const els = {
   tripName: document.getElementById('tripName'),
   citiesContainer: document.getElementById('citiesContainer'),
   addCityBtn: document.getElementById('addCityBtn'),
+  sortCitiesBtn: document.getElementById('sortCitiesBtn'),
+  setupInsights: document.getElementById('setupInsights'),
   planBtn: document.getElementById('planBtn'),
   activitiesGrid: document.getElementById('activitiesGrid'),
   continueArrangeBtn: document.getElementById('continueArrangeBtn'),
@@ -483,6 +485,58 @@ function addCityRow(city = { id: uid(), name: '', startDate: '', endDate: '', no
   renderCities();
 }
 
+function daysBetween(startDate, endDate) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
+  return Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+}
+
+function renderSetupInsights() {
+  if (!els.setupInsights) return;
+  const complete = state.cities.filter((c) => c.name && c.startDate && c.endDate);
+  if (!complete.length) {
+    els.setupInsights.innerHTML = 'Add city dates to see a quick trip health check.';
+    return;
+  }
+
+  const sorted = [...complete].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+  const totalDays = sorted.reduce((sum, c) => sum + daysBetween(c.startDate, c.endDate), 0);
+  let overlapCount = 0;
+  let reverseDateCount = 0;
+
+  sorted.forEach((city, idx) => {
+    if (new Date(city.endDate) < new Date(city.startDate)) reverseDateCount += 1;
+    if (!idx) return;
+    const prev = sorted[idx - 1];
+    if (new Date(city.startDate) <= new Date(prev.endDate)) overlapCount += 1;
+  });
+
+  const firstDate = sorted[0].startDate;
+  const lastDate = sorted[sorted.length - 1].endDate;
+  const issues = [];
+  if (overlapCount) issues.push(`<span class="warn">${overlapCount} date overlap${overlapCount > 1 ? 's' : ''}</span>`);
+  if (reverseDateCount) issues.push(`<span class="warn">${reverseDateCount} city with end date before start date</span>`);
+
+  els.setupInsights.innerHTML = `
+    <strong>${complete.length}</strong> cities •
+    <strong>${totalDays}</strong> planned day${totalDays === 1 ? '' : 's'} •
+    <strong>${esc(firstDate)}</strong> to <strong>${esc(lastDate)}</strong>
+    ${issues.length ? `• ${issues.join(' • ')}` : '• Looks good to plan'}
+  `;
+}
+
+function sortCitiesByDate() {
+  const withDates = state.cities.filter((c) => c.startDate);
+  const withoutDates = state.cities.filter((c) => !c.startDate);
+  state.cities = [
+    ...withDates.sort((a, b) => new Date(a.startDate) - new Date(b.startDate)),
+    ...withoutDates
+  ];
+  renderCities();
+  showToast('Cities sorted by start date.', 'success');
+}
+
 function renderCities() {
   bindCityAutocompleteOutsideClick();
   els.citiesContainer.innerHTML = '';
@@ -503,6 +557,7 @@ function renderCities() {
     inputs.forEach((input) => {
       input.addEventListener('input', () => {
         city[input.dataset.field] = input.value;
+        renderSetupInsights();
       });
     });
 
@@ -574,6 +629,8 @@ function renderCities() {
     });
     els.citiesContainer.appendChild(row);
   });
+
+  renderSetupInsights();
 }
 
 function typeToTime(type) {
@@ -2370,6 +2427,7 @@ function clearPlannedResultsKeepSetup() {
 }
 
 els.addCityBtn.addEventListener('click', () => { addCityRow(); });
+els.sortCitiesBtn?.addEventListener('click', sortCitiesByDate);
 els.planBtn.addEventListener('click', async () => {
   if (state.isPlanning) return;
   clearSnapshot();
