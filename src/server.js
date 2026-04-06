@@ -245,14 +245,14 @@ function parseUserId(rawUserId) {
 function buildChatSystemPrompt(tripContext = {}) {
   const cities = Array.isArray(tripContext.cities) && tripContext.cities.length
     ? tripContext.cities.map((city) => {
-      const hotels = Array.isArray(city.hotels) && city.hotels.length
-        ? city.hotels.map((hotel) => `${hotel.name || 'Hotel'} (${hotel.checkIn || '?'} → ${hotel.checkOut || '?'})`).join('; ')
-        : 'No hotels listed';
-      return `${city.name} (${city.startDate} → ${city.endDate}) | Hotels: ${hotels}`;
+      const accommodations = Array.isArray(city.accommodations) && city.accommodations.length
+        ? city.accommodations.map((accommodation) => `${accommodation.name || 'Accommodation'} (${accommodation.checkIn || '?'} → ${accommodation.checkOut || '?'})`).join('; ')
+        : 'No accommodations listed';
+      return `${city.name} (${city.startDate} → ${city.endDate}) | Accommodations: ${accommodations}`;
     }).join(' | ')
     : 'None yet';
   const travels = Array.isArray(tripContext.travels) && tripContext.travels.length
-    ? tripContext.travels.map((travel) => `${travel.type || 'travel'}: ${travel.departureCity || '?'} → ${travel.arrivalCity || '?'} at ${travel.dateTime || '?'} (${travel.duration || 'duration unknown'})`).join(' | ')
+    ? tripContext.travels.map((travel) => `Entry: ${travel.entryPoint || '?'} at ${travel.dateTime || '?'}`).join(' | ')
     : 'None yet';
   const approved = Array.isArray(tripContext.approvedActivities) && tripContext.approvedActivities.length
     ? tripContext.approvedActivities.join(', ')

@@ -4,7 +4,7 @@ const { getSummary } = require('./preferences');
 const MODEL = 'claude-sonnet-4-6';
 
 const SYSTEM_PROMPT = `## Role
-You are a blunt, opinionated travel planning agent. Your job is to design itineraries tailored to the specific traveler's preferences and profile. You are not a generalist — you filter everything through what this specific user actually enjoys. Be concise. At most 3 sentences per activity. Use provided accommodation (hotel) and flight/train context to shape recommendation timing and geography.
+You are a blunt, opinionated travel planning agent. Your job is to design itineraries tailored to the specific traveler's preferences and profile. You are not a generalist — you filter everything through what this specific user actually enjoys. Be concise. At most 3 sentences per activity. Use provided accommodation and trip entry context to shape recommendation timing and geography.
 
 ---
 
@@ -172,7 +172,7 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
 }
 
 async function planCity(city, profile = null, userId = 'default', travels = []) {
-  const { name, startDate, endDate, notes, hotels } = city;
+  const { name, startDate, endDate, notes, accommodations } = city;
   const client = getClient();
   if (!client) {
     const err = new Error('Anthropic API key not configured');
@@ -180,24 +180,23 @@ async function planCity(city, profile = null, userId = 'default', travels = []) 
     throw err;
   }
 
-  const cityHotels = Array.isArray(hotels) && hotels.length
-    ? hotels.map((hotel) => `${hotel.name || 'Hotel'} | ${hotel.address || 'Address missing'} | ${hotel.checkIn || '?'} → ${hotel.checkOut || '?'}`).join('\n')
-    : 'No hotels provided for this city yet.';
+  const cityAccommodations = Array.isArray(accommodations) && accommodations.length
+    ? accommodations.map((accommodation) => `${accommodation.type || 'Accommodation'}: ${accommodation.name || 'Unnamed accommodation'} | ${accommodation.address || 'Address missing'} | ${accommodation.checkIn || '?'} → ${accommodation.checkOut || '?'}`).join('\n')
+    : 'No accommodations provided for this city yet.';
 
   const relatedTravels = Array.isArray(travels)
     ? travels.filter((travel) => {
-      const departure = String(travel?.departureCity || '').trim().toLowerCase();
-      const arrival = String(travel?.arrivalCity || '').trim().toLowerCase();
+      const entryPoint = String(travel?.entryPoint || '').trim().toLowerCase();
       const cityName = String(name || '').trim().toLowerCase();
-      return departure === cityName || arrival === cityName;
+      return entryPoint.includes(cityName);
     })
     : [];
 
   const travelContext = relatedTravels.length
-    ? relatedTravels.map((travel) => `${travel.type || 'travel'} ${travel.departureCity || '?'} → ${travel.arrivalCity || '?'} @ ${travel.dateTime || '?'} (${travel.duration || 'duration unknown'})`).join('\n')
-    : 'No direct flight/train segments logged for this city.';
+    ? relatedTravels.map((travel) => `Entry via ${travel.entryPoint || '?'} @ ${travel.dateTime || '?'}`).join('\n')
+    : 'No trip entry details explicitly tied to this city.';
 
-  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Hotel context:\n${cityHotels}\n\nFlight/train context touching this city:\n${travelContext}\n\nUse accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near hotel or transport hubs). Return a maximum of 6-8 activities. Be concise.\n\nReturn JSON only.`;
+  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nUse accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Return a maximum of 6-8 activities. Be concise.\n\nReturn JSON only.`;
 
   const learnedSummary = getSummary(profile, userId);
   const effectiveSystemPrompt = learnedSummary
