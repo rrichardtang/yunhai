@@ -47,6 +47,20 @@
           <h2>Review Activities</h2>
           <div class="budget" id="budgetTracker"></div>
         </div>
+        <div class="review-toolbar">
+          <input id="reviewSearch" type="search" placeholder="Search activities, neighborhoods, cuisines..." />
+          <select id="reviewCityFilter" aria-label="Filter by city">
+            <option value="">All cities</option>
+          </select>
+          <select id="reviewVerdictFilter" aria-label="Filter by review state">
+            <option value="">All states</option>
+            <option value="unreviewed">Unreviewed</option>
+            <option value="approved">Approved</option>
+            <option value="declined">Declined</option>
+          </select>
+          <button id="approveVisibleBtn" class="secondary" type="button">✅ Approve visible</button>
+          <button id="clearVisibleBtn" class="secondary" type="button">↺ Clear visible</button>
+        </div>
         <div id="activitiesGrid" class="cards-grid"></div>
         <div class="step-nav sticky-nav step-nav-split">
           <button id="backToSetupBtn" class="secondary nav-secondary" type="button">← Back to Setup</button>

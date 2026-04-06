@@ -19,7 +19,12 @@ const state = {
   keys: { anthropicConfigured: false, unsplashConfigured: false },
   isPlanning: false,
   profilesStore: null,
-  profile: null
+  profile: null,
+  reviewFilters: {
+    search: '',
+    city: '',
+    verdict: ''
+  }
 };
 
 const PROFILES_KEY = 'travelplanner_profiles_v1';
@@ -56,6 +61,11 @@ const els = {
   setupInsights: document.getElementById('setupInsights'),
   planBtn: document.getElementById('planBtn'),
   activitiesGrid: document.getElementById('activitiesGrid'),
+  reviewSearch: document.getElementById('reviewSearch'),
+  reviewCityFilter: document.getElementById('reviewCityFilter'),
+  reviewVerdictFilter: document.getElementById('reviewVerdictFilter'),
+  approveVisibleBtn: document.getElementById('approveVisibleBtn'),
+  clearVisibleBtn: document.getElementById('clearVisibleBtn'),
   continueArrangeBtn: document.getElementById('continueArrangeBtn'),
   backToSetupBtn: document.getElementById('backToSetupBtn'),
   continueArrangeHint: document.getElementById('continueArrangeHint'),
@@ -887,6 +897,52 @@ function updateReviewNav() {
   }
 }
 
+function populateReviewCityFilter() {
+  if (!els.reviewCityFilter) return;
+  const current = state.reviewFilters.city;
+  const cities = [...new Set(state.activities.map((a) => String(a.city || '').trim()).filter(Boolean))].sort();
+  els.reviewCityFilter.innerHTML = ['<option value="">All cities</option>', ...cities.map((city) => `<option value="${esc(city)}">${esc(city)}</option>`)].join('');
+  els.reviewCityFilter.value = current;
+}
+
+function getFilteredReviewActivities() {
+  const search = String(state.reviewFilters.search || '').trim().toLowerCase();
+  const city = String(state.reviewFilters.city || '').trim().toLowerCase();
+  const verdict = String(state.reviewFilters.verdict || '').trim();
+
+  return state.activities.filter((a) => {
+    const review = state.reviewed[a.id] || { approved: null };
+    const text = [a.name, a.city, a.type, a.why_it_fits, a.pitfall, a.booking_advice].join(' ').toLowerCase();
+
+    if (search && !text.includes(search)) return false;
+    if (city && String(a.city || '').trim().toLowerCase() !== city) return false;
+    if (verdict === 'approved' && review.approved !== true) return false;
+    if (verdict === 'declined' && review.approved !== false) return false;
+    if (verdict === 'unreviewed' && review.approved !== null) return false;
+    return true;
+  });
+}
+
+function applyVerdictToVisibleActivities(verdict = null) {
+  const visible = getFilteredReviewActivities();
+  if (!visible.length) {
+    showToast('No visible activities to update.', 'info');
+    return;
+  }
+
+  visible.forEach((activity) => {
+    const existing = state.reviewed[activity.id] || { approved: null, notes: '' };
+    state.reviewed[activity.id] = {
+      ...existing,
+      approved: verdict,
+      notes: verdict === false ? '' : existing.notes
+    };
+  });
+
+  showToast(`Updated ${visible.length} visible activities.`, 'success');
+  renderActivities();
+}
+
 let reviewImageEnrichInFlight = false;
 
 function enrichImages(items = []) {
@@ -948,6 +1004,7 @@ function renderActivities() {
   console.log('[renderActivities] step=', state.step, 'activity count=', state.activities.length);
   renderBudget();
   updateReviewNav();
+  populateReviewCityFilter();
 
   if (state.step === 2 && !reviewImageEnrichInFlight) {
     console.log('[renderActivities] step 2 detected, calling enrichImages');
@@ -967,8 +1024,15 @@ function renderActivities() {
     });
   }
 
+  const filteredActivities = getFilteredReviewActivities();
+
+  if (!filteredActivities.length) {
+    els.activitiesGrid.innerHTML = '<div class="item"><strong>No activities match your filters.</strong><p>Try clearing search/filter settings.</p></div>';
+    return;
+  }
+
   els.activitiesGrid.innerHTML = '';
-  state.activities.forEach((a) => {
+  filteredActivities.forEach((a) => {
     const review = state.reviewed[a.id] || { approved: null, notes: '' };
     const approvedState = review.approved;
     const isApproved = approvedState === true;
@@ -2360,8 +2424,12 @@ function resetToFresh() {
   state.arrangeCity = null;
   state.chatHistory = [];
   state.chatLoading = false;
+  state.reviewFilters = { search: '', city: '', verdict: '' };
 
   els.tripName.value = '';
+  if (els.reviewSearch) els.reviewSearch.value = '';
+  if (els.reviewCityFilter) els.reviewCityFilter.value = '';
+  if (els.reviewVerdictFilter) els.reviewVerdictFilter.value = '';
   renderCities();
   addCityRow();
   renderActivities();
@@ -2441,6 +2509,21 @@ els.backToSetupBtn.addEventListener('click', () => {
   clearPlannedResultsKeepSetup();
   setStep(1);
 });
+els.reviewSearch?.addEventListener('input', (e) => {
+  state.reviewFilters.search = e.target.value || '';
+  renderActivities();
+});
+els.reviewCityFilter?.addEventListener('change', (e) => {
+  state.reviewFilters.city = e.target.value || '';
+  renderActivities();
+});
+els.reviewVerdictFilter?.addEventListener('change', (e) => {
+  state.reviewFilters.verdict = e.target.value || '';
+  renderActivities();
+});
+els.approveVisibleBtn?.addEventListener('click', () => applyVerdictToVisibleActivities(true));
+els.clearVisibleBtn?.addEventListener('click', () => applyVerdictToVisibleActivities(null));
+
 els.continueArrangeBtn.addEventListener('click', () => {
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
   if (!approved.length) return;
