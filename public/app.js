@@ -660,6 +660,20 @@ function setStep(n) {
   state.step = n;
   els.steps.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
   els.panels.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
+  updateStepNavButtons();
+}
+
+function updateStepNavButtons() {
+  const activePanel = els.panels[state.step - 1];
+  if (!activePanel) return;
+
+  const backButtons = activePanel.querySelectorAll('[data-nav-back]');
+  const nextButtons = activePanel.querySelectorAll('[data-nav-next]');
+  const isFirstStep = state.step === 1;
+  const isLastStep = state.step === els.panels.length;
+
+  backButtons.forEach((btn) => btn.classList.toggle('hidden', isFirstStep));
+  nextButtons.forEach((btn) => btn.classList.toggle('hidden', isLastStep));
 }
 
 function setPlanningLoading(isLoading) {
@@ -668,7 +682,7 @@ function setPlanningLoading(isLoading) {
 
   state.isPlanning = isLoading;
   els.planBtn.disabled = isLoading;
-  els.planBtn.textContent = isLoading ? 'Planning…' : 'Plan My Trip';
+  els.planBtn.textContent = isLoading ? 'Planning…' : 'Next →';
 
   if (!isLoading) {
     overlay.classList.add('hidden');
@@ -694,6 +708,51 @@ function setPlanningLoading(isLoading) {
       messageEl.classList.add('loading-visible');
     }, 140);
   }, 2400);
+}
+
+async function goToNextStep(fromStep = state.step) {
+  if (fromStep === 1) {
+    if (state.isPlanning) return;
+    if (!validateLocationsBeforePlanning()) {
+      showToast('Please validate all locations before planning your trip.', 'error');
+      return;
+    }
+    clearSnapshot();
+    clearPlannedResultsKeepSetup();
+    setPlanningLoading(true);
+    try { await planTrip(); }
+    catch (e) { showToast(e?.message || 'Failed to plan trip.', 'error'); }
+    finally { setPlanningLoading(false); }
+    return;
+  }
+
+  if (fromStep === 2) {
+    const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
+    if (!approved.length) return;
+    state.commutes = {};
+    state.days = expandDays(state.cities);
+    state.arrangeCity = state.days[0]?.city || null;
+    approved.forEach((a) => {
+      state.placements[a.id] = state.placements[a.id] || { dayId: null, time: parseTimeTo24(a.suggested_time || typeToTime(a.type)) };
+    });
+    renderArrange();
+    setStep(3);
+    return;
+  }
+
+  if (fromStep === 3) {
+    try {
+      await generateItinerary();
+    } catch (e) {
+      showToast(e?.message || 'Failed to generate itinerary.', 'error');
+    }
+  }
+}
+
+function goToPreviousStep(fromStep = state.step) {
+  if (fromStep <= 1) return;
+  if (fromStep === 4) renderArrange();
+  setStep(fromStep - 1);
 }
 
 function addCityRow(city = { id: uid(), name: '', startDate: '', endDate: '', notes: '' }) {
@@ -2990,23 +3049,6 @@ els.travelEntryPoint?.addEventListener('input', (e) => {
 els.travelEntryTime?.addEventListener('input', (e) => {
   setTravelEntryTime(e.target.value || '09:00');
 });
-els.planBtn.addEventListener('click', async () => {
-  if (state.isPlanning) return;
-  if (!validateLocationsBeforePlanning()) {
-    showToast('Please validate all locations before planning your trip.', 'error');
-    return;
-  }
-  clearSnapshot();
-  clearPlannedResultsKeepSetup();
-  setPlanningLoading(true);
-  try { await planTrip(); }
-  catch (e) { showToast(e?.message || 'Failed to plan trip.', 'error'); }
-  finally { setPlanningLoading(false); }
-});
-els.backToSetupBtn.addEventListener('click', () => {
-  clearPlannedResultsKeepSetup();
-  setStep(1);
-});
 els.reviewSearch?.addEventListener('input', (e) => {
   state.reviewFilters.search = e.target.value || '';
   renderActivities();
@@ -3022,29 +3064,8 @@ els.reviewVerdictFilter?.addEventListener('change', (e) => {
 els.approveVisibleBtn?.addEventListener('click', () => applyVerdictToVisibleActivities(true));
 els.clearVisibleBtn?.addEventListener('click', () => applyVerdictToVisibleActivities(null));
 
-els.continueArrangeBtn.addEventListener('click', () => {
-  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
-  if (!approved.length) return;
-  state.commutes = {};
-  state.days = expandDays(state.cities);
-  state.arrangeCity = state.days[0]?.city || null;
-  approved.forEach((a) => {
-    state.placements[a.id] = state.placements[a.id] || { dayId: null, time: parseTimeTo24(a.suggested_time || typeToTime(a.type)) };
-  });
-  renderArrange();
-  setStep(3);
-});
 els.saveProgressBtn.addEventListener('click', saveSnapshot);
 els.autoArrangeBtn?.addEventListener('click', autoArrangeActiveCity);
-els.backToReviewBtn.addEventListener('click', () => setStep(2));
-els.generateBtn.addEventListener('click', async () => {
-  try {
-    await generateItinerary();
-  } catch (e) {
-    showToast(e?.message || 'Failed to generate itinerary.', 'error');
-  }
-});
-els.editBtn.addEventListener('click', () => { renderArrange(); setStep(3); });
 els.downloadCalendarBtn?.addEventListener('click', () => {
   if (!state.currentItineraryId) return;
   window.open(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/calendar.ics`, '_blank');
@@ -3118,6 +3139,20 @@ els.activitiesGrid.addEventListener('change', () => {
     state.placements[a.id] = state.placements[a.id] || { dayId: null, time: parseTimeTo24(a.suggested_time || typeToTime(a.type)) };
   });
   renderArrange();
+});
+
+document.querySelectorAll('[data-nav-next]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const fromStep = Number(btn.dataset.navNext || state.step);
+    goToNextStep(fromStep);
+  });
+});
+
+document.querySelectorAll('[data-nav-back]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const fromStep = Number(btn.dataset.navBack || state.step);
+    goToPreviousStep(fromStep);
+  });
 });
 
 (async function init() {
