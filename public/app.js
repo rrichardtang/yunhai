@@ -131,10 +131,10 @@ const cityAutocomplete = {
 };
 
 let googleMapsSdkPromise = null;
-const placesAutocompleteByInput = new WeakMap();
+const placesAutocompleteByElement = new WeakMap();
 
 function isGooglePlacesReady() {
-  return Boolean(window.google?.maps?.places?.Autocomplete);
+  return Boolean(window.google?.maps?.places?.PlaceAutocompleteElement);
 }
 
 function clearLocationValidationError() {
@@ -188,7 +188,11 @@ function markTravelEntryUnvalidated() {
 }
 
 function buildGoogleMapsSdkUrl(apiKey = '') {
-  const base = String(window.TRAVELPLANNER_GOOGLE_MAPS_SDK_BASE_URL || 'https://maps.googleapis.com/maps/api/js?libraries=places');
+  const defaultBase = 'https://maps.googleapis.com/maps/api/js?libraries=places&v=beta&loading=async';
+  let base = String(window.TRAVELPLANNER_GOOGLE_MAPS_SDK_BASE_URL || defaultBase);
+  if (!base.includes('libraries=places')) base += `${base.includes('?') ? '&' : '?'}libraries=places`;
+  if (!base.includes('v=')) base += '&v=beta';
+  if (!base.includes('loading=')) base += '&loading=async';
   const separator = base.includes('?') ? '&' : '?';
   return `${base}${separator}key=${encodeURIComponent(apiKey)}`;
 }
@@ -203,9 +207,16 @@ async function loadGoogleMapsPlacesSDK(apiKey = '') {
     script.src = buildGoogleMapsSdkUrl(apiKey);
     script.async = true;
     script.defer = true;
-    script.onload = () => {
-      if (isGooglePlacesReady()) resolve(true);
-      else reject(new Error('Google Places library failed to initialize.'));
+    script.onload = async () => {
+      try {
+        if (window.google?.maps?.importLibrary) {
+          await window.google.maps.importLibrary('places');
+        }
+        if (isGooglePlacesReady()) resolve(true);
+        else reject(new Error('Google Places library failed to initialize.'));
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error('Google Places library failed to initialize.'));
+      }
     };
     script.onerror = () => reject(new Error('Failed to load Google Maps SDK.'));
     document.head.appendChild(script);
@@ -221,46 +232,79 @@ function getAccommodationAutocompleteInput(row) {
   return row?.querySelector('[data-accommodation-field="address"]') || null;
 }
 
-function attachPlacesAutocomplete(input, { onResolved, onInvalid }) {
-  if (!input || !isGooglePlacesReady()) return;
-  if (placesAutocompleteByInput.has(input)) return;
+function extractResolvedPlace(placeLike) {
+  const formattedAddress = String(
+    placeLike?.formattedAddress
+    || placeLike?.formatted_address
+    || placeLike?.displayName?.text
+    || ''
+  ).trim();
+  const placeId = String(placeLike?.id || placeLike?.place_id || '').trim();
+  const latFn = placeLike?.location?.lat || placeLike?.geometry?.location?.lat;
+  const lngFn = placeLike?.location?.lng || placeLike?.geometry?.location?.lng;
+  const lat = typeof latFn === 'function' ? latFn.call(placeLike.location || placeLike.geometry?.location) : Number(latFn);
+  const lng = typeof lngFn === 'function' ? lngFn.call(placeLike.location || placeLike.geometry?.location) : Number(lngFn);
 
-  const autocomplete = new google.maps.places.Autocomplete(input, {
-    fields: ['place_id', 'formatted_address', 'geometry']
-  });
+  if (!formattedAddress || !placeId || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { formattedAddress, placeId, lat, lng };
+}
 
-  autocomplete.addListener('place_changed', () => {
-    const place = autocomplete.getPlace();
-    const formattedAddress = String(place?.formatted_address || '').trim();
-    const placeId = String(place?.place_id || '').trim();
-    const latFn = place?.geometry?.location?.lat;
-    const lngFn = place?.geometry?.location?.lng;
-    const lat = typeof latFn === 'function' ? latFn() : null;
-    const lng = typeof lngFn === 'function' ? lngFn() : null;
+async function resolvePlaceFromAutocompleteEvent(event, element) {
+  const eventPlace = event?.detail?.place || event?.detail?.placeResult || event?.place;
+  const fromEventPlace = extractResolvedPlace(eventPlace);
+  if (fromEventPlace) return fromEventPlace;
 
-    if (!formattedAddress || !placeId || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+  const prediction = event?.detail?.placePrediction || event?.placePrediction;
+  if (prediction?.toPlace) {
+    const place = prediction.toPlace();
+    if (place?.fetchFields) {
+      await place.fetchFields({ fields: ['id', 'formattedAddress', 'location'] });
+    }
+    const resolved = extractResolvedPlace(place);
+    if (resolved) return resolved;
+  }
+
+  const componentPlace = typeof element?.getPlace === 'function' ? element.getPlace() : null;
+  const resolvedFromComponent = extractResolvedPlace(componentPlace);
+  if (resolvedFromComponent) return resolvedFromComponent;
+
+  return null;
+}
+
+function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInput }) {
+  if (!element || !isGooglePlacesReady()) return;
+  if (placesAutocompleteByElement.has(element)) return;
+
+  const handleSelection = async (event) => {
+    try {
+      const resolved = await resolvePlaceFromAutocompleteEvent(event, element);
+      if (!resolved) {
+        if (typeof onInvalid === 'function') onInvalid();
+        return;
+      }
+      if (typeof onResolved === 'function') onResolved(resolved);
+    } catch {
       if (typeof onInvalid === 'function') onInvalid();
-      return;
     }
+  };
 
-    if (typeof onResolved === 'function') {
-      onResolved({
-        formattedAddress,
-        placeId,
-        lat,
-        lng
-      });
-    }
-  });
+  element.addEventListener('gmp-placeselect', handleSelection);
+  element.addEventListener('place_changed', handleSelection);
 
-  placesAutocompleteByInput.set(input, autocomplete);
+  const handleInput = () => {
+    if (typeof onInput === 'function') onInput();
+  };
+  element.addEventListener('input', handleInput);
+  element.addEventListener('change', handleInput);
+
+  placesAutocompleteByElement.set(element, { handleSelection, handleInput });
 }
 
 function initializePlacesWidgets() {
   if (!isGooglePlacesReady()) return;
 
   if (els.travelEntryPoint) {
-    attachPlacesAutocomplete(els.travelEntryPoint, {
+    attachPlaceAutocompleteElement(els.travelEntryPoint, {
       onResolved: ({ formattedAddress, placeId, lat, lng }) => {
         ensureSingleTravelEntry();
         state.travels[0].entryPoint = formattedAddress;
@@ -273,6 +317,9 @@ function initializePlacesWidgets() {
         if (els.travelEntryPointLng) els.travelEntryPointLng.value = String(lng);
         setTravelResolvedAddress(formattedAddress);
         clearLocationValidationError();
+      },
+      onInput: () => {
+        markTravelEntryUnvalidated();
       },
       onInvalid: () => {
         markTravelEntryUnvalidated();
@@ -287,7 +334,7 @@ function initializePlacesWidgets() {
       const input = getAccommodationAutocompleteInput(row);
       if (!input) return;
 
-      attachPlacesAutocomplete(input, {
+      attachPlaceAutocompleteElement(input, {
         onResolved: ({ formattedAddress, placeId, lat, lng }) => {
           accommodation.address = formattedAddress;
           accommodation.placeId = placeId;
@@ -298,6 +345,14 @@ function initializePlacesWidgets() {
           const resolved = row.querySelector('[data-accommodation-resolved]');
           if (resolved) resolved.textContent = `Validated location: ${formattedAddress}`;
           clearLocationValidationError();
+        },
+        onInput: () => {
+          accommodation.placeId = '';
+          accommodation.latitude = null;
+          accommodation.longitude = null;
+          row.dataset.addressValidated = '0';
+          const resolved = row.querySelector('[data-accommodation-resolved]');
+          if (resolved) resolved.textContent = '';
         },
         onInvalid: () => {
           accommodation.placeId = '';
@@ -791,7 +846,11 @@ function renderAccommodations() {
                 <option value="other" ${accommodation.type === 'other' ? 'selected' : ''}>Other</option>
               </select>
               <input type="text" placeholder="Accommodation name" value="${esc(accommodation.name || '')}" data-accommodation-field="name" />
-              <input type="text" placeholder="Accommodation address" value="${esc(accommodation.address || '')}" data-accommodation-field="address" />
+              <gmp-places-autocomplete
+                data-accommodation-field="address"
+                placeholder="Accommodation address"
+                value="${esc(accommodation.address || '')}"
+              ></gmp-places-autocomplete>
               <input type="date" value="${esc(accommodation.checkIn || '')}" data-accommodation-field="checkIn" />
               <input type="date" value="${esc(accommodation.checkOut || '')}" data-accommodation-field="checkOut" />
               <button class="secondary" type="button" data-remove-accommodation>Remove</button>
@@ -809,16 +868,9 @@ function renderAccommodations() {
       if (!hotel) return;
 
       hotelRow.querySelectorAll('[data-accommodation-field]').forEach((input) => {
+        if (input.dataset.accommodationField === 'address') return;
         input.addEventListener('input', () => {
           hotel[input.dataset.accommodationField] = input.value;
-          if (input.dataset.accommodationField === 'address') {
-            hotel.placeId = '';
-            hotel.latitude = null;
-            hotel.longitude = null;
-            hotelRow.dataset.addressValidated = '0';
-            const resolved = hotelRow.querySelector('[data-accommodation-resolved]');
-            if (resolved) resolved.textContent = '';
-          }
         });
       });
 
@@ -894,7 +946,7 @@ function renderCities() {
     row.className = 'city-row';
     row.innerHTML = `
       <div class="city-autocomplete">
-        <input placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off" />
+        <gmp-places-autocomplete placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off"></gmp-places-autocomplete>
         <div class="muted-text" data-city-resolved>${city.latitude != null && city.longitude != null ? `Validated location: ${esc(city.name)}` : ''}</div>
       </div>
       <input type="date" value="${esc(city.startDate)}" data-field="startDate" />
@@ -902,7 +954,7 @@ function renderCities() {
       <input type="text" placeholder="Notes for this city (e.g. want to see FC Barcelona game)" value="${esc(city.notes || '')}" data-field="notes" />
       <button class="secondary" type="button" data-remove-city>Remove</button>
     `;
-    const inputs = row.querySelectorAll('input');
+    const inputs = row.querySelectorAll('input[data-field]');
     inputs.forEach((input) => {
       input.addEventListener('input', () => {
         city[input.dataset.field] = input.value;
@@ -919,9 +971,9 @@ function renderCities() {
       });
     });
 
-    const cityNameInput = row.querySelector('input[data-field="name"]');
+    const cityNameInput = row.querySelector('[data-field="name"]');
     if (cityNameInput && isGooglePlacesReady()) {
-      attachPlacesAutocomplete(cityNameInput, {
+      attachPlaceAutocompleteElement(cityNameInput, {
         onResolved: ({ formattedAddress, placeId, lat, lng }) => {
           city.name = formattedAddress;
           city.placeId = placeId;
@@ -932,6 +984,13 @@ function renderCities() {
           if (resolved) resolved.textContent = `Validated location: ${formattedAddress}`;
           clearLocationValidationError();
           renderSetupInsights();
+        },
+        onInput: () => {
+          city.placeId = '';
+          city.latitude = null;
+          city.longitude = null;
+          const resolved = row.querySelector('[data-city-resolved]');
+          if (resolved) resolved.textContent = '';
         },
         onInvalid: () => {
           city.placeId = '';
