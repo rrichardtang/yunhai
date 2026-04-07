@@ -63,7 +63,8 @@ const els = {
   travelEntryPointLng: document.getElementById('travelEntryPointLng'),
   travelEntryPointResolved: document.getElementById('travelEntryPointResolved'),
   locationValidationError: document.getElementById('locationValidationError'),
-  travelEntryDateTime: document.getElementById('travelEntryDateTime'),
+  travelEntryDate: document.getElementById('travelEntryDate'),
+  travelEntryTime: document.getElementById('travelEntryTime'),
   addCityBtn: document.getElementById('addCityBtn'),
   sortCitiesBtn: document.getElementById('sortCitiesBtn'),
   setupInsights: document.getElementById('setupInsights'),
@@ -134,7 +135,7 @@ let googleMapsSdkPromise = null;
 const placesAutocompleteByElement = new WeakMap();
 
 function isGooglePlacesReady() {
-  return Boolean(window.google?.maps?.places?.PlaceAutocompleteElement);
+  return Boolean(window.google?.maps?.places?.Autocomplete);
 }
 
 function clearLocationValidationError() {
@@ -161,7 +162,10 @@ function normalizeCoordinate(value) {
 
 function normalizeAccommodation(accommodation = {}) {
   return {
-    ...accommodation,
+    id: String(accommodation.id || uid()),
+    address: String(accommodation.address || ''),
+    checkIn: String(accommodation.checkIn || ''),
+    checkOut: String(accommodation.checkOut || ''),
     placeId: String(accommodation.placeId || ''),
     latitude: normalizeCoordinate(accommodation.latitude),
     longitude: normalizeCoordinate(accommodation.longitude)
@@ -232,64 +236,33 @@ function getAccommodationAutocompleteInput(row) {
   return row?.querySelector('[data-accommodation-field="address"]') || null;
 }
 
-function extractResolvedPlace(placeLike) {
-  const formattedAddress = String(
-    placeLike?.formattedAddress
-    || placeLike?.formatted_address
-    || placeLike?.displayName?.text
-    || ''
-  ).trim();
-  const placeId = String(placeLike?.id || placeLike?.place_id || '').trim();
-  const latFn = placeLike?.location?.lat || placeLike?.geometry?.location?.lat;
-  const lngFn = placeLike?.location?.lng || placeLike?.geometry?.location?.lng;
-  const lat = typeof latFn === 'function' ? latFn.call(placeLike.location || placeLike.geometry?.location) : Number(latFn);
-  const lng = typeof lngFn === 'function' ? lngFn.call(placeLike.location || placeLike.geometry?.location) : Number(lngFn);
-
-  if (!formattedAddress || !placeId || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { formattedAddress, placeId, lat, lng };
-}
-
-async function resolvePlaceFromAutocompleteEvent(event, element) {
-  const eventPlace = event?.detail?.place || event?.detail?.placeResult || event?.place;
-  const fromEventPlace = extractResolvedPlace(eventPlace);
-  if (fromEventPlace) return fromEventPlace;
-
-  const prediction = event?.detail?.placePrediction || event?.placePrediction;
-  if (prediction?.toPlace) {
-    const place = prediction.toPlace();
-    if (place?.fetchFields) {
-      await place.fetchFields({ fields: ['id', 'formattedAddress', 'location'] });
-    }
-    const resolved = extractResolvedPlace(place);
-    if (resolved) return resolved;
-  }
-
-  const componentPlace = typeof element?.getPlace === 'function' ? element.getPlace() : null;
-  const resolvedFromComponent = extractResolvedPlace(componentPlace);
-  if (resolvedFromComponent) return resolvedFromComponent;
-
-  return null;
-}
-
 function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInput }) {
   if (!element || !isGooglePlacesReady()) return;
   if (placesAutocompleteByElement.has(element)) return;
 
-  const handleSelection = async (event) => {
+  const autocomplete = new google.maps.places.Autocomplete(element, {
+    fields: ['formatted_address', 'place_id', 'geometry'],
+    types: ['geocode']
+  });
+
+  const handleSelection = () => {
     try {
-      const resolved = await resolvePlaceFromAutocompleteEvent(event, element);
-      if (!resolved) {
+      const place = autocomplete.getPlace();
+      const formattedAddress = String(place?.formatted_address || '').trim();
+      const placeId = String(place?.place_id || '').trim();
+      const lat = place?.geometry?.location?.lat?.();
+      const lng = place?.geometry?.location?.lng?.();
+      if (!formattedAddress || !placeId || !Number.isFinite(lat) || !Number.isFinite(lng)) {
         if (typeof onInvalid === 'function') onInvalid();
         return;
       }
-      if (typeof onResolved === 'function') onResolved(resolved);
+      if (typeof onResolved === 'function') onResolved({ formattedAddress, placeId, lat, lng });
     } catch {
       if (typeof onInvalid === 'function') onInvalid();
     }
   };
 
-  element.addEventListener('gmp-placeselect', handleSelection);
-  element.addEventListener('place_changed', handleSelection);
+  const listener = autocomplete.addListener('place_changed', handleSelection);
 
   const handleInput = () => {
     if (typeof onInput === 'function') onInput();
@@ -297,7 +270,7 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
   element.addEventListener('input', handleInput);
   element.addEventListener('change', handleInput);
 
-  placesAutocompleteByElement.set(element, { handleSelection, handleInput });
+  placesAutocompleteByElement.set(element, { handleSelection, handleInput, listener, autocomplete });
 }
 
 function initializePlacesWidgets() {
@@ -755,8 +728,6 @@ function addAccommodationRow(city) {
     : [];
   city.accommodations.push({
     id: uid(),
-    type: 'hotel',
-    name: '',
     address: '',
     placeId: '',
     latitude: null,
@@ -768,15 +739,17 @@ function addAccommodationRow(city) {
 }
 
 function ensureSingleTravelEntry() {
-  const autoDateTime = getTripEntryDateTime();
+  const autoDate = getTripStartDate();
   const existing = Array.isArray(state.travels) && state.travels.length ? state.travels[0] : null;
+  const existingTime = extractTimeFromDateTime(existing?.dateTime) || '09:00';
+  const dateTime = autoDate ? `${autoDate}T${existingTime}` : '';
   state.travels = [{
     id: existing?.id || uid(),
     entryPoint: existing?.entryPoint || '',
     entryPointPlaceId: existing?.entryPointPlaceId || '',
     entryPointLat: normalizeCoordinate(existing?.entryPointLat),
     entryPointLng: normalizeCoordinate(existing?.entryPointLng),
-    dateTime: autoDateTime
+    dateTime
   }];
 }
 
@@ -788,9 +761,23 @@ function getTripStartDate() {
   return dates[0] || '';
 }
 
-function getTripEntryDateTime() {
-  const startDate = getTripStartDate();
-  return startDate ? `${startDate}T09:00` : '';
+function extractTimeFromDateTime(dateTime = '') {
+  const text = String(dateTime || '');
+  if (!text.includes('T')) return '';
+  const [, timePart] = text.split('T');
+  const match = String(timePart || '').match(/^(\d{2}:\d{2})/);
+  return match ? match[1] : '';
+}
+
+function setTravelEntryTime(timeValue = '') {
+  ensureSingleTravelEntry();
+  const date = getTripStartDate();
+  if (!date) {
+    state.travels[0].dateTime = '';
+    return;
+  }
+  const safeTime = String(timeValue || '').match(/^\d{2}:\d{2}$/) ? String(timeValue) : '09:00';
+  state.travels[0].dateTime = `${date}T${safeTime}`;
 }
 
 function syncTravelDateTimes() {
@@ -812,8 +799,11 @@ function renderTravels() {
     els.travelEntryPointLng.value = travel.entryPointLng == null ? '' : String(travel.entryPointLng);
   }
   setTravelResolvedAddress((travel.entryPointLat != null && travel.entryPointLng != null) ? travel.entryPoint : '');
-  if (els.travelEntryDateTime) {
-    els.travelEntryDateTime.value = travel.dateTime || '';
+  if (els.travelEntryDate) {
+    els.travelEntryDate.value = getTripStartDate() || '';
+  }
+  if (els.travelEntryTime) {
+    els.travelEntryTime.value = extractTimeFromDateTime(travel.dateTime) || '09:00';
   }
 }
 
@@ -838,19 +828,13 @@ function renderAccommodations() {
         ${(Array.isArray(city.accommodations) && city.accommodations.length)
           ? city.accommodations.map((accommodation) => `
             <div class="hotel-row" data-hotel-id="${esc(accommodation.id || '')}" data-address-validated="${accommodation.latitude != null && accommodation.longitude != null ? '1' : '0'}">
-              <select data-accommodation-field="type">
-                <option value="hotel" ${accommodation.type === 'hotel' ? 'selected' : ''}>Hotel</option>
-                <option value="airbnb" ${accommodation.type === 'airbnb' ? 'selected' : ''}>Airbnb</option>
-                <option value="hostel" ${accommodation.type === 'hostel' ? 'selected' : ''}>Hostel</option>
-                <option value="guesthouse" ${accommodation.type === 'guesthouse' ? 'selected' : ''}>Guesthouse</option>
-                <option value="other" ${accommodation.type === 'other' ? 'selected' : ''}>Other</option>
-              </select>
-              <input type="text" placeholder="Accommodation name" value="${esc(accommodation.name || '')}" data-accommodation-field="name" />
-              <gmp-places-autocomplete
+              <input
+                type="text"
                 data-accommodation-field="address"
                 placeholder="Accommodation address"
                 value="${esc(accommodation.address || '')}"
-              ></gmp-places-autocomplete>
+                autocomplete="off"
+              />
               <input type="date" value="${esc(accommodation.checkIn || '')}" data-accommodation-field="checkIn" />
               <input type="date" value="${esc(accommodation.checkOut || '')}" data-accommodation-field="checkOut" />
               <button class="secondary" type="button" data-remove-accommodation>Remove</button>
@@ -946,7 +930,7 @@ function renderCities() {
     row.className = 'city-row';
     row.innerHTML = `
       <div class="city-autocomplete">
-        <gmp-places-autocomplete placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off"></gmp-places-autocomplete>
+        <input type="text" placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off" />
         <div class="muted-text" data-city-resolved>${city.latitude != null && city.longitude != null ? `Validated location: ${esc(city.name)}` : ''}</div>
       </div>
       <input type="date" value="${esc(city.startDate)}" data-field="startDate" />
@@ -2103,7 +2087,7 @@ async function updateCommutesForCityDays(dayIds = []) {
   for (const dayId of dayIds) {
     const day = state.days.find((d) => d.id === dayId);
     const accommodation = day ? getAccommodationForDay(day.city, day.date) : null;
-    const accommodationLocation = [accommodation?.name, accommodation?.address].filter(Boolean).join(', ').trim();
+    const accommodationLocation = String(accommodation?.address || '').trim();
     const orderedActivities = state.activities
       .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === dayId)
       .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
@@ -2468,11 +2452,8 @@ function renderItinerary() {
       `)
       .join('');
     const accommodation = getAccommodationForDay(d.city, d.date);
-    const accommodationTypeLabel = accommodation?.type
-      ? accommodation.type.charAt(0).toUpperCase() + accommodation.type.slice(1)
-      : 'Accommodation';
     const accommodationInfo = accommodation
-      ? `<p class="muted-text"><strong>${esc(accommodationTypeLabel)}:</strong> ${esc(accommodation.name || 'Unnamed accommodation')}${accommodation.address ? ` · ${esc(accommodation.address)}` : ''}</p>`
+      ? `<p class="muted-text"><strong>Accommodation:</strong> ${esc(accommodation.address || 'Address missing')}</p>`
       : '';
     return `<section class="day-col"><div class="day-head">${d.date} • ${esc(d.city)}</div><div class="list">${accommodationInfo}${items || '<em>No activities assigned.</em>'}</div></section>`;
   }).join('');
@@ -3009,7 +2990,7 @@ function validateLocationsBeforePlanning() {
     }
 
     for (const accommodation of (city.accommodations || [])) {
-      const label = `${accommodation.name || 'Accommodation'} in ${city.name || 'city'}`;
+      const label = `Accommodation in ${city.name || 'city'}`;
       if (!String(accommodation.address || '').trim()) {
         showLocationValidationError(`${label} is missing an address. Please select an address from Google Places.`);
         return false;
@@ -3030,6 +3011,9 @@ els.travelEntryPoint?.addEventListener('input', (e) => {
   ensureSingleTravelEntry();
   state.travels[0].entryPoint = e.target.value || '';
   markTravelEntryUnvalidated();
+});
+els.travelEntryTime?.addEventListener('input', (e) => {
+  setTravelEntryTime(e.target.value || '09:00');
 });
 els.planBtn.addEventListener('click', async () => {
   if (state.isPlanning) return;
