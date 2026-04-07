@@ -2744,15 +2744,16 @@ async function autoArrangeActiveCity() {
 
   for (const activity of regularActivities) {
     const durationMinutes = Math.max(30, Number(activity.duration_hours || 1) * 60);
-    const suggestedStart = minutesFromTime(parseTimeTo24(activity.suggested_time || typeToTime(activity.type)));
     const windows = parseOpeningWindows(activity.opening_hours);
     let placed = false;
 
     for (const day of activeDays) {
       const bounds = dayWindows[day.id];
-      const dayStart = Math.max(bounds.start, bounds.cursor, suggestedStart);
+      const dayStart = Math.max(bounds.start, bounds.cursor);
       const dayEnd = bounds.end;
       for (const [openStart, openEnd] of windows.length ? windows : [[bounds.start, bounds.end]]) {
+        // Skip this window if it has already closed by the time this day's window opens
+        if (openEnd <= dayStart) continue;
         const candidateStart = Math.max(dayStart, openStart);
         const candidateEnd = candidateStart + durationMinutes;
         if (candidateEnd <= Math.min(dayEnd, openEnd)) {

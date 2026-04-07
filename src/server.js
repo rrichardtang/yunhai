@@ -275,10 +275,13 @@ async function buildCityTravelTiming(cities = []) {
 
     const firstAccommodation = pickFirstAccommodation(city);
     const lastAccommodation = pickLastAccommodation(city);
-    const arrivalTime = extractTimeFromDateTime(city?.travelEntry?.dateTime) || '09:00';
+    const logistics = city?.logistics || {};
+    const arrivalTime = logistics?.arrival?.customTime
+      || extractTimeFromDateTime(city?.travelEntry?.dateTime)
+      || '09:00';
     const arrivalDate = String(city?.startDate || '').slice(0, 10);
     const departureDate = String(city?.endDate || city?.startDate || '').slice(0, 10);
-    const departureTime = String(city?.leaveTime || '18:00');
+    const departureTime = logistics?.departure?.customTime || String(city?.leaveTime || '18:00');
 
     const timing = {
       city: cityName,
@@ -292,30 +295,31 @@ async function buildCityTravelTiming(cities = []) {
       interCitySummary: ''
     };
 
-    if (index === 0 && city?.travelEntry && firstAccommodation) {
-      const origin = resolveLocationQuery({
-        lat: city.travelEntry.entryPointLat,
-        lng: city.travelEntry.entryPointLng,
-        fallbackText: city.travelEntry.entryPoint
-      });
+    const arrivalOrigin = resolveLocationQuery({
+      lat: logistics?.arrival?.latitude ?? city?.travelEntry?.entryPointLat,
+      lng: logistics?.arrival?.longitude ?? city?.travelEntry?.entryPointLng,
+      fallbackText: logistics?.arrival?.location || city?.travelEntry?.entryPoint
+    });
+    if (arrivalOrigin && firstAccommodation) {
       const destination = resolveLocationQuery({
         lat: firstAccommodation.latitude,
         lng: firstAccommodation.longitude,
         fallbackText: firstAccommodation.address
       });
-      const arrivalDateTime = arrivalDate ? `${arrivalDate}T${arrivalTime}:00` : city?.travelEntry?.dateTime;
-      const leg = await estimateTravelMinutes({ origin, destination, departureDateTime: city?.travelEntry?.dateTime, arrivalDateTime });
+      const arrivalDateTime = `${arrivalDate}T${arrivalTime}:00`;
+      const leg = await estimateTravelMinutes({ origin: arrivalOrigin, destination, departureDateTime: arrivalDateTime, arrivalDateTime });
       if (leg?.durationMinutes) {
         timing.arrivalTravelMinutes = leg.durationMinutes;
         timing.arrivalAvailableTime = timeFromMinutes(parseMinutesFromTime(arrivalTime) + leg.durationMinutes);
-        timing.arrivalSummary = `User arrives at ${city.travelEntry.entryPoint || cityName} at ${arrivalTime}, ${leg.durationMinutes} min travel to accommodation, available for activities at ${timing.arrivalAvailableTime}.`;
+        const locationLabel = logistics?.arrival?.location || city?.travelEntry?.entryPoint || cityName;
+        timing.arrivalSummary = `User arrives at ${locationLabel} at ${arrivalTime}, ${leg.durationMinutes} min travel to accommodation, available for activities at ${timing.arrivalAvailableTime}.`;
       }
     }
 
     const departureLocation = resolveLocationQuery({
-      lat: city?.departureLat,
-      lng: city?.departureLng,
-      fallbackText: city?.departureLocation
+      lat: logistics?.departure?.latitude ?? city?.departureLat,
+      lng: logistics?.departure?.longitude ?? city?.departureLng,
+      fallbackText: logistics?.departure?.location || city?.departureLocation
     });
     if (lastAccommodation && departureLocation) {
       const origin = resolveLocationQuery({

@@ -1,18 +1,21 @@
 # Current State
 
-_Last updated: <!-- YYYY-MM-DD -->_
+_Last updated: 2026-04-07_
 
 ## Objective
-<!-- One sentence: what is the active goal right now? -->
+Continue local development of TravelPlanner and push changes to git for VPS deployment.
 
 ## Active Workstream
-<!-- What is actively being worked on? -->
+Trip Setup UI improvements — complete. All Google Places inputs working for city, accommodation, arrival, and departure.
 
 ## Constraints
-<!-- Technical, time, or scope constraints in effect -->
+- Local development, testing on VPS at https://travelplanner.srv1553531.hstgr.cloud/planner.html
+- Google Maps API does not work on localhost, so testing requires VPS deployment
+- No .env file locally — user only edits frontend files
 
 ## Risks
-<!-- Anything that could block or derail current work -->
+- New arrival/departure location fields added to `city.logistics` but backend may not consume them yet
+- `city.travelEntry` (first city only) still exists separately from `city.logistics.arrival` — may need reconciliation
 
 ## Next Actions
-<!-- Immediate next steps when resuming work -->
+- Await next feature request
