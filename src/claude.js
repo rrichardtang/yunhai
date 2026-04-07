@@ -185,7 +185,7 @@ async function planCity(city, profile = null, userId = 'default', travels = []) 
       const coordText = (Number.isFinite(Number(accommodation.latitude)) && Number.isFinite(Number(accommodation.longitude)))
         ? ` [${Number(accommodation.latitude)}, ${Number(accommodation.longitude)}]`
         : '';
-      return `${accommodation.type || 'Accommodation'}: ${accommodation.name || 'Unnamed accommodation'} | ${accommodation.address || 'Address missing'}${coordText} | ${accommodation.checkIn || '?'} → ${accommodation.checkOut || '?'}`;
+      return `Accommodation: ${accommodation.address || 'Address missing'}${coordText} | ${accommodation.checkIn || '?'} → ${accommodation.checkOut || '?'}`;
     }).join('\n')
     : 'No accommodations provided for this city yet.';
 
