@@ -38,25 +38,7 @@
           <button id="sortCitiesBtn" class="secondary" type="button">↕ Sort cities by date</button>
         </div>
         <div id="citiesContainer"></div>
-
-        <section class="accommodations-panel">
-          <h3>Accommodations</h3>
-          <p class="muted-text">Add accommodations for each city.</p>
-          <div id="accommodationsContainer"></div>
-        </section>
-
-        <section class="accommodations-panel">
-          <h3>Travel</h3>
-          <p class="muted-text">Trip entry details auto-populate from your earliest city start date.</p>
-          <div class="travel-row">
-            <input id="travelEntryPoint" type="text" placeholder="Entry point location (e.g. JFK, Grand Central Terminal)" autocomplete="off" />
-            <input id="travelEntryPointLat" type="hidden" />
-            <input id="travelEntryPointLng" type="hidden" />
-            <input id="travelEntryDate" type="date" readonly title="Auto-populated from trip start date" />
-            <input id="travelEntryTime" type="time" value="09:00" title="Select your preferred entry time" />
-          </div>
-          <div id="locationValidationError" class="muted-text warn hidden"></div>
-        </section>
+        <div id="locationValidationError" class="muted-text warn hidden"></div>
 
         <div id="setupInsights" class="setup-insights muted-text"></div>
         <div class="step-nav sticky-nav">

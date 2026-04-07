@@ -54,67 +54,59 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .setup-insights strong { color: #2a3b55; }
 .setup-insights .warn { color: #8f2422; font-weight: 700; }
 .city-row {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(130px, auto) minmax(130px, auto) minmax(260px, 0.8fr) auto;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.city-hotels {
-  grid-column: 1 / -1;
   border: 1px solid #e2e8f2;
-  border-radius: 10px;
-  background: #f8fbff;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 6px;
+  margin-bottom: 8px;
 }
 
-.city-hotels-head {
+.city-row-main {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) minmax(130px, auto) minmax(130px, auto) minmax(220px, 0.8fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.city-row-toggle {
+  min-width: 32px;
+  padding: 4px 8px;
+}
+
+.city-drawer {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #d6deea;
+}
+
+.city-section-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin: 0 0 4px;
+}
+
+.city-section-head h4 {
+  margin: 0;
+  font-size: .92rem;
 }
 
 .city-hotels-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .hotel-row {
   display: grid;
-  grid-template-columns: 1fr 1.2fr repeat(2, minmax(140px, auto)) auto;
-  gap: 8px;
-}
-
-.accommodations-panel {
-  border: 1px solid #dce4ef;
-  border-radius: 12px;
-  background: #fdfefe;
-  padding: 12px;
-  margin-bottom: 12px;
-}
-
-.accommodations-panel h3 {
-  margin: 0 0 4px;
-}
-
-.travel-list-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 12px 0 8px;
-}
-
-.travel-list-head h4 {
-  margin: 0;
+  grid-template-columns: 1.2fr repeat(2, minmax(120px, auto)) auto;
+  gap: 6px;
 }
 
 .travel-row {
   display: grid;
-  grid-template-columns: minmax(110px, auto) repeat(2, minmax(150px, 1fr)) minmax(180px, auto) minmax(150px, auto) minmax(160px, auto) auto;
-  gap: 8px;
-  margin-bottom: 8px;
+  grid-template-columns: 1.4fr minmax(130px, auto) minmax(120px, auto);
+  gap: 6px;
+  margin-bottom: 6px;
 }
 
 .travel-row input,
@@ -990,7 +982,7 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 @media (max-width: 900px) {
   .setup-actions { flex-direction: column; }
   .review-toolbar { grid-template-columns: 1fr; }
-  .city-row { grid-template-columns: 1fr; }
+  .city-row-main,
   .hotel-row,
   .travel-row { grid-template-columns: 1fr; }
   .topbar-row { flex-direction: column; align-items: flex-start; }
