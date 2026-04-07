@@ -128,7 +128,7 @@ let googleMapsSdkPromise = null;
 const placesAutocompleteByElement = new WeakMap();
 
 function isGooglePlacesReady() {
-  return Boolean(window.google?.maps?.places?.Autocomplete);
+  return Boolean(window.google?.maps?.places?.PlaceAutocompleteElement);
 }
 
 function clearLocationValidationError() {
@@ -226,37 +226,73 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
   if (!element || !isGooglePlacesReady()) return;
   if (placesAutocompleteByElement.has(element)) return;
 
-  const autocomplete = new google.maps.places.Autocomplete(element, {
-    fields: ['formatted_address', 'place_id', 'geometry'],
+  const PlaceAutocompleteElementCtor = window.google?.maps?.places?.PlaceAutocompleteElement;
+  if (!PlaceAutocompleteElementCtor) return;
+
+  const placeAutocomplete = new PlaceAutocompleteElementCtor({
     types: ['geocode']
   });
+  placeAutocomplete.classList.add('tp-place-autocomplete');
+  if ('value' in placeAutocomplete) placeAutocomplete.value = element.value || '';
+  element.classList.add('place-autocomplete-fallback');
+  element.insertAdjacentElement('afterend', placeAutocomplete);
 
-  const handleSelection = () => {
+  const getWidgetValue = () => {
+    if (typeof placeAutocomplete.value === 'string') return placeAutocomplete.value;
+    const internalInput = placeAutocomplete.shadowRoot?.querySelector('input');
+    return internalInput?.value || '';
+  };
+
+  const syncInputFromWidget = (dispatchType = 'input') => {
+    const value = getWidgetValue();
+    element.value = value;
+    element.dispatchEvent(new Event(dispatchType, { bubbles: true }));
+    if (typeof onInput === 'function') onInput();
+  };
+
+  const handleSelection = async (event) => {
     try {
-      const place = autocomplete.getPlace();
-      const formattedAddress = String(place?.formatted_address || '').trim();
-      const placeId = String(place?.place_id || '').trim();
-      const lat = place?.geometry?.location?.lat?.();
-      const lng = place?.geometry?.location?.lng?.();
+      const place = event?.placePrediction?.toPlace?.() || event?.place || null;
+      if (!place || typeof place.fetchFields !== 'function') {
+        if (typeof onInvalid === 'function') onInvalid();
+        return;
+      }
+
+      await place.fetchFields({
+        fields: ['formattedAddress', 'location', 'id']
+      });
+
+      const formattedAddress = String(place?.formattedAddress || '').trim();
+      const placeId = String(place?.id || '').trim();
+      const lat = place?.location?.lat?.();
+      const lng = place?.location?.lng?.();
+
       if (!formattedAddress || !placeId || !Number.isFinite(lat) || !Number.isFinite(lng)) {
         if (typeof onInvalid === 'function') onInvalid();
         return;
       }
+
+      if ('value' in placeAutocomplete) placeAutocomplete.value = formattedAddress;
+      syncInputFromWidget('change');
       if (typeof onResolved === 'function') onResolved({ formattedAddress, placeId, lat, lng });
     } catch {
       if (typeof onInvalid === 'function') onInvalid();
     }
   };
 
-  const listener = autocomplete.addListener('place_changed', handleSelection);
+  const handleInput = () => syncInputFromWidget('input');
+  const handleChange = () => syncInputFromWidget('change');
+  placeAutocomplete.addEventListener('input', handleInput);
+  placeAutocomplete.addEventListener('change', handleChange);
+  placeAutocomplete.addEventListener('gmp-select', handleSelection);
+  placeAutocomplete.addEventListener('gmp-placeselect', handleSelection);
 
-  const handleInput = () => {
-    if (typeof onInput === 'function') onInput();
-  };
-  element.addEventListener('input', handleInput);
-  element.addEventListener('change', handleInput);
-
-  placesAutocompleteByElement.set(element, { handleSelection, handleInput, listener, autocomplete });
+  placesAutocompleteByElement.set(element, {
+    placeAutocomplete,
+    handleSelection,
+    handleInput,
+    handleChange
+  });
 }
 
 function initializePlacesWidgets() {
