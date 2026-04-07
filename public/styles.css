@@ -114,6 +114,15 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   margin-top: 0;
 }
 
+.place-autocomplete-fallback {
+  display: none;
+}
+
+.tp-place-autocomplete {
+  display: block;
+  width: 100%;
+}
+
 .city-autocomplete {
   position: relative;
 }
