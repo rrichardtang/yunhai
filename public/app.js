@@ -1006,17 +1006,24 @@ function renderCities() {
     row.querySelectorAll('input[data-field]').forEach((input) => {
       input.addEventListener('input', () => {
         city[input.dataset.field] = input.value;
+
         if (input.dataset.field === 'name') {
           city.placeId = '';
           city.latitude = null;
           city.longitude = null;
+          renderSetupInsights();
+          return;
         }
+
         if (input.dataset.field === 'startDate' || input.dataset.field === 'endDate') {
           if (!cityIsReadyForDetails(city)) city.detailsExpanded = false;
+          syncTravelDateTimes();
+          renderSetupInsights();
+          renderCities();
+          return;
         }
-        syncTravelDateTimes();
+
         renderSetupInsights();
-        renderCities();
       });
     });
 
