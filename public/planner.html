@@ -59,7 +59,9 @@
         </section>
 
         <div id="setupInsights" class="setup-insights muted-text"></div>
-        <button id="planBtn" class="primary">Plan My Trip</button>
+        <div class="step-nav sticky-nav">
+          <button id="planBtn" class="primary nav-primary" type="button" data-nav-next="1">Next →</button>
+        </div>
       </section>
 
       <section id="step2" class="panel step-panel">
@@ -83,10 +85,8 @@
         </div>
         <div id="activitiesGrid" class="cards-grid"></div>
         <div class="step-nav sticky-nav step-nav-split">
-          <button id="backToSetupBtn" class="secondary nav-secondary" type="button">← Back to Setup</button>
-          <button id="continueArrangeBtn" class="primary nav-primary" type="button" title="Approve at least one activity to continue">
-            Continue to Arrange →
-          </button>
+          <button id="backToSetupBtn" class="secondary nav-secondary" type="button" data-nav-back="2">← Back</button>
+          <button id="continueArrangeBtn" class="primary nav-primary" type="button" data-nav-next="2" title="Approve at least one activity to continue">Next →</button>
           <p id="continueArrangeHint" class="nav-hint muted-text">Approve at least one activity to continue</p>
         </div>
       </section>
@@ -106,9 +106,9 @@
         <h3>Days</h3>
         <div id="dayColumns" class="day-columns"></div>
         <div class="step-nav sticky-nav step-nav-split">
-          <button id="backToReviewBtn" class="secondary nav-secondary" type="button">← Back</button>
+          <button id="backToReviewBtn" class="secondary nav-secondary" type="button" data-nav-back="3">← Back</button>
           <button id="saveProgressBtn" class="secondary" type="button">💾 Save Progress</button>
-          <button id="generateBtn" class="primary nav-primary" type="button">Generate Itinerary →</button>
+          <button id="generateBtn" class="primary nav-primary" type="button" data-nav-next="3">Next →</button>
         </div>
       </section>
 
@@ -126,7 +126,7 @@
           <div id="savedItineraries" class="saved-itineraries-list"></div>
         </section>
         <div class="step-nav sticky-nav">
-          <button id="editBtn" class="secondary nav-secondary" type="button">← Edit</button>
+          <button id="editBtn" class="secondary nav-secondary" type="button" data-nav-back="4">← Back</button>
         </div>
       </section>
     </main>
