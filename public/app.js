@@ -1949,7 +1949,10 @@ function normalizeActivityMetadata(activity = {}) {
   const durationHours = Number(activity.duration_hours || 0) > 0
     ? Number(activity.duration_hours)
     : (parsedDuration || defaults.durationHours || 1.5);
-  const openingHours = String(activity.opening_hours || activity.openingHours || defaults.openingHours || '').trim();
+  const FIXED_HOUR_CATEGORIES = new Set(['breakfast', 'lunch', 'dinner', 'nightlife', 'sunset']);
+  const openingHours = (FIXED_HOUR_CATEGORIES.has(category)
+    ? defaults.openingHours
+    : String(activity.opening_hours || activity.openingHours || defaults.openingHours || '').trim());
   return {
     ...activity,
     category,
