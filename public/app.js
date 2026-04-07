@@ -175,13 +175,12 @@ function normalizeTravelEntry(travel = {}) {
   };
 }
 
-function markTravelEntryUnvalidated() {
-  ensureSingleTravelEntry();
-  state.travels[0].entryPointPlaceId = '';
-  state.travels[0].entryPointLat = null;
-  state.travels[0].entryPointLng = null;
-  if (els.travelEntryPointLat) els.travelEntryPointLat.value = '';
-  if (els.travelEntryPointLng) els.travelEntryPointLng.value = '';
+function markTravelEntryUnvalidated(city) {
+  if (!city?.travelEntry) return;
+  city.travelEntry.entryPointPlaceId = '';
+  city.travelEntry.entryPointLat = null;
+  city.travelEntry.entryPointLng = null;
+  syncLegacyTravelsFromCities();
 }
 
 function buildGoogleMapsSdkUrl(apiKey = '') {
@@ -755,22 +754,26 @@ function goToPreviousStep(fromStep = state.step) {
   setStep(fromStep - 1);
 }
 
-function addCityRow(city = { id: uid(), name: '', startDate: '', endDate: '', notes: '' }) {
-  state.cities.push({
+function normalizeCityData(city = {}) {
+  return {
     ...city,
+    id: city.id || uid(),
     notes: city.notes || '',
-    accommodations: Array.isArray(city.accommodations)
-      ? city.accommodations.map(normalizeAccommodation)
-      : []
-  });
+    detailsExpanded: Boolean(city.detailsExpanded),
+    accommodations: Array.isArray(city.accommodations) ? city.accommodations.map(normalizeAccommodation) : [],
+    travelEntry: city.travelEntry ? normalizeTravelEntry(city.travelEntry) : null
+  };
+}
+
+function addCityRow(city = { id: uid(), name: '', startDate: '', endDate: '', notes: '' }) {
+  state.cities.push(normalizeCityData(city));
+  syncTravelDateTimes();
   renderCities();
 }
 
 function addAccommodationRow(city) {
   if (!city) return;
-  city.accommodations = Array.isArray(city.accommodations)
-    ? city.accommodations
-    : [];
+  city.accommodations = Array.isArray(city.accommodations) ? city.accommodations : [];
   city.accommodations.push({
     id: uid(),
     address: '',
@@ -783,29 +786,6 @@ function addAccommodationRow(city) {
   renderCities();
 }
 
-function ensureSingleTravelEntry() {
-  const autoDate = getTripStartDate();
-  const existing = Array.isArray(state.travels) && state.travels.length ? state.travels[0] : null;
-  const existingTime = extractTimeFromDateTime(existing?.dateTime) || '09:00';
-  const dateTime = autoDate ? `${autoDate}T${existingTime}` : '';
-  state.travels = [{
-    id: existing?.id || uid(),
-    entryPoint: existing?.entryPoint || '',
-    entryPointPlaceId: existing?.entryPointPlaceId || '',
-    entryPointLat: normalizeCoordinate(existing?.entryPointLat),
-    entryPointLng: normalizeCoordinate(existing?.entryPointLng),
-    dateTime
-  }];
-}
-
-function getTripStartDate() {
-  const dates = state.cities
-    .map((city) => String(city?.startDate || '').slice(0, 10))
-    .filter(Boolean)
-    .sort();
-  return dates[0] || '';
-}
-
 function extractTimeFromDateTime(dateTime = '') {
   const text = String(dateTime || '');
   if (!text.includes('T')) return '';
@@ -814,103 +794,66 @@ function extractTimeFromDateTime(dateTime = '') {
   return match ? match[1] : '';
 }
 
-function setTravelEntryTime(timeValue = '') {
-  ensureSingleTravelEntry();
-  const date = getTripStartDate();
-  if (!date) {
-    state.travels[0].dateTime = '';
+function getPrimaryCity() {
+  return state.cities[0] || null;
+}
+
+function syncLegacyTravelsFromCities() {
+  const firstCity = getPrimaryCity();
+  if (!firstCity?.travelEntry) {
+    state.travels = [];
     return;
   }
+  state.travels = [normalizeTravelEntry(firstCity.travelEntry)];
+}
+
+function ensureFirstCityTravelEntry() {
+  const firstCity = getPrimaryCity();
+  if (!firstCity) {
+    state.travels = [];
+    return null;
+  }
+  const existing = firstCity.travelEntry || state.travels[0] || {};
+  const existingTime = extractTimeFromDateTime(existing.dateTime) || '09:00';
+  const dateTime = firstCity.startDate ? `${firstCity.startDate}T${existingTime}` : '';
+  firstCity.travelEntry = normalizeTravelEntry({ ...existing, id: existing.id || uid(), dateTime });
+  syncLegacyTravelsFromCities();
+  return firstCity.travelEntry;
+}
+
+function setTravelEntryTime(city, timeValue = '') {
+  if (!city || state.cities[0]?.id !== city.id) return;
+  const travelEntry = ensureFirstCityTravelEntry();
+  if (!travelEntry) return;
   const safeTime = String(timeValue || '').match(/^\d{2}:\d{2}$/) ? String(timeValue) : '09:00';
-  state.travels[0].dateTime = `${date}T${safeTime}`;
+  travelEntry.dateTime = city.startDate ? `${city.startDate}T${safeTime}` : '';
+  syncLegacyTravelsFromCities();
 }
 
 function syncTravelDateTimes() {
-  ensureSingleTravelEntry();
-}
-
-function renderTravels() {
-  ensureSingleTravelEntry();
-  const travel = state.travels[0];
-  if (!travel) return;
-
-  if (els.travelEntryPoint) {
-    els.travelEntryPoint.value = travel.entryPoint || '';
-  }
-  if (els.travelEntryPointLat) {
-    els.travelEntryPointLat.value = travel.entryPointLat == null ? '' : String(travel.entryPointLat);
-  }
-  if (els.travelEntryPointLng) {
-    els.travelEntryPointLng.value = travel.entryPointLng == null ? '' : String(travel.entryPointLng);
-  }
-  if (els.travelEntryDate) {
-    els.travelEntryDate.value = getTripStartDate() || '';
-  }
-  if (els.travelEntryTime) {
-    els.travelEntryTime.value = extractTimeFromDateTime(travel.dateTime) || '09:00';
-  }
-}
-
-function renderAccommodations() {
-  if (!els.accommodationsContainer) return;
-  els.accommodationsContainer.innerHTML = '';
-
-  if (!state.cities.length) {
-    els.accommodationsContainer.innerHTML = '<p class="muted-text">Add a city first to add accommodations.</p>';
+  const firstCity = getPrimaryCity();
+  if (!firstCity) {
+    state.travels = [];
     return;
   }
+  if (firstCity.travelEntry || state.travels[0]) {
+    ensureFirstCityTravelEntry();
+  }
+}
 
-  state.cities.forEach((city) => {
-    const card = document.createElement('div');
-    card.className = 'city-hotels';
-    card.innerHTML = `
-      <div class="city-hotels-head">
-        <strong>${esc(city.name || 'Unnamed city')}</strong>
-        <button class="secondary" type="button" data-add-accommodation>+ Add accommodation</button>
-      </div>
-      <div class="city-hotels-list">
-        ${(Array.isArray(city.accommodations) && city.accommodations.length)
-          ? city.accommodations.map((accommodation) => `
-            <div class="hotel-row" data-hotel-id="${esc(accommodation.id || '')}" data-address-validated="${accommodation.latitude != null && accommodation.longitude != null ? '1' : '0'}">
-              <input
-                type="text"
-                data-accommodation-field="address"
-                placeholder="Accommodation address"
-                value="${esc(accommodation.address || '')}"
-                autocomplete="off"
-              />
-              <input type="date" value="${esc(accommodation.checkIn || '')}" data-accommodation-field="checkIn" />
-              <input type="date" value="${esc(accommodation.checkOut || '')}" data-accommodation-field="checkOut" />
-              <button class="secondary" type="button" data-remove-accommodation>Remove</button>
-            </div>
-          `).join('')
-          : '<p class="muted-text">No accommodations added for this city yet.</p>'}
-      </div>
-    `;
+function hydrateTravelIntoCities() {
+  if (!state.cities.length) {
+    state.travels = [];
+    return;
+  }
+  if (!state.cities[0].travelEntry && state.travels[0]) {
+    state.cities[0].travelEntry = normalizeTravelEntry(state.travels[0]);
+  }
+  syncTravelDateTimes();
+}
 
-    card.querySelector('[data-add-accommodation]')?.addEventListener('click', () => addAccommodationRow(city));
-    card.querySelectorAll('.hotel-row').forEach((hotelRow) => {
-      const hotelId = hotelRow.dataset.hotelId;
-      const hotel = (city.accommodations || []).find((h) => h.id === hotelId);
-      if (!hotel) return;
-
-      hotelRow.querySelectorAll('[data-accommodation-field]').forEach((input) => {
-        if (input.dataset.accommodationField === 'address') return;
-        input.addEventListener('input', () => {
-          hotel[input.dataset.accommodationField] = input.value;
-        });
-      });
-
-      hotelRow.querySelector('[data-remove-accommodation]')?.addEventListener('click', () => {
-        city.accommodations = (city.accommodations || []).filter((h) => h.id !== hotelId);
-        renderAccommodations();
-      });
-    });
-
-    els.accommodationsContainer.appendChild(card);
-  });
-
-  initializePlacesWidgets();
+function cityIsReadyForDetails(city) {
+  return Boolean(String(city?.name || '').trim() && city?.startDate && city?.endDate);
 }
 
 function daysBetween(startDate, endDate) {
@@ -955,12 +898,16 @@ function renderSetupInsights() {
 }
 
 function sortCitiesByDate() {
+  const existingTravel = state.cities.find((c) => c?.travelEntry)?.travelEntry || state.travels[0] || null;
   const withDates = state.cities.filter((c) => c.startDate);
   const withoutDates = state.cities.filter((c) => !c.startDate);
   state.cities = [
     ...withDates.sort((a, b) => new Date(a.startDate) - new Date(b.startDate)),
     ...withoutDates
   ];
+  state.cities.forEach((city) => { city.travelEntry = null; });
+  if (state.cities[0] && existingTravel) state.cities[0].travelEntry = normalizeTravelEntry(existingTravel);
+  syncTravelDateTimes();
   renderCities();
   showToast('Cities sorted by start date.', 'success');
 }
@@ -2574,10 +2521,7 @@ async function loadItineraryById(id) {
     state.currentItineraryId = itinerary.id || null;
     state.tripName = itinerary.tripName || state.tripName;
     state.cities = Array.isArray(itinerary.cities)
-      ? itinerary.cities.map((city) => ({
-        ...city,
-        accommodations: Array.isArray(city.accommodations) ? city.accommodations.map(normalizeAccommodation) : []
-      }))
+      ? itinerary.cities.map(normalizeCityData)
       : state.cities;
     state.travels = Array.isArray(itinerary.travels) ? itinerary.travels.slice(0, 1).map(normalizeTravelEntry) : state.travels;
     state.days = Array.isArray(itinerary.days)
@@ -2599,8 +2543,8 @@ async function loadItineraryById(id) {
     state.activities = activities;
     state.reviewed = reviewed;
     state.placements = placements;
+    hydrateTravelIntoCities();
     renderCities();
-    renderTravels();
     if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = !state.currentItineraryId;
     renderItinerary();
     await fetchSavedItineraries();
@@ -2613,12 +2557,14 @@ async function loadItineraryById(id) {
 
 async function planTrip() {
   state.tripName = els.tripName.value.trim();
-  const cities = state.cities.map(({name,startDate,endDate,notes,accommodations}) => ({
+  syncLegacyTravelsFromCities();
+  const cities = state.cities.map(({name,startDate,endDate,notes,accommodations,travelEntry}) => ({
     name,
     startDate,
     endDate,
     notes,
-    accommodations: Array.isArray(accommodations) ? accommodations : []
+    accommodations: Array.isArray(accommodations) ? accommodations : [],
+    travelEntry: travelEntry ? { ...travelEntry } : null
   }));
   const travels = state.travels.map((travel) => ({ ...travel }));
   const payload = { cities, travels, profile: state.profile || loadProfile(), userId: ensureUserId() };
@@ -2742,6 +2688,7 @@ async function generateItinerary() {
 }
 
 function getTripContext() {
+  syncLegacyTravelsFromCities();
   return {
     step: state.step,
     cities: state.cities,
@@ -2927,7 +2874,6 @@ function resetToFresh() {
   if (els.reviewCityFilter) els.reviewCityFilter.value = '';
   if (els.reviewVerdictFilter) els.reviewVerdictFilter.value = '';
   renderCities();
-  renderTravels();
   addCityRow();
   renderActivities();
   els.dayColumns.innerHTML = '';
@@ -2941,12 +2887,9 @@ function resetToFresh() {
 
 function hydrateFromSnapshot(snapshot) {
   state.tripName = snapshot.tripName || '';
-  state.cities = (snapshot.cities || []).map((city) => ({
-    ...city,
-    notes: city.notes || '',
-    accommodations: Array.isArray(city.accommodations) ? city.accommodations.map(normalizeAccommodation) : []
-  }));
+  state.cities = (snapshot.cities || []).map(normalizeCityData);
   state.travels = Array.isArray(snapshot.travels) ? snapshot.travels.slice(0, 1).map(normalizeTravelEntry) : [];
+  hydrateTravelIntoCities();
   state.activities = snapshot.activities || [];
   state.placements = snapshot.placements || {};
   state.commutes = normalizeCommuteStateMap(snapshot.commutes || {});
@@ -2956,7 +2899,6 @@ function hydrateFromSnapshot(snapshot) {
 
   els.tripName.value = state.tripName;
   renderCities();
-  renderTravels();
   renderActivities();
   renderArrange();
   setStep(3);
@@ -3001,14 +2943,14 @@ function clearPlannedResultsKeepSetup() {
 
 function validateLocationsBeforePlanning() {
   clearLocationValidationError();
-  ensureSingleTravelEntry();
-
-  const travel = state.travels[0] || {};
-  if (!String(travel.entryPoint || '').trim()) {
+  const firstCity = state.cities[0] || null;
+  const travel = firstCity?.travelEntry || null;
+  const firstCityReady = cityIsReadyForDetails(firstCity);
+  if (firstCityReady && !String(travel?.entryPoint || '').trim()) {
     showLocationValidationError('Travel entry point is required. Please select it from Google Places suggestions.');
     return false;
   }
-  if (travel.entryPointLat == null || travel.entryPointLng == null) {
+  if (firstCityReady && (travel?.entryPointLat == null || travel?.entryPointLng == null)) {
     showLocationValidationError('Travel entry point is not validated. Please pick a suggestion from Google Places.');
     return false;
   }
@@ -3041,14 +2983,6 @@ function validateLocationsBeforePlanning() {
 
 els.addCityBtn.addEventListener('click', () => { addCityRow(); });
 els.sortCitiesBtn?.addEventListener('click', sortCitiesByDate);
-els.travelEntryPoint?.addEventListener('input', (e) => {
-  ensureSingleTravelEntry();
-  state.travels[0].entryPoint = e.target.value || '';
-  markTravelEntryUnvalidated();
-});
-els.travelEntryTime?.addEventListener('input', (e) => {
-  setTravelEntryTime(e.target.value || '09:00');
-});
 els.reviewSearch?.addEventListener('input', (e) => {
   state.reviewFilters.search = e.target.value || '';
   renderActivities();
