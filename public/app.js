@@ -1364,6 +1364,10 @@ function renderCities() {
     row.querySelectorAll('[data-logistics]').forEach((input) => {
       input.addEventListener('input', () => {
         const field = input.dataset.logistics;
+
+        // Don't re-render on text input for location fields — it destroys the autocomplete widget
+        if (field === 'arrivalLocation' || field === 'departureLocation') return;
+
         if (field === 'accommodationCheckIn') {
           city.logistics.accommodation.checkIn = input.value || '';
           if (city.accommodations[0]) city.accommodations[0].checkIn = input.value || '';
