@@ -61,7 +61,6 @@ const els = {
   travelEntryPoint: document.getElementById('travelEntryPoint'),
   travelEntryPointLat: document.getElementById('travelEntryPointLat'),
   travelEntryPointLng: document.getElementById('travelEntryPointLng'),
-  travelEntryPointResolved: document.getElementById('travelEntryPointResolved'),
   locationValidationError: document.getElementById('locationValidationError'),
   travelEntryDate: document.getElementById('travelEntryDate'),
   travelEntryTime: document.getElementById('travelEntryTime'),
@@ -150,11 +149,6 @@ function showLocationValidationError(message) {
   els.locationValidationError.classList.remove('hidden');
 }
 
-function setTravelResolvedAddress(text = '') {
-  if (!els.travelEntryPointResolved) return;
-  els.travelEntryPointResolved.textContent = text ? `Validated location: ${text}` : '';
-}
-
 function normalizeCoordinate(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
@@ -188,7 +182,6 @@ function markTravelEntryUnvalidated() {
   state.travels[0].entryPointLng = null;
   if (els.travelEntryPointLat) els.travelEntryPointLat.value = '';
   if (els.travelEntryPointLng) els.travelEntryPointLng.value = '';
-  setTravelResolvedAddress('');
 }
 
 function buildGoogleMapsSdkUrl(apiKey = '') {
@@ -288,7 +281,6 @@ function initializePlacesWidgets() {
         els.travelEntryPoint.value = formattedAddress;
         if (els.travelEntryPointLat) els.travelEntryPointLat.value = String(lat);
         if (els.travelEntryPointLng) els.travelEntryPointLng.value = String(lng);
-        setTravelResolvedAddress(formattedAddress);
         clearLocationValidationError();
       },
       onInput: () => {
@@ -315,8 +307,6 @@ function initializePlacesWidgets() {
           accommodation.longitude = lng;
           input.value = formattedAddress;
           row.dataset.addressValidated = '1';
-          const resolved = row.querySelector('[data-accommodation-resolved]');
-          if (resolved) resolved.textContent = `Validated location: ${formattedAddress}`;
           clearLocationValidationError();
         },
         onInput: () => {
@@ -324,16 +314,12 @@ function initializePlacesWidgets() {
           accommodation.latitude = null;
           accommodation.longitude = null;
           row.dataset.addressValidated = '0';
-          const resolved = row.querySelector('[data-accommodation-resolved]');
-          if (resolved) resolved.textContent = '';
         },
         onInvalid: () => {
           accommodation.placeId = '';
           accommodation.latitude = null;
           accommodation.longitude = null;
           row.dataset.addressValidated = '0';
-          const resolved = row.querySelector('[data-accommodation-resolved]');
-          if (resolved) resolved.textContent = 'Address could not be validated. Please choose a suggestion.';
           showLocationValidationError('One or more accommodation addresses are invalid. Please select each from Google Places suggestions.');
         }
       });
@@ -798,7 +784,6 @@ function renderTravels() {
   if (els.travelEntryPointLng) {
     els.travelEntryPointLng.value = travel.entryPointLng == null ? '' : String(travel.entryPointLng);
   }
-  setTravelResolvedAddress((travel.entryPointLat != null && travel.entryPointLng != null) ? travel.entryPoint : '');
   if (els.travelEntryDate) {
     els.travelEntryDate.value = getTripStartDate() || '';
   }
@@ -838,7 +823,6 @@ function renderAccommodations() {
               <input type="date" value="${esc(accommodation.checkIn || '')}" data-accommodation-field="checkIn" />
               <input type="date" value="${esc(accommodation.checkOut || '')}" data-accommodation-field="checkOut" />
               <button class="secondary" type="button" data-remove-accommodation>Remove</button>
-              <div class="muted-text" data-accommodation-resolved>${accommodation.latitude != null && accommodation.longitude != null ? `Validated location: ${esc(accommodation.address || '')}` : ''}</div>
             </div>
           `).join('')
           : '<p class="muted-text">No accommodations added for this city yet.</p>'}
@@ -931,7 +915,6 @@ function renderCities() {
     row.innerHTML = `
       <div class="city-autocomplete">
         <input type="text" placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off" />
-        <div class="muted-text" data-city-resolved>${city.latitude != null && city.longitude != null ? `Validated location: ${esc(city.name)}` : ''}</div>
       </div>
       <input type="date" value="${esc(city.startDate)}" data-field="startDate" />
       <input type="date" value="${esc(city.endDate)}" data-field="endDate" />
@@ -946,8 +929,6 @@ function renderCities() {
           city.placeId = '';
           city.latitude = null;
           city.longitude = null;
-          const resolved = row.querySelector('[data-city-resolved]');
-          if (resolved) resolved.textContent = '';
         }
         syncTravelDateTimes();
         renderTravels();
@@ -964,8 +945,6 @@ function renderCities() {
           city.latitude = lat;
           city.longitude = lng;
           cityNameInput.value = formattedAddress;
-          const resolved = row.querySelector('[data-city-resolved]');
-          if (resolved) resolved.textContent = `Validated location: ${formattedAddress}`;
           clearLocationValidationError();
           renderSetupInsights();
         },
@@ -973,15 +952,11 @@ function renderCities() {
           city.placeId = '';
           city.latitude = null;
           city.longitude = null;
-          const resolved = row.querySelector('[data-city-resolved]');
-          if (resolved) resolved.textContent = '';
         },
         onInvalid: () => {
           city.placeId = '';
           city.latitude = null;
           city.longitude = null;
-          const resolved = row.querySelector('[data-city-resolved]');
-          if (resolved) resolved.textContent = 'City could not be validated. Please choose a suggestion.';
           showLocationValidationError('City location is invalid. Please choose a Google Places suggestion.');
         }
       });
