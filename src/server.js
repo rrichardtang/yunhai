@@ -264,7 +264,12 @@ function buildChatSystemPrompt(tripContext = {}) {
   const cities = Array.isArray(tripContext.cities) && tripContext.cities.length
     ? tripContext.cities.map((city) => {
       const accommodations = Array.isArray(city.accommodations) && city.accommodations.length
-        ? city.accommodations.map((accommodation) => `${accommodation.name || 'Accommodation'} (${accommodation.checkIn || '?'} → ${accommodation.checkOut || '?'})`).join('; ')
+        ? city.accommodations.map((accommodation) => {
+          const coords = (Number.isFinite(Number(accommodation.latitude)) && Number.isFinite(Number(accommodation.longitude)))
+            ? ` [${Number(accommodation.latitude)}, ${Number(accommodation.longitude)}]`
+            : '';
+          return `${accommodation.address || 'Address missing'}${coords} (${accommodation.checkIn || '?'} → ${accommodation.checkOut || '?'})`;
+        }).join('; ')
         : 'No accommodations listed';
       return `${city.name} (${city.startDate} → ${city.endDate}) | Accommodations: ${accommodations}`;
     }).join(' | ')
