@@ -57,13 +57,7 @@ const els = {
   panels: [1,2,3,4].map((n) => document.getElementById(`step${n}`)),
   tripName: document.getElementById('tripName'),
   citiesContainer: document.getElementById('citiesContainer'),
-  accommodationsContainer: document.getElementById('accommodationsContainer'),
-  travelEntryPoint: document.getElementById('travelEntryPoint'),
-  travelEntryPointLat: document.getElementById('travelEntryPointLat'),
-  travelEntryPointLng: document.getElementById('travelEntryPointLng'),
   locationValidationError: document.getElementById('locationValidationError'),
-  travelEntryDate: document.getElementById('travelEntryDate'),
-  travelEntryTime: document.getElementById('travelEntryTime'),
   addCityBtn: document.getElementById('addCityBtn'),
   sortCitiesBtn: document.getElementById('sortCitiesBtn'),
   setupInsights: document.getElementById('setupInsights'),
@@ -268,29 +262,34 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
 function initializePlacesWidgets() {
   if (!isGooglePlacesReady()) return;
 
-  if (els.travelEntryPoint) {
-    attachPlaceAutocompleteElement(els.travelEntryPoint, {
-      onResolved: ({ formattedAddress, placeId, lat, lng }) => {
-        ensureSingleTravelEntry();
-        state.travels[0].entryPoint = formattedAddress;
-        state.travels[0].entryPointPlaceId = placeId;
-        state.travels[0].entryPointLat = lat;
-        state.travels[0].entryPointLng = lng;
+  state.cities.forEach((city, index) => {
+    if (index !== 0) return;
+    const input = document.querySelector(`[data-city-id="${CSS.escape(city.id)}"] [data-travel-entry-point]`);
+    if (!input) return;
 
-        els.travelEntryPoint.value = formattedAddress;
-        if (els.travelEntryPointLat) els.travelEntryPointLat.value = String(lat);
-        if (els.travelEntryPointLng) els.travelEntryPointLng.value = String(lng);
+    attachPlaceAutocompleteElement(input, {
+      onResolved: ({ formattedAddress, placeId, lat, lng }) => {
+        const travelEntry = ensureFirstCityTravelEntry();
+        if (!travelEntry) return;
+        travelEntry.entryPoint = formattedAddress;
+        travelEntry.entryPointPlaceId = placeId;
+        travelEntry.entryPointLat = lat;
+        travelEntry.entryPointLng = lng;
+        input.value = formattedAddress;
         clearLocationValidationError();
+        syncLegacyTravelsFromCities();
       },
       onInput: () => {
-        markTravelEntryUnvalidated();
+        ensureFirstCityTravelEntry();
+        markTravelEntryUnvalidated(city);
       },
       onInvalid: () => {
-        markTravelEntryUnvalidated();
+        ensureFirstCityTravelEntry();
+        markTravelEntryUnvalidated(city);
         showLocationValidationError('Could not validate the travel entry point. Please choose a suggestion from Google Places.');
       }
     });
-  }
+  });
 
   state.cities.forEach((city) => {
     (city.accommodations || []).forEach((accommodation) => {
@@ -915,20 +914,60 @@ function sortCitiesByDate() {
 function renderCities() {
   bindCityAutocompleteOutsideClick();
   els.citiesContainer.innerHTML = '';
-  state.cities.forEach((city) => {
+
+  state.cities.forEach((city, index) => {
+    const readyForDetails = cityIsReadyForDetails(city);
+    const isFirstCity = index === 0;
+    const travelEntry = isFirstCity ? ensureFirstCityTravelEntry() : null;
+    const travelTime = extractTimeFromDateTime(travelEntry?.dateTime) || '09:00';
+
     const row = document.createElement('div');
     row.className = 'city-row';
+    row.dataset.cityId = city.id;
     row.innerHTML = `
-      <div class="city-autocomplete">
-        <input type="text" placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off" />
+      <div class="city-row-main">
+        <button class="secondary city-row-toggle" type="button" data-toggle-details ${readyForDetails ? '' : 'disabled'}>${city.detailsExpanded ? '−' : '+'}</button>
+        <div class="city-autocomplete">
+          <input type="text" placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off" />
+        </div>
+        <input type="date" value="${esc(city.startDate)}" data-field="startDate" />
+        <input type="date" value="${esc(city.endDate)}" data-field="endDate" />
+        <input type="text" placeholder="Notes" value="${esc(city.notes || '')}" data-field="notes" />
+        <button class="secondary" type="button" data-remove-city>Remove</button>
       </div>
-      <input type="date" value="${esc(city.startDate)}" data-field="startDate" />
-      <input type="date" value="${esc(city.endDate)}" data-field="endDate" />
-      <input type="text" placeholder="Notes for this city (e.g. want to see FC Barcelona game)" value="${esc(city.notes || '')}" data-field="notes" />
-      <button class="secondary" type="button" data-remove-city>Remove</button>
+      ${readyForDetails && city.detailsExpanded ? `
+        <div class="city-drawer">
+          ${isFirstCity ? `
+            <div class="city-section-head">
+              <h4>Travel (entry for this trip)</h4>
+            </div>
+            <div class="travel-row">
+              <input type="text" data-travel-entry-point placeholder="Entry point" value="${esc(travelEntry?.entryPoint || '')}" autocomplete="off" />
+              <input type="date" value="${esc(city.startDate || '')}" readonly />
+              <input type="time" value="${esc(travelTime)}" data-travel-entry-time />
+            </div>
+          ` : ''}
+          <div class="city-section-head">
+            <h4>Accommodations</h4>
+            <button class="secondary" type="button" data-add-accommodation>+ Add</button>
+          </div>
+          <div class="city-hotels-list">
+            ${(Array.isArray(city.accommodations) && city.accommodations.length)
+              ? city.accommodations.map((accommodation) => `
+                <div class="hotel-row" data-hotel-id="${esc(accommodation.id || '')}" data-address-validated="${accommodation.latitude != null && accommodation.longitude != null ? '1' : '0'}">
+                  <input type="text" data-accommodation-field="address" placeholder="Accommodation address" value="${esc(accommodation.address || '')}" autocomplete="off" />
+                  <input type="date" value="${esc(accommodation.checkIn || '')}" data-accommodation-field="checkIn" />
+                  <input type="date" value="${esc(accommodation.checkOut || '')}" data-accommodation-field="checkOut" />
+                  <button class="secondary" type="button" data-remove-accommodation>Remove</button>
+                </div>
+              `).join('')
+              : '<p class="muted-text">No accommodations yet.</p>'}
+          </div>
+        </div>
+      ` : ''}
     `;
-    const inputs = row.querySelectorAll('input[data-field]');
-    inputs.forEach((input) => {
+
+    row.querySelectorAll('input[data-field]').forEach((input) => {
       input.addEventListener('input', () => {
         city[input.dataset.field] = input.value;
         if (input.dataset.field === 'name') {
@@ -936,10 +975,19 @@ function renderCities() {
           city.latitude = null;
           city.longitude = null;
         }
+        if (input.dataset.field === 'startDate' || input.dataset.field === 'endDate') {
+          if (!cityIsReadyForDetails(city)) city.detailsExpanded = false;
+        }
         syncTravelDateTimes();
-        renderTravels();
         renderSetupInsights();
+        renderCities();
       });
+    });
+
+    row.querySelector('[data-toggle-details]')?.addEventListener('click', () => {
+      if (!readyForDetails) return;
+      city.detailsExpanded = !city.detailsExpanded;
+      renderCities();
     });
 
     const cityNameInput = row.querySelector('[data-field="name"]');
@@ -971,14 +1019,54 @@ function renderCities() {
     row.querySelector('[data-remove-city]')?.addEventListener('click', () => {
       if (cityAutocomplete.activeCityId === city.id) closeCityAutocomplete();
       state.cities = state.cities.filter((c) => c.id !== city.id);
+      syncTravelDateTimes();
       renderCities();
+    });
+
+    row.querySelector('[data-add-accommodation]')?.addEventListener('click', () => addAccommodationRow(city));
+
+    row.querySelectorAll('.hotel-row').forEach((hotelRow) => {
+      const hotelId = hotelRow.dataset.hotelId;
+      const hotel = (city.accommodations || []).find((h) => h.id === hotelId);
+      if (!hotel) return;
+
+      hotelRow.querySelectorAll('[data-accommodation-field]').forEach((input) => {
+        if (input.dataset.accommodationField === 'address') {
+          input.addEventListener('input', () => {
+            hotel.address = input.value || '';
+            hotel.placeId = '';
+            hotel.latitude = null;
+            hotel.longitude = null;
+            hotelRow.dataset.addressValidated = '0';
+          });
+          return;
+        }
+        input.addEventListener('input', () => {
+          hotel[input.dataset.accommodationField] = input.value;
+        });
+      });
+
+      hotelRow.querySelector('[data-remove-accommodation]')?.addEventListener('click', () => {
+        city.accommodations = (city.accommodations || []).filter((h) => h.id !== hotelId);
+        renderCities();
+      });
+    });
+
+    row.querySelector('[data-travel-entry-point]')?.addEventListener('input', (e) => {
+      const entry = ensureFirstCityTravelEntry();
+      if (!entry) return;
+      entry.entryPoint = e.target.value || '';
+      markTravelEntryUnvalidated(city);
+    });
+
+    row.querySelector('[data-travel-entry-time]')?.addEventListener('input', (e) => {
+      setTravelEntryTime(city, e.target.value || '09:00');
     });
 
     els.citiesContainer.appendChild(row);
   });
 
   renderSetupInsights();
-  renderAccommodations();
   initializePlacesWidgets();
 }
 
