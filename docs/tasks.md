@@ -15,3 +15,6 @@
 - [x] Persist itineraries server-side with list/load/delete APIs
 - [x] Add final-step saved itinerary manager UI (open/delete)
 - [x] Add one-click `.ics` export for calendar import
+- [x] Add shared auto-arrange category defaults config and API endpoint
+- [x] Extend Claude activity schema with category/duration/opening-hours metadata
+- [x] Implement smarter metadata-aware auto-arrange scheduling with placement diagnostics

@@ -4,7 +4,8 @@
   "description": "Personal AI itinerary builder",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "node --test src/*.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

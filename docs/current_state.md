@@ -30,3 +30,8 @@
 ## Known Limitations
 - Calendar export uses floating local times (no timezone conversion).
 - Saved itinerary storage is file-based JSON (single-node, not multi-writer safe).
+
+## New Auto-Arrange Enhancements (in progress)
+- Claude output now includes richer metadata fields per activity: `category`, `duration`, and `opening_hours` (plus normalized `duration_hours`).
+- Shared category default config added in `src/arrangeConfig.js` and exposed to frontend via `GET /api/arrange-config`.
+- Arrange UI now applies metadata-aware scheduling (duration + opening-hours-aware slotting) and produces diagnostics when an activity cannot be placed.

@@ -8,6 +8,7 @@ TravelPlanner is a single-page frontend served by an Express backend.
 - `public/styles.css`: dark navy/cream design system
 - `src/server.js`: API + static serving
 - `src/claude.js`: Anthropic wrapper with required system prompt
+- `src/arrangeConfig.js`: shared category defaults + metadata fallback logic for scheduling
 - `src/unsplash.js`: Unsplash proxy fetcher
 
 ## Data Flow
