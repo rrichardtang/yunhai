@@ -1,5 +1,6 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { getSummary } = require('./preferences');
+const { inferCategory, getCategoryDefaults } = require('./arrangeConfig');
 
 const MODEL = 'claude-sonnet-4-6';
 
@@ -46,6 +47,9 @@ Return a JSON array of activity objects. Each object must have these fields:
 - dedicated_time_block (boolean — true if this requires 2+ hours of committed time)
 - suggested_time (string — e.g. "9:00am", "2:00pm", "sunset")
 - duration_hours (number)
+- duration (string, e.g. "2 hours")
+- category (string, e.g. museum / restaurant / park)
+- opening_hours (string, e.g. "10:00-18:00" or "12:00-14:30,19:00-22:00")
 
 For each activity, provide realistic start and end locations based on the activity description and the city. Use recognizable landmarks, neighborhoods, or points of interest.
 
@@ -153,7 +157,11 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
     ? verdictRaw
     : 'Recommend';
 
+  const normalizedCategory = inferCategory(raw);
+  const defaults = getCategoryDefaults(normalizedCategory);
   const duration = Number(raw.duration_hours);
+  const durationHours = Number.isFinite(duration) && duration > 0 ? duration : defaults.durationHours;
+
   return {
     name: String(raw.name || 'Untitled activity').trim(),
     type: String(raw.type || 'tour').trim().toLowerCase(),
@@ -167,12 +175,15 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
     verdict,
     dedicated_time_block: Boolean(raw.dedicated_time_block),
     suggested_time: String(raw.suggested_time || '').trim() || '10:00am',
-    duration_hours: Number.isFinite(duration) && duration > 0 ? duration : 1.5
+    duration_hours: durationHours,
+    duration: String(raw.duration || `${durationHours} hours`).trim(),
+    category: normalizedCategory,
+    opening_hours: String(raw.opening_hours || defaults.openingHours || '').trim()
   };
 }
 
-async function planCity(city, profile = null, userId = 'default', travels = []) {
-  const { name, startDate, endDate, notes, accommodations } = city;
+async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null) {
+  const { name, startDate, endDate, leaveTime, notes, accommodations } = city;
   const client = getClient();
   if (!client) {
     const err = new Error('Anthropic API key not configured');
@@ -200,7 +211,14 @@ async function planCity(city, profile = null, userId = 'default', travels = []) 
     }).join('\n')
     : 'No trip entry details provided yet.';
 
-  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nUse accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Return a maximum of 6-8 activities. Be concise.\n\nReturn JSON only.`;
+  const departureContext = `User leaving ${name} on ${endDate || '?'} at ${leaveTime || '18:00'}`;
+  const travelTimingContext = [
+    travelTiming?.arrivalSummary || '',
+    travelTiming?.departureSummary || '',
+    travelTiming?.interCitySummary || ''
+  ].filter(Boolean).join('\n') || 'No computed transfer-time constraints available.';
+
+  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nUse accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Respect the computed time windows exactly on arrival/departure/transfer days. Return a maximum of 6-8 activities. Be concise.\n\nReturn JSON only.`;
 
   const learnedSummary = getSummary(profile, userId);
   const effectiveSystemPrompt = learnedSummary

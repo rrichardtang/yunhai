@@ -4,6 +4,7 @@ const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const { planCity } = require('./claude');
 const { fetchUnsplashImage } = require('./unsplash');
+const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('./arrangeConfig');
 const {
   recordSignal,
   load: loadPreferences,
@@ -148,6 +149,221 @@ function formatLatLng(lat, lng) {
   return `${latitude},${longitude}`;
 }
 
+function parseMinutesFromTime(value = '09:00') {
+  const text = String(value || '').trim();
+  const match = text.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return 9 * 60;
+  const hours = Math.max(0, Math.min(23, Number(match[1] || 0)));
+  const minutes = Math.max(0, Math.min(59, Number(match[2] || 0)));
+  return (hours * 60) + minutes;
+}
+
+function timeFromMinutes(totalMinutes = 0) {
+  const safe = Math.max(0, Math.min(23 * 60 + 59, Math.round(Number(totalMinutes) || 0)));
+  const hours = Math.floor(safe / 60);
+  const minutes = safe % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function extractTimeFromDateTime(value = '') {
+  const text = String(value || '');
+  const match = text.match(/T(\d{2}:\d{2})/);
+  return match ? match[1] : '';
+}
+
+function pickFirstAccommodation(city = {}) {
+  const accommodations = Array.isArray(city?.accommodations) ? city.accommodations : [];
+  if (!accommodations.length) return null;
+  return accommodations.slice().sort((a, b) => {
+    const aDate = String(a?.checkIn || a?.checkOut || '9999-12-31');
+    const bDate = String(b?.checkIn || b?.checkOut || '9999-12-31');
+    return aDate.localeCompare(bDate);
+  })[0] || null;
+}
+
+function pickLastAccommodation(city = {}) {
+  const accommodations = Array.isArray(city?.accommodations) ? city.accommodations : [];
+  if (!accommodations.length) return null;
+  return accommodations.slice().sort((a, b) => {
+    const aDate = String(a?.checkOut || a?.checkIn || '0000-01-01');
+    const bDate = String(b?.checkOut || b?.checkIn || '0000-01-01');
+    return bDate.localeCompare(aDate);
+  })[0] || null;
+}
+
+function resolveLocationQuery({ lat, lng, fallbackText }) {
+  const coords = formatLatLng(lat, lng);
+  if (coords) return coords;
+  const text = String(fallbackText || '').trim();
+  return text || '';
+}
+
+async function fetchDistanceMatrixLeg({
+  origin,
+  destination,
+  mode = 'driving',
+  departureDateTime = '',
+  arrivalDateTime = ''
+}) {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey || !origin || !destination) return null;
+
+  const params = new URLSearchParams({
+    origins: origin,
+    destinations: destination,
+    mode,
+    key: apiKey
+  });
+
+  const departureEpoch = Math.floor(new Date(departureDateTime).getTime() / 1000);
+  const arrivalEpoch = Math.floor(new Date(arrivalDateTime).getTime() / 1000);
+  if (mode === 'driving' && Number.isFinite(departureEpoch) && departureEpoch > 0) {
+    params.set('departure_time', String(departureEpoch));
+    params.set('traffic_model', 'best_guess');
+  }
+  if (mode === 'transit') {
+    if (Number.isFinite(departureEpoch) && departureEpoch > 0) {
+      params.set('departure_time', String(departureEpoch));
+    } else if (Number.isFinite(arrivalEpoch) && arrivalEpoch > 0) {
+      params.set('arrival_time', String(arrivalEpoch));
+    }
+  }
+
+  const response = await fetch(`${DISTANCE_MATRIX_BASE_URL}?${params.toString()}`);
+  if (!response.ok) return null;
+
+  const data = await response.json();
+  if (data?.status !== 'OK') return null;
+  const element = data?.rows?.[0]?.elements?.[0] || null;
+  if (!element || element.status !== 'OK') return null;
+
+  const inTrafficSeconds = Number(element?.duration_in_traffic?.value || 0);
+  const baseSeconds = Number(element?.duration?.value || 0);
+  const totalSeconds = inTrafficSeconds || baseSeconds;
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return null;
+
+  return {
+    durationMinutes: Math.max(1, Math.round(totalSeconds / 60)),
+    distanceMeters: Number(element?.distance?.value || 0) || null,
+    mode
+  };
+}
+
+async function estimateTravelMinutes({ origin, destination, departureDateTime = '', arrivalDateTime = '' }) {
+  const modeCandidates = ['transit', 'driving'];
+  for (const mode of modeCandidates) {
+    try {
+      const leg = await fetchDistanceMatrixLeg({ origin, destination, mode, departureDateTime, arrivalDateTime });
+      if (leg?.durationMinutes) return leg;
+    } catch {
+      // next mode fallback
+    }
+  }
+  return null;
+}
+
+async function buildCityTravelTiming(cities = []) {
+  const timingByCity = {};
+  const sortedCities = Array.isArray(cities)
+    ? cities.slice().sort((a, b) => String(a?.startDate || '').localeCompare(String(b?.startDate || '')))
+    : [];
+
+  for (let index = 0; index < sortedCities.length; index += 1) {
+    const city = sortedCities[index] || {};
+    const cityName = String(city?.name || '').trim();
+    if (!cityName) continue;
+
+    const firstAccommodation = pickFirstAccommodation(city);
+    const lastAccommodation = pickLastAccommodation(city);
+    const arrivalTime = extractTimeFromDateTime(city?.travelEntry?.dateTime) || '09:00';
+    const arrivalDate = String(city?.startDate || '').slice(0, 10);
+    const departureDate = String(city?.endDate || city?.startDate || '').slice(0, 10);
+    const departureTime = String(city?.leaveTime || '18:00');
+
+    const timing = {
+      city: cityName,
+      arrivalTravelMinutes: null,
+      arrivalAvailableTime: arrivalTime,
+      arrivalSummary: '',
+      departureTravelMinutes: null,
+      departureMustLeaveTime: departureTime,
+      departureSummary: '',
+      interCityTravelMinutes: null,
+      interCitySummary: ''
+    };
+
+    if (index === 0 && city?.travelEntry && firstAccommodation) {
+      const origin = resolveLocationQuery({
+        lat: city.travelEntry.entryPointLat,
+        lng: city.travelEntry.entryPointLng,
+        fallbackText: city.travelEntry.entryPoint
+      });
+      const destination = resolveLocationQuery({
+        lat: firstAccommodation.latitude,
+        lng: firstAccommodation.longitude,
+        fallbackText: firstAccommodation.address
+      });
+      const arrivalDateTime = arrivalDate ? `${arrivalDate}T${arrivalTime}:00` : city?.travelEntry?.dateTime;
+      const leg = await estimateTravelMinutes({ origin, destination, departureDateTime: city?.travelEntry?.dateTime, arrivalDateTime });
+      if (leg?.durationMinutes) {
+        timing.arrivalTravelMinutes = leg.durationMinutes;
+        timing.arrivalAvailableTime = timeFromMinutes(parseMinutesFromTime(arrivalTime) + leg.durationMinutes);
+        timing.arrivalSummary = `User arrives at ${city.travelEntry.entryPoint || cityName} at ${arrivalTime}, ${leg.durationMinutes} min travel to accommodation, available for activities at ${timing.arrivalAvailableTime}.`;
+      }
+    }
+
+    const departureLocation = resolveLocationQuery({
+      lat: city?.departureLat,
+      lng: city?.departureLng,
+      fallbackText: city?.departureLocation
+    });
+    if (lastAccommodation && departureLocation) {
+      const origin = resolveLocationQuery({
+        lat: lastAccommodation.latitude,
+        lng: lastAccommodation.longitude,
+        fallbackText: lastAccommodation.address
+      });
+      const departureDateTime = departureDate ? `${departureDate}T${departureTime}:00` : '';
+      const leg = await estimateTravelMinutes({ origin, destination: departureLocation, arrivalDateTime: departureDateTime });
+      if (leg?.durationMinutes) {
+        timing.departureTravelMinutes = leg.durationMinutes;
+        timing.departureMustLeaveTime = timeFromMinutes(parseMinutesFromTime(departureTime) - leg.durationMinutes);
+        timing.departureSummary = `User must depart by ${timing.departureMustLeaveTime} to reach departure point by ${departureTime}.`;
+      }
+    }
+
+    if (index > 0) {
+      const previousCity = sortedCities[index - 1] || {};
+      const previousLastAccommodation = pickLastAccommodation(previousCity);
+      if (previousLastAccommodation && firstAccommodation) {
+        const origin = resolveLocationQuery({
+          lat: previousLastAccommodation.latitude,
+          lng: previousLastAccommodation.longitude,
+          fallbackText: previousLastAccommodation.address
+        });
+        const destination = resolveLocationQuery({
+          lat: firstAccommodation.latitude,
+          lng: firstAccommodation.longitude,
+          fallbackText: firstAccommodation.address
+        });
+        const travelDate = String(city?.startDate || '').slice(0, 10);
+        const departureRef = `${String(previousCity?.endDate || city?.startDate || '').slice(0, 10)}T${String(previousCity?.leaveTime || '09:00')}:00`;
+        const leg = await estimateTravelMinutes({ origin, destination, departureDateTime: departureRef, arrivalDateTime: `${travelDate}T09:00:00` });
+        if (leg?.durationMinutes) {
+          timing.interCityTravelMinutes = leg.durationMinutes;
+          const earliestAfterTransfer = timeFromMinutes((9 * 60) + leg.durationMinutes);
+          timing.arrivalAvailableTime = timeFromMinutes(Math.max(parseMinutesFromTime(timing.arrivalAvailableTime), parseMinutesFromTime(earliestAfterTransfer)));
+          timing.interCitySummary = `Inter-city transfer from ${previousCity?.name || 'previous city'} accommodation to ${cityName} accommodation takes about ${leg.durationMinutes} min; schedule no activities before ${timing.arrivalAvailableTime} on ${travelDate || 'travel day'}.`;
+        }
+      }
+    }
+
+    timingByCity[cityName] = timing;
+  }
+
+  return timingByCity;
+}
+
 function isUsableLocation(value = '') {
   const normalized = String(value || '').trim();
   if (!normalized) return false;
@@ -271,7 +487,7 @@ function buildChatSystemPrompt(tripContext = {}) {
           return `${accommodation.address || 'Address missing'}${coords} (${accommodation.checkIn || '?'} → ${accommodation.checkOut || '?'})`;
         }).join('; ')
         : 'No accommodations listed';
-      return `${city.name} (${city.startDate} → ${city.endDate}) | Accommodations: ${accommodations}`;
+      return `${city.name} (${city.startDate} → ${city.endDate}) | User leaving ${city.name} on ${city.endDate || '?'} at ${city.leaveTime || '18:00'} | Accommodations: ${accommodations}`;
     }).join(' | ')
     : 'None yet';
   const travels = Array.isArray(tripContext.travels) && tripContext.travels.length
@@ -401,6 +617,10 @@ app.get('/api/status', (_req, res) => {
   });
 });
 
+app.get('/api/arrange-config', (_req, res) => {
+  res.json({ categoryDefaults: DEFAULT_ACTIVITY_CATEGORY_CONFIG });
+});
+
 app.post('/api/plan', async (req, res) => {
   const { cities, travels, profile, userId } = req.body || {};
   if (!Array.isArray(cities) || cities.length === 0) {
@@ -425,9 +645,11 @@ app.post('/api/plan', async (req, res) => {
 
   try {
     const tripTravels = Array.isArray(travels) ? travels.slice(0, 1) : [];
+    const cityTravelTiming = await buildCityTravelTiming(cities);
     for (const city of cities) {
-      const activities = await planCity(city, profile, resolvedUserId, tripTravels);
-      sendEvent({ type: 'city', city: city.name, activities });
+      const timing = cityTravelTiming[String(city?.name || '').trim()] || null;
+      const activities = await planCity(city, profile, resolvedUserId, tripTravels, timing);
+      sendEvent({ type: 'city', city: city.name, activities, travelTiming: timing });
     }
     sendEvent({ type: 'done' });
     res.end();
