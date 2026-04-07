@@ -206,12 +206,20 @@ function normalizeCityLogistics(city = {}) {
     arrival: {
       date: String(arrival.date || arrivalDate || ''),
       timeOfDay: normalizeTimeOfDay(arrival.timeOfDay || ''),
-      customTime: parseTimeTo24(arrival.customTime || '')
+      customTime: parseTimeTo24(arrival.customTime || ''),
+      location: String(arrival.location || ''),
+      placeId: String(arrival.placeId || ''),
+      latitude: normalizeCoordinate(arrival.latitude),
+      longitude: normalizeCoordinate(arrival.longitude)
     },
     departure: {
       date: String(departure.date || departureDate || ''),
       timeOfDay: normalizeTimeOfDay(departure.timeOfDay || ''),
-      customTime: parseTimeTo24(departure.customTime || city.leaveTime || '')
+      customTime: parseTimeTo24(departure.customTime || city.leaveTime || ''),
+      location: String(departure.location || ''),
+      placeId: String(departure.placeId || ''),
+      latitude: normalizeCoordinate(departure.latitude),
+      longitude: normalizeCoordinate(departure.longitude)
     }
   };
 }
@@ -1136,6 +1144,9 @@ function renderCities() {
     const isFirstCity = index === 0;
     const travelEntry = isFirstCity ? ensureFirstCityTravelEntry() : null;
     city.logistics = normalizeCityLogistics(city);
+    if (!Array.isArray(city.accommodations) || city.accommodations.length === 0) {
+      city.accommodations = [normalizeAccommodation({ checkIn: city.logistics.accommodation.checkIn, checkOut: city.logistics.accommodation.checkOut })];
+    }
     syncCityLegacyDates(city);
     const timelineError = validateCityTimeline(city);
 
@@ -1157,28 +1168,32 @@ function renderCities() {
         <div class="city-drawer">
           <div class="city-dropdown-grid" role="group" aria-label="City stay details">
             <div class="city-dropdown-section">
-              <label class="city-dropdown-label" for="accommodation-type-${esc(city.id)}">Accommodation + date range</label>
+              <label class="city-dropdown-label">Accommodation</label>
               <div class="city-dropdown-row accommodation-row">
-                <select id="accommodation-type-${esc(city.id)}" data-logistics="accommodationType" aria-label="Accommodation type" tabindex="1">
-                  <option value="hotel" ${city.logistics.accommodation.type === 'hotel' ? 'selected' : ''}>Hotel</option>
-                  <option value="airbnb" ${city.logistics.accommodation.type === 'airbnb' ? 'selected' : ''}>Airbnb</option>
-                  <option value="none" ${city.logistics.accommodation.type === 'none' ? 'selected' : ''}>None</option>
-                </select>
-                <input type="date" value="${esc(city.logistics.accommodation.checkIn)}" data-logistics="accommodationCheckIn" aria-label="Accommodation check-in date" />
-                <input type="date" value="${esc(city.logistics.accommodation.checkOut)}" data-logistics="accommodationCheckOut" aria-label="Accommodation check-out date" />
+                <div class="city-autocomplete">
+                  <input type="text" placeholder="Accommodation address" value="${esc((city.accommodations?.[0]?.address) || '')}" data-accommodation-field="address" data-hotel-id="${esc(city.accommodations?.[0]?.id || '')}" autocomplete="off" aria-label="Accommodation address" />
+                </div>
+                <input type="date" value="${esc(city.logistics.accommodation.checkIn)}" data-logistics="accommodationCheckIn" aria-label="Check-in date" />
+                <input type="date" value="${esc(city.logistics.accommodation.checkOut)}" data-logistics="accommodationCheckOut" aria-label="Check-out date" />
               </div>
             </div>
 
             <div class="city-dropdown-section">
-              <label class="city-dropdown-label">Arrival time</label>
+              <label class="city-dropdown-label">Arrival</label>
               <div class="city-dropdown-row arrival-row">
+                <div class="city-autocomplete">
+                  <input type="text" placeholder="Arrival location (e.g. airport)" value="${esc(city.logistics.arrival.location)}" data-logistics="arrivalLocation" autocomplete="off" aria-label="Arrival location" />
+                </div>
                 <input type="time" value="${esc(city.logistics.arrival.customTime || TIME_OF_DAY_PRESETS[city.logistics.arrival.timeOfDay] || '09:00')}" data-logistics="arrivalTime" aria-label="Arrival time" />
               </div>
             </div>
 
             <div class="city-dropdown-section">
-              <label class="city-dropdown-label">Departure time</label>
+              <label class="city-dropdown-label">Departure</label>
               <div class="city-dropdown-row departure-row">
+                <div class="city-autocomplete">
+                  <input type="text" placeholder="Departure location (e.g. train station)" value="${esc(city.logistics.departure.location)}" data-logistics="departureLocation" autocomplete="off" aria-label="Departure location" />
+                </div>
                 <input type="time" value="${esc(city.logistics.departure.customTime || TIME_OF_DAY_PRESETS[city.logistics.departure.timeOfDay] || '18:00')}" data-logistics="departureTime" aria-label="Departure time" />
               </div>
             </div>
@@ -1211,6 +1226,7 @@ function renderCities() {
         if (field === 'dateFrom') {
           city.logistics.arrival.date = input.value || '';
           city.logistics.accommodation.checkIn = input.value || '';
+          if (city.accommodations?.[0]) city.accommodations[0].checkIn = input.value || '';
           syncCityLegacyDates(city);
           syncTravelDateTimes();
           renderSetupInsights();
@@ -1221,6 +1237,7 @@ function renderCities() {
         if (field === 'dateTo') {
           city.logistics.departure.date = input.value || '';
           city.logistics.accommodation.checkOut = input.value || '';
+          if (city.accommodations?.[0]) city.accommodations[0].checkOut = input.value || '';
           syncCityLegacyDates(city);
           syncTravelDateTimes();
           renderSetupInsights();
@@ -1265,6 +1282,78 @@ function renderCities() {
       });
     }
 
+    const accommodationInput = row.querySelector('[data-accommodation-field="address"]');
+    if (accommodationInput && isGooglePlacesReady()) {
+      const accom = city.accommodations[0];
+      attachPlaceAutocompleteElement(accommodationInput, {
+        onResolved: ({ formattedAddress, placeId, lat, lng }) => {
+          accom.address = formattedAddress;
+          accom.placeId = placeId;
+          accom.latitude = lat;
+          accom.longitude = lng;
+          accommodationInput.value = formattedAddress;
+          clearLocationValidationError();
+        },
+        onInput: () => { accom.placeId = ''; accom.latitude = null; accom.longitude = null; },
+        onInvalid: () => {
+          accom.placeId = ''; accom.latitude = null; accom.longitude = null;
+          showLocationValidationError('Accommodation address is invalid. Please choose a Google Places suggestion.');
+        }
+      });
+    }
+
+    const arrivalLocationInput = row.querySelector('[data-logistics="arrivalLocation"]');
+    if (arrivalLocationInput && isGooglePlacesReady()) {
+      attachPlaceAutocompleteElement(arrivalLocationInput, {
+        onResolved: ({ formattedAddress, placeId, lat, lng }) => {
+          city.logistics.arrival.location = formattedAddress;
+          city.logistics.arrival.placeId = placeId;
+          city.logistics.arrival.latitude = lat;
+          city.logistics.arrival.longitude = lng;
+          arrivalLocationInput.value = formattedAddress;
+          clearLocationValidationError();
+        },
+        onInput: () => {
+          city.logistics.arrival.location = arrivalLocationInput.value;
+          city.logistics.arrival.placeId = '';
+          city.logistics.arrival.latitude = null;
+          city.logistics.arrival.longitude = null;
+        },
+        onInvalid: () => {
+          city.logistics.arrival.placeId = '';
+          city.logistics.arrival.latitude = null;
+          city.logistics.arrival.longitude = null;
+          showLocationValidationError('Arrival location is invalid. Please choose a Google Places suggestion.');
+        }
+      });
+    }
+
+    const departureLocationInput = row.querySelector('[data-logistics="departureLocation"]');
+    if (departureLocationInput && isGooglePlacesReady()) {
+      attachPlaceAutocompleteElement(departureLocationInput, {
+        onResolved: ({ formattedAddress, placeId, lat, lng }) => {
+          city.logistics.departure.location = formattedAddress;
+          city.logistics.departure.placeId = placeId;
+          city.logistics.departure.latitude = lat;
+          city.logistics.departure.longitude = lng;
+          departureLocationInput.value = formattedAddress;
+          clearLocationValidationError();
+        },
+        onInput: () => {
+          city.logistics.departure.location = departureLocationInput.value;
+          city.logistics.departure.placeId = '';
+          city.logistics.departure.latitude = null;
+          city.logistics.departure.longitude = null;
+        },
+        onInvalid: () => {
+          city.logistics.departure.placeId = '';
+          city.logistics.departure.latitude = null;
+          city.logistics.departure.longitude = null;
+          showLocationValidationError('Departure location is invalid. Please choose a Google Places suggestion.');
+        }
+      });
+    }
+
     row.querySelector('[data-remove-city]')?.addEventListener('click', () => {
       if (cityAutocomplete.activeCityId === city.id) closeCityAutocomplete();
       state.cities = state.cities.filter((c) => c.id !== city.id);
@@ -1275,15 +1364,18 @@ function renderCities() {
     row.querySelectorAll('[data-logistics]').forEach((input) => {
       input.addEventListener('input', () => {
         const field = input.dataset.logistics;
-        if (field === 'accommodationType') city.logistics.accommodation.type = input.value;
-        if (field === 'accommodationCheckIn') city.logistics.accommodation.checkIn = input.value || '';
-        if (field === 'accommodationCheckOut') city.logistics.accommodation.checkOut = input.value || '';
-        if (field === 'arrivalDate') city.logistics.arrival.date = input.value || '';
+        if (field === 'accommodationCheckIn') {
+          city.logistics.accommodation.checkIn = input.value || '';
+          if (city.accommodations[0]) city.accommodations[0].checkIn = input.value || '';
+        }
+        if (field === 'accommodationCheckOut') {
+          city.logistics.accommodation.checkOut = input.value || '';
+          if (city.accommodations[0]) city.accommodations[0].checkOut = input.value || '';
+        }
         if (field === 'arrivalTime') {
           city.logistics.arrival.timeOfDay = 'custom';
           city.logistics.arrival.customTime = parseTimeTo24(input.value || '');
         }
-        if (field === 'departureDate') city.logistics.departure.date = input.value || '';
         if (field === 'departureTime') {
           city.logistics.departure.timeOfDay = 'custom';
           city.logistics.departure.customTime = parseTimeTo24(input.value || '');

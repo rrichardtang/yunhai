@@ -82,9 +82,9 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .city-dropdown-section { border: 1px solid #e2e8f2; border-radius: 10px; padding: 10px; background: #f8fbff; }
 .city-dropdown-label { display: block; font-size: .86rem; font-weight: 700; color: #2a3b55; margin-bottom: 6px; }
 .city-dropdown-row { display: grid; gap: 6px; }
-.accommodation-row { grid-template-columns: minmax(120px, 1fr) repeat(2, minmax(130px, 1fr)); }
+.accommodation-row { grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(130px, 1fr)); }
 .arrival-row,
-.departure-row { grid-template-columns: 1fr; max-width: 200px; }
+.departure-row { grid-template-columns: minmax(180px, 1fr) auto; }
 .city-dropdown-row input,
 .city-dropdown-row select { margin-top: 0; }
 .city-dropdown-error { margin: 0; color: #8f2422; font-weight: 700; font-size: .9rem; }
