@@ -16,12 +16,26 @@
           <h1>TravelPlanner</h1>
           <p>Personal AI itinerary builder</p>
         </div>
-        <button id="preferencesLink" class="link-btn" type="button">My Profile</button>
+        <div class="topbar-actions">
+          <div class="mode-toggle" role="group" aria-label="View mode">
+            <button id="planningModeBtn" class="link-btn mode-btn active" type="button">Planning</button>
+            <button id="executionModeBtn" class="link-btn mode-btn" type="button">Execution</button>
+          </div>
+          <button id="preferencesLink" class="link-btn" type="button">My Profile</button>
+        </div>
       </div>
     </header>
 
     <main class="container">
       <div id="apiBanner" class="api-banner hidden"></div>
+
+      <section id="executionModeView" class="panel execution-panel hidden" aria-live="polite">
+        <div class="between execution-head">
+          <h2>Execution Mode</h2>
+          <p class="muted-text">What’s next, where it is, and how to get there.</p>
+        </div>
+        <div id="executionModeList" class="execution-list"></div>
+      </section>
 
       <nav class="steps" id="stepIndicator">
         <div class="step active">1. Setup</div>

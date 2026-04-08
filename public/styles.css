@@ -23,6 +23,22 @@ body {
 .topbar h1 { margin: 0 0 4px; }
 .topbar p { margin: 0; opacity: .85; }
 .topbar-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.mode-toggle {
+  display: inline-flex;
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.mode-btn {
+  border: 0;
+  border-radius: 0;
+  padding: 7px 12px;
+}
+.mode-btn.active {
+  background: var(--cream);
+  color: var(--navy);
+}
 .link-btn { background: transparent; color: var(--cream); border: 1px solid rgba(255,255,255,.35); }
 .link-btn:hover { border-color: rgba(255,255,255,.6); }
 .container { max-width: 1280px; margin: 24px auto; padding: 0 20px 40px; }
@@ -31,6 +47,62 @@ body {
 .step.active { background: var(--accent); color: #fff; }
 .panel { background: rgba(255,255,255,.9); border: 1px solid #e7e2d8; border-radius: 16px; padding: 18px; display: none; }
 .panel.active { display: block; }
+.execution-panel { margin-bottom: 14px; }
+.execution-head p { margin: 0; }
+.execution-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.execution-item {
+  border: 1px solid #dce4ef;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+}
+.execution-time {
+  font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.execution-place {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.execution-note {
+  margin: 0 0 8px;
+  color: #40516b;
+  font-size: .93rem;
+}
+.execution-meta {
+  margin: 0 0 8px;
+  color: #53657f;
+  font-size: .88rem;
+}
+.execution-actions {
+  display: flex;
+  gap: 8px;
+}
+.execution-actions a,
+.execution-actions button {
+  text-decoration: none;
+  border: 1px solid #d4ddea;
+  border-radius: 999px;
+  background: #f5f8fc;
+  color: #23344e;
+  padding: 6px 10px;
+  font-weight: 700;
+  font-size: .84rem;
+}
+
+body.execution-mode .steps,
+body.execution-mode .step-panel {
+  display: none !important;
+}
+
+body.execution-mode #executionModeView {
+  display: block !important;
+}
 label { display: block; margin-bottom: 12px; font-weight: 600; }
 input, textarea, button { font: inherit; }
 input, textarea { width: 100%; padding: 10px; border: 1px solid #d9dde4; border-radius: 10px; margin-top: 6px; }
@@ -1009,6 +1081,7 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   .arrival-row,
   .departure-row { grid-template-columns: 1fr; }
   .topbar-row { flex-direction: column; align-items: flex-start; }
+  .topbar-actions { width: 100%; justify-content: space-between; }
   .step-nav-split { flex-direction: column; }
   .step-nav-split .nav-secondary,
   .step-nav-split .nav-primary { max-width: none; }
