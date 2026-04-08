@@ -3333,18 +3333,30 @@ function buildScheduledDays() {
   })).filter((d) => d.activities.length);
 }
 
+const STEP_LABELS = { 1: 'setup', 2: 'reviewing activities', 3: 'arranging schedule', 4: 'itinerary finalized' };
+
+function slimCities() {
+  return state.cities.map((c) => ({
+    name: c.name,
+    startDate: c.startDate,
+    endDate: c.endDate,
+    leaveTime: c.leaveTime,
+    notes: c.notes || '',
+    accommodations: (c.accommodations || []).map((a) => a.address).filter(Boolean)
+  }));
+}
+
 function getTripContext() {
   syncLegacyTravelsFromCities();
+  const scheduled = buildScheduledDays();
+  const hasSchedule = scheduled.length > 0;
   return {
-    step: state.step,
+    step: STEP_LABELS[state.step] || 'unknown',
     tripName: state.tripName,
-    cities: state.cities,
-    travels: state.travels,
-    itineraryId: state.currentItineraryId || null,
-    profile: state.profile || null,
-    approvedActivities: state.activities.filter((a) => state.reviewed[a.id]?.approved).map((a) => a.name),
-    declinedActivities: state.activities.filter((a) => state.reviewed[a.id]?.approved === false).map((a) => a.name),
-    scheduledByDay: buildScheduledDays()
+    cities: slimCities(),
+    approvedActivities: hasSchedule ? [] : state.activities.filter((a) => state.reviewed[a.id]?.approved).map((a) => a.name),
+    declinedActivities: hasSchedule ? [] : state.activities.filter((a) => state.reviewed[a.id]?.approved === false).map((a) => a.name),
+    scheduledByDay: scheduled
   };
 }
 

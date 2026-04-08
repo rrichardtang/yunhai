@@ -4,6 +4,21 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-07] Fix activity images not loading at step 2
+
+- Moved `setStep(2)` before `renderActivities()` in the streaming city event handler so `enrichImages` fires on the first city arrival instead of waiting for user interaction
+- File: `public/app.js`
+
+## [2026-04-07] Optimize concierge context window for cost efficiency
+
+- Stripped getTripContext(): sends only city name/dates/leaveTime/accommodation addresses, drops raw objects, coordinates, IDs, UI state, travels array, raw profile
+- Approved/declined lists omitted when schedule exists (schedule supersedes them); declined list dropped entirely
+- Step sent as human-readable label instead of number
+- buildChatSystemPrompt() simplified — removed formatProfileBlock, coordinates, checkIn/checkOut timestamps
+- System prompt cached per session via getCachedPrompt(), only rebuilt when tripContext changes
+- Compaction threshold lowered from 100k tokens to 8k (~40-50 messages)
+- Files: public/app.js, src/server.js, src/chat.js
+
 ## [2026-04-07] Evolving context window for concierge chatbot
 
 - `getTripContext()` now sends profile, tripName, itineraryId, and scheduledByDay (day-by-day activity placements with times/locations)

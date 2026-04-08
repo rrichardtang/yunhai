@@ -2,13 +2,15 @@ const Anthropic = require('@anthropic-ai/sdk');
 
 const SESSION_STORE = new Map();
 const MODEL_CONTEXT_WINDOW_TOKENS = 200000;
-const COMPACT_THRESHOLD_TOKENS = MODEL_CONTEXT_WINDOW_TOKENS * 0.5;
+const COMPACT_THRESHOLD_TOKENS = 8000;
 const CHARS_PER_TOKEN = 4;
 
 function createEmptySession() {
   return {
     history: [],
-    tripContext: {}
+    tripContext: {},
+    cachedSystemPrompt: null,
+    contextHash: null
   };
 }
 
@@ -20,6 +22,10 @@ function getSession(sessionId) {
   return SESSION_STORE.get(sessionId);
 }
 
+function hashContext(context) {
+  return JSON.stringify(context);
+}
+
 function setTripContext(sessionId, context = {}) {
   const session = getSession(sessionId);
   if (!session) return null;
@@ -28,6 +34,19 @@ function setTripContext(sessionId, context = {}) {
     ...(context || {})
   };
   return session;
+}
+
+function getCachedPrompt(sessionId, context, buildFn) {
+  const session = getSession(sessionId);
+  if (!session) return buildFn();
+  const hash = hashContext(context);
+  if (session.contextHash === hash && session.cachedSystemPrompt) {
+    return session.cachedSystemPrompt;
+  }
+  const prompt = buildFn();
+  session.contextHash = hash;
+  session.cachedSystemPrompt = prompt;
+  return prompt;
 }
 
 function addMessage(sessionId, role, content) {
@@ -106,5 +125,6 @@ module.exports = {
   addMessage,
   getHistory,
   compactHistory,
-  clearSession
+  clearSession,
+  getCachedPrompt
 };

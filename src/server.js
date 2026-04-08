@@ -13,7 +13,7 @@ const {
   resolveUserId,
   DEFAULT_USER_ID
 } = require('./preferences');
-const { getSession, setTripContext, addMessage, getHistory, compactHistory, clearSession } = require('./chat');
+const { getSession, setTripContext, addMessage, getHistory, compactHistory, clearSession, getCachedPrompt } = require('./chat');
 const {
   saveItinerary,
   getLatestItinerary,
@@ -482,54 +482,38 @@ function parseUserId(rawUserId) {
 }
 
 function formatCityLine(city) {
-  const accomList = Array.isArray(city.accommodations) && city.accommodations.length
-    ? city.accommodations.map((a) => {
-      const coords = (Number.isFinite(Number(a.latitude)) && Number.isFinite(Number(a.longitude)))
-        ? ` [${Number(a.latitude)}, ${Number(a.longitude)}]`
-        : '';
-      return `${a.address || 'Address missing'}${coords} (${a.checkIn || '?'} → ${a.checkOut || '?'})`;
-    }).join('; ')
-    : 'No accommodations listed';
-  return `${city.name} (${city.startDate} → ${city.endDate}) | Leaving at ${city.leaveTime || '18:00'} | Accommodations: ${accomList}`;
+  const accoms = Array.isArray(city.accommodations) && city.accommodations.length
+    ? city.accommodations.join('; ')
+    : 'none listed';
+  return `${city.name} (${city.startDate} → ${city.endDate}, leaving ${city.leaveTime || '18:00'}) — staying: ${accoms}`;
 }
 
 function formatScheduleBlock(scheduledByDay) {
   if (!Array.isArray(scheduledByDay) || !scheduledByDay.length) return '';
   const lines = scheduledByDay.map((day) => {
-    const acts = day.activities.map((a) => `  - ${a.time || '?'} ${a.name} (${a.type}, ${a.duration || '?'})${a.location ? ' @ ' + a.location : ''}`);
-    return `${day.date} — ${day.city}\n${acts.join('\n')}`;
+    const acts = day.activities.map((a) => `  ${a.time || '?'} ${a.name} (${a.type}, ${a.duration || '?'})`);
+    return `${day.date} ${day.city}\n${acts.join('\n')}`;
   });
   return `\n\n## Scheduled Itinerary\n${lines.join('\n')}`;
-}
-
-function formatProfileBlock(profile, prefSummary) {
-  const parts = [];
-  if (prefSummary) parts.push(prefSummary);
-  else if (profile?.aboutMe) parts.push(`About me: ${profile.aboutMe}`);
-  if (!parts.length) return '';
-  return `\n\n## Traveler Profile\n${parts.join('\n')}`;
 }
 
 function buildChatSystemPrompt(tripContext = {}, prefSummary = '') {
   const cities = Array.isArray(tripContext.cities) && tripContext.cities.length
     ? tripContext.cities.map(formatCityLine).join('\n')
     : 'None yet';
-  const travels = Array.isArray(tripContext.travels) && tripContext.travels.length
-    ? tripContext.travels.slice(0, 1).map((t) => `Entry: ${t.entryPoint || '?'} at ${t.dateTime || '?'}`).join(', ')
-    : 'None yet';
-  const approved = Array.isArray(tripContext.approvedActivities) && tripContext.approvedActivities.length
-    ? tripContext.approvedActivities.join(', ')
-    : 'None yet';
-  const declined = Array.isArray(tripContext.declinedActivities) && tripContext.declinedActivities.length
-    ? tripContext.declinedActivities.join(', ')
-    : 'None yet';
 
-  const base = `You are a concise, opinionated travel advisor. You have full context of this trip — dates, accommodations, scheduled activities, and the traveler's preferences. Answer in 2-4 sentences. Be honest about downsides. Tailor suggestions to the traveler's dates, location, and tastes.`;
+  const hasSchedule = Array.isArray(tripContext.scheduledByDay) && tripContext.scheduledByDay.length > 0;
+  let activityLines = '';
+  if (!hasSchedule) {
+    const approved = Array.isArray(tripContext.approvedActivities) && tripContext.approvedActivities.length
+      ? tripContext.approvedActivities.join(', ') : '';
+    if (approved) activityLines = `\n- Approved: ${approved}`;
+  }
 
-  const tripBlock = `\n\n## Trip: ${tripContext.tripName || 'Untitled'}\n- Cities:\n${cities}\n- Travel entry: ${travels}\n- Planning step: ${tripContext.step ?? 'Unknown'}\n- Approved: ${approved}\n- Declined: ${declined}`;
-
+  const base = 'You are a concise, opinionated travel advisor. You know this trip\'s dates, accommodations, scheduled activities, and the traveler\'s preferences. Answer in 2-4 sentences. Be honest about downsides. Tailor suggestions to the dates, location, and tastes.';
+  const profileBlock = prefSummary ? `\n\n## Traveler\n${prefSummary}` : '';
+  const tripBlock = `\n\n## Trip: ${tripContext.tripName || 'Untitled'} (${tripContext.step || 'unknown'})\n${cities}${activityLines}`;
   const scheduleBlock = formatScheduleBlock(tripContext.scheduledByDay);
-  const profileBlock = formatProfileBlock(tripContext.profile, prefSummary);
 
   return base + profileBlock + tripBlock + scheduleBlock;
 }
@@ -890,7 +874,7 @@ app.post('/api/chat/message', async (req, res) => {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 220,
-      system: buildChatSystemPrompt(tripContext || {}, prefSummary),
+      system: getCachedPrompt(sessionId, tripContext || {}, () => buildChatSystemPrompt(tripContext || {}, prefSummary)),
       messages: toAnthropicMessages(getHistory(sessionId))
     });
 
