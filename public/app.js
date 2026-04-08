@@ -26,6 +26,7 @@ const state = {
     city: '',
     verdict: ''
   },
+  viewMode: 'planning',
   arrangeConfig: null,
   arrangeDiagnostics: {},
   lastPlannedFingerprint: null
@@ -87,6 +88,10 @@ const els = {
   savedItineraries: document.getElementById('savedItineraries'),
   editBtn: document.getElementById('editBtn'),
   apiBanner: document.getElementById('apiBanner'),
+  planningModeBtn: document.getElementById('planningModeBtn'),
+  executionModeBtn: document.getElementById('executionModeBtn'),
+  executionModeView: document.getElementById('executionModeView'),
+  executionModeList: document.getElementById('executionModeList'),
   preferencesLink: document.getElementById('preferencesLink'),
   prefsModal: document.getElementById('prefsModal'),
   prefsClose: document.getElementById('prefsClose'),
@@ -111,6 +116,7 @@ const els = {
 };
 
 const SNAPSHOT_KEY = 'travelplanner_snapshot';
+const VIEW_MODE_KEY = 'travelplanner_view_mode_v1';
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s='') => s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalizeCity = (str = '') => String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -3051,6 +3057,76 @@ function renderItinerary() {
       : '';
     return `<section class="day-col"><div class="day-head">${d.date} • ${esc(d.city)}</div><div class="list">${accommodationInfo}${items || '<em>No activities assigned.</em>'}</div></section>`;
   }).join('');
+
+  renderExecutionMode();
+}
+
+function getExecutionRows() {
+  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
+  return approved
+    .map((activity) => {
+      const placement = state.placements[activity.id] || {};
+      const day = state.days.find((d) => d.id === placement.dayId);
+      if (!day) return null;
+
+      const time = placement.time || parseTimeTo24(activity.suggested_time || typeToTime(activity.type));
+      const place = String(activity.start_location || activity.end_location || activity.city || '').trim();
+      const note = String(activity.why_it_fits || activity.type || '').trim();
+      const locationQuery = place || `${activity.name} ${activity.city || ''}`;
+      const navigateHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`;
+      const phone = String(activity.phone || activity.phone_number || activity.contact_phone || '').trim();
+
+      return {
+        id: activity.id,
+        date: day.date,
+        city: day.city,
+        time,
+        title: activity.name,
+        place,
+        note,
+        navigateHref,
+        callHref: phone ? `tel:${phone}` : ''
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const aKey = `${a.date}T${parseTimeTo24(a.time)}`;
+      const bKey = `${b.date}T${parseTimeTo24(b.time)}`;
+      return new Date(aKey).getTime() - new Date(bKey).getTime();
+    });
+}
+
+function renderExecutionMode() {
+  if (!els.executionModeList) return;
+  const rows = getExecutionRows();
+
+  if (!rows.length) {
+    els.executionModeList.innerHTML = '<p class="muted-text">No scheduled itinerary yet. Build your plan in Planning Mode first.</p>';
+    return;
+  }
+
+  els.executionModeList.innerHTML = rows.map((row) => `
+    <article class="execution-item">
+      <div class="execution-time">${esc(row.time)} • ${esc(row.date)}</div>
+      <div class="execution-place">${esc(row.title)}${row.place ? ` — ${esc(row.place)}` : ''}</div>
+      <p class="execution-note">${esc(row.note || 'No note')}</p>
+      <p class="execution-meta">${esc(row.city)}</p>
+      <div class="execution-actions">
+        <a href="${esc(row.navigateHref)}" target="_blank" rel="noopener noreferrer">🧭 Navigate</a>
+        ${row.callHref ? `<a href="${esc(row.callHref)}">📞 Call</a>` : '<button type="button" disabled>📞 Call</button>'}
+      </div>
+    </article>
+  `).join('');
+}
+
+function setViewMode(mode = 'planning') {
+  const resolved = mode === 'execution' ? 'execution' : 'planning';
+  state.viewMode = resolved;
+  localStorage.setItem(VIEW_MODE_KEY, resolved);
+  document.body.classList.toggle('execution-mode', resolved === 'execution');
+  if (els.planningModeBtn) els.planningModeBtn.classList.toggle('active', resolved === 'planning');
+  if (els.executionModeBtn) els.executionModeBtn.classList.toggle('active', resolved === 'execution');
+  if (resolved === 'execution') renderExecutionMode();
 }
 
 async function fetchSavedItineraries() {
@@ -3681,6 +3757,8 @@ els.downloadCalendarBtn?.addEventListener('click', () => {
   if (!state.currentItineraryId) return;
   window.open(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/calendar.ics`, '_blank');
 });
+els.planningModeBtn?.addEventListener('click', () => setViewMode('planning'));
+els.executionModeBtn?.addEventListener('click', () => setViewMode('execution'));
 els.preferencesLink.addEventListener('click', openPreferencesModal);
 els.prefsClose.addEventListener('click', closePreferencesModal);
 els.prefsModal.addEventListener('click', (e) => {
@@ -3779,5 +3857,6 @@ document.querySelectorAll('[data-nav-back]').forEach((btn) => {
   await fetchArrangeConfig();
   await fetchSavedItineraries();
   renderSavedItineraries();
+  setViewMode(localStorage.getItem(VIEW_MODE_KEY) === 'execution' ? 'execution' : 'planning');
   maybePromptSnapshot();
 })();
