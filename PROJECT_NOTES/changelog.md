@@ -4,6 +4,24 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-07] Evolving context window for concierge chatbot
+
+- `getTripContext()` now sends profile, tripName, itineraryId, and scheduledByDay (day-by-day activity placements with times/locations)
+- `buildChatSystemPrompt()` refactored into focused helpers (`formatCityLine`, `formatScheduleBlock`, `formatProfileBlock`) and renders structured sections
+- Chat endpoint loads user's learned preferences server-side via `getPreferenceSummary()` — chatbot always knows traveler tastes
+- Per-trip chat sessions: `ensureChatSessionId()` uses a `chat_sessions` localStorage map keyed by itinerary ID
+- Loading a saved itinerary restores its associated chat session and history
+- Saving an itinerary binds the current chat session to the new itinerary ID
+- Files: `public/app.js`, `src/server.js`
+
+## [2026-04-07] Replace hard-coded Auto Arrange scheduler with LLM call
+
+- Deleted heuristic scheduling loop (opening hours windows, cursor tracking, category guards)
+- New `POST /api/arrange` endpoint sends days (with availability windows) + activities to claude-haiku-4-5 and returns `{ placements, unplaced }`
+- Frontend maps returned `{ date, time }` placements back to `{ dayId, time }` using activeDays
+- Button shows "Arranging…" and disables during the call
+- Files: `src/server.js`, `public/app.js`
+
 ## [2026-04-07] Trigger fresh plan generation when step 1 data changes
 
 - Added `step1Fingerprint()` — JSON snapshot of `state.cities` + `state.travels`

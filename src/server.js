@@ -8,6 +8,7 @@ const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('./arrangeConfig');
 const {
   recordSignal,
   load: loadPreferences,
+  getSummary: getPreferenceSummary,
   reset: resetPreferences,
   resolveUserId,
   DEFAULT_USER_ID
@@ -480,22 +481,41 @@ function parseUserId(rawUserId) {
   return resolveUserId(rawUserId == null ? DEFAULT_USER_ID : rawUserId);
 }
 
-function buildChatSystemPrompt(tripContext = {}) {
+function formatCityLine(city) {
+  const accomList = Array.isArray(city.accommodations) && city.accommodations.length
+    ? city.accommodations.map((a) => {
+      const coords = (Number.isFinite(Number(a.latitude)) && Number.isFinite(Number(a.longitude)))
+        ? ` [${Number(a.latitude)}, ${Number(a.longitude)}]`
+        : '';
+      return `${a.address || 'Address missing'}${coords} (${a.checkIn || '?'} → ${a.checkOut || '?'})`;
+    }).join('; ')
+    : 'No accommodations listed';
+  return `${city.name} (${city.startDate} → ${city.endDate}) | Leaving at ${city.leaveTime || '18:00'} | Accommodations: ${accomList}`;
+}
+
+function formatScheduleBlock(scheduledByDay) {
+  if (!Array.isArray(scheduledByDay) || !scheduledByDay.length) return '';
+  const lines = scheduledByDay.map((day) => {
+    const acts = day.activities.map((a) => `  - ${a.time || '?'} ${a.name} (${a.type}, ${a.duration || '?'})${a.location ? ' @ ' + a.location : ''}`);
+    return `${day.date} — ${day.city}\n${acts.join('\n')}`;
+  });
+  return `\n\n## Scheduled Itinerary\n${lines.join('\n')}`;
+}
+
+function formatProfileBlock(profile, prefSummary) {
+  const parts = [];
+  if (prefSummary) parts.push(prefSummary);
+  else if (profile?.aboutMe) parts.push(`About me: ${profile.aboutMe}`);
+  if (!parts.length) return '';
+  return `\n\n## Traveler Profile\n${parts.join('\n')}`;
+}
+
+function buildChatSystemPrompt(tripContext = {}, prefSummary = '') {
   const cities = Array.isArray(tripContext.cities) && tripContext.cities.length
-    ? tripContext.cities.map((city) => {
-      const accommodations = Array.isArray(city.accommodations) && city.accommodations.length
-        ? city.accommodations.map((accommodation) => {
-          const coords = (Number.isFinite(Number(accommodation.latitude)) && Number.isFinite(Number(accommodation.longitude)))
-            ? ` [${Number(accommodation.latitude)}, ${Number(accommodation.longitude)}]`
-            : '';
-          return `${accommodation.address || 'Address missing'}${coords} (${accommodation.checkIn || '?'} → ${accommodation.checkOut || '?'})`;
-        }).join('; ')
-        : 'No accommodations listed';
-      return `${city.name} (${city.startDate} → ${city.endDate}) | User leaving ${city.name} on ${city.endDate || '?'} at ${city.leaveTime || '18:00'} | Accommodations: ${accommodations}`;
-    }).join(' | ')
+    ? tripContext.cities.map(formatCityLine).join('\n')
     : 'None yet';
   const travels = Array.isArray(tripContext.travels) && tripContext.travels.length
-    ? tripContext.travels.slice(0, 1).map((travel) => `Entry point: ${travel.entryPoint || '?'} at ${travel.dateTime || '?'}`).join(' | ')
+    ? tripContext.travels.slice(0, 1).map((t) => `Entry: ${t.entryPoint || '?'} at ${t.dateTime || '?'}`).join(', ')
     : 'None yet';
   const approved = Array.isArray(tripContext.approvedActivities) && tripContext.approvedActivities.length
     ? tripContext.approvedActivities.join(', ')
@@ -504,7 +524,14 @@ function buildChatSystemPrompt(tripContext = {}) {
     ? tripContext.declinedActivities.join(', ')
     : 'None yet';
 
-  return `You are a concise, opinionated travel advisor helping plan a trip. You have full context of the user's itinerary and preferences. Answer questions directly in 2-4 sentences. Be honest about downsides. Remember everything discussed in this conversation.\n\nCurrent trip context:\n- Cities: ${cities}\n- Travel entry: ${travels}\n- Current planning step: ${tripContext.step ?? 'Unknown'}\n- Approved activities: ${approved}\n- Declined activities: ${declined}`;
+  const base = `You are a concise, opinionated travel advisor. You have full context of this trip — dates, accommodations, scheduled activities, and the traveler's preferences. Answer in 2-4 sentences. Be honest about downsides. Tailor suggestions to the traveler's dates, location, and tastes.`;
+
+  const tripBlock = `\n\n## Trip: ${tripContext.tripName || 'Untitled'}\n- Cities:\n${cities}\n- Travel entry: ${travels}\n- Planning step: ${tripContext.step ?? 'Unknown'}\n- Approved: ${approved}\n- Declined: ${declined}`;
+
+  const scheduleBlock = formatScheduleBlock(tripContext.scheduledByDay);
+  const profileBlock = formatProfileBlock(tripContext.profile, prefSummary);
+
+  return base + profileBlock + tripBlock + scheduleBlock;
 }
 
 function toAnthropicMessages(history = []) {
@@ -842,7 +869,7 @@ app.post('/api/profile/enrich', async (req, res) => {
 });
 
 app.post('/api/chat/message', async (req, res) => {
-  const { sessionId, message, tripContext } = req.body || {};
+  const { sessionId, message, tripContext, userId: rawUserId } = req.body || {};
   if (!sessionId || !message || typeof message !== 'string') {
     return res.status(400).json({ error: 'sessionId and message are required' });
   }
@@ -850,6 +877,9 @@ app.post('/api/chat/message', async (req, res) => {
   if (!process.env.ANTHROPIC_API_KEY) {
     return res.status(503).json({ error: 'Anthropic API key not configured for chat.' });
   }
+
+  const userId = safeUserId(rawUserId);
+  const prefSummary = getPreferenceSummary(tripContext?.profile || null, userId);
 
   getSession(sessionId);
   setTripContext(sessionId, tripContext || {});
@@ -860,7 +890,7 @@ app.post('/api/chat/message', async (req, res) => {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 220,
-      system: buildChatSystemPrompt(tripContext || {}),
+      system: buildChatSystemPrompt(tripContext || {}, prefSummary),
       messages: toAnthropicMessages(getHistory(sessionId))
     });
 

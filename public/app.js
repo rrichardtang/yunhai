@@ -3163,6 +3163,8 @@ async function loadItineraryById(id) {
     renderItinerary();
     await fetchSavedItineraries();
     renderSavedItineraries();
+    ensureChatSessionId();
+    await restoreChatHistory();
     setStep(4);
   } catch {
     showToast('Could not load itinerary.', 'error');
@@ -3308,6 +3310,11 @@ async function generateItinerary() {
   const data = await res.json();
   state.itinerary = data.itinerary;
   state.currentItineraryId = data?.itinerary?.id || null;
+  if (state.currentItineraryId && state.chatSessionId) {
+    const map = loadChatSessionMap();
+    map[state.currentItineraryId] = state.chatSessionId;
+    saveChatSessionMap(map);
+  }
   if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = !state.currentItineraryId;
   renderItinerary();
   await fetchSavedItineraries();
@@ -3315,18 +3322,51 @@ async function generateItinerary() {
   setStep(4);
 }
 
+function buildScheduledDays() {
+  return state.days.map((d) => ({
+    date: d.date,
+    city: d.city,
+    activities: state.activities
+      .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === d.id)
+      .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)))
+      .map((a) => ({ name: a.name, type: a.type, time: state.placements[a.id]?.time, duration: a.duration, location: a.start_location }))
+  })).filter((d) => d.activities.length);
+}
+
 function getTripContext() {
   syncLegacyTravelsFromCities();
   return {
     step: state.step,
+    tripName: state.tripName,
     cities: state.cities,
     travels: state.travels,
+    itineraryId: state.currentItineraryId || null,
+    profile: state.profile || null,
     approvedActivities: state.activities.filter((a) => state.reviewed[a.id]?.approved).map((a) => a.name),
-    declinedActivities: state.activities.filter((a) => state.reviewed[a.id]?.approved === false).map((a) => a.name)
+    declinedActivities: state.activities.filter((a) => state.reviewed[a.id]?.approved === false).map((a) => a.name),
+    scheduledByDay: buildScheduledDays()
   };
 }
 
+function loadChatSessionMap() {
+  try { return JSON.parse(localStorage.getItem('chat_sessions') || '{}'); } catch { return {}; }
+}
+
+function saveChatSessionMap(map) {
+  localStorage.setItem('chat_sessions', JSON.stringify(map));
+}
+
 function ensureChatSessionId() {
+  const itineraryId = state.currentItineraryId;
+  if (itineraryId) {
+    const map = loadChatSessionMap();
+    if (!map[itineraryId]) {
+      map[itineraryId] = crypto.randomUUID();
+      saveChatSessionMap(map);
+    }
+    state.chatSessionId = map[itineraryId];
+    return state.chatSessionId;
+  }
   const existing = localStorage.getItem('chat_session_id');
   state.chatSessionId = existing || crypto.randomUUID();
   if (!existing) localStorage.setItem('chat_session_id', state.chatSessionId);
@@ -3380,7 +3420,8 @@ async function sendChatMessage() {
       body: JSON.stringify({
         sessionId: ensureChatSessionId(),
         message,
-        tripContext: getTripContext()
+        tripContext: getTripContext(),
+        userId: ensureUserId()
       })
     });
     const data = await res.json();
@@ -3402,7 +3443,7 @@ async function sendChatMessage() {
 }
 
 async function resetChatSession() {
-  const existing = localStorage.getItem('chat_session_id');
+  const existing = state.chatSessionId || localStorage.getItem('chat_session_id');
   if (existing) {
     try { await fetch(`/api/chat/session/${encodeURIComponent(existing)}`, { method: 'DELETE' }); } catch {}
   }
@@ -3410,6 +3451,7 @@ async function resetChatSession() {
   const nextSessionId = crypto.randomUUID();
   localStorage.setItem('chat_session_id', nextSessionId);
   state.chatSessionId = nextSessionId;
+  state.currentItineraryId = null;
   state.chatHistory = [];
   state.chatLoading = false;
   renderChatMessages();

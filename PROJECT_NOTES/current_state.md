@@ -6,7 +6,7 @@ _Last updated: 2026-04-07_
 Continue local development of TravelPlanner and push changes to git for VPS deployment.
 
 ## Active Workstream
-Step 1 dirty-check for plan regeneration — pushed to main, awaiting VPS test results.
+Concierge chatbot evolving context window — awaiting VPS test.
 
 ## Constraints
 - Local development, testing on VPS at https://travelplanner.srv1553531.hstgr.cloud/planner.html
@@ -14,10 +14,9 @@ Step 1 dirty-check for plan regeneration — pushed to main, awaiting VPS test r
 - No .env file locally — user only edits frontend files
 
 ## Risks
-- Auto Arrange meal fix not yet verified on VPS
-- `travelTiming` server changes require Google Maps API key to be active on VPS to have effect
-- Step 1 fingerprint uses full JSON of `state.cities` + `state.travels` — any field change (even cosmetic) triggers regeneration
+- Chat system prompt is now larger (profile + schedule) — monitor token usage on Haiku
+- Per-trip chat session map in localStorage could grow if user creates many itineraries
 
 ## Next Actions
-- Test on VPS: edit a city after planning and confirm Next triggers fresh generation
-- Test on VPS: press Next without changes and confirm it skips straight to step 2
+- Push to main and test concierge chatbot on VPS with a real trip
+- Verify chat session switches correctly when loading different saved itineraries
