@@ -878,7 +878,7 @@ app.post('/api/chat/message', async (req, res) => {
     return res.status(503).json({ error: 'Anthropic API key not configured for chat.' });
   }
 
-  const userId = safeUserId(rawUserId);
+  const userId = parseUserId(rawUserId);
   const prefSummary = getPreferenceSummary(tripContext?.profile || null, userId);
 
   getSession(sessionId);
