@@ -2714,70 +2714,72 @@ async function autoArrangeActiveCity() {
   if (hasExistingPlacements && !window.confirm('This will replace your current arrangement. Continue?')) return;
 
   const cityPlan = state.cities.find((c) => cityMatches(c.name, activeCity));
-  const arrivalDay = activeDays.find((d) => d.date === cityPlan?.startDate) || activeDays[0];
-  const departureDay = activeDays.find((d) => d.date === cityPlan?.endDate) || activeDays[activeDays.length - 1];
-  const arrivalMinutes = getCityDayWindowStart(cityPlan, arrivalDay?.date);
-  const departureMinutes = getCityDayWindowEnd(cityPlan, departureDay?.date);
 
-  const dayWindows = activeDays.reduce((acc, day) => {
-    const dayStart = getCityDayWindowStart(cityPlan, day.date);
-    const dayEnd = getCityDayWindowEnd(cityPlan, day.date);
-    acc[day.id] = { start: dayStart, end: dayEnd, cursor: dayStart, date: day.date };
-    return acc;
-  }, {});
+  const dayPayload = activeDays.map((day) => {
+    const startMins = getCityDayWindowStart(cityPlan, day.date);
+    const endMins = getCityDayWindowEnd(cityPlan, day.date);
+    const isArrival = day.date === cityPlan?.startDate;
+    const isDeparture = day.date === cityPlan?.endDate;
+    const label = isArrival && isDeparture ? 'arrival + departure day'
+      : isArrival ? 'arrival day'
+      : isDeparture ? 'departure day'
+      : 'full day';
+    return { date: day.date, label, windowStart: timeFromMinutes(startMins), windowEnd: timeFromMinutes(endMins) };
+  });
 
   approvedInCity.forEach((a) => {
     state.activities = state.activities.map((current) => (current.id === a.id ? a : current));
-    state.placements[a.id] = { ...(state.placements[a.id] || {}), dayId: null, time: parseTimeTo24(a.suggested_time || typeToTime(a.type)) };
+    state.placements[a.id] = { ...(state.placements[a.id] || {}), dayId: null, time: null };
   });
 
-  const diagnostics = [];
-  const arrivalActivities = approvedInCity.filter((a) => a.category === 'arrival' || /\b(arrival|arrive)\b/i.test(a.name || ''));
-  const departureActivities = approvedInCity.filter((a) => a.category === 'departure' || /\b(depart|departure)\b/i.test(a.name || ''));
-  const regularActivities = approvedInCity
-    .filter((a) => !arrivalActivities.some((x) => x.id === a.id) && !departureActivities.some((x) => x.id === a.id))
-    .sort((a, b) => minutesFromTime(parseTimeTo24(a.suggested_time || typeToTime(a.type))) - minutesFromTime(parseTimeTo24(b.suggested_time || typeToTime(b.type))));
+  els.autoArrangeBtn.disabled = true;
+  els.autoArrangeBtn.textContent = 'Arranging…';
 
-  arrivalActivities.forEach((activity) => {
-    const start = Math.max(dayWindows[arrivalDay.id].start, minutesFromTime(parseTimeTo24(activity.suggested_time || '09:00')));
-    state.placements[activity.id] = { dayId: arrivalDay.id, time: timeFromMinutes(start) };
-  });
+  try {
+    const res = await fetch('/api/arrange', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        days: dayPayload,
+        activities: approvedInCity.map((a) => ({
+          id: a.id,
+          name: a.name,
+          category: a.category,
+          duration_hours: a.duration_hours,
+          opening_hours: a.opening_hours,
+          suggested_time: a.suggested_time
+        }))
+      })
+    });
 
-  departureActivities.forEach((activity) => {
-    state.placements[activity.id] = { dayId: departureDay.id, time: timeFromMinutes(Math.max(dayWindows[departureDay.id].start, departureMinutes - Math.max(30, Number(activity.duration_hours || 1) * 60))) };
-  });
+    if (!res.ok) throw new Error('Arrange request failed');
+    const { placements, unplaced = [] } = await res.json();
 
-  for (const activity of regularActivities) {
-    const durationMinutes = Math.max(30, Number(activity.duration_hours || 1) * 60);
-    const windows = parseOpeningWindows(activity.opening_hours);
-    let placed = false;
-
-    for (const day of activeDays) {
-      const bounds = dayWindows[day.id];
-      const dayStart = Math.max(bounds.start, bounds.cursor);
-      const dayEnd = bounds.end;
-      for (const [openStart, openEnd] of windows.length ? windows : [[bounds.start, bounds.end]]) {
-        // Skip this window if it has already closed by the time this day's window opens
-        if (openEnd <= dayStart) continue;
-        const candidateStart = Math.max(dayStart, openStart);
-        const candidateEnd = candidateStart + durationMinutes;
-        if (candidateEnd <= Math.min(dayEnd, openEnd)) {
-          state.placements[activity.id] = { dayId: day.id, time: timeFromMinutes(candidateStart) };
-          bounds.cursor = candidateEnd;
-          placed = true;
-          diagnostics.push(`${activity.name}: placed ${timeFromMinutes(candidateStart)} in ${day.city} (${activity.category}, ${activity.opening_hours || 'default hours'}).`);
-          break;
-        }
-      }
-      if (placed) break;
+    const dateToDay = Object.fromEntries(activeDays.map((d) => [d.date, d]));
+    for (const [id, placement] of Object.entries(placements || {})) {
+      const day = dateToDay[placement.date];
+      if (day) state.placements[id] = { dayId: day.id, time: placement.time };
     }
 
-    if (!placed) {
-      diagnostics.push(`${activity.name}: could not fit (${durationMinutes} min). Reason: insufficient time window or opening-hours conflict.`);
-    }
+    const diagnostics = [
+      ...Object.entries(placements || {}).map(([id, p]) => {
+        const a = approvedInCity.find((x) => x.id === id);
+        return a ? `${a.name}: placed ${p.time} on ${p.date}` : null;
+      }).filter(Boolean),
+      ...unplaced.map((u) => {
+        const a = approvedInCity.find((x) => x.id === u.id);
+        return a ? `${a.name}: unplaced — ${u.reason}` : null;
+      }).filter(Boolean)
+    ];
+
+    state.arrangeDiagnostics[activeCity] = diagnostics;
+  } catch (e) {
+    showToast(e?.message || 'Failed to arrange activities.', 'error');
+  } finally {
+    els.autoArrangeBtn.disabled = false;
+    els.autoArrangeBtn.textContent = 'Auto Arrange';
   }
 
-  state.arrangeDiagnostics[activeCity] = diagnostics;
   const activeDayIds = activeDays.map((d) => d.id);
   await updateCommutesForCityDays(activeDayIds);
   renderArrange();

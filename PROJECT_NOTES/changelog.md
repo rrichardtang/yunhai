@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-07] Trigger fresh plan generation when step 1 data changes
+
+- Added `step1Fingerprint()` — JSON snapshot of `state.cities` + `state.travels`
+- Stored as `state.lastPlannedFingerprint` after each successful `planTrip()` run
+- `goToNextStep` now compares current fingerprint against stored one — forces regeneration if changed, skips to step 2 if unchanged
+- Files: `public/app.js`
+
 ## [2026-04-07] Overhaul Auto Arrange logic
 
 - Fixed meal scheduling: meal categories (breakfast, lunch, dinner, nightlife, sunset) now always use category-default opening hours, overriding Claude's generated values — prevents breakfast being placed at 4pm on arrival days

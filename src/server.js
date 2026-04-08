@@ -625,6 +625,70 @@ app.get('/api/arrange-config', (_req, res) => {
   res.json({ categoryDefaults: DEFAULT_ACTIVITY_CATEGORY_CONFIG });
 });
 
+app.post('/api/arrange', async (req, res) => {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: 'Anthropic API key not configured' });
+  }
+
+  const { days, activities } = req.body || {};
+  if (!Array.isArray(days) || !Array.isArray(activities)) {
+    return res.status(400).json({ error: 'days and activities are required arrays' });
+  }
+
+  const daysText = days.map((d) =>
+    `- ${d.date} (${d.label}): available ${d.windowStart} – ${d.windowEnd}`
+  ).join('\n');
+
+  const activitiesText = activities.map((a) =>
+    `- id:${a.id} | "${a.name}" | category:${a.category} | duration:${a.duration_hours}h | opening_hours:${a.opening_hours || 'flexible'} | suggested_time:${a.suggested_time || 'flexible'}`
+  ).join('\n');
+
+  const prompt = `You are scheduling activities for a trip. Assign each activity to a specific date and start time that respects all constraints.
+
+DAYS (date: available window):
+${daysText}
+
+ACTIVITIES TO SCHEDULE:
+${activitiesText}
+
+RULES:
+- Each activity must be placed within its day's available window (windowStart to windowEnd).
+- Respect opening_hours — do not place an activity outside its opening window.
+- Spread activities sensibly across all days — do not pile everything on one day.
+- Meals (breakfast, lunch, dinner) must be placed at realistic meal times. Never schedule breakfast in the afternoon.
+- Activities should not overlap — account for duration when sequencing on the same day.
+- Prefer the suggested_time where it fits within constraints.
+- If an activity cannot be placed on any day, include it in unplaced with a reason.
+
+Respond ONLY with valid JSON in exactly this shape:
+{
+  "placements": {
+    "<activity id>": { "date": "YYYY-MM-DD", "time": "HH:MM" }
+  },
+  "unplaced": [
+    { "id": "<activity id>", "reason": "..." }
+  ]
+}`;
+
+  try {
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    const raw = extractText(response.content);
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return res.status(500).json({ error: 'Failed to parse arrangement' });
+
+    const result = JSON.parse(jsonMatch[0]);
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Failed to arrange activities' });
+  }
+});
+
 app.post('/api/plan', async (req, res) => {
   const { cities, travels, profile, userId } = req.body || {};
   if (!Array.isArray(cities) || cities.length === 0) {

@@ -6,7 +6,7 @@ _Last updated: 2026-04-07_
 Continue local development of TravelPlanner and push changes to git for VPS deployment.
 
 ## Active Workstream
-Auto Arrange overhaul — pushed to main, awaiting VPS test results.
+Step 1 dirty-check for plan regeneration — pushed to main, awaiting VPS test results.
 
 ## Constraints
 - Local development, testing on VPS at https://travelplanner.srv1553531.hstgr.cloud/planner.html
@@ -14,9 +14,10 @@ Auto Arrange overhaul — pushed to main, awaiting VPS test results.
 - No .env file locally — user only edits frontend files
 
 ## Risks
-- Auto Arrange meal fix not yet verified on VPS — breakfast-at-4pm bug may still surface if activity `opening_hours` from Claude doesn't match expected format
+- Auto Arrange meal fix not yet verified on VPS
 - `travelTiming` server changes require Google Maps API key to be active on VPS to have effect
+- Step 1 fingerprint uses full JSON of `state.cities` + `state.travels` — any field change (even cosmetic) triggers regeneration
 
 ## Next Actions
-- Test Auto Arrange on VPS with a 4pm arrival day — confirm breakfast defers to next morning
-- Verify `travelTiming.arrivalAvailableTime` reflects accommodation travel time for all cities
+- Test on VPS: edit a city after planning and confirm Next triggers fresh generation
+- Test on VPS: press Next without changes and confirm it skips straight to step 2
