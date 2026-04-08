@@ -659,6 +659,7 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .prefs-divider { border: 0; border-top: 1px solid #e5eaf2; margin: 18px 0; }
 .profile-section h4 { margin: 0 0 12px; }
 .profile-label { margin-bottom: 8px; }
+.ai-summary-hint { margin: 0 0 8px; font-size: 0.85rem; color: #6b7a90; }
 .profile-selector-row {
   display: flex;
   align-items: center;

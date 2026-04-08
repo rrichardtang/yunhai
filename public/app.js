@@ -101,6 +101,8 @@ const els = {
   deleteProfileBtn: document.getElementById('deleteProfileBtn'),
   profileQuestions: document.getElementById('profileQuestions'),
   profileTravelNotes: document.getElementById('profileTravelNotes'),
+  profileAiSummary: document.getElementById('profileAiSummary'),
+  aiSummarySection: document.getElementById('aiSummarySection'),
   profileEditBtn: document.getElementById('profileEditBtn'),
   saveProgressBtn: document.getElementById('saveProgressBtn'),
   autoArrangeBtn: document.getElementById('autoArrangeBtn'),
@@ -1514,6 +1516,16 @@ function renderPreferencesModal() {
   els.profileTravelNotes.disabled = false;
   els.profileEditBtn.textContent = 'Save';
 
+  if (els.aiSummarySection && els.profileAiSummary) {
+    const instruction = profile.profileInstruction || '';
+    if (instruction) {
+      els.profileAiSummary.value = instruction;
+      els.aiSummarySection.classList.remove('hidden');
+    } else {
+      els.aiSummarySection.classList.add('hidden');
+    }
+  }
+
   els.profileQuestions.querySelectorAll('[data-rating]').forEach((slider) => {
     slider.addEventListener('input', () => {
       const key = slider.closest('.profile-question')?.dataset.question;
@@ -1537,9 +1549,11 @@ function renderPreferencesModal() {
 
 function getProfilePayload() {
   const aboutMeValue = els.profileTravelNotes ? els.profileTravelNotes.value : (state.profile?.aboutMe ?? '');
+  const aiSummaryValue = els.profileAiSummary ? els.profileAiSummary.value : (state.profile?.profileInstruction ?? '');
   return normalizeProfile({
     ...(state.profile || defaultProfile()),
-    aboutMe: aboutMeValue
+    aboutMe: aboutMeValue,
+    profileInstruction: aiSummaryValue
   });
 }
 
@@ -2767,18 +2781,10 @@ async function autoArrangeActiveCity() {
       if (day) state.placements[id] = { dayId: day.id, time: placement.time };
     }
 
-    const diagnostics = [
-      ...Object.entries(placements || {}).map(([id, p]) => {
-        const a = approvedInCity.find((x) => x.id === id);
-        return a ? `${a.name}: placed ${p.time} on ${p.date}` : null;
-      }).filter(Boolean),
-      ...unplaced.map((u) => {
-        const a = approvedInCity.find((x) => x.id === u.id);
-        return a ? `${a.name}: unplaced — ${u.reason}` : null;
-      }).filter(Boolean)
-    ];
-
-    state.arrangeDiagnostics[activeCity] = diagnostics;
+    state.arrangeDiagnostics[activeCity] = unplaced.map((u) => {
+      const a = approvedInCity.find((x) => x.id === u.id);
+      return a ? `${a.name}: unplaced — ${u.reason}` : null;
+    }).filter(Boolean);
   } catch (e) {
     showToast(e?.message || 'Failed to arrange activities.', 'error');
   } finally {
@@ -3792,6 +3798,10 @@ els.profileEditBtn.addEventListener('click', async () => {
 
     if (res.ok && instruction) {
       saveProfile({ ...next, profileInstruction: instruction });
+      if (els.profileAiSummary && els.aiSummarySection) {
+        els.profileAiSummary.value = instruction;
+        els.aiSummarySection.classList.remove('hidden');
+      }
       showToast('Profile saved!', 'success');
     } else {
       console.warn('[profile enrich] missing instruction or non-ok response', {
