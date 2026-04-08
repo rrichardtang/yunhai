@@ -6,7 +6,7 @@ _Last updated: 2026-04-07_
 Continue local development of TravelPlanner and push changes to git for VPS deployment.
 
 ## Active Workstream
-Trip Setup UI improvements — complete. All Google Places inputs working for city, accommodation, arrival, and departure.
+Auto Arrange overhaul — pushed to main, awaiting VPS test results.
 
 ## Constraints
 - Local development, testing on VPS at https://travelplanner.srv1553531.hstgr.cloud/planner.html
@@ -14,8 +14,9 @@ Trip Setup UI improvements — complete. All Google Places inputs working for ci
 - No .env file locally — user only edits frontend files
 
 ## Risks
-- New arrival/departure location fields added to `city.logistics` but backend may not consume them yet
-- `city.travelEntry` (first city only) still exists separately from `city.logistics.arrival` — may need reconciliation
+- Auto Arrange meal fix not yet verified on VPS — breakfast-at-4pm bug may still surface if activity `opening_hours` from Claude doesn't match expected format
+- `travelTiming` server changes require Google Maps API key to be active on VPS to have effect
 
 ## Next Actions
-- Await next feature request
+- Test Auto Arrange on VPS with a 4pm arrival day — confirm breakfast defers to next morning
+- Verify `travelTiming.arrivalAvailableTime` reflects accommodation travel time for all cities

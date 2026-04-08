@@ -27,7 +27,8 @@ const state = {
     verdict: ''
   },
   arrangeConfig: null,
-  arrangeDiagnostics: {}
+  arrangeDiagnostics: {},
+  lastPlannedFingerprint: null
 };
 
 const PROFILES_KEY = 'travelplanner_profiles_v1';
@@ -905,8 +906,9 @@ async function goToNextStep(fromStep = state.step) {
 
     const hasExistingActivities = Array.isArray(state.activities) && state.activities.length > 0;
     const hasReviewedState = state.reviewed && typeof state.reviewed === 'object';
+    const step1Changed = state.lastPlannedFingerprint && state.lastPlannedFingerprint !== step1Fingerprint();
 
-    if (hasExistingActivities && hasReviewedState) {
+    if (hasExistingActivities && hasReviewedState && !step1Changed) {
       setStep(2);
       return;
     }
@@ -3271,6 +3273,7 @@ async function planTrip() {
     }
   }
 
+  state.lastPlannedFingerprint = step1Fingerprint();
   setStep(2);
 }
 
@@ -3452,6 +3455,10 @@ function getSnapshot() {
   } catch {
     return null;
   }
+}
+
+function step1Fingerprint() {
+  return JSON.stringify({ cities: state.cities, travels: state.travels });
 }
 
 function clearSnapshot() {
