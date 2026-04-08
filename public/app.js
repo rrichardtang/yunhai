@@ -3239,6 +3239,7 @@ async function planTrip() {
       });
 
       state.activities.push(...cityActivities);
+      setStep(2);
       renderActivities();
 
       completedCities += 1;
@@ -3253,7 +3254,6 @@ async function planTrip() {
       } else {
         updatePlanningStatus(`Got ${cityActivities.length} activities for ${evt.city}!`, progress);
       }
-      setStep(2);
     }
 
     if (evt.type === 'done') {
