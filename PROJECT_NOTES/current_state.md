@@ -6,7 +6,7 @@ _Last updated: 2026-04-07_
 Continue local development of TravelPlanner and push changes to git for VPS deployment.
 
 ## Active Workstream
-Concierge chatbot evolving context window — awaiting VPS test.
+Chat-driven preference learning and profile distillation — awaiting VPS test.
 
 ## Constraints
 - Local development, testing on VPS at https://travelplanner.srv1553531.hstgr.cloud/planner.html
@@ -14,9 +14,10 @@ Concierge chatbot evolving context window — awaiting VPS test.
 - No .env file locally — user only edits frontend files
 
 ## Risks
-- Chat system prompt is now larger (profile + schedule) — monitor token usage on Haiku
-- Per-trip chat session map in localStorage could grow if user creates many itineraries
+- Haiku must reliably return JSON from chat — fallback to raw text if it doesn't
+- Distillation quality depends on signal volume — first few distillations may be thin
 
 ## Next Actions
-- Push to main and test concierge chatbot on VPS with a real trip
-- Verify chat session switches correctly when loading different saved itineraries
+- Test chat preference extraction on VPS (tell chatbot a preference, verify it appears in user JSON)
+- Test distillation fires after 10 signals and produces a coherent profile paragraph
+- Verify distilled profile flows into future chat and planning prompts

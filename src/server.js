@@ -7,6 +7,9 @@ const { fetchUnsplashImage } = require('./unsplash');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('./arrangeConfig');
 const {
   recordSignal,
+  recordConstraint,
+  needsDistillation,
+  distill: distillProfile,
   load: loadPreferences,
   getSummary: getPreferenceSummary,
   reset: resetPreferences,
@@ -510,12 +513,43 @@ function buildChatSystemPrompt(tripContext = {}, prefSummary = '') {
     if (approved) activityLines = `\n- Approved: ${approved}`;
   }
 
-  const base = 'You are a concise, opinionated travel advisor. You know this trip\'s dates, accommodations, scheduled activities, and the traveler\'s preferences. Answer in 2-4 sentences. Be honest about downsides. Tailor suggestions to the dates, location, and tastes.';
+  const base = `You are a concise, opinionated travel advisor. You know this trip's dates, accommodations, scheduled activities, and the traveler's preferences. Answer in 2-4 sentences. Be honest about downsides. Tailor suggestions to the dates, location, and tastes.
+
+Respond ONLY with valid JSON: {"reply":"your response","signals":[]}
+The "signals" array captures any travel preferences or constraints the user reveals. Each signal is one of:
+- Activity preference: {"type":"walk","verdict":"approved"} or {"type":"museum","verdict":"declined"}
+- Constraint: {"constraint":"no activities before 9am"}
+Only include signals when the user clearly states a preference. Omit the array or leave it empty otherwise. Do NOT extract signals from your own suggestions.`;
   const profileBlock = prefSummary ? `\n\n## Traveler\n${prefSummary}` : '';
   const tripBlock = `\n\n## Trip: ${tripContext.tripName || 'Untitled'} (${tripContext.step || 'unknown'})\n${cities}${activityLines}`;
   const scheduleBlock = formatScheduleBlock(tripContext.scheduledByDay);
 
   return base + profileBlock + tripBlock + scheduleBlock;
+}
+
+function parseChatResponse(raw) {
+  const fallback = { reply: raw || 'Sorry, I couldn\'t process that.', signals: [] };
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.reply !== 'string') return fallback;
+    return { reply: parsed.reply, signals: Array.isArray(parsed.signals) ? parsed.signals : [] };
+  } catch {
+    return fallback;
+  }
+}
+
+function processChatSignals(signals, userId) {
+  if (!signals.length) return;
+  for (const sig of signals) {
+    if (sig.constraint) {
+      recordConstraint(userId, sig.constraint);
+    } else if (sig.type && sig.verdict) {
+      recordSignal({ userId, name: '', type: sig.type, verdict: sig.verdict, city: '', why_it_fits: '' });
+    }
+  }
+  if (needsDistillation(userId)) {
+    distillProfile(userId).catch((err) => console.error('[chat] distillation failed:', err.message));
+  }
 }
 
 function toAnthropicMessages(history = []) {
@@ -795,7 +829,11 @@ app.post('/api/commute', async (req, res) => {
 app.post('/api/preferences/signal', (req, res) => {
   try {
     const { userId, name, type, verdict, city, why_it_fits } = req.body || {};
-    recordSignal({ userId: parseUserId(userId), name, type, verdict, city, why_it_fits });
+    const resolvedUserId = parseUserId(userId);
+    recordSignal({ userId: resolvedUserId, name, type, verdict, city, why_it_fits });
+    if (needsDistillation(resolvedUserId)) {
+      distillProfile(resolvedUserId).catch((err) => console.error('[preferences] distillation failed:', err.message));
+    }
     return res.json({ ok: true });
   } catch (error) {
     return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid preferences signal payload' });
@@ -873,16 +911,19 @@ app.post('/api/chat/message', async (req, res) => {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
-      max_tokens: 220,
+      max_tokens: 300,
       system: getCachedPrompt(sessionId, tripContext || {}, () => buildChatSystemPrompt(tripContext || {}, prefSummary)),
       messages: toAnthropicMessages(getHistory(sessionId))
     });
 
-    const reply = (response.content || [])
+    const rawText = (response.content || [])
       .filter((c) => c.type === 'text')
       .map((c) => c.text)
       .join('\n')
-      .trim() || 'I would skip this unless it strongly matches your interests.';
+      .trim();
+
+    const { reply, signals } = parseChatResponse(rawText);
+    processChatSignals(signals, userId);
 
     addMessage(sessionId, 'assistant', reply);
     await compactHistory(sessionId);

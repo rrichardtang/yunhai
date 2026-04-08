@@ -9,6 +9,18 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Moved `setStep(2)` before `renderActivities()` in the streaming city event handler so `enrichImages` fires on the first city arrival instead of waiting for user interaction
 - File: `public/app.js`
 
+## [2026-04-07] Chat-driven preference learning with profile distillation
+
+- Concierge chatbot now returns structured JSON with optional preference signals extracted from user messages
+- New signal types: activity preferences (type + verdict) and freeform constraints ("no activities before 9am")
+- `recordConstraint()` stores deduplicated scheduling/preference constraints (max 20)
+- Profile distillation: every 10 new signals, Haiku synthesizes all data (existing profile + signals + constraints + self-reported answers) into a single evolving profile paragraph (max 1000 tokens)
+- After distillation, raw signals pruned to last 10, constraints absorbed into paragraph
+- `getSummary()` returns distilled profile as primary output, falls back to derived approach pre-distillation
+- Distillation triggered from both chat signals and activity approve/decline endpoint
+- `parseChatResponse()` handles JSON with graceful fallback to raw text
+- Files: src/preferences.js, src/server.js
+
 ## [2026-04-07] Optimize concierge context window for cost efficiency
 
 - Stripped getTripContext(): sends only city name/dates/leaveTime/accommodation addresses, drops raw objects, coordinates, IDs, UI state, travels array, raw profile
