@@ -2332,7 +2332,100 @@ function getLogisticsForDay(city, date) {
 
 function getAccommodationLabel(cityName, date) {
   const acc = getAccommodationForDay(cityName, date);
-  return String(acc?.address || '').trim() || 'Accommodation';
+  const raw = String(acc?.address || '').trim();
+  if (!raw) return 'Accommodation';
+  const short = raw.split(',')[0].trim();
+  return short || raw;
+}
+
+function logisticsArrivalId(cityName) {
+  return `logistics-arrival-${String(cityName || '').trim().toLowerCase().replace(/\s+/g, '-')}`;
+}
+
+function logisticsDepartureId(cityName) {
+  return `logistics-departure-${String(cityName || '').trim().toLowerCase().replace(/\s+/g, '-')}`;
+}
+
+function buildLogisticsPseudoActivities(cityObj, date, cityName) {
+  if (!cityObj) return { arrival: null, departure: null };
+  const logistics = cityObj.logistics || {};
+  const arrivalDate = String(logistics.arrival?.date || cityObj.startDate || '').slice(0, 10);
+  const departureDate = String(logistics.departure?.date || cityObj.endDate || '').slice(0, 10);
+  const dateStr = String(date || '').slice(0, 10);
+  const acc = getAccommodationForDay(cityName, date);
+  const accAddress = String(acc?.address || '').trim();
+  const accLat = normalizeCoordinate(acc?.latitude);
+  const accLng = normalizeCoordinate(acc?.longitude);
+
+  let arrival = null;
+  if (dateStr === arrivalDate) {
+    const arrLoc = String(logistics.arrival?.location || '').trim();
+    arrival = {
+      id: logisticsArrivalId(cityName),
+      name: 'Arrival → Accommodation',
+      city: cityName,
+      start_location: arrLoc,
+      start_latitude: normalizeCoordinate(logistics.arrival?.latitude),
+      start_longitude: normalizeCoordinate(logistics.arrival?.longitude),
+      end_location: accAddress,
+      end_latitude: accLat,
+      end_longitude: accLng
+    };
+  }
+
+  let departure = null;
+  if (dateStr === departureDate) {
+    const depLoc = String(logistics.departure?.location || '').trim();
+    departure = {
+      id: logisticsDepartureId(cityName),
+      name: 'Accommodation → Departure',
+      city: cityName,
+      start_location: accAddress,
+      start_latitude: accLat,
+      start_longitude: accLng,
+      end_location: depLoc,
+      end_latitude: normalizeCoordinate(logistics.departure?.latitude),
+      end_longitude: normalizeCoordinate(logistics.departure?.longitude)
+    };
+  }
+
+  return { arrival, departure };
+}
+
+function makeLogisticsCommuteIndicator(fromId, toId, baseTime, cardHeight) {
+  const commute = state.commutes[commutePairKey(fromId, toId)] || null;
+  const selected = resolveSelectedCommuteDetails(commute);
+  if (!selected || !Number.isFinite(selected.durationMinutes)) return '';
+
+  const y = yFromTime(baseTime) + cardHeight + 6;
+  const options = COMMUTE_MODE_ORDER
+    .map((mode) => {
+      const option = commute?.modes?.[mode];
+      if (!option || !Number.isFinite(Number(option.durationMinutes))) return '';
+      const isActive = selected.selectedMode === mode;
+      return `
+        <button type="button" class="commute-option ${isActive ? 'active' : ''}" data-mode="${mode}">
+          <span>${esc(option.modeIcon || '🚇')} ${esc(COMMUTE_MODE_LABEL[mode] || mode)} - ${Number(option.durationMinutes)} min</span>
+          ${isActive ? '<span class="commute-option-check">✓</span>' : ''}
+        </button>
+      `;
+    })
+    .filter(Boolean)
+    .join('');
+
+  if (!options) return '';
+
+  return `
+    <div class="commute-indicator" style="top:${y}px;">
+      <div class="commute-selector" data-from-id="${esc(fromId)}" data-to-id="${esc(toId)}">
+        <button type="button" class="commute-selector-trigger" aria-expanded="false">
+          <span class="commute-selected-label">${esc(formatCommuteBadge(commute))}</span>
+          <span class="commute-selector-arrow" aria-hidden="true">▾</span>
+        </button>
+        <div class="commute-selector-menu" role="menu">${options}</div>
+      </div>
+    </div>
+  `;
 }
 
 function getPlacementTimeRange(activity, placementOverride = null) {
@@ -2488,14 +2581,17 @@ function renderArrange() {
     const cityObj = state.cities.find((c) => cityMatches(c.name, d.city));
     const dayLogistics = getLogisticsForDay(cityObj, d.date);
     const accLabel = getAccommodationLabel(d.city, d.date);
+    const arrId = logisticsArrivalId(d.city);
+    const depId = logisticsDepartureId(d.city);
 
     let html = '';
 
     if (dayLogistics?.isArrival) {
       const arrivalLabel = dayLogistics.arrivalLocation || 'Arrival';
-      html += makeLogisticsCard(`Arrive: ${arrivalLabel}`, '✈️', dayLogistics.arrivalTime, '');
-      const transitY = yFromTime(dayLogistics.arrivalTime) + getLogisticsCardHeight() + 4;
-      html += makeLogisticsTransit(arrivalLabel, accLabel, transitY);
+      html += makeLogisticsCard(`Arrive: ${arrivalLabel}`, '✈️', dayLogistics.arrivalTime, accLabel);
+      if (items.length > 0) {
+        html += makeLogisticsCommuteIndicator(arrId, items[0].id, dayLogistics.arrivalTime, getLogisticsCardHeight());
+      }
     }
 
     items.forEach((item, index) => {
@@ -2512,10 +2608,9 @@ function renderArrange() {
         const lastPlacement = state.placements[lastItem.id] || {};
         const lastTime = parseTimeTo24(lastPlacement.time || lastItem.suggested_time || typeToTime(lastItem.type));
         const lastEndMins = minutesFromTime(lastTime) + Math.max(30, Number(lastItem.duration_hours || 1) * 60);
-        const transitY = yFromTime(timeFromMinutes(lastEndMins)) + 6;
-        html += makeLogisticsTransit(accLabel, departureLabel, transitY);
+        html += makeLogisticsCommuteIndicator(lastItem.id, depId, timeFromMinutes(lastEndMins), 0);
       }
-      html += makeLogisticsCard(`Depart: ${departureLabel}`, '🛫', dayLogistics.departureTime, '');
+      html += makeLogisticsCard(`Depart: ${departureLabel}`, '🛫', dayLogistics.departureTime, accLabel);
     }
 
     schedule.innerHTML = html;
@@ -2759,7 +2854,21 @@ async function updateCommutesForCityDays(dayIds = []) {
       if (dayIdsSet.has(fromId) && dayIdsSet.has(toId)) delete state.commutes[key];
     });
 
-    if (orderedActivities.length < 2) continue;
+    // Build logistics pseudo-activities for this day
+    const cityObj = day ? state.cities.find((c) => cityMatches(c.name, day.city)) : null;
+    const { arrival: arrivalPseudo, departure: departurePseudo } = buildLogisticsPseudoActivities(cityObj, day?.date, day?.city);
+
+    // Clean up old logistics commute keys for this day
+    if (arrivalPseudo) {
+      Object.keys(state.commutes).forEach((key) => {
+        if (key.startsWith(arrivalPseudo.id + '->')) delete state.commutes[key];
+      });
+    }
+    if (departurePseudo) {
+      Object.keys(state.commutes).forEach((key) => {
+        if (key.endsWith('->' + departurePseudo.id)) delete state.commutes[key];
+      });
+    }
 
     const payloadActivities = orderedActivities.map((a) => ({
       id: a.id,
@@ -2774,7 +2883,14 @@ async function updateCommutesForCityDays(dayIds = []) {
       suggested_time: state.placements[a.id]?.time || parseTimeTo24(a.suggested_time || typeToTime(a.type))
     }));
 
-    const commutes = await fetchCommutesForActivities(payloadActivities);
+    // Prepend arrival pseudo-activity, append departure pseudo-activity
+    const fullPayload = [...payloadActivities];
+    if (arrivalPseudo && fullPayload.length > 0) fullPayload.unshift(arrivalPseudo);
+    if (departurePseudo && fullPayload.length > 0) fullPayload.push(departurePseudo);
+
+    if (fullPayload.length < 2) continue;
+
+    const commutes = await fetchCommutesForActivities(fullPayload);
     commutes.forEach((c) => {
       const selectedMode = resolveSelectedCommuteMode(c);
       const selected = c?.modes?.[selectedMode] || {};
