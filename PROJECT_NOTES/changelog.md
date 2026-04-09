@@ -4,6 +4,60 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-08] Add apply-note button to refine activities from user notes
+
+- New `/api/activity/refine` endpoint: sends activity + user note to Haiku, returns only changed fields
+- Checkmark button appears next to notes textarea on approved activities
+- On click, merges LLM-returned field updates into the activity in-place, clears note, re-renders
+- Refined activity (e.g. specific restaurant) flows into auto-arrange with correct name/location/details
+- Files: `public/app.js`, `public/styles.css`, `src/server.js`
+
+## [2026-04-08] Fix chat response showing raw JSON
+
+- `parseChatResponse` now strips markdown code fences before `JSON.parse`
+- Matches the same fallback strategy used in `claude.js` for activity generation
+- Files: `src/server.js`
+
+## [2026-04-08] Fix pace slider crash (paceLabel collision)
+
+- Renamed new profile pace function to `pacePrefLabel` to avoid collision with existing `paceLabel` at line 3128
+- Existing `paceLabel` returns an object `{label, className}` for itinerary insights; later declaration was shadowing it
+- Files: `public/app.js`
+
+## [2026-04-08] Add pace preference and LLM-reasoned activity counts
+
+- Added "How packed do you like your days?" slider to user profile (1–5: very relaxed → non-stop)
+- Removed hardcoded "6-8 activities" constraint; LLM now reasons from date range + pace
+- Pace description injected into activity generation and auto-arrange prompts
+- Auto-arrange rule 9 now gives pace-specific scheduling guidance (gaps vs. tight packing)
+- Pace flows through `getSummary()`, `formatProfileForEnrichment()`, and arrange API call
+- Files: `public/app.js`, `src/claude.js`, `src/preferences.js`, `src/server.js`
+
+## [2026-04-08] Replace time-of-day presets with exact time field
+
+- Removed `TIME_OF_DAY_PRESETS` (morning/afternoon/evening), `normalizeTimeOfDay`, and the `timeOfDay`+`customTime` dual-field system
+- Replaced with single `time` field (HH:MM) on `logistics.arrival` and `logistics.departure`
+- Time inputs start empty — user must select an exact time before progressing
+- Validation blocks "Next" if either arrival or departure time is missing
+- Server reads `.time` first with fallback to `.customTime` for old saved data
+- Updated `cityDropdownValidation.js` and its tests to match
+- Files: `public/app.js`, `src/server.js`, `src/cityDropdownValidation.js`, `src/cityDropdownValidation.test.js`
+
+## [2026-04-08] Bias Google Places autocomplete to selected city
+
+- Added `cityLocationBias()` helper — creates 50km radius circle from city lat/lng
+- Passed `locationBias` to `PlaceAutocompleteElement` for accommodation, arrival, departure, and travel entry inputs
+- City name input intentionally unbiased (global search)
+- Files: `public/app.js`
+
+## [2026-04-08] Improve activity images and clean up review UI
+
+- Frontend now sends activity `type` to `/api/image` for more relevant Unsplash results
+- Unsplash fetches 5 candidates per query (was 1); `usedUrls` Set prevents duplicates across activities
+- Removed "Clear Visible" button from review toolbar
+- Removed "Cultural Time Budget" bar and all related CSS (`.budget`, `.progress` classes)
+- Files: `public/app.js`, `public/planner.html`, `public/styles.css`, `src/unsplash.js`
+
 ## [2026-04-08] Overhaul auto-arrange prompt for better scheduling
 
 - Upgraded arrange model from claude-haiku-4-5 to claude-sonnet-4-6, max_tokens 1024→2048
@@ -17,10 +71,9 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 - Root cause: `buildLogisticsPseudoActivities` set arrival pseudo's end_location to accommodation (not arrival point), so commute pipeline computed accommodation→accommodation = 0 min. Same issue for departure pseudo's start_location.
 - Fix: each pseudo-activity now uses its own physical location for both start/end coords
-- Extracted `renderCommuteSelector()` — single source for commute dropdown HTML; `makeCommuteIndicator` and `makeLogisticsCommuteIndicator` are thin wrappers
-- Simplified `updateCommutesForCityDays`: merged two fragile cleanup passes into one pass over all payload IDs; replaced conditional unshift/push with flat array expression
+- Extracted `renderCommuteSelector()` — single source for commute dropdown HTML
+- Simplified `updateCommutesForCityDays`: merged two fragile cleanup passes into one
 - Removed dead `makeLogisticsTransit` function
-- Net: 36 insertions, 95 deletions
 - Files: `public/app.js`
 
 ## [2026-04-08] Simplify auto-arrange: LLM-driven scheduling with commute-aware inputs
@@ -30,111 +83,33 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Activity locations sent in arrange payload for LLM geographic clustering
 - Prompt updated: LLM estimates inter-activity travel time, groups nearby activities per day
 - Deleted `applyCommuteTimeAdjustments` — LLM scheduling trusted, hardcoded post-processing removed
-- `updateCommutesForCityDays` now fetches commutes for display only (no time shifting)
 - Files: `public/app.js`, `src/server.js`
 
 ## [2026-04-08] Real commute times for arrival/departure logistics legs
 
-- Logistics pseudo-activities (arrival→accommodation, accommodation→departure) injected into commute calculation pipeline
-- Google Maps Distance Matrix now calculates real transit/driving/walking times for these legs
+- Logistics pseudo-activities injected into commute calculation pipeline
+- Google Maps Distance Matrix calculates real transit/driving/walking times for these legs
 - Commute mode selector rendered between logistics cards and first/last activities
-- Accommodation label truncated to first comma-segment to avoid raw address overflow
 - Files: `public/app.js`
 
 ## [2026-04-08] Arrival/departure logistics cards and auto-arrange constraints
 
-- Render fixed ✈️ arrival and 🛫 departure cards on arrival/departure days in the arrange view
-- Transit arrows shown: arrival location → accommodation, accommodation → departure location
-- `/api/arrange` prompt now includes FIXED FIRST/LAST annotations so Claude schedules no activities before arrival transit or after departure transit
-- Fixed Google Places library init: merge `importLibrary('places')` return value into `window.google.maps.places` so `PlaceAutocompleteElement` is found
-- Added editable AI-generated summary section in profile modal (hidden until first enrichment, user-editable)
+- Render fixed arrival and departure cards on arrival/departure days in the arrange view
+- `/api/arrange` prompt includes FIXED FIRST/LAST annotations
+- Fixed Google Places library init
+- Added editable AI-generated summary section in profile modal
 - Files: `public/app.js`, `public/styles.css`, `src/server.js`
 
-## [2026-04-07] Fix activity images not loading at step 2
+## [2026-04-07] Summary of earlier work
 
-- Moved `setStep(2)` before `renderActivities()` in the streaming city event handler so `enrichImages` fires on the first city arrival instead of waiting for user interaction
-- File: `public/app.js`
-
-## [2026-04-07] Chat-driven preference learning with profile distillation
-
-- Concierge chatbot now returns structured JSON with optional preference signals extracted from user messages
-- New signal types: activity preferences (type + verdict) and freeform constraints ("no activities before 9am")
-- `recordConstraint()` stores deduplicated scheduling/preference constraints (max 20)
-- Profile distillation: every 10 new signals, Haiku synthesizes all data (existing profile + signals + constraints + self-reported answers) into a single evolving profile paragraph (max 1000 tokens)
-- After distillation, raw signals pruned to last 10, constraints absorbed into paragraph
-- `getSummary()` returns distilled profile as primary output, falls back to derived approach pre-distillation
-- Distillation triggered from both chat signals and activity approve/decline endpoint
-- `parseChatResponse()` handles JSON with graceful fallback to raw text
-- Files: src/preferences.js, src/server.js
-
-## [2026-04-07] Optimize concierge context window for cost efficiency
-
-- Stripped getTripContext(): sends only city name/dates/leaveTime/accommodation addresses, drops raw objects, coordinates, IDs, UI state, travels array, raw profile
-- Approved/declined lists omitted when schedule exists (schedule supersedes them); declined list dropped entirely
-- Step sent as human-readable label instead of number
-- buildChatSystemPrompt() simplified — removed formatProfileBlock, coordinates, checkIn/checkOut timestamps
-- System prompt cached per session via getCachedPrompt(), only rebuilt when tripContext changes
-- Compaction threshold lowered from 100k tokens to 8k (~40-50 messages)
-- Files: public/app.js, src/server.js, src/chat.js
-
-## [2026-04-07] Evolving context window for concierge chatbot
-
-- `getTripContext()` now sends profile, tripName, itineraryId, and scheduledByDay (day-by-day activity placements with times/locations)
-- `buildChatSystemPrompt()` refactored into focused helpers (`formatCityLine`, `formatScheduleBlock`, `formatProfileBlock`) and renders structured sections
-- Chat endpoint loads user's learned preferences server-side via `getPreferenceSummary()` — chatbot always knows traveler tastes
-- Per-trip chat sessions: `ensureChatSessionId()` uses a `chat_sessions` localStorage map keyed by itinerary ID
-- Loading a saved itinerary restores its associated chat session and history
-- Saving an itinerary binds the current chat session to the new itinerary ID
-- Files: `public/app.js`, `src/server.js`
-
-## [2026-04-07] Replace hard-coded Auto Arrange scheduler with LLM call
-
-- Deleted heuristic scheduling loop (opening hours windows, cursor tracking, category guards)
-- New `POST /api/arrange` endpoint sends days (with availability windows) + activities to claude-haiku-4-5 and returns `{ placements, unplaced }`
-- Frontend maps returned `{ date, time }` placements back to `{ dayId, time }` using activeDays
-- Button shows "Arranging…" and disables during the call
-- Files: `src/server.js`, `public/app.js`
-
-## [2026-04-07] Trigger fresh plan generation when step 1 data changes
-
-- Added `step1Fingerprint()` — JSON snapshot of `state.cities` + `state.travels`
-- Stored as `state.lastPlannedFingerprint` after each successful `planTrip()` run
-- `goToNextStep` now compares current fingerprint against stored one — forces regeneration if changed, skips to step 2 if unchanged
-- Files: `public/app.js`
-
-## [2026-04-07] Overhaul Auto Arrange logic
-
-- Fixed meal scheduling: meal categories (breakfast, lunch, dinner, nightlife, sunset) now always use category-default opening hours, overriding Claude's generated values — prevents breakfast being placed at 4pm on arrival days
-- Auto Arrange now skips opening windows that have already closed by the time a day's available window starts (`openEnd <= dayStart`)
-- Fixed `buildCityTravelTiming` (server) to read arrival/departure times from `city.logistics.arrival/departure.customTime` with fallback to legacy `travelEntry`
-- Arrival-point → accommodation travel time now computed for all cities (was previously only city index 0)
-- Departure location now reads from `city.logistics.departure.{location,latitude,longitude}` with legacy field fallback
-- `auto_version_control.md` updated: removed `Claude Code` branch, now always commits/pushes to `main`
-- Files: `public/app.js`, `src/server.js`, `.claude/rules/auto_version_control.md`
-
-## [2026-04-07] Fix arrival/departure location autocomplete
-
-- Skip `renderCities()` for `arrivalLocation`/`departureLocation` input events to prevent DOM teardown from destroying the Places widget mid-typing
-- Same pattern already used for city name input
-- File: `public/app.js`
-
-## [2026-04-07] Add Google Places location inputs for accommodation, arrival, departure
-
-- Replaced accommodation type dropdown (Hotel/Airbnb/None) with a Google Places autocomplete address input
-- Added arrival location input with Places autocomplete (e.g. airport)
-- Added departure location input with Places autocomplete (e.g. train station)
-- Added location/placeId/lat/lng fields to `city.logistics.arrival` and `city.logistics.departure`
-- Ensured first accommodation entry auto-created when drawer renders
-- Synced accommodation check-in/check-out dates from city-level date range changes
-- Files: `public/app.js`, `public/styles.css`
-
-## [2026-04-07] Simplify trip setup date/time UX
-
-- Added start/end date inputs to city main row that auto-populate accommodation check-in/check-out and arrival/departure dates
-- Replaced Morning/Afternoon/Evening/Custom dropdown with native `<input type="time">` for arrival and departure
-- Fixed `normalizeCityLogistics` to read from `city.logistics` first, preserving state across re-renders
-- Files: `public/app.js`, `public/styles.css`
-
-## [2026-04-07] Scaffolded PROJECT_NOTES/
-
-- Created `current_state.md`, `decisions.md`, `open_items.md`, `changelog.md`
+- Fix activity images not loading at step 2
+- Chat-driven preference learning with profile distillation
+- Optimize concierge context window for cost efficiency
+- Evolving context window for concierge chatbot
+- Replace Auto Arrange heuristic with LLM call
+- Trigger fresh plan generation when step 1 data changes
+- Overhaul Auto Arrange logic and meal scheduling
+- Fix arrival/departure location autocomplete
+- Add Google Places location inputs for accommodation, arrival, departure
+- Simplify trip setup date/time UX
+- Scaffolded PROJECT_NOTES/

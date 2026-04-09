@@ -6,7 +6,7 @@ _Last updated: 2026-04-08_
 Continue local development of TravelPlanner and push changes to git for VPS deployment.
 
 ## Active Workstream
-Auto-arrange prompt overhaul — ready to test on VPS.
+Activity review UX — note-driven refinement, pace preference, LLM-reasoned activity counts.
 
 ## Constraints
 - Local development, testing on VPS at https://travelplanner.srv1553531.hstgr.cloud/planner.html
@@ -15,7 +15,8 @@ Auto-arrange prompt overhaul — ready to test on VPS.
 
 ## Risks
 - LLM may not reliably estimate inter-activity travel time accurately (no exact commute data at schedule time)
+- Existing `paceLabel` function name collision was caught post-deploy — watch for similar naming conflicts in the large app.js file
 
 ## Next Actions
-- Push and test auto-arrange on VPS: verify activities distribute evenly across days
-- Verify traveler profile/constraints are reflected in scheduling (e.g. late starts for non-morning people)
+- Test apply-note refinement on VPS (verify activity card updates correctly after refine)
+- Test pace slider and activity count behavior across different trip lengths and pace values
