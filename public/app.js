@@ -42,7 +42,7 @@ const PROFILE_QUESTIONS = [
   { key: 'outdoorNature', label: 'Do you enjoy outdoor / nature activities?', summary: 'Outdoor / nature activities' },
   { key: 'nightlifeBars', label: 'Are you into nightlife and bars?', summary: 'Nightlife and bars' },
   { key: 'structuredTours', label: 'Do you like structured tours?', summary: 'Structured tours' },
-  { key: 'pace', label: 'How packed do you like your days?', summary: 'Trip pace', labels: ['Very relaxed', 'Easy-going', 'Moderate', 'Active', 'Non-stop'] }
+  { key: 'pace', label: 'How packed do you like your days?', summary: 'Trip pace' }
 ];
 const PROFILE_MIN = 1;
 const PROFILE_MAX = 5;
@@ -57,7 +57,7 @@ function profileLabel(value) {
   return 'Love this';
 }
 
-function paceLabel(value) {
+function pacePrefLabel(value) {
   const rating = Number(value);
   if (rating <= 1) return 'Very relaxed';
   if (rating === 2) return 'Easy-going';
@@ -1490,7 +1490,7 @@ function renderPreferencesModal() {
 
   els.profileQuestions.innerHTML = PROFILE_QUESTIONS.map((q) => {
     const active = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Number(profile.answers[q.key] || PROFILE_DEFAULT)));
-    const label = q.key === 'pace' ? paceLabel(active) : profileLabel(active);
+    const label = q.key === 'pace' ? pacePrefLabel(active) : profileLabel(active);
     return `
       <div class="profile-question" data-question="${esc(q.key)}">
         <p>${esc(q.label)}</p>
@@ -1544,7 +1544,7 @@ function renderPreferencesModal() {
       const valueEl = question.querySelector('.rating-value');
       const labelEl = question.querySelector('.rating-label');
       if (valueEl) valueEl.textContent = `${nextAnswer}/5`;
-      if (labelEl) labelEl.textContent = key === 'pace' ? paceLabel(nextAnswer) : profileLabel(nextAnswer);
+      if (labelEl) labelEl.textContent = key === 'pace' ? pacePrefLabel(nextAnswer) : profileLabel(nextAnswer);
     });
   });
 }
