@@ -260,12 +260,10 @@ function syncCityLegacyDates(city) {
   city.startDate = logistics.arrival.date || '';
   city.endDate = logistics.departure.date || '';
 
-  const arrivalTime = normalizeTimeOfDay(logistics.arrival.timeOfDay) === 'custom'
-    ? parseTimeTo24(logistics.arrival.customTime || '')
-    : TIME_OF_DAY_PRESETS[normalizeTimeOfDay(logistics.arrival.timeOfDay)];
-  const departureTime = normalizeTimeOfDay(logistics.departure.timeOfDay) === 'custom'
-    ? parseTimeTo24(logistics.departure.customTime || '')
-    : TIME_OF_DAY_PRESETS[normalizeTimeOfDay(logistics.departure.timeOfDay)];
+  const arrivalKey = normalizeTimeOfDay(logistics.arrival.timeOfDay);
+  const arrivalTime = arrivalKey === 'custom' ? parseTimeTo24(logistics.arrival.customTime || '') : TIME_OF_DAY_PRESETS[arrivalKey];
+  const departureKey = normalizeTimeOfDay(logistics.departure.timeOfDay);
+  const departureTime = departureKey === 'custom' ? parseTimeTo24(logistics.departure.customTime || '') : TIME_OF_DAY_PRESETS[departureKey];
 
   city.leaveTime = parseTimeTo24(departureTime || city.leaveTime || '18:00');
   city.travelTiming = {
@@ -1750,80 +1748,30 @@ function applyVerdictToVisibleActivities(verdict = null) {
 let reviewImageEnrichInFlight = false;
 
 function enrichImages(items = []) {
-  console.log('[enrichImages] starting with', items.length, 'items');
+  const itemsToFetch = (items || []).filter((item) => item && !item.imageUrl && item.name);
+  if (!itemsToFetch.length) return Promise.resolve();
 
-  if (!Array.isArray(items) || !items.length) {
-    const immediatePromise = Promise.resolve();
-    console.log('[enrichImages] no items; created/returning immediate Promise:', immediatePromise);
-    immediatePromise.then(() => {
-      console.log('[enrichImages] immediate Promise resolved (no items)');
-      console.log('[enrichImages] done');
-    });
-    return immediatePromise;
-  }
-
-  const itemsToFetch = items.filter((item) => item && !item.imageUrl && item.name);
-  console.log('[enrichImages] items needing images:', itemsToFetch.map((i) => i.name));
-
-  if (!itemsToFetch.length) {
-    const immediatePromise = Promise.resolve();
-    console.log('[enrichImages] no images to fetch; created/returning immediate Promise:', immediatePromise);
-    immediatePromise.then(() => {
-      console.log('[enrichImages] immediate Promise resolved (nothing to fetch)');
-      console.log('[enrichImages] done');
-    });
-    return immediatePromise;
-  }
-
-  const enrichmentPromise = Promise.all(itemsToFetch.map(async (item) => {
+  return Promise.all(itemsToFetch.map(async (item) => {
     try {
-      const name = String(item.name || '');
-      const city = String(item.city || '');
-      console.log('[enrichImages] fetching image for:', name, city);
-      const params = new URLSearchParams({ q: name, city });
-      const url = `/api/image?${params.toString()}`;
-      console.log('[image fetch] url=', url);
-      const res = await fetch(url);
+      const params = new URLSearchParams({ q: item.name, city: item.city || '' });
+      const res = await fetch(`/api/image?${params}`);
       if (!res.ok) return;
       const data = await res.json();
-      console.log('[enrichImages] got response:', data);
       if (data?.imageUrl) item.imageUrl = data.imageUrl;
-    } catch (err) {
-      console.error('[image fetch error]', err);
-    }
+    } catch {}
   }));
-
-  console.log('[enrichImages] created/returning Promise:', enrichmentPromise);
-  return enrichmentPromise.then((result) => {
-    console.log('[enrichImages] Promise resolved');
-    console.log('[enrichImages] done');
-    return result;
-  }).catch((err) => {
-    console.error('[enrichImages] Promise rejected', err);
-    throw err;
-  });
 }
 
 function renderActivities() {
-  console.log('[renderActivities] step=', state.step, 'activity count=', state.activities.length);
   renderBudget();
   updateReviewNav();
   populateReviewCityFilter();
 
   if (state.step === 2 && !reviewImageEnrichInFlight) {
-    console.log('[renderActivities] step 2 detected, calling enrichImages');
     reviewImageEnrichInFlight = true;
-    console.log('[renderActivities] enrichment start');
-    const enrichPromise = enrichImages(state.activities);
-    console.log('[renderActivities] enrichPromise returned:', enrichPromise);
-    enrichPromise.then(() => {
-      console.log('[renderActivities] enrichPromise.then() fired!');
-      if (state.step === 2) {
-        renderActivities(); // Re-render cards to display loaded images
-      }
-    }).catch((err) => {
-      console.error('[renderActivities] enrichPromise rejected:', err);
-    }).finally(() => {
+    enrichImages(state.activities).then(() => {
+      if (state.step === 2) renderActivities();
+    }).catch(() => {}).finally(() => {
       reviewImageEnrichInFlight = false;
     });
   }
@@ -1999,8 +1947,7 @@ function parseOpeningWindows(openingHours = '') {
 }
 
 function formatDuration(hours = 1) {
-  const h = Number(hours || 1);
-  return Number.isInteger(h) ? `${h}h` : `${h}h`;
+  return `${Number(hours || 1)}h`;
 }
 
 function parseTimeTo24(raw = '') {
@@ -2332,21 +2279,14 @@ function getAccommodationLabel(cityName, date) {
   return short || raw;
 }
 
-function logisticsArrivalId(cityName) {
-  return `logistics-arrival-${String(cityName || '').trim().toLowerCase().replace(/\s+/g, '-')}`;
+function citySlug(cityName) {
+  return String(cityName || '').trim().toLowerCase().replace(/\s+/g, '-');
 }
 
-function logisticsDepartureId(cityName) {
-  return `logistics-departure-${String(cityName || '').trim().toLowerCase().replace(/\s+/g, '-')}`;
-}
-
-function logisticsAccommodationArrivalId(cityName) {
-  return `logistics-acc-arrival-${String(cityName || '').trim().toLowerCase().replace(/\s+/g, '-')}`;
-}
-
-function logisticsAccommodationDepartureId(cityName) {
-  return `logistics-acc-departure-${String(cityName || '').trim().toLowerCase().replace(/\s+/g, '-')}`;
-}
+function logisticsArrivalId(cityName) { return `logistics-arrival-${citySlug(cityName)}`; }
+function logisticsDepartureId(cityName) { return `logistics-departure-${citySlug(cityName)}`; }
+function logisticsAccommodationArrivalId(cityName) { return `logistics-acc-arrival-${citySlug(cityName)}`; }
+function logisticsAccommodationDepartureId(cityName) { return `logistics-acc-departure-${citySlug(cityName)}`; }
 
 function buildLogisticsPseudoActivities(cityObj, date, cityName) {
   if (!cityObj) return { arrival: null, departure: null };
@@ -2524,7 +2464,6 @@ function bindCommuteInteractions() {
 }
 
 function renderArrange() {
-  console.log('[render] state.commutes=', state.commutes);
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
   const cityGroups = getArrangeCities();
   renderArrangeCityNav(cityGroups);
@@ -2533,12 +2472,6 @@ function renderArrange() {
   const activeCity = state.arrangeCity;
   const activeDays = state.days.filter((d) => cityMatches(d.city, activeCity));
 
-  const approvedByCity = approved.reduce((acc, activity) => {
-    const city = String(activity.city || '').trim() || '(missing city)';
-    acc[city] = (acc[city] || 0) + 1;
-    return acc;
-  }, {});
-  console.log('[arrange] activeCity=', activeCity, 'approvedByCity=', approvedByCity, 'state.cities=', state.cities.map((c) => c.name));
 
   els.stagingArea.innerHTML = approved
     .filter((a) => cityMatches(a.city, activeCity) && !state.placements[a.id]?.dayId)
@@ -2737,10 +2670,8 @@ async function fetchCommutesForActivities(activities = []) {
       body: JSON.stringify({ activities })
     });
     const data = await res.json();
-    console.log('[commute response]', data);
     return Array.isArray(data?.commutes) ? data.commutes : [];
-  } catch (err) {
-    console.error('[commute error]', err);
+  } catch {
     return [];
   }
 }
@@ -2964,15 +2895,16 @@ async function autoArrangeActiveCity() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         days: dayPayload,
-        activities: approvedInCity.map((a) => ({
-          id: a.id,
-          name: a.name,
-          category: a.category,
-          duration_hours: a.duration_hours,
-          opening_hours: a.opening_hours,
-          suggested_time: a.suggested_time,
-          location: a.start_location || a.end_location || ''
-        }))
+        activities: approvedInCity.map((a) => {
+          const obj = { id: a.id, name: a.name, category: a.category, duration_hours: a.duration_hours };
+          if (a.opening_hours) obj.opening_hours = a.opening_hours;
+          const st = String(a.suggested_time || '').trim();
+          if (st && st !== '10:00am') obj.suggested_time = st;
+          const loc = (a.start_location || a.end_location || '').trim();
+          if (loc) obj.location = loc;
+          return obj;
+        }),
+        userId: ensureUserId()
       })
     });
 
@@ -3984,16 +3916,12 @@ els.profileEditBtn.addEventListener('click', async () => {
   saveProfile(next);
 
   try {
-    console.log('[profile enrich] request payload', next);
-
     const res = await fetch('/api/profile/enrich', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(next)
     });
     const data = await res.json();
-    console.log('[profile enrich] response', { status: res.status, ok: res.ok, data });
-
     const instruction = String(
       data?.instruction
       ?? data?.profileInstruction
@@ -4008,15 +3936,9 @@ els.profileEditBtn.addEventListener('click', async () => {
       }
       showToast('Profile saved!', 'success');
     } else {
-      console.warn('[profile enrich] missing instruction or non-ok response', {
-        status: res.status,
-        ok: res.ok,
-        data
-      });
       showToast('Profile saved (enrichment failed)', 'info');
     }
-  } catch (enrichErr) {
-    console.error('[profile enrich] catch error', enrichErr);
+  } catch {
     showToast('Profile saved (enrichment failed)', 'info');
   } finally {
     activeSavingToastId = null;

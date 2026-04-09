@@ -675,10 +675,16 @@ app.post('/api/arrange', async (req, res) => {
     return res.status(503).json({ error: 'Anthropic API key not configured' });
   }
 
-  const { days, activities } = req.body || {};
+  const { days, activities, userId: rawUserId } = req.body || {};
   if (!Array.isArray(days) || !Array.isArray(activities)) {
     return res.status(400).json({ error: 'days and activities are required arrays' });
   }
+  const userId = parseUserId(rawUserId);
+  const prefs = loadPreferences(userId);
+  const prefParts = [];
+  if (prefs.distilledProfile) prefParts.push(prefs.distilledProfile);
+  if (prefs.constraints.length) prefParts.push(`Constraints: ${prefs.constraints.map((c) => c.text).join('; ')}`);
+  const prefSummary = prefParts.join('\n');
 
   const daysText = days.map((d) => {
     let line = `- ${d.date} (${d.label}): available ${d.windowStart} – ${d.windowEnd}`;
@@ -687,44 +693,46 @@ app.post('/api/arrange', async (req, res) => {
     return line;
   }).join('\n');
 
-  const activitiesText = activities.map((a) =>
-    `- id:${a.id} | "${a.name}" | category:${a.category} | duration:${a.duration_hours}h | opening_hours:${a.opening_hours || 'flexible'} | suggested_time:${a.suggested_time || 'flexible'} | location:${a.location || 'unknown'}`
-  ).join('\n');
+  const activitiesText = activities.map((a) => {
+    const parts = [`id:${a.id}`, `"${a.name}"`, a.category, `${a.duration_hours}h`];
+    if (a.opening_hours) parts.push(`hours:${a.opening_hours}`);
+    const suggested = String(a.suggested_time || '').trim();
+    if (suggested && suggested !== '10:00am') parts.push(`preferred:${suggested}`);
+    if (a.location) parts.push(`at:${a.location}`);
+    return `- ${parts.join(' | ')}`;
+  }).join('\n');
+  const perDay = Math.ceil(activities.length / days.length);
 
-  const prompt = `You are scheduling activities for a trip. Assign each activity to a specific date and start time that respects all constraints.
+  const travelerBlock = prefSummary ? `\nTRAVELER PROFILE:\n${prefSummary}\n` : '';
 
-DAYS (date: available window):
+  const prompt = `Schedule ${activities.length} activities across ${days.length} days. Target ~${perDay} activities per day — distribute evenly.
+
+DAYS:
 ${daysText}
 
-ACTIVITIES TO SCHEDULE:
+ACTIVITIES:
 ${activitiesText}
+${travelerBlock}
+RULES (priority order):
+1. Distribute ~${perDay} activities per day.
+2. Stay within each day's available window (windowStart–windowEnd).
+3. FIXED FIRST/LAST bookends are immovable.
+4. Respect opening hours.
+5. Meals at realistic times: breakfast 7–9am, lunch 11:30am–1:30pm, dinner 6–8:30pm.
+6. No overlaps — account for duration + 20min travel buffer between activities.
+7. Group nearby locations on the same day when possible.
+8. Honor preferred time hints when they fit.
+9. Respect the traveler profile when scheduling times and pacing.
+10. If an activity cannot fit, include it in unplaced with a reason.
 
-RULES:
-- Each activity must be placed within its day's available window (windowStart to windowEnd).
-- On days with a FIXED FIRST/LAST item: no activities may be scheduled before FIXED FIRST time or end after FIXED LAST time. These represent transit to/from accommodation and already account for travel duration.
-- Respect opening_hours — do not place an activity outside its opening window.
-- Spread activities sensibly across all days — do not pile everything on one day.
-- Meals (breakfast, lunch, dinner) must be placed at realistic meal times. Never schedule breakfast in the afternoon.
-- Activities should not overlap — account for duration AND realistic travel time between consecutive activities (estimate 15-30 min between nearby locations, more for distant ones).
-- Group geographically nearby activities on the same day to minimize transit.
-- Prefer the suggested_time where it fits within constraints.
-- If an activity cannot be placed on any day, include it in unplaced with a reason.
-
-Respond ONLY with valid JSON in exactly this shape:
-{
-  "placements": {
-    "<activity id>": { "date": "YYYY-MM-DD", "time": "HH:MM" }
-  },
-  "unplaced": [
-    { "id": "<activity id>", "reason": "..." }
-  ]
-}`;
+Respond ONLY with JSON:
+{"placements":{"<id>":{"date":"YYYY-MM-DD","time":"HH:MM"}},"unplaced":[{"id":"<id>","reason":"..."}]}`;
 
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 1024,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
       messages: [{ role: 'user', content: prompt }]
     });
 

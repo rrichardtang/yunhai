@@ -6,7 +6,7 @@ _Last updated: 2026-04-08_
 Continue local development of TravelPlanner and push changes to git for VPS deployment.
 
 ## Active Workstream
-Auto-arrange overhaul — pushed, awaiting VPS test.
+Auto-arrange prompt overhaul — ready to test on VPS.
 
 ## Constraints
 - Local development, testing on VPS at https://travelplanner.srv1553531.hstgr.cloud/planner.html
@@ -15,8 +15,7 @@ Auto-arrange overhaul — pushed, awaiting VPS test.
 
 ## Risks
 - LLM may not reliably estimate inter-activity travel time accurately (no exact commute data at schedule time)
-- Logistics pseudo-activities need valid lat/lng or address strings for Google Maps to resolve transit commute durations
 
 ## Next Actions
-- Test auto-arrange on arrival/departure days: first/last activities should respect transit buffer
-- Verify commute badges still render correctly after the post-processing removal
+- Push and test auto-arrange on VPS: verify activities distribute evenly across days
+- Verify traveler profile/constraints are reflected in scheduling (e.g. late starts for non-morning people)

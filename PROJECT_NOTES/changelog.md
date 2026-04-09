@@ -4,6 +4,25 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-08] Overhaul auto-arrange prompt for better scheduling
+
+- Upgraded arrange model from claude-haiku-4-5 to claude-sonnet-4-6, max_tokens 1024→2048
+- Injected traveler profile (distilledProfile + constraints) into arrange prompt
+- Stripped noise from activity payload: omit empty fields, filter default suggested_time (10:00am)
+- Restructured prompt: numbered priority rules, explicit per-day activity target, concrete meal windows
+- Removed redundant/aggressive instructions suited for weaker model
+- Files: `src/server.js`, `public/app.js`
+
+## [2026-04-08] Fix 0-min logistics commutes; clean up commute system
+
+- Root cause: `buildLogisticsPseudoActivities` set arrival pseudo's end_location to accommodation (not arrival point), so commute pipeline computed accommodation→accommodation = 0 min. Same issue for departure pseudo's start_location.
+- Fix: each pseudo-activity now uses its own physical location for both start/end coords
+- Extracted `renderCommuteSelector()` — single source for commute dropdown HTML; `makeCommuteIndicator` and `makeLogisticsCommuteIndicator` are thin wrappers
+- Simplified `updateCommutesForCityDays`: merged two fragile cleanup passes into one pass over all payload IDs; replaced conditional unshift/push with flat array expression
+- Removed dead `makeLogisticsTransit` function
+- Net: 36 insertions, 95 deletions
+- Files: `public/app.js`
+
 ## [2026-04-08] Simplify auto-arrange: LLM-driven scheduling with commute-aware inputs
 
 - Pre-fetch arrival→accommodation and accommodation→departure commute times via Google Maps before `/api/arrange` call
