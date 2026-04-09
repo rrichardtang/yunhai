@@ -71,11 +71,9 @@ const els = {
   reviewCityFilter: document.getElementById('reviewCityFilter'),
   reviewVerdictFilter: document.getElementById('reviewVerdictFilter'),
   approveVisibleBtn: document.getElementById('approveVisibleBtn'),
-  clearVisibleBtn: document.getElementById('clearVisibleBtn'),
   continueArrangeBtn: document.getElementById('continueArrangeBtn'),
   backToSetupBtn: document.getElementById('backToSetupBtn'),
   continueArrangeHint: document.getElementById('continueArrangeHint'),
-  budgetTracker: document.getElementById('budgetTracker'),
   arrangeCityNav: document.getElementById('arrangeCityNav'),
   arrangeDiagnostics: document.getElementById('arrangeDiagnostics'),
   dayColumns: document.getElementById('dayColumns'),
@@ -1676,16 +1674,6 @@ function getActivityStyle(type = '') {
   return map[normalized] || { icon: '📍', colorClass: 'activity-default' };
 }
 
-function renderBudget() {
-  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
-  const dedicated = approved.filter((a) => a.dedicated_time_block).length;
-  const pct = Math.min(100, (dedicated / 5) * 100);
-  const level = dedicated >= 5 ? 'bad' : dedicated >= 4 ? 'warn' : '';
-  els.budgetTracker.innerHTML = `
-    <div><strong>Cultural Time Budget:</strong> ${dedicated}/5 dedicated blocks</div>
-    <div class="progress ${level}"><span style="width:${pct}%"></span></div>
-  `;
-}
 
 function updateReviewNav() {
   const approvedCount = state.activities.filter((a) => state.reviewed[a.id]?.approved).length;
@@ -1753,7 +1741,7 @@ function enrichImages(items = []) {
 
   return Promise.all(itemsToFetch.map(async (item) => {
     try {
-      const params = new URLSearchParams({ q: item.name, city: item.city || '' });
+      const params = new URLSearchParams({ q: item.name, city: item.city || '', type: item.type || '' });
       const res = await fetch(`/api/image?${params}`);
       if (!res.ok) return;
       const data = await res.json();
@@ -1763,7 +1751,6 @@ function enrichImages(items = []) {
 }
 
 function renderActivities() {
-  renderBudget();
   updateReviewNav();
   populateReviewCityFilter();
 
@@ -3891,7 +3878,6 @@ els.reviewVerdictFilter?.addEventListener('change', (e) => {
   renderActivities();
 });
 els.approveVisibleBtn?.addEventListener('click', () => applyVerdictToVisibleActivities(true));
-els.clearVisibleBtn?.addEventListener('click', () => applyVerdictToVisibleActivities(null));
 
 els.saveProgressBtn.addEventListener('click', saveSnapshot);
 els.autoArrangeBtn?.addEventListener('click', autoArrangeActiveCity);

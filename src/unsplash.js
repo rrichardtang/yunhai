@@ -1,4 +1,5 @@
 const cache = new Map();
+const usedUrls = new Set();
 
 const FALLBACK_STOPWORDS = new Set([
   'the', 'a', 'an', 'and', 'or', 'at', 'in', 'for', 'on', 'with', 'from', 'to',
@@ -49,10 +50,16 @@ async function searchUnsplash(query) {
   if (!normalizedQuery) return null;
 
   const key = normalizedQuery.toLowerCase();
-  if (cache.has(key)) return cache.get(key);
+  if (cache.has(key)) {
+    const urls = cache.get(key);
+    if (!Array.isArray(urls)) return urls;
+    const picked = urls.find((u) => !usedUrls.has(u)) || urls[0] || null;
+    if (picked) usedUrls.add(picked);
+    return picked;
+  }
 
   const q = encodeURIComponent(normalizedQuery);
-  const url = `https://api.unsplash.com/search/photos?query=${q}&per_page=1&orientation=landscape`;
+  const url = `https://api.unsplash.com/search/photos?query=${q}&per_page=5&orientation=landscape`;
 
   const res = await fetch(url, {
     headers: {
@@ -72,9 +79,11 @@ async function searchUnsplash(query) {
   }
 
   const data = await res.json();
-  const imageUrl = data?.results?.[0]?.urls?.regular || null;
-  cache.set(key, imageUrl);
-  return imageUrl;
+  const urls = (data?.results || []).map((r) => r?.urls?.regular).filter(Boolean);
+  cache.set(key, urls);
+  const picked = urls.find((u) => !usedUrls.has(u)) || urls[0] || null;
+  if (picked) usedUrls.add(picked);
+  return picked;
 }
 
 async function fetchUnsplashImage(query, city, type) {
