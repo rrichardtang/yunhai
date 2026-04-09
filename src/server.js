@@ -680,9 +680,12 @@ app.post('/api/arrange', async (req, res) => {
     return res.status(400).json({ error: 'days and activities are required arrays' });
   }
 
-  const daysText = days.map((d) =>
-    `- ${d.date} (${d.label}): available ${d.windowStart} – ${d.windowEnd}`
-  ).join('\n');
+  const daysText = days.map((d) => {
+    let line = `- ${d.date} (${d.label}): available ${d.windowStart} – ${d.windowEnd}`;
+    if (d.fixedStart) line += `\n  FIXED FIRST: "${d.fixedStart.label}" at ${d.fixedStart.time} — schedule NO activities before this`;
+    if (d.fixedEnd) line += `\n  FIXED LAST: "${d.fixedEnd.label}" at ${d.fixedEnd.time} — schedule NO activities after this`;
+    return line;
+  }).join('\n');
 
   const activitiesText = activities.map((a) =>
     `- id:${a.id} | "${a.name}" | category:${a.category} | duration:${a.duration_hours}h | opening_hours:${a.opening_hours || 'flexible'} | suggested_time:${a.suggested_time || 'flexible'}`
@@ -698,6 +701,8 @@ ${activitiesText}
 
 RULES:
 - Each activity must be placed within its day's available window (windowStart to windowEnd).
+- On days with a FIXED FIRST item: the first regular activity must start AFTER that fixed item's time. Do not place anything before it.
+- On days with a FIXED LAST item: the last regular activity must END before that fixed item's time. Do not place anything after it.
 - Respect opening_hours — do not place an activity outside its opening window.
 - Spread activities sensibly across all days — do not pile everything on one day.
 - Meals (breakfast, lunch, dinner) must be placed at realistic meal times. Never schedule breakfast in the afternoon.

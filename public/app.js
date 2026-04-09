@@ -364,7 +364,11 @@ async function loadGoogleMapsPlacesSDK(apiKey = '') {
     script.onload = async () => {
       try {
         if (window.google?.maps?.importLibrary) {
-          await window.google.maps.importLibrary('places');
+          const lib = await window.google.maps.importLibrary('places');
+          if (lib?.PlaceAutocompleteElement) {
+            if (!window.google.maps.places) window.google.maps.places = {};
+            Object.assign(window.google.maps.places, lib);
+          }
         }
         if (isGooglePlacesReady()) resolve(true);
         else reject(new Error('Google Places library failed to initialize.'));
@@ -2275,6 +2279,62 @@ function makeCommuteIndicator(currentItem, nextItem) {
   `;
 }
 
+function makeLogisticsCard(label, icon, time, subtitle = '') {
+  const y = yFromTime(time);
+  const subtitleHtml = subtitle ? `<span class="logistics-card-sub">${esc(subtitle)}</span>` : '';
+  return `
+    <div class="logistics-card" style="top:${y}px;" aria-label="${esc(label)}">
+      <span class="logistics-card-icon" aria-hidden="true">${icon}</span>
+      <div class="logistics-card-text">
+        <span class="logistics-card-label">${esc(label)}</span>
+        ${subtitleHtml}
+      </div>
+      <span class="logistics-card-time">${esc(time)}</span>
+    </div>
+  `;
+}
+
+function makeLogisticsTransit(fromLabel, toLabel, yTop) {
+  return `
+    <div class="logistics-transit" style="top:${yTop}px;">
+      <span class="logistics-transit-line" aria-hidden="true"></span>
+      <span class="logistics-transit-label">🧳 ${esc(fromLabel)} → ${esc(toLabel)}</span>
+    </div>
+  `;
+}
+
+function getLogisticsCardHeight() {
+  return 36;
+}
+
+function getLogisticsForDay(city, date) {
+  if (!city) return null;
+  const logistics = city.logistics || {};
+  const arrivalDate = String(logistics.arrival?.date || city.startDate || '').slice(0, 10);
+  const departureDate = String(logistics.departure?.date || city.endDate || '').slice(0, 10);
+  const dateStr = String(date || '').slice(0, 10);
+
+  const result = { isArrival: false, isDeparture: false };
+  if (dateStr === arrivalDate) {
+    const time = city.travelTiming?.arrivalAvailableTime || '09:00';
+    result.isArrival = true;
+    result.arrivalTime = time;
+    result.arrivalLocation = String(logistics.arrival?.location || '').trim();
+  }
+  if (dateStr === departureDate) {
+    const time = city.travelTiming?.departureMustLeaveTime || '18:00';
+    result.isDeparture = true;
+    result.departureTime = time;
+    result.departureLocation = String(logistics.departure?.location || '').trim();
+  }
+  return result;
+}
+
+function getAccommodationLabel(cityName, date) {
+  const acc = getAccommodationForDay(cityName, date);
+  return String(acc?.address || '').trim() || 'Accommodation';
+}
+
 function getPlacementTimeRange(activity, placementOverride = null) {
   const placement = placementOverride || state.placements[activity.id] || {};
   const startTime = parseTimeTo24(placement.time || activity.suggested_time || typeToTime(activity.type));
@@ -2425,13 +2485,38 @@ function renderArrange() {
       .filter((a) => state.placements[a.id]?.dayId === d.id)
       .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
 
+    const cityObj = state.cities.find((c) => cityMatches(c.name, d.city));
+    const dayLogistics = getLogisticsForDay(cityObj, d.date);
+    const accLabel = getAccommodationLabel(d.city, d.date);
+
     let html = '';
+
+    if (dayLogistics?.isArrival) {
+      const arrivalLabel = dayLogistics.arrivalLocation || 'Arrival';
+      html += makeLogisticsCard(`Arrive: ${arrivalLabel}`, '✈️', dayLogistics.arrivalTime, '');
+      const transitY = yFromTime(dayLogistics.arrivalTime) + getLogisticsCardHeight() + 4;
+      html += makeLogisticsTransit(arrivalLabel, accLabel, transitY);
+    }
+
     items.forEach((item, index) => {
       html += makePlacedCard(item);
       if (index < items.length - 1) {
         html += makeCommuteIndicator(item, items[index + 1]);
       }
     });
+
+    if (dayLogistics?.isDeparture) {
+      const departureLabel = dayLogistics.departureLocation || 'Departure';
+      if (items.length > 0) {
+        const lastItem = items[items.length - 1];
+        const lastPlacement = state.placements[lastItem.id] || {};
+        const lastTime = parseTimeTo24(lastPlacement.time || lastItem.suggested_time || typeToTime(lastItem.type));
+        const lastEndMins = minutesFromTime(lastTime) + Math.max(30, Number(lastItem.duration_hours || 1) * 60);
+        const transitY = yFromTime(timeFromMinutes(lastEndMins)) + 6;
+        html += makeLogisticsTransit(accLabel, departureLabel, transitY);
+      }
+      html += makeLogisticsCard(`Depart: ${departureLabel}`, '🛫', dayLogistics.departureTime, '');
+    }
 
     schedule.innerHTML = html;
   });
@@ -2735,6 +2820,12 @@ async function autoArrangeActiveCity() {
 
   const cityPlan = state.cities.find((c) => cityMatches(c.name, activeCity));
 
+  const cityLogistics = cityPlan?.logistics || {};
+  const arrivalLocation = String(cityLogistics.arrival?.location || '').trim() || 'arrival point';
+  const departureLocation = String(cityLogistics.departure?.location || '').trim() || 'departure point';
+  const primaryAccommodation = cityPlan?.accommodations?.[0];
+  const accommodationLabel = String(primaryAccommodation?.address || '').trim() || 'accommodation';
+
   const dayPayload = activeDays.map((day) => {
     const startMins = getCityDayWindowStart(cityPlan, day.date);
     const endMins = getCityDayWindowEnd(cityPlan, day.date);
@@ -2744,7 +2835,15 @@ async function autoArrangeActiveCity() {
       : isArrival ? 'arrival day'
       : isDeparture ? 'departure day'
       : 'full day';
-    return { date: day.date, label, windowStart: timeFromMinutes(startMins), windowEnd: timeFromMinutes(endMins) };
+
+    const fixedStart = isArrival
+      ? { label: `Transit: ${arrivalLocation} → ${accommodationLabel}`, time: timeFromMinutes(startMins) }
+      : null;
+    const fixedEnd = isDeparture
+      ? { label: `Transit: ${accommodationLabel} → ${departureLocation}`, time: timeFromMinutes(endMins) }
+      : null;
+
+    return { date: day.date, label, windowStart: timeFromMinutes(startMins), windowEnd: timeFromMinutes(endMins), fixedStart, fixedEnd };
   });
 
   approvedInCity.forEach((a) => {
