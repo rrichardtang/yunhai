@@ -2783,37 +2783,6 @@ async function fetchCommutesForActivities(activities = []) {
   }
 }
 
-function applyCommuteTimeAdjustments(dayId, orderedActivities = [], commutes = []) {
-  if (!dayId || orderedActivities.length < 2 || !commutes.length) return;
-  const commuteMap = new Map(commutes.map((c) => [commutePairKey(c.fromId, c.toId), c]));
-
-  for (let i = 1; i < orderedActivities.length; i += 1) {
-    const current = orderedActivities[i];
-    const previous = orderedActivities[i - 1];
-    const commute = commuteMap.get(commutePairKey(previous.id, current.id));
-    if (!commute) continue;
-
-    const prevPlacement = state.placements[previous.id] || {};
-    const currentPlacement = state.placements[current.id] || {};
-    const prevStart = minutesFromTime(parseTimeTo24(prevPlacement.time || previous.suggested_time || typeToTime(previous.type)));
-    const prevDurationMinutes = Number(previous.duration_hours || 1) * 60;
-    const currentStart = minutesFromTime(parseTimeTo24(currentPlacement.time || current.suggested_time || typeToTime(current.type)));
-    const selected = resolveSelectedCommuteDetails(commute);
-    const commuteMinutes = Number(selected?.durationMinutes || 0);
-
-    const minByTravel = prevStart + prevDurationMinutes + commuteMinutes;
-    const adjustedStart = Math.max(currentStart, minByTravel);
-
-    state.placements[current.id] = {
-      ...currentPlacement,
-      dayId,
-      time: timeFromMinutes(adjustedStart)
-    };
-  }
-
-  enforceDayTimeBoundaries(dayId);
-}
-
 function enforceDayTimeBoundaries(dayId) {
   const day = state.days.find((d) => d.id === dayId);
   if (!day) return;
@@ -2962,8 +2931,6 @@ async function updateCommutesForCityDays(dayIds = []) {
       };
     });
 
-    applyCommuteTimeAdjustments(dayId, orderedActivities, commutes);
-    enforceDayTimeBoundaries(dayId);
   }
 }
 
@@ -3002,6 +2969,26 @@ async function autoArrangeActiveCity() {
   const primaryAccommodation = cityPlan?.accommodations?.[0];
   const accommodationLabel = String(primaryAccommodation?.address || '').trim() || 'accommodation';
 
+  // Fetch arrival→accommodation and accommodation→departure commute durations via Google Maps
+  const arrLogistics = buildLogisticsPseudoActivities(cityPlan, cityPlan?.startDate, activeCity);
+  const depLogistics = buildLogisticsPseudoActivities(cityPlan, cityPlan?.endDate, activeCity);
+  const [arrivalCommutes, departureCommutes] = await Promise.all([
+    arrLogistics.arrival && arrLogistics.arrivalAccommodation
+      ? fetchCommutesForActivities([arrLogistics.arrival, arrLogistics.arrivalAccommodation])
+      : [],
+    depLogistics.departureAccommodation && depLogistics.departure
+      ? fetchCommutesForActivities([depLogistics.departureAccommodation, depLogistics.departure])
+      : []
+  ]);
+
+  let arrivalTransitMins = 0;
+  const arrCommute = resolveSelectedCommuteDetails(arrivalCommutes[0]);
+  if (arrCommute && Number.isFinite(arrCommute.durationMinutes)) arrivalTransitMins = arrCommute.durationMinutes;
+
+  let departureTransitMins = 0;
+  const depCommute = resolveSelectedCommuteDetails(departureCommutes[0]);
+  if (depCommute && Number.isFinite(depCommute.durationMinutes)) departureTransitMins = depCommute.durationMinutes;
+
   const dayPayload = activeDays.map((day) => {
     const startMins = getCityDayWindowStart(cityPlan, day.date);
     const endMins = getCityDayWindowEnd(cityPlan, day.date);
@@ -3013,10 +3000,10 @@ async function autoArrangeActiveCity() {
       : 'full day';
 
     const fixedStart = isArrival
-      ? { label: `Transit: ${arrivalLocation} → ${accommodationLabel}`, time: timeFromMinutes(startMins) }
+      ? { label: `Transit: ${arrivalLocation} → ${accommodationLabel}`, time: timeFromMinutes(startMins + arrivalTransitMins) }
       : null;
     const fixedEnd = isDeparture
-      ? { label: `Transit: ${accommodationLabel} → ${departureLocation}`, time: timeFromMinutes(endMins) }
+      ? { label: `Transit: ${accommodationLabel} → ${departureLocation}`, time: timeFromMinutes(endMins - departureTransitMins) }
       : null;
 
     return { date: day.date, label, windowStart: timeFromMinutes(startMins), windowEnd: timeFromMinutes(endMins), fixedStart, fixedEnd };
@@ -3042,7 +3029,8 @@ async function autoArrangeActiveCity() {
           category: a.category,
           duration_hours: a.duration_hours,
           opening_hours: a.opening_hours,
-          suggested_time: a.suggested_time
+          suggested_time: a.suggested_time,
+          location: a.start_location || a.end_location || ''
         }))
       })
     });

@@ -688,7 +688,7 @@ app.post('/api/arrange', async (req, res) => {
   }).join('\n');
 
   const activitiesText = activities.map((a) =>
-    `- id:${a.id} | "${a.name}" | category:${a.category} | duration:${a.duration_hours}h | opening_hours:${a.opening_hours || 'flexible'} | suggested_time:${a.suggested_time || 'flexible'}`
+    `- id:${a.id} | "${a.name}" | category:${a.category} | duration:${a.duration_hours}h | opening_hours:${a.opening_hours || 'flexible'} | suggested_time:${a.suggested_time || 'flexible'} | location:${a.location || 'unknown'}`
   ).join('\n');
 
   const prompt = `You are scheduling activities for a trip. Assign each activity to a specific date and start time that respects all constraints.
@@ -701,12 +701,12 @@ ${activitiesText}
 
 RULES:
 - Each activity must be placed within its day's available window (windowStart to windowEnd).
-- On days with a FIXED FIRST item: the first regular activity must start AFTER that fixed item's time. Do not place anything before it.
-- On days with a FIXED LAST item: the last regular activity must END before that fixed item's time. Do not place anything after it.
+- On days with a FIXED FIRST/LAST item: no activities may be scheduled before FIXED FIRST time or end after FIXED LAST time. These represent transit to/from accommodation and already account for travel duration.
 - Respect opening_hours — do not place an activity outside its opening window.
 - Spread activities sensibly across all days — do not pile everything on one day.
 - Meals (breakfast, lunch, dinner) must be placed at realistic meal times. Never schedule breakfast in the afternoon.
-- Activities should not overlap — account for duration when sequencing on the same day.
+- Activities should not overlap — account for duration AND realistic travel time between consecutive activities (estimate 15-30 min between nearby locations, more for distant ones).
+- Group geographically nearby activities on the same day to minimize transit.
 - Prefer the suggested_time where it fits within constraints.
 - If an activity cannot be placed on any day, include it in unplaced with a reason.
 
