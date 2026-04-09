@@ -280,12 +280,12 @@ async function buildCityTravelTiming(cities = []) {
     const firstAccommodation = pickFirstAccommodation(city);
     const lastAccommodation = pickLastAccommodation(city);
     const logistics = city?.logistics || {};
-    const arrivalTime = logistics?.arrival?.customTime
+    const arrivalTime = logistics?.arrival?.time || logistics?.arrival?.customTime
       || extractTimeFromDateTime(city?.travelEntry?.dateTime)
       || '09:00';
     const arrivalDate = String(city?.startDate || '').slice(0, 10);
     const departureDate = String(city?.endDate || city?.startDate || '').slice(0, 10);
-    const departureTime = logistics?.departure?.customTime || String(city?.leaveTime || '18:00');
+    const departureTime = logistics?.departure?.time || logistics?.departure?.customTime || String(city?.leaveTime || '18:00');
 
     const timing = {
       city: cityName,

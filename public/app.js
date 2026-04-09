@@ -183,17 +183,6 @@ function formatYmdLocal(date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-const TIME_OF_DAY_PRESETS = {
-  morning: '09:00',
-  afternoon: '14:00',
-  evening: '19:00'
-};
-
-function normalizeTimeOfDay(value = '') {
-  const key = String(value || '').toLowerCase();
-  if (['morning', 'afternoon', 'evening', 'custom'].includes(key)) return key;
-  return 'morning';
-}
 
 function normalizeCityLogistics(city = {}) {
   const arrivalDate = String(city.arrivalDate || city.startDate || '');
@@ -212,8 +201,7 @@ function normalizeCityLogistics(city = {}) {
     },
     arrival: {
       date: String(arrival.date || arrivalDate || ''),
-      timeOfDay: normalizeTimeOfDay(arrival.timeOfDay || ''),
-      customTime: parseTimeTo24(arrival.customTime || ''),
+      time: parseTimeTo24(arrival.time || arrival.customTime || ''),
       location: String(arrival.location || ''),
       placeId: String(arrival.placeId || ''),
       latitude: normalizeCoordinate(arrival.latitude),
@@ -221,8 +209,7 @@ function normalizeCityLogistics(city = {}) {
     },
     departure: {
       date: String(departure.date || departureDate || ''),
-      timeOfDay: normalizeTimeOfDay(departure.timeOfDay || ''),
-      customTime: parseTimeTo24(departure.customTime || city.leaveTime || ''),
+      time: parseTimeTo24(departure.time || departure.customTime || city.leaveTime || ''),
       location: String(departure.location || ''),
       placeId: String(departure.placeId || ''),
       latitude: normalizeCoordinate(departure.latitude),
@@ -231,19 +218,18 @@ function normalizeCityLogistics(city = {}) {
   };
 }
 
-function resolveDateTime(date = '', timeOfDay = 'morning', customTime = '') {
+function resolveDateTime(date = '', time = '') {
   const normalizedDate = String(date || '').slice(0, 10);
   if (!normalizedDate) return null;
-  const key = normalizeTimeOfDay(timeOfDay);
-  const time = key === 'custom' ? parseTimeTo24(customTime || '') : TIME_OF_DAY_PRESETS[key];
-  if (!time) return null;
-  return `${normalizedDate}T${time}:00`;
+  const normalizedTime = parseTimeTo24(time || '');
+  if (!normalizedTime) return null;
+  return `${normalizedDate}T${normalizedTime}:00`;
 }
 
 function validateCityTimeline(city = {}) {
   const logistics = city.logistics || normalizeCityLogistics(city);
-  const arrivalDateTime = resolveDateTime(logistics.arrival.date, logistics.arrival.timeOfDay, logistics.arrival.customTime);
-  const departureDateTime = resolveDateTime(logistics.departure.date, logistics.departure.timeOfDay, logistics.departure.customTime);
+  const arrivalDateTime = resolveDateTime(logistics.arrival.date, logistics.arrival.time);
+  const departureDateTime = resolveDateTime(logistics.departure.date, logistics.departure.time);
 
   if (!arrivalDateTime || !departureDateTime) return '';
   if (new Date(departureDateTime).getTime() < new Date(arrivalDateTime).getTime()) {
@@ -258,10 +244,8 @@ function syncCityLegacyDates(city) {
   city.startDate = logistics.arrival.date || '';
   city.endDate = logistics.departure.date || '';
 
-  const arrivalKey = normalizeTimeOfDay(logistics.arrival.timeOfDay);
-  const arrivalTime = arrivalKey === 'custom' ? parseTimeTo24(logistics.arrival.customTime || '') : TIME_OF_DAY_PRESETS[arrivalKey];
-  const departureKey = normalizeTimeOfDay(logistics.departure.timeOfDay);
-  const departureTime = departureKey === 'custom' ? parseTimeTo24(logistics.departure.customTime || '') : TIME_OF_DAY_PRESETS[departureKey];
+  const arrivalTime = logistics.arrival.time || '';
+  const departureTime = logistics.departure.time || '';
 
   city.leaveTime = parseTimeTo24(departureTime || city.leaveTime || '18:00');
   city.travelTiming = {
@@ -289,6 +273,11 @@ const placesAutocompleteByElement = new WeakMap();
 
 function isGooglePlacesReady() {
   return Boolean(window.google?.maps?.places?.PlaceAutocompleteElement);
+}
+
+function cityLocationBias(city) {
+  if (!Number.isFinite(city?.latitude) || !Number.isFinite(city?.longitude)) return undefined;
+  return { center: { lat: city.latitude, lng: city.longitude }, radius: 50000 };
 }
 
 function clearLocationValidationError() {
@@ -386,16 +375,16 @@ function getAccommodationAutocompleteInput(row) {
   return row?.querySelector('[data-accommodation-field="address"]') || null;
 }
 
-function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInput }) {
+function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInput, locationBias }) {
   if (!element || !isGooglePlacesReady()) return;
   if (placesAutocompleteByElement.has(element)) return;
 
   const PlaceAutocompleteElementCtor = window.google?.maps?.places?.PlaceAutocompleteElement;
   if (!PlaceAutocompleteElementCtor) return;
 
-  const placeAutocomplete = new PlaceAutocompleteElementCtor({
-    types: ['geocode']
-  });
+  const opts = { types: ['geocode'] };
+  if (locationBias) opts.locationBias = locationBias;
+  const placeAutocomplete = new PlaceAutocompleteElementCtor(opts);
   placeAutocomplete.classList.add('tp-place-autocomplete');
   if ('value' in placeAutocomplete) placeAutocomplete.value = element.value || '';
   element.classList.add('place-autocomplete-fallback');
@@ -468,6 +457,7 @@ function initializePlacesWidgets() {
     if (!input) return;
 
     attachPlaceAutocompleteElement(input, {
+      locationBias: cityLocationBias(city),
       onResolved: ({ formattedAddress, placeId, lat, lng }) => {
         const travelEntry = ensureFirstCityTravelEntry();
         if (!travelEntry) return;
@@ -498,6 +488,7 @@ function initializePlacesWidgets() {
       if (!input) return;
 
       attachPlaceAutocompleteElement(input, {
+        locationBias: cityLocationBias(city),
         onResolved: ({ formattedAddress, placeId, lat, lng }) => {
           accommodation.address = formattedAddress;
           accommodation.placeId = placeId;
@@ -1194,7 +1185,7 @@ function renderCities() {
                 <div class="city-autocomplete">
                   <input type="text" placeholder="Arrival location (e.g. airport)" value="${esc(city.logistics.arrival.location)}" data-logistics="arrivalLocation" autocomplete="off" aria-label="Arrival location" />
                 </div>
-                <input type="time" value="${esc(city.logistics.arrival.customTime || TIME_OF_DAY_PRESETS[city.logistics.arrival.timeOfDay] || '09:00')}" data-logistics="arrivalTime" aria-label="Arrival time" />
+                <input type="time" value="${esc(city.logistics.arrival.time || '')}" data-logistics="arrivalTime" aria-label="Arrival time" />
               </div>
             </div>
 
@@ -1204,7 +1195,7 @@ function renderCities() {
                 <div class="city-autocomplete">
                   <input type="text" placeholder="Departure location (e.g. train station)" value="${esc(city.logistics.departure.location)}" data-logistics="departureLocation" autocomplete="off" aria-label="Departure location" />
                 </div>
-                <input type="time" value="${esc(city.logistics.departure.customTime || TIME_OF_DAY_PRESETS[city.logistics.departure.timeOfDay] || '18:00')}" data-logistics="departureTime" aria-label="Departure time" />
+                <input type="time" value="${esc(city.logistics.departure.time || '')}" data-logistics="departureTime" aria-label="Departure time" />
               </div>
             </div>
 
@@ -1296,6 +1287,7 @@ function renderCities() {
     if (accommodationInput && isGooglePlacesReady()) {
       const accom = city.accommodations[0];
       attachPlaceAutocompleteElement(accommodationInput, {
+        locationBias: cityLocationBias(city),
         onResolved: ({ formattedAddress, placeId, lat, lng }) => {
           accom.address = formattedAddress;
           accom.placeId = placeId;
@@ -1315,6 +1307,7 @@ function renderCities() {
     const arrivalLocationInput = row.querySelector('[data-logistics="arrivalLocation"]');
     if (arrivalLocationInput && isGooglePlacesReady()) {
       attachPlaceAutocompleteElement(arrivalLocationInput, {
+        locationBias: cityLocationBias(city),
         onResolved: ({ formattedAddress, placeId, lat, lng }) => {
           city.logistics.arrival.location = formattedAddress;
           city.logistics.arrival.placeId = placeId;
@@ -1341,6 +1334,7 @@ function renderCities() {
     const departureLocationInput = row.querySelector('[data-logistics="departureLocation"]');
     if (departureLocationInput && isGooglePlacesReady()) {
       attachPlaceAutocompleteElement(departureLocationInput, {
+        locationBias: cityLocationBias(city),
         onResolved: ({ formattedAddress, placeId, lat, lng }) => {
           city.logistics.departure.location = formattedAddress;
           city.logistics.departure.placeId = placeId;
@@ -1387,12 +1381,10 @@ function renderCities() {
           if (city.accommodations[0]) city.accommodations[0].checkOut = input.value || '';
         }
         if (field === 'arrivalTime') {
-          city.logistics.arrival.timeOfDay = 'custom';
-          city.logistics.arrival.customTime = parseTimeTo24(input.value || '');
+          city.logistics.arrival.time = parseTimeTo24(input.value || '');
         }
         if (field === 'departureTime') {
-          city.logistics.departure.timeOfDay = 'custom';
-          city.logistics.departure.customTime = parseTimeTo24(input.value || '');
+          city.logistics.departure.time = parseTimeTo24(input.value || '');
         }
 
         syncCityLegacyDates(city);
@@ -3850,6 +3842,13 @@ function validateLocationsBeforePlanning() {
     const logistics = city.logistics || normalizeCityLogistics(city);
     if (!logistics.arrival.date || !logistics.departure.date) {
       showLocationValidationError(`City "${city.name}" needs both arrival and departure dates.`);
+      return false;
+    }
+
+    const arrivalTime = logistics.arrival.time || '';
+    const departureTime = logistics.departure.time || '';
+    if (!arrivalTime || !departureTime) {
+      showLocationValidationError(`City "${city.name}" needs both arrival and departure times.`);
       return false;
     }
 
