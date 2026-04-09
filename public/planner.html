@@ -31,9 +31,22 @@
 
       <section id="executionModeView" class="panel execution-panel hidden" aria-live="polite">
         <div class="between execution-head">
-          <h2>Execution Mode</h2>
-          <p class="muted-text">What’s next, where it is, and how to get there.</p>
+          <div>
+            <h2>Execution Mode · Smart Minimal Itinerary</h2>
+            <p class="muted-text">Lightweight, shareable, and ready offline.</p>
+          </div>
+          <div class="execution-toolbar">
+            <button id="shareMinimalBtn" class="secondary" type="button">🔗 Share</button>
+            <button id="copyMinimalBtn" class="secondary" type="button">📋 Copy</button>
+            <button id="saveOfflineMinimalBtn" class="secondary" type="button">📥 Save Offline</button>
+            <button id="printMinimalBtn" class="secondary" type="button">🖨 Print</button>
+          </div>
         </div>
+        <div id="executionSummary" class="execution-summary"></div>
+        <section class="execution-confirmations-panel">
+          <h3>Consolidated Confirmations</h3>
+          <div id="executionConfirmations" class="execution-confirmations"></div>
+        </section>
         <div id="executionModeList" class="execution-list"></div>
       </section>
 

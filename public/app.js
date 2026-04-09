@@ -100,6 +100,12 @@ const els = {
   executionModeBtn: document.getElementById('executionModeBtn'),
   executionModeView: document.getElementById('executionModeView'),
   executionModeList: document.getElementById('executionModeList'),
+  executionSummary: document.getElementById('executionSummary'),
+  executionConfirmations: document.getElementById('executionConfirmations'),
+  shareMinimalBtn: document.getElementById('shareMinimalBtn'),
+  copyMinimalBtn: document.getElementById('copyMinimalBtn'),
+  saveOfflineMinimalBtn: document.getElementById('saveOfflineMinimalBtn'),
+  printMinimalBtn: document.getElementById('printMinimalBtn'),
   preferencesLink: document.getElementById('preferencesLink'),
   prefsModal: document.getElementById('prefsModal'),
   prefsClose: document.getElementById('prefsClose'),
@@ -127,6 +133,7 @@ const els = {
 
 const SNAPSHOT_KEY = 'travelplanner_snapshot';
 const VIEW_MODE_KEY = 'travelplanner_view_mode_v1';
+const MINIMAL_OFFLINE_KEY = 'travelplanner_minimal_offline_v1';
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s='') => s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalizeCity = (str = '') => String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -3258,26 +3265,206 @@ function getExecutionRows() {
     });
 }
 
+function getConsolidatedConfirmations() {
+  const rows = [];
+  state.cities.forEach((city) => {
+    const cityName = String(city?.name || '').trim();
+    const logistics = city?.logistics || {};
+    const accommodation = (city?.accommodations || [])[0] || {};
+
+    if (accommodation?.address) {
+      rows.push({
+        city: cityName,
+        type: 'Accommodation',
+        title: accommodation.address,
+        meta: [accommodation.checkIn, accommodation.checkOut].filter(Boolean).join(' → ')
+      });
+    }
+
+    if (logistics?.arrival?.location || logistics?.arrival?.time) {
+      rows.push({
+        city: cityName,
+        type: 'Arrival',
+        title: logistics.arrival.location || 'Arrival location',
+        meta: [logistics.arrival.date, logistics.arrival.time].filter(Boolean).join(' • ')
+      });
+    }
+
+    if (logistics?.departure?.location || logistics?.departure?.time) {
+      rows.push({
+        city: cityName,
+        type: 'Departure',
+        title: logistics.departure.location || 'Departure location',
+        meta: [logistics.departure.date, logistics.departure.time].filter(Boolean).join(' • ')
+      });
+    }
+  });
+
+  return rows;
+}
+
+function getMinimalPayload() {
+  const executionRows = getExecutionRows();
+  const confirmations = getConsolidatedConfirmations();
+  const firstDate = state.days[0]?.date || '';
+  const lastDate = state.days[state.days.length - 1]?.date || '';
+  return {
+    itineraryId: state.currentItineraryId || '',
+    tripName: state.tripName || 'Untitled Trip',
+    generatedAt: new Date().toISOString(),
+    firstDate,
+    lastDate,
+    cities: [...new Set(state.days.map((d) => d.city).filter(Boolean))],
+    itemCount: executionRows.length,
+    executionRows,
+    confirmations
+  };
+}
+
+function getMinimalOfflineStore() {
+  try {
+    return JSON.parse(localStorage.getItem(MINIMAL_OFFLINE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveMinimalOfflinePayload(payload) {
+  const id = String(payload?.itineraryId || '').trim();
+  if (!id) {
+    showToast('Generate and save an itinerary first.', 'info');
+    return;
+  }
+
+  const store = getMinimalOfflineStore();
+  store[id] = payload;
+  localStorage.setItem(MINIMAL_OFFLINE_KEY, JSON.stringify(store));
+  showToast('Minimal itinerary saved for offline use.', 'success');
+}
+
+function loadMinimalOfflinePayload(id = '') {
+  const key = String(id || '').trim();
+  if (!key) return null;
+  const store = getMinimalOfflineStore();
+  return store[key] || null;
+}
+
+function copyMinimalItineraryText() {
+  const payload = getMinimalPayload();
+  const lines = [
+    `${payload.tripName}`,
+    payload.firstDate && payload.lastDate ? `${payload.firstDate} → ${payload.lastDate}` : '',
+    '',
+    'SCHEDULE',
+    ...payload.executionRows.map((row) => `${row.date} ${parseTimeTo24(row.time)} • ${row.title}${row.place ? ` — ${row.place}` : ''}`),
+    '',
+    'CONSOLIDATED CONFIRMATIONS',
+    ...payload.confirmations.map((row) => `${row.type}: ${row.title}${row.meta ? ` (${row.meta})` : ''}${row.city ? ` [${row.city}]` : ''}`)
+  ].filter(Boolean);
+
+  navigator.clipboard.writeText(lines.join('\n'))
+    .then(() => showToast('Copied minimal itinerary.', 'success'))
+    .catch(() => showToast('Could not copy itinerary text.', 'error'));
+}
+
+async function shareMinimalItinerary() {
+  if (!state.currentItineraryId) {
+    showToast('Save itinerary first to create a share link.', 'info');
+    return;
+  }
+
+  const shareUrl = `${window.location.origin}/planner.html?itinerary=${encodeURIComponent(state.currentItineraryId)}&mode=execution`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: `${state.tripName || 'Trip'} — Smart Minimal Itinerary`,
+        text: 'Open this lightweight itinerary view',
+        url: shareUrl
+      });
+      return;
+    } catch {
+      // fallback to clipboard below
+    }
+  }
+
+  navigator.clipboard.writeText(shareUrl)
+    .then(() => showToast('Share link copied.', 'success'))
+    .catch(() => showToast('Could not copy share link.', 'error'));
+}
+
+function renderExecutionSummary(payload) {
+  if (!els.executionSummary) return;
+  const range = payload.firstDate && payload.lastDate ? `${payload.firstDate} → ${payload.lastDate}` : 'No date range';
+  els.executionSummary.innerHTML = `
+    <article class="execution-summary-card">
+      <h4>Trip</h4>
+      <p>${esc(payload.tripName)}</p>
+    </article>
+    <article class="execution-summary-card">
+      <h4>Dates</h4>
+      <p>${esc(range)}</p>
+    </article>
+    <article class="execution-summary-card">
+      <h4>Cities</h4>
+      <p>${esc(payload.cities.join(', ') || '—')}</p>
+    </article>
+    <article class="execution-summary-card">
+      <h4>Items</h4>
+      <p>${payload.itemCount}</p>
+    </article>
+  `;
+}
+
+function renderExecutionConfirmations(confirmations = []) {
+  if (!els.executionConfirmations) return;
+  if (!confirmations.length) {
+    els.executionConfirmations.innerHTML = '<p class="muted-text">No confirmations captured yet.</p>';
+    return;
+  }
+
+  els.executionConfirmations.innerHTML = confirmations.map((row) => `
+    <article class="execution-confirmation-item">
+      <p><strong>${esc(row.type)}:</strong> ${esc(row.title || '—')}</p>
+      <p class="muted-text">${esc([row.city, row.meta].filter(Boolean).join(' • '))}</p>
+    </article>
+  `).join('');
+}
+
 function renderExecutionMode() {
   if (!els.executionModeList) return;
-  const rows = getExecutionRows();
+  const payload = getMinimalPayload();
+  const rows = payload.executionRows;
+  renderExecutionSummary(payload);
+  renderExecutionConfirmations(payload.confirmations);
 
   if (!rows.length) {
     els.executionModeList.innerHTML = '<p class="muted-text">No scheduled itinerary yet. Build your plan in Planning Mode first.</p>';
     return;
   }
 
-  els.executionModeList.innerHTML = rows.map((row) => `
+  const groups = rows.reduce((acc, row) => {
+    const key = `${row.date}__${row.city}`;
+    if (!acc[key]) acc[key] = { date: row.date, city: row.city, items: [] };
+    acc[key].items.push(row);
+    return acc;
+  }, {});
+
+  els.executionModeList.innerHTML = Object.values(groups).map((group) => `
+    <section class="execution-day-group">
+      <h3>${esc(group.date)} • ${esc(group.city)}</h3>
+      ${group.items.map((row) => `
     <article class="execution-item">
-      <div class="execution-time">${esc(row.time)} • ${esc(row.date)}</div>
+      <div class="execution-time">${esc(row.time)}</div>
       <div class="execution-place">${esc(row.title)}${row.place ? ` — ${esc(row.place)}` : ''}</div>
       <p class="execution-note">${esc(row.note || 'No note')}</p>
-      <p class="execution-meta">${esc(row.city)}</p>
       <div class="execution-actions">
         <a href="${esc(row.navigateHref)}" target="_blank" rel="noopener noreferrer">🧭 Navigate</a>
         ${row.callHref ? `<a href="${esc(row.callHref)}">📞 Call</a>` : '<button type="button" disabled>📞 Call</button>'}
       </div>
     </article>
+      `).join('')}
+    </section>
   `).join('');
 }
 
@@ -3851,6 +4038,48 @@ function maybePromptSnapshot() {
   };
 }
 
+async function maybeLoadSharedItineraryFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const itineraryId = String(params.get('itinerary') || '').trim();
+  const mode = String(params.get('mode') || '').trim().toLowerCase();
+
+  if (!itineraryId) return false;
+
+  try {
+    await loadItineraryById(itineraryId);
+    if (mode === 'execution') setViewMode('execution');
+    return true;
+  } catch {
+    const offline = loadMinimalOfflinePayload(itineraryId);
+    if (!offline) return false;
+
+    if (els.executionSummary) {
+      renderExecutionSummary(offline);
+    }
+    if (els.executionConfirmations) {
+      renderExecutionConfirmations(offline.confirmations || []);
+    }
+    if (els.executionModeList) {
+      els.executionModeList.innerHTML = (offline.executionRows || []).map((row) => `
+        <article class="execution-item">
+          <div class="execution-time">${esc(row.time)} • ${esc(row.date)}</div>
+          <div class="execution-place">${esc(row.title)}${row.place ? ` — ${esc(row.place)}` : ''}</div>
+          <p class="execution-note">${esc(row.note || '')}</p>
+        </article>
+      `).join('');
+    }
+    setViewMode('execution');
+    return true;
+  }
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
 function clearPlannedResultsKeepSetup() {
   state.activities = [];
   state.reviewed = {};
@@ -3925,6 +4154,10 @@ els.downloadCalendarBtn?.addEventListener('click', () => {
   if (!state.currentItineraryId) return;
   window.open(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/calendar.ics`, '_blank');
 });
+els.shareMinimalBtn?.addEventListener('click', shareMinimalItinerary);
+els.copyMinimalBtn?.addEventListener('click', copyMinimalItineraryText);
+els.saveOfflineMinimalBtn?.addEventListener('click', () => saveMinimalOfflinePayload(getMinimalPayload()));
+els.printMinimalBtn?.addEventListener('click', () => window.print());
 els.planningModeBtn?.addEventListener('click', () => setViewMode('planning'));
 els.executionModeBtn?.addEventListener('click', () => setViewMode('execution'));
 els.preferencesLink.addEventListener('click', openPreferencesModal);
@@ -4019,6 +4252,8 @@ document.querySelectorAll('[data-nav-back]').forEach((btn) => {
   await fetchArrangeConfig();
   await fetchSavedItineraries();
   renderSavedItineraries();
+  registerServiceWorker();
   setViewMode(localStorage.getItem(VIEW_MODE_KEY) === 'execution' ? 'execution' : 'planning');
-  maybePromptSnapshot();
+  const loadedFromShare = await maybeLoadSharedItineraryFromUrl();
+  if (!loadedFromShare) maybePromptSnapshot();
 })();

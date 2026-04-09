@@ -49,6 +49,59 @@ body {
 .panel.active { display: block; }
 .execution-panel { margin-bottom: 14px; }
 .execution-head p { margin: 0; }
+.execution-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.execution-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.execution-summary-card {
+  border: 1px solid #dce4ef;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f9fbff;
+}
+.execution-summary-card h4 {
+  margin: 0 0 4px;
+  font-size: .85rem;
+  color: #445a79;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+.execution-summary-card p {
+  margin: 0;
+  font-weight: 700;
+}
+.execution-confirmations-panel {
+  border: 1px solid #e0e7f2;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fff;
+  margin-bottom: 10px;
+}
+.execution-confirmations-panel h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+.execution-confirmations {
+  display: grid;
+  gap: 6px;
+}
+.execution-confirmation-item {
+  border: 1px solid #e5ebf4;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fcfdff;
+}
+.execution-confirmation-item p {
+  margin: 2px 0;
+  font-size: .9rem;
+}
 .execution-list {
   display: flex;
   flex-direction: column;
@@ -1132,10 +1185,46 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   .step-nav-split { flex-direction: column; }
   .step-nav-split .nav-secondary,
   .step-nav-split .nav-primary { max-width: none; }
+  .execution-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .execution-toolbar {
+    width: 100%;
+  }
+  .execution-toolbar button {
+    flex: 1;
+  }
   .toast-host {
     left: 12px;
     right: 12px;
     bottom: 12px;
     max-width: none;
+  }
+}
+
+@media print {
+  .topbar,
+  .mode-toggle,
+  .steps,
+  .step-panel,
+  #chatWidget,
+  .execution-toolbar,
+  .saved-itineraries-panel,
+  #downloadCalendarBtn,
+  .sticky-nav {
+    display: none !important;
+  }
+
+  body,
+  .container,
+  .panel,
+  #executionModeView {
+    display: block !important;
+    background: #fff !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }
