@@ -331,6 +331,21 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .notes-row .apply-note:not(:disabled):hover { background: #f0fdf4; border-color: #22c55e; }
 
 .hidden { display: none !important; }
+
+.auth-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+#forwardingPanel code {
+  display: inline-block;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  background: #f3f4f6;
+  font-weight: 600;
+}
 .between { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .day-columns { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 10px; }
 .day-col { min-width: 280px; max-width: 280px; border: 1px solid #dbe1ea; border-radius: 12px; background: white; }

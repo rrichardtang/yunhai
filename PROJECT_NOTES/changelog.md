@@ -4,6 +4,19 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-09] Add Clerk auth + user-scoped itineraries + email forwarding ingest
+
+- Integrated Clerk auth boundary in planner app (frontend sign-in gate + Bearer token API calls)
+- Added server-side Clerk middleware and protected `/api/*` routes (except status + inbound webhook)
+- Converted itinerary persistence to authenticated user ownership (`userId`) for save/list/load/delete/ICS
+- Added per-user forwarding inbox generation using hashed alias + configurable forwarding domain
+- Added `/api/auth/session` to return user auth context + forwarding address
+- Added `/api/email/inbound` webhook with shared-secret verification for forwarded booking emails
+- Implemented booking parser (flight/hotel/car/other heuristics) and itinerary attachment flow
+- Added optional Resend outbound confirmation email after successful ingest
+- Relaxed userId validator to accept Clerk-style IDs
+- Files: `src/server.js`, `src/itineraryStore.js`, `src/emailForwarding.js`, `src/preferences.js`, `public/planner.html`, `public/app.js`, `public/styles.css`, `package.json`
+
 ## [2026-04-09] Build Smart Minimal Itinerary extension on top of Execution Mode
 
 - Extended existing Execution Mode (not a parallel view) into a "Smart Minimal Itinerary" surface

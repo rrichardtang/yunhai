@@ -29,7 +29,11 @@ const state = {
   viewMode: 'planning',
   arrangeConfig: null,
   arrangeDiagnostics: {},
-  lastPlannedFingerprint: null
+  lastPlannedFingerprint: null,
+  authReady: false,
+  authUserId: '',
+  authUserEmail: '',
+  forwardingAddress: ''
 };
 
 const PROFILES_KEY = 'travelplanner_profiles_v1';
@@ -96,6 +100,11 @@ const els = {
   savedItineraries: document.getElementById('savedItineraries'),
   editBtn: document.getElementById('editBtn'),
   apiBanner: document.getElementById('apiBanner'),
+  authUserLabel: document.getElementById('authUserLabel'),
+  signInBtn: document.getElementById('signInBtn'),
+  signOutBtn: document.getElementById('signOutBtn'),
+  forwardingPanel: document.getElementById('forwardingPanel'),
+  forwardingAddress: document.getElementById('forwardingAddress'),
   planningModeBtn: document.getElementById('planningModeBtn'),
   executionModeBtn: document.getElementById('executionModeBtn'),
   executionModeView: document.getElementById('executionModeView'),
@@ -1436,6 +1445,7 @@ function typeToTime(type) {
 }
 
 function ensureUserId() {
+  if (state.authUserId) return state.authUserId;
   const existing = localStorage.getItem(USER_ID_KEY);
   if (existing) return existing;
   const next = crypto.randomUUID();
@@ -1443,8 +1453,26 @@ function ensureUserId() {
   return next;
 }
 
+async function getAuthToken() {
+  const clerk = window.Clerk;
+  if (!clerk?.session) return '';
+  try {
+    return await clerk.session.getToken();
+  } catch {
+    return '';
+  }
+}
+
+async function apiFetch(url, options = {}) {
+  const token = await getAuthToken();
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  const next = { ...options, headers };
+  return fetch(url, next);
+}
+
 function postPreferenceSignal(activity, verdict) {
-  fetch('/api/preferences/signal', {
+  apiFetch('/api/preferences/signal', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -1630,7 +1658,7 @@ function closePreferencesModal() {
 }
 
 async function fetchStatus() {
-  const res = await fetch('/api/status');
+  const res = await apiFetch('/api/status');
   const data = await res.json();
   state.keys = data.keys || state.keys;
   const googleMapsApiKey = String(data?.googleMapsApiKey || '').trim();
@@ -1656,7 +1684,7 @@ async function fetchStatus() {
 
 async function fetchArrangeConfig() {
   try {
-    const res = await fetch('/api/arrange-config');
+    const res = await apiFetch('/api/arrange-config');
     const data = await res.json();
     if (!res.ok) throw new Error('Failed to fetch arrange config');
     state.arrangeConfig = data?.categoryDefaults || DEFAULT_ARRANGE_CATEGORY_CONFIG;
@@ -1751,7 +1779,7 @@ function enrichImages(items = []) {
   return Promise.all(itemsToFetch.map(async (item) => {
     try {
       const params = new URLSearchParams({ q: item.name, city: item.city || '', type: item.type || '' });
-      const res = await fetch(`/api/image?${params}`);
+      const res = await apiFetch(`/api/image?${params}`);
       if (!res.ok) return;
       const data = await res.json();
       if (data?.imageUrl) item.imageUrl = data.imageUrl;
@@ -1846,7 +1874,7 @@ function renderActivities() {
         applyBtn.disabled = true;
         applyBtn.textContent = '…';
         try {
-          const resp = await fetch('/api/activity/refine', {
+          const resp = await apiFetch('/api/activity/refine', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ activity: a, note })
@@ -2690,7 +2718,7 @@ function renderArrange() {
 async function fetchCommutesForActivities(activities = []) {
   if (!Array.isArray(activities) || activities.length < 2) return [];
   try {
-    const res = await fetch('/api/commute', {
+    const res = await apiFetch('/api/commute', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ activities })
@@ -2916,7 +2944,7 @@ async function autoArrangeActiveCity() {
   els.autoArrangeBtn.textContent = 'Arranging…';
 
   try {
-    const res = await fetch('/api/arrange', {
+    const res = await apiFetch('/api/arrange', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3480,7 +3508,7 @@ function setViewMode(mode = 'planning') {
 
 async function fetchSavedItineraries() {
   try {
-    const res = await fetch('/api/itineraries');
+    const res = await apiFetch('/api/itineraries');
     const data = await res.json();
     state.savedItineraries = Array.isArray(data?.itineraries) ? data.itineraries : [];
   } catch {
@@ -3528,7 +3556,7 @@ function renderSavedItineraries() {
       if (!confirmed) return;
 
       try {
-        const res = await fetch(`/api/itinerary/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        const res = await apiFetch(`/api/itinerary/${encodeURIComponent(id)}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Failed to delete itinerary');
         if (state.currentItineraryId === id) {
           state.currentItineraryId = null;
@@ -3550,7 +3578,7 @@ function renderSavedItineraries() {
 async function loadItineraryById(id) {
   if (!id) return;
   try {
-    const res = await fetch(`/api/itinerary/${encodeURIComponent(id)}`);
+    const res = await apiFetch(`/api/itinerary/${encodeURIComponent(id)}`);
     const data = await res.json();
     if (!res.ok || !data?.itinerary) throw new Error('Failed to load itinerary');
 
@@ -3616,7 +3644,7 @@ async function planTrip() {
   state.reviewed = {};
   renderActivities();
 
-  const res = await fetch('/api/plan', {
+  const res = await apiFetch('/api/plan', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -3727,7 +3755,7 @@ async function generateItinerary() {
     travels: state.travels,
     days: byDay
   };
-  const res = await fetch('/api/itinerary', {
+  const res = await apiFetch('/api/itinerary', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -3826,7 +3854,7 @@ function setChatOpen(isOpen) {
 async function restoreChatHistory() {
   try {
     const sessionId = ensureChatSessionId();
-    const res = await fetch(`/api/chat/session/${encodeURIComponent(sessionId)}`);
+    const res = await apiFetch(`/api/chat/session/${encodeURIComponent(sessionId)}`);
     const data = await res.json();
     state.chatHistory = Array.isArray(data.history)
       ? data.history.filter((msg) => msg.role === 'user' || msg.role === 'assistant')
@@ -3851,7 +3879,7 @@ async function sendChatMessage() {
   renderChatMessages();
 
   try {
-    const res = await fetch('/api/chat/message', {
+    const res = await apiFetch('/api/chat/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3882,7 +3910,7 @@ async function sendChatMessage() {
 async function resetChatSession() {
   const existing = state.chatSessionId || localStorage.getItem('chat_session_id');
   if (existing) {
-    try { await fetch(`/api/chat/session/${encodeURIComponent(existing)}`, { method: 'DELETE' }); } catch {}
+    try { await apiFetch(`/api/chat/session/${encodeURIComponent(existing)}`, { method: 'DELETE' }); } catch {}
   }
 
   const nextSessionId = crypto.randomUUID();
@@ -4080,6 +4108,67 @@ function registerServiceWorker() {
   });
 }
 
+function renderAuthUi() {
+  if (els.authUserLabel) {
+    els.authUserLabel.textContent = state.authUserEmail || (state.authUserId ? 'Signed in' : 'Signed out');
+  }
+  if (els.signInBtn) els.signInBtn.classList.toggle('hidden', Boolean(state.authUserId));
+  if (els.signOutBtn) els.signOutBtn.classList.toggle('hidden', !state.authUserId);
+  if (els.forwardingPanel) els.forwardingPanel.classList.toggle('hidden', !state.forwardingAddress);
+  if (els.forwardingAddress) els.forwardingAddress.textContent = state.forwardingAddress || 'Not available yet';
+}
+
+async function loadAuthSessionData() {
+  try {
+    const res = await apiFetch('/api/auth/session');
+    if (!res.ok) return;
+    const data = await res.json();
+    state.authUserId = String(data?.userId || state.authUserId || '');
+    state.forwardingAddress = String(data?.forwardingAddress || '');
+    localStorage.setItem(USER_ID_KEY, state.authUserId);
+  } catch {}
+  renderAuthUi();
+}
+
+async function initClerkAuth() {
+  const clerk = window.Clerk;
+  if (!clerk) throw new Error('Clerk SDK not loaded');
+
+  const statusRes = await fetch('/api/status');
+  const statusData = await statusRes.json();
+  const publishableKey = String(statusData?.clerkPublishableKey || '').trim();
+  if (!publishableKey) {
+    throw new Error('Clerk publishable key missing on server');
+  }
+
+  await clerk.load({ publishableKey });
+  const user = clerk.user;
+  if (!user) {
+    await clerk.openSignIn({
+      redirectUrl: window.location.href,
+      afterSignInUrl: window.location.href,
+      afterSignUpUrl: window.location.href
+    });
+    throw new Error('Authentication required');
+  }
+
+  state.authUserId = user.id || '';
+  state.authUserEmail = user.primaryEmailAddress?.emailAddress || '';
+  state.authReady = true;
+  renderAuthUi();
+
+  if (els.signInBtn) {
+    els.signInBtn.onclick = () => clerk.openSignIn({ redirectUrl: window.location.href, afterSignInUrl: window.location.href });
+  }
+  if (els.signOutBtn) {
+    els.signOutBtn.onclick = async () => {
+      await clerk.signOut({ redirectUrl: window.location.href });
+    };
+  }
+
+  await loadAuthSessionData();
+}
+
 function clearPlannedResultsKeepSetup() {
   state.activities = [];
   state.reviewed = {};
@@ -4175,7 +4264,7 @@ els.profileEditBtn.addEventListener('click', async () => {
   saveProfile(next);
 
   try {
-    const res = await fetch('/api/profile/enrich', {
+    const res = await apiFetch('/api/profile/enrich', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(next)
@@ -4240,6 +4329,16 @@ document.querySelectorAll('[data-nav-back]').forEach((btn) => {
 });
 
 (async function init() {
+  try {
+    await initClerkAuth();
+  } catch (error) {
+    if (els.apiBanner) {
+      els.apiBanner.textContent = `Authentication required: ${error.message || 'Please sign in.'}`;
+      els.apiBanner.classList.remove('hidden');
+    }
+    return;
+  }
+
   state.profilesStore = loadProfiles();
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   mountPlanningOverlay();

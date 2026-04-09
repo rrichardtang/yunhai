@@ -17,6 +17,11 @@
           <p>Personal AI itinerary builder</p>
         </div>
         <div class="topbar-actions">
+          <div id="authControls" class="auth-controls">
+            <span id="authUserLabel" class="muted-text"></span>
+            <button id="signInBtn" class="secondary" type="button">Sign in</button>
+            <button id="signOutBtn" class="secondary hidden" type="button">Sign out</button>
+          </div>
           <div class="mode-toggle" role="group" aria-label="View mode">
             <button id="planningModeBtn" class="link-btn mode-btn active" type="button">Planning</button>
             <button id="executionModeBtn" class="link-btn mode-btn" type="button">Execution</button>
@@ -28,6 +33,11 @@
 
     <main class="container">
       <div id="apiBanner" class="api-banner hidden"></div>
+      <section id="forwardingPanel" class="panel hidden" aria-live="polite">
+        <h3>Your private booking inbox</h3>
+        <p class="muted-text">Forward confirmations here (privacy-first, no mailbox linking):</p>
+        <p><code id="forwardingAddress">Not available yet</code></p>
+      </section>
 
       <section id="executionModeView" class="panel execution-panel hidden" aria-live="polite">
         <div class="between execution-head">
@@ -199,6 +209,7 @@
     <script>
       window.TRAVELPLANNER_GOOGLE_MAPS_SDK_BASE_URL = 'https://maps.googleapis.com/maps/api/js?libraries=places&v=beta&loading=async';
     </script>
+    <script async crossorigin="anonymous" data-clerk-publishable-key="" src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

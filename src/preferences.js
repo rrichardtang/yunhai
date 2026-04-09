@@ -35,8 +35,8 @@ function resolveUserId(userId) {
     err.statusCode = 400;
     throw err;
   }
-  if (resolved.length > 64 || !/^[A-Za-z0-9-]+$/.test(resolved)) {
-    const err = new Error('userId must be <= 64 chars and contain only letters, numbers, and hyphens');
+  if (resolved.length > 128 || !/^[A-Za-z0-9_.|:-]+$/.test(resolved)) {
+    const err = new Error('userId must be <= 128 chars and contain safe identifier characters');
     err.statusCode = 400;
     throw err;
   }

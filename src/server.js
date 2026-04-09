@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
+const { clerkMiddleware, requireAuth } = require('@clerk/express');
 const { planCity } = require('./claude');
 const { fetchUnsplashImage } = require('./unsplash');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('./arrangeConfig');
@@ -13,8 +14,7 @@ const {
   load: loadPreferences,
   getSummary: getPreferenceSummary,
   reset: resetPreferences,
-  resolveUserId,
-  DEFAULT_USER_ID
+  resolveUserId
 } = require('./preferences');
 const { getSession, setTripContext, addMessage, getHistory, compactHistory, clearSession, getCachedPrompt } = require('./chat');
 const {
@@ -22,14 +22,33 @@ const {
   getLatestItinerary,
   getItineraryById,
   listItineraries,
-  deleteItinerary
+  deleteItinerary,
+  addParsedBookings
 } = require('./itineraryStore');
+const {
+  getOrCreateForwardingAddress,
+  resolveUserFromRecipient,
+  parseBookingEmail,
+  sendIngestConfirmation
+} = require('./emailForwarding');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3457);
 
 app.use(express.json({ limit: '1mb' }));
+app.use(clerkMiddleware());
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+function requireConfiguredAuth(req, res, next) {
+  if (!process.env.CLERK_SECRET_KEY || !process.env.CLERK_PUBLISHABLE_KEY) {
+    return res.status(503).json({ error: 'Clerk is not configured' });
+  }
+  return requireAuth()(req, res, next);
+}
+
+function getAuthedUserId(req) {
+  return String(req?.auth?.userId || '').trim();
+}
 
 function parseTimeForCalendar(raw = '') {
   const normalized = String(raw || '').trim().toLowerCase();
@@ -481,7 +500,7 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
 }
 
 function parseUserId(rawUserId) {
-  return resolveUserId(rawUserId == null ? DEFAULT_USER_ID : rawUserId);
+  return resolveUserId(rawUserId);
 }
 
 function formatCityLine(city) {
@@ -664,11 +683,85 @@ app.get('/api/status', (_req, res) => {
     keys: {
       anthropicConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
       unsplashConfigured: Boolean(process.env.UNSPLASH_ACCESS_KEY),
-      googleMapsConfigured: Boolean(process.env.GOOGLE_MAPS_API_KEY)
+      googleMapsConfigured: Boolean(process.env.GOOGLE_MAPS_API_KEY),
+      clerkConfigured: Boolean(process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY),
+      resendConfigured: Boolean(process.env.RESEND_API_KEY)
     },
-    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
+    clerkPublishableKey: process.env.CLERK_PUBLISHABLE_KEY || ''
   });
 });
+
+app.get('/api/auth/session', requireConfiguredAuth, (req, res) => {
+  const userId = getAuthedUserId(req);
+  const userEmail = String(req?.auth?.sessionClaims?.email || req?.auth?.sessionClaims?.email_address || '').trim();
+  const forwardingAddress = getOrCreateForwardingAddress(userId, userEmail);
+
+  return res.json({
+    userId,
+    forwardingAddress,
+    forwardingEnabled: Boolean(forwardingAddress)
+  });
+});
+
+app.post('/api/email/inbound', async (req, res) => {
+  const expectedSecret = String(process.env.EMAIL_WEBHOOK_SECRET || '').trim();
+  const providedSecret = String(req.headers['x-travelplanner-email-secret'] || '').trim();
+  if (expectedSecret && providedSecret !== expectedSecret) {
+    return res.status(401).json({ error: 'Invalid webhook secret' });
+  }
+
+  const payload = req.body || {};
+  const recipients = [payload.to, payload.recipient, payload.envelope?.to].flat().filter(Boolean);
+  const routing = recipients
+    .map((value) => resolveUserFromRecipient(value))
+    .find(Boolean);
+
+  if (!routing?.userId) {
+    return res.status(400).json({ error: 'No matching forwarding address found' });
+  }
+
+  const parsedBookings = parseBookingEmail({
+    subject: payload.subject || '',
+    text: payload.text || payload.textBody || '',
+    html: payload.html || payload.htmlBody || ''
+  });
+
+  if (!parsedBookings.length) {
+    return res.json({ ok: true, parsed: 0, message: 'No booking details detected' });
+  }
+
+  const source = {
+    from: String(payload.from || payload.sender || '').slice(0, 200),
+    subject: String(payload.subject || '').slice(0, 200),
+    receivedAt: new Date().toISOString()
+  };
+
+  const attached = addParsedBookings({
+    userId: routing.userId,
+    itineraryId: String(payload.itineraryId || '').trim(),
+    bookings: parsedBookings,
+    source
+  });
+
+  if (!attached) {
+    return res.status(404).json({ error: 'No itinerary found for user to attach booking' });
+  }
+
+  try {
+    await sendIngestConfirmation({
+      toEmail: routing.userEmail,
+      parsedCount: attached.added,
+      forwardingAddress: `${routing.alias}@${process.env.FORWARDING_EMAIL_DOMAIN}`
+    });
+  } catch (error) {
+    console.error('[email] confirmation send failed:', error.message);
+  }
+
+  return res.json({ ok: true, parsed: attached.added, itineraryId: attached.itineraryId });
+});
+
+app.use('/api', requireConfiguredAuth);
 
 app.post('/api/activity/refine', async (req, res) => {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -721,11 +814,11 @@ app.post('/api/arrange', async (req, res) => {
     return res.status(503).json({ error: 'Anthropic API key not configured' });
   }
 
-  const { days, activities, userId: rawUserId, profile } = req.body || {};
+  const { days, activities, profile } = req.body || {};
   if (!Array.isArray(days) || !Array.isArray(activities)) {
     return res.status(400).json({ error: 'days and activities are required arrays' });
   }
-  const userId = parseUserId(rawUserId);
+  const userId = parseUserId(getAuthedUserId(req));
   const prefs = loadPreferences(userId);
   const prefParts = [];
   if (prefs.distilledProfile) prefParts.push(prefs.distilledProfile);
@@ -797,14 +890,14 @@ Respond ONLY with JSON:
 });
 
 app.post('/api/plan', async (req, res) => {
-  const { cities, travels, profile, userId } = req.body || {};
+  const { cities, travels, profile } = req.body || {};
   if (!Array.isArray(cities) || cities.length === 0) {
     return res.status(400).json({ error: 'cities must be a non-empty array' });
   }
 
   let resolvedUserId;
   try {
-    resolvedUserId = parseUserId(userId);
+    resolvedUserId = parseUserId(getAuthedUserId(req));
   } catch (error) {
     return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid userId' });
   }
@@ -890,8 +983,8 @@ app.post('/api/commute', async (req, res) => {
 
 app.post('/api/preferences/signal', (req, res) => {
   try {
-    const { userId, name, type, verdict, city, why_it_fits } = req.body || {};
-    const resolvedUserId = parseUserId(userId);
+    const { name, type, verdict, city, why_it_fits } = req.body || {};
+    const resolvedUserId = parseUserId(getAuthedUserId(req));
     recordSignal({ userId: resolvedUserId, name, type, verdict, city, why_it_fits });
     if (needsDistillation(resolvedUserId)) {
       distillProfile(resolvedUserId).catch((err) => console.error('[preferences] distillation failed:', err.message));
@@ -904,7 +997,7 @@ app.post('/api/preferences/signal', (req, res) => {
 
 app.get('/api/preferences', (req, res) => {
   try {
-    const userId = parseUserId(req.query?.userId);
+    const userId = parseUserId(getAuthedUserId(req));
     return res.json({ preferences: loadPreferences(userId) });
   } catch (error) {
     return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid userId' });
@@ -913,7 +1006,7 @@ app.get('/api/preferences', (req, res) => {
 
 app.post('/api/preferences/reset', (req, res) => {
   try {
-    const userId = parseUserId(req.body?.userId);
+    const userId = parseUserId(getAuthedUserId(req));
     const preferences = resetPreferences(userId);
     return res.json({ ok: true, preferences });
   } catch (error) {
@@ -953,7 +1046,7 @@ app.post('/api/profile/enrich', async (req, res) => {
 });
 
 app.post('/api/chat/message', async (req, res) => {
-  const { sessionId, message, tripContext, userId: rawUserId } = req.body || {};
+  const { sessionId, message, tripContext } = req.body || {};
   if (!sessionId || !message || typeof message !== 'string') {
     return res.status(400).json({ error: 'sessionId and message are required' });
   }
@@ -962,7 +1055,7 @@ app.post('/api/chat/message', async (req, res) => {
     return res.status(503).json({ error: 'Anthropic API key not configured for chat.' });
   }
 
-  const userId = parseUserId(rawUserId);
+  const userId = parseUserId(getAuthedUserId(req));
   const prefSummary = getPreferenceSummary(tripContext?.profile || null, userId);
 
   getSession(sessionId);
@@ -1015,33 +1108,39 @@ app.delete('/api/chat/session/:sessionId', (req, res) => {
 });
 
 app.post('/api/itinerary', (req, res) => {
+  const userId = parseUserId(getAuthedUserId(req));
   const payload = req.body || {};
-  const itinerary = saveItinerary(payload);
+  const itinerary = saveItinerary(payload, userId);
   res.json({ itinerary });
 });
 
-app.get('/api/itinerary', (_req, res) => {
-  res.json({ itinerary: getLatestItinerary() });
+app.get('/api/itinerary', (req, res) => {
+  const userId = parseUserId(getAuthedUserId(req));
+  res.json({ itinerary: getLatestItinerary(userId) });
 });
 
-app.get('/api/itineraries', (_req, res) => {
-  res.json({ itineraries: listItineraries() });
+app.get('/api/itineraries', (req, res) => {
+  const userId = parseUserId(getAuthedUserId(req));
+  res.json({ itineraries: listItineraries(userId) });
 });
 
 app.get('/api/itinerary/:id', (req, res) => {
-  const itinerary = getItineraryById(req.params.id);
+  const userId = parseUserId(getAuthedUserId(req));
+  const itinerary = getItineraryById(req.params.id, userId);
   if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
   return res.json({ itinerary });
 });
 
 app.delete('/api/itinerary/:id', (req, res) => {
-  const deleted = deleteItinerary(req.params.id);
+  const userId = parseUserId(getAuthedUserId(req));
+  const deleted = deleteItinerary(req.params.id, userId);
   if (!deleted) return res.status(404).json({ error: 'Itinerary not found' });
   return res.json({ ok: true });
 });
 
 app.get('/api/itinerary/:id/calendar.ics', (req, res) => {
-  const itinerary = getItineraryById(req.params.id);
+  const userId = parseUserId(getAuthedUserId(req));
+  const itinerary = getItineraryById(req.params.id, userId);
   if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
 
   const ics = buildItineraryIcs(itinerary);

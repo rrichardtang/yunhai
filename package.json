@@ -10,8 +10,10 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@clerk/express": "^2.1.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "openai": "^4.104.0"
+    "openai": "^4.104.0",
+    "resend": "^6.10.0"
   }
 }

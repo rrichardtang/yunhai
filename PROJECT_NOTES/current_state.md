@@ -6,18 +6,20 @@ _Last updated: 2026-04-09_
 Continue local development of TravelPlanner and push changes to git for VPS deployment.
 
 ## Active Workstream
-Smart Minimal Itinerary in Execution Mode — lightweight mobile view with share/offline support and consolidated confirmations.
+Auth + privacy-first booking ingestion:
+- Clerk auth integrated (frontend + backend protected APIs)
+- Itinerary storage now user-scoped by authenticated Clerk user ID
+- Per-user forwarding inbox address + webhook-based forwarded-email parser
 
 ## Constraints
-- Local development, testing on VPS at https://travelplanner.srv1553531.hstgr.cloud/planner.html
-- Google Maps API does not work on localhost, so testing requires VPS deployment
-- No .env file locally — user only edits frontend files
+- Clerk + Resend + webhook envs must be configured on VPS (`CLERK_*`, `FORWARDING_EMAIL_DOMAIN`, `EMAIL_WEBHOOK_SECRET`, optional `RESEND_*`)
+- Local runtime currently has a `.git/objects` ownership mismatch from earlier root operations, which blocks additional commits until ownership is repaired
 
 ## Risks
-- LLM may not reliably estimate inter-activity travel time accurately (no exact commute data at schedule time)
-- Existing `paceLabel` function name collision was caught post-deploy — watch for similar naming conflicts in the large app.js file
+- Booking email parser is heuristic MVP and may miss edge-case confirmation formats
+- Existing legacy itineraries without `userId` are intentionally not visible under new auth-scoped reads
 
 ## Next Actions
-- Validate shared-link open flow (`?itinerary=<id>&mode=execution`) on VPS/mobile
-- Verify service worker caching behavior and offline fallback payload experience
-- Consider adding PDF export if one-page print output needs richer formatting
+- Configure Clerk (Google + email magic link) and verify sign-in/sign-out + persisted sessions across devices
+- Configure forwarding domain + webhook to `/api/email/inbound` and test end-to-end parsing into itinerary bookings
+- Repair git ownership (`.git/objects`) so remaining code changes can be committed cleanly
