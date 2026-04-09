@@ -2346,6 +2346,14 @@ function logisticsDepartureId(cityName) {
   return `logistics-departure-${String(cityName || '').trim().toLowerCase().replace(/\s+/g, '-')}`;
 }
 
+function logisticsAccommodationArrivalId(cityName) {
+  return `logistics-acc-arrival-${String(cityName || '').trim().toLowerCase().replace(/\s+/g, '-')}`;
+}
+
+function logisticsAccommodationDepartureId(cityName) {
+  return `logistics-acc-departure-${String(cityName || '').trim().toLowerCase().replace(/\s+/g, '-')}`;
+}
+
 function buildLogisticsPseudoActivities(cityObj, date, cityName) {
   if (!cityObj) return { arrival: null, departure: null };
   const logistics = cityObj.logistics || {};
@@ -2358,6 +2366,7 @@ function buildLogisticsPseudoActivities(cityObj, date, cityName) {
   const accLng = normalizeCoordinate(acc?.longitude);
 
   let arrival = null;
+  let arrivalAccommodation = null;
   if (dateStr === arrivalDate) {
     const arrLoc = String(logistics.arrival?.location || '').trim();
     arrival = {
@@ -2371,9 +2380,21 @@ function buildLogisticsPseudoActivities(cityObj, date, cityName) {
       end_latitude: accLat,
       end_longitude: accLng
     };
+    arrivalAccommodation = {
+      id: logisticsAccommodationArrivalId(cityName),
+      name: 'Accommodation',
+      city: cityName,
+      start_location: accAddress,
+      start_latitude: accLat,
+      start_longitude: accLng,
+      end_location: accAddress,
+      end_latitude: accLat,
+      end_longitude: accLng
+    };
   }
 
   let departure = null;
+  let departureAccommodation = null;
   if (dateStr === departureDate) {
     const depLoc = String(logistics.departure?.location || '').trim();
     departure = {
@@ -2387,9 +2408,20 @@ function buildLogisticsPseudoActivities(cityObj, date, cityName) {
       end_latitude: normalizeCoordinate(logistics.departure?.latitude),
       end_longitude: normalizeCoordinate(logistics.departure?.longitude)
     };
+    departureAccommodation = {
+      id: logisticsAccommodationDepartureId(cityName),
+      name: 'Accommodation',
+      city: cityName,
+      start_location: accAddress,
+      start_latitude: accLat,
+      start_longitude: accLng,
+      end_location: accAddress,
+      end_latitude: accLat,
+      end_longitude: accLng
+    };
   }
 
-  return { arrival, departure };
+  return { arrival, arrivalAccommodation, departure, departureAccommodation };
 }
 
 function makeLogisticsCommuteIndicator(fromId, toId, baseTime, cardHeight) {
@@ -2583,14 +2615,27 @@ function renderArrange() {
     const accLabel = getAccommodationLabel(d.city, d.date);
     const arrId = logisticsArrivalId(d.city);
     const depId = logisticsDepartureId(d.city);
+    const arrAccId = logisticsAccommodationArrivalId(d.city);
+    const depAccId = logisticsAccommodationDepartureId(d.city);
+    const cardH = getLogisticsCardHeight();
 
     let html = '';
 
     if (dayLogistics?.isArrival) {
       const arrivalLabel = dayLogistics.arrivalLocation || 'Arrival';
-      html += makeLogisticsCard(`Arrive: ${arrivalLabel}`, '✈️', dayLogistics.arrivalTime, accLabel);
+      // 1. Arrival location card
+      html += makeLogisticsCard(`Arrive: ${arrivalLabel}`, '✈️', dayLogistics.arrivalTime);
+      // 2. Commute: arrival → accommodation
+      html += makeLogisticsCommuteIndicator(arrId, arrAccId, dayLogistics.arrivalTime, cardH);
+      // 3. Accommodation card (positioned after arrival + commute)
+      const arrToAccCommute = state.commutes[commutePairKey(arrId, arrAccId)] || null;
+      const arrToAccMins = resolveSelectedCommuteDetails(arrToAccCommute)?.durationMinutes || 0;
+      const accArrivalMins = minutesFromTime(dayLogistics.arrivalTime) + arrToAccMins;
+      const accArrivalTime = timeFromMinutes(accArrivalMins);
+      html += makeLogisticsCard(accLabel, '🏨', accArrivalTime);
+      // 4. Commute: accommodation → first activity
       if (items.length > 0) {
-        html += makeLogisticsCommuteIndicator(arrId, items[0].id, dayLogistics.arrivalTime, getLogisticsCardHeight());
+        html += makeLogisticsCommuteIndicator(arrAccId, items[0].id, accArrivalTime, cardH);
       }
     }
 
@@ -2608,9 +2653,19 @@ function renderArrange() {
         const lastPlacement = state.placements[lastItem.id] || {};
         const lastTime = parseTimeTo24(lastPlacement.time || lastItem.suggested_time || typeToTime(lastItem.type));
         const lastEndMins = minutesFromTime(lastTime) + Math.max(30, Number(lastItem.duration_hours || 1) * 60);
-        html += makeLogisticsCommuteIndicator(lastItem.id, depId, timeFromMinutes(lastEndMins), 0);
+        // 1. Commute: last activity → accommodation
+        html += makeLogisticsCommuteIndicator(lastItem.id, depAccId, timeFromMinutes(lastEndMins), 0);
       }
-      html += makeLogisticsCard(`Depart: ${departureLabel}`, '🛫', dayLogistics.departureTime, accLabel);
+      // 2. Accommodation card (positioned before departure - commute)
+      const accToDepCommute = state.commutes[commutePairKey(depAccId, depId)] || null;
+      const accToDepMins = resolveSelectedCommuteDetails(accToDepCommute)?.durationMinutes || 0;
+      const accDepartureMins = minutesFromTime(dayLogistics.departureTime) - accToDepMins;
+      const accDepartureTime = timeFromMinutes(Math.max(0, accDepartureMins));
+      html += makeLogisticsCard(accLabel, '🏨', accDepartureTime);
+      // 3. Commute: accommodation → departure
+      html += makeLogisticsCommuteIndicator(depAccId, depId, accDepartureTime, cardH);
+      // 4. Departure location card
+      html += makeLogisticsCard(`Depart: ${departureLabel}`, '🛫', dayLogistics.departureTime);
     }
 
     schedule.innerHTML = html;
@@ -2856,19 +2911,14 @@ async function updateCommutesForCityDays(dayIds = []) {
 
     // Build logistics pseudo-activities for this day
     const cityObj = day ? state.cities.find((c) => cityMatches(c.name, day.city)) : null;
-    const { arrival: arrivalPseudo, departure: departurePseudo } = buildLogisticsPseudoActivities(cityObj, day?.date, day?.city);
+    const { arrival: arrivalPseudo, arrivalAccommodation: arrAccPseudo, departure: departurePseudo, departureAccommodation: depAccPseudo } = buildLogisticsPseudoActivities(cityObj, day?.date, day?.city);
 
     // Clean up old logistics commute keys for this day
-    if (arrivalPseudo) {
-      Object.keys(state.commutes).forEach((key) => {
-        if (key.startsWith(arrivalPseudo.id + '->')) delete state.commutes[key];
-      });
-    }
-    if (departurePseudo) {
-      Object.keys(state.commutes).forEach((key) => {
-        if (key.endsWith('->' + departurePseudo.id)) delete state.commutes[key];
-      });
-    }
+    const logisticsIds = [arrivalPseudo, arrAccPseudo, departurePseudo, depAccPseudo].filter(Boolean).map((p) => p.id);
+    Object.keys(state.commutes).forEach((key) => {
+      const [fromId, toId] = key.split('->');
+      if (logisticsIds.includes(fromId) || logisticsIds.includes(toId)) delete state.commutes[key];
+    });
 
     const payloadActivities = orderedActivities.map((a) => ({
       id: a.id,
@@ -2883,10 +2933,20 @@ async function updateCommutesForCityDays(dayIds = []) {
       suggested_time: state.placements[a.id]?.time || parseTimeTo24(a.suggested_time || typeToTime(a.type))
     }));
 
-    // Prepend arrival pseudo-activity, append departure pseudo-activity
+    // Prepend arrival chain (arrival → accommodation → first activity), append departure chain (last activity → accommodation → departure)
     const fullPayload = [...payloadActivities];
-    if (arrivalPseudo && fullPayload.length > 0) fullPayload.unshift(arrivalPseudo);
-    if (departurePseudo && fullPayload.length > 0) fullPayload.push(departurePseudo);
+    if (arrivalPseudo && arrAccPseudo) {
+      fullPayload.unshift(arrAccPseudo);
+      fullPayload.unshift(arrivalPseudo);
+    } else if (arrivalPseudo && fullPayload.length > 0) {
+      fullPayload.unshift(arrivalPseudo);
+    }
+    if (departurePseudo && depAccPseudo) {
+      fullPayload.push(depAccPseudo);
+      fullPayload.push(departurePseudo);
+    } else if (departurePseudo && fullPayload.length > 0) {
+      fullPayload.push(departurePseudo);
+    }
 
     if (fullPayload.length < 2) continue;
 

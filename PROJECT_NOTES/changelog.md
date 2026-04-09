@@ -4,6 +4,14 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-08] Real commute times for arrival/departure logistics legs
+
+- Logistics pseudo-activities (arrival→accommodation, accommodation→departure) injected into commute calculation pipeline
+- Google Maps Distance Matrix now calculates real transit/driving/walking times for these legs
+- Commute mode selector rendered between logistics cards and first/last activities
+- Accommodation label truncated to first comma-segment to avoid raw address overflow
+- Files: `public/app.js`
+
 ## [2026-04-08] Arrival/departure logistics cards and auto-arrange constraints
 
 - Render fixed ✈️ arrival and 🛫 departure cards on arrival/departure days in the arrange view
