@@ -1,12 +1,12 @@
 # Current State
 
-_Last updated: 2026-04-08_
+_Last updated: 2026-04-09_
 
 ## Objective
 Continue local development of TravelPlanner and push changes to git for VPS deployment.
 
 ## Active Workstream
-Activity review UX — note-driven refinement, pace preference, LLM-reasoned activity counts.
+Smart Minimal Itinerary in Execution Mode — lightweight mobile view with share/offline support and consolidated confirmations.
 
 ## Constraints
 - Local development, testing on VPS at https://travelplanner.srv1553531.hstgr.cloud/planner.html
@@ -18,5 +18,6 @@ Activity review UX — note-driven refinement, pace preference, LLM-reasoned act
 - Existing `paceLabel` function name collision was caught post-deploy — watch for similar naming conflicts in the large app.js file
 
 ## Next Actions
-- Test apply-note refinement on VPS (verify activity card updates correctly after refine)
-- Test pace slider and activity count behavior across different trip lengths and pace values
+- Validate shared-link open flow (`?itinerary=<id>&mode=execution`) on VPS/mobile
+- Verify service worker caching behavior and offline fallback payload experience
+- Consider adding PDF export if one-page print output needs richer formatting

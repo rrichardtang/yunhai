@@ -4,6 +4,17 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-09] Build Smart Minimal Itinerary extension on top of Execution Mode
+
+- Extended existing Execution Mode (not a parallel view) into a "Smart Minimal Itinerary" surface
+- Added mobile-friendly execution toolbar actions: Share link, Copy text, Save Offline, Print
+- Added compact trip summary cards (trip/date range/cities/item count)
+- Added "Consolidated Confirmations" block (accommodation + arrival/departure details per city)
+- Grouped execution schedule by day/city for lightweight on-trip scanning
+- Added URL-share flow via `?itinerary=<id>&mode=execution`
+- Added offline fallback pack in localStorage for shared links and service worker shell caching (`public/sw.js`)
+- Files: `public/planner.html`, `public/styles.css`, `public/app.js`, `public/sw.js`
+
 ## [2026-04-08] Add apply-note button to refine activities from user notes
 
 - New `/api/activity/refine` endpoint: sends activity + user note to Haiku, returns only changed fields
