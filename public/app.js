@@ -2240,12 +2240,8 @@ function makePlacedCard(item) {
   `;
 }
 
-function makeCommuteIndicator(currentItem, nextItem) {
-  const placement = state.placements[currentItem.id] || {};
-  const time = parseTimeTo24(placement.time || currentItem.suggested_time || typeToTime(currentItem.type));
-  const h = Math.max(28, Number(currentItem.duration_hours || 1) * PX_PER_HOUR);
-  const y = yFromTime(time) + h + 6;
-  const commute = state.commutes[commutePairKey(currentItem.id, nextItem.id)] || null;
+function renderCommuteSelector(fromId, toId, y) {
+  const commute = state.commutes[commutePairKey(fromId, toId)] || null;
   const selected = resolveSelectedCommuteDetails(commute);
   if (!selected || !Number.isFinite(selected.durationMinutes)) return '';
 
@@ -2268,7 +2264,7 @@ function makeCommuteIndicator(currentItem, nextItem) {
 
   return `
     <div class="commute-indicator" style="top:${y}px;">
-      <div class="commute-selector" data-from-id="${esc(currentItem.id)}" data-to-id="${esc(nextItem.id)}">
+      <div class="commute-selector" data-from-id="${esc(fromId)}" data-to-id="${esc(toId)}">
         <button type="button" class="commute-selector-trigger" aria-expanded="false">
           <span class="commute-selected-label">${esc(formatCommuteBadge(commute))}</span>
           <span class="commute-selector-arrow" aria-hidden="true">▾</span>
@@ -2277,6 +2273,13 @@ function makeCommuteIndicator(currentItem, nextItem) {
       </div>
     </div>
   `;
+}
+
+function makeCommuteIndicator(currentItem, nextItem) {
+  const placement = state.placements[currentItem.id] || {};
+  const time = parseTimeTo24(placement.time || currentItem.suggested_time || typeToTime(currentItem.type));
+  const h = Math.max(28, Number(currentItem.duration_hours || 1) * PX_PER_HOUR);
+  return renderCommuteSelector(currentItem.id, nextItem.id, yFromTime(time) + h + 6);
 }
 
 function makeLogisticsCard(label, icon, time, subtitle = '') {
@@ -2290,15 +2293,6 @@ function makeLogisticsCard(label, icon, time, subtitle = '') {
         ${subtitleHtml}
       </div>
       <span class="logistics-card-time">${esc(time)}</span>
-    </div>
-  `;
-}
-
-function makeLogisticsTransit(fromLabel, toLabel, yTop) {
-  return `
-    <div class="logistics-transit" style="top:${yTop}px;">
-      <span class="logistics-transit-line" aria-hidden="true"></span>
-      <span class="logistics-transit-label">🧳 ${esc(fromLabel)} → ${esc(toLabel)}</span>
     </div>
   `;
 }
@@ -2376,9 +2370,9 @@ function buildLogisticsPseudoActivities(cityObj, date, cityName) {
       start_location: arrLoc,
       start_latitude: normalizeCoordinate(logistics.arrival?.latitude),
       start_longitude: normalizeCoordinate(logistics.arrival?.longitude),
-      end_location: accAddress,
-      end_latitude: accLat,
-      end_longitude: accLng
+      end_location: arrLoc,
+      end_latitude: normalizeCoordinate(logistics.arrival?.latitude),
+      end_longitude: normalizeCoordinate(logistics.arrival?.longitude)
     };
     arrivalAccommodation = {
       id: logisticsAccommodationArrivalId(cityName),
@@ -2401,9 +2395,9 @@ function buildLogisticsPseudoActivities(cityObj, date, cityName) {
       id: logisticsDepartureId(cityName),
       name: 'Accommodation → Departure',
       city: cityName,
-      start_location: accAddress,
-      start_latitude: accLat,
-      start_longitude: accLng,
+      start_location: depLoc,
+      start_latitude: normalizeCoordinate(logistics.departure?.latitude),
+      start_longitude: normalizeCoordinate(logistics.departure?.longitude),
       end_location: depLoc,
       end_latitude: normalizeCoordinate(logistics.departure?.latitude),
       end_longitude: normalizeCoordinate(logistics.departure?.longitude)
@@ -2425,39 +2419,7 @@ function buildLogisticsPseudoActivities(cityObj, date, cityName) {
 }
 
 function makeLogisticsCommuteIndicator(fromId, toId, baseTime, cardHeight) {
-  const commute = state.commutes[commutePairKey(fromId, toId)] || null;
-  const selected = resolveSelectedCommuteDetails(commute);
-  if (!selected || !Number.isFinite(selected.durationMinutes)) return '';
-
-  const y = yFromTime(baseTime) + cardHeight + 6;
-  const options = COMMUTE_MODE_ORDER
-    .map((mode) => {
-      const option = commute?.modes?.[mode];
-      if (!option || !Number.isFinite(Number(option.durationMinutes))) return '';
-      const isActive = selected.selectedMode === mode;
-      return `
-        <button type="button" class="commute-option ${isActive ? 'active' : ''}" data-mode="${mode}">
-          <span>${esc(option.modeIcon || '🚇')} ${esc(COMMUTE_MODE_LABEL[mode] || mode)} - ${Number(option.durationMinutes)} min</span>
-          ${isActive ? '<span class="commute-option-check">✓</span>' : ''}
-        </button>
-      `;
-    })
-    .filter(Boolean)
-    .join('');
-
-  if (!options) return '';
-
-  return `
-    <div class="commute-indicator" style="top:${y}px;">
-      <div class="commute-selector" data-from-id="${esc(fromId)}" data-to-id="${esc(toId)}">
-        <button type="button" class="commute-selector-trigger" aria-expanded="false">
-          <span class="commute-selected-label">${esc(formatCommuteBadge(commute))}</span>
-          <span class="commute-selector-arrow" aria-hidden="true">▾</span>
-        </button>
-        <div class="commute-selector-menu" role="menu">${options}</div>
-      </div>
-    </div>
-  `;
+  return renderCommuteSelector(fromId, toId, yFromTime(baseTime) + cardHeight + 6);
 }
 
 function getPlacementTimeRange(activity, placementOverride = null) {
@@ -2866,35 +2828,18 @@ function recalculateDayFromIndex(dayId, startIndex = 1) {
 async function updateCommutesForCityDays(dayIds = []) {
   for (const dayId of dayIds) {
     const day = state.days.find((d) => d.id === dayId);
-    const accommodation = day ? getAccommodationForDay(day.city, day.date) : null;
+    if (!day) continue;
+    const accommodation = getAccommodationForDay(day.city, day.date);
     const accommodationLocation = String(accommodation?.address || '').trim();
     const orderedActivities = state.activities
       .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === dayId)
       .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
 
-    const dayIdsSet = new Set(orderedActivities.map((a) => a.id));
-    Object.keys(state.commutes).forEach((key) => {
-      const [fromId, toId] = key.split('->');
-      if (dayIdsSet.has(fromId) && dayIdsSet.has(toId)) delete state.commutes[key];
-    });
-
-    // Build logistics pseudo-activities for this day
-    const cityObj = day ? state.cities.find((c) => cityMatches(c.name, day.city)) : null;
-    const { arrival: arrivalPseudo, arrivalAccommodation: arrAccPseudo, departure: departurePseudo, departureAccommodation: depAccPseudo } = buildLogisticsPseudoActivities(cityObj, day?.date, day?.city);
-
-    // Clean up old logistics commute keys for this day
-    const logisticsIds = [arrivalPseudo, arrAccPseudo, departurePseudo, depAccPseudo].filter(Boolean).map((p) => p.id);
-    Object.keys(state.commutes).forEach((key) => {
-      const [fromId, toId] = key.split('->');
-      if (logisticsIds.includes(fromId) || logisticsIds.includes(toId)) delete state.commutes[key];
-    });
-
+    const cityObj = state.cities.find((c) => cityMatches(c.name, day.city));
+    const { arrival, arrivalAccommodation, departure, departureAccommodation } = buildLogisticsPseudoActivities(cityObj, day.date, day.city);
     const payloadActivities = orderedActivities.map((a) => ({
-      id: a.id,
-      name: a.name,
-      city: a.city,
-      start_location: a.start_location,
-      end_location: a.end_location,
+      id: a.id, name: a.name, city: a.city,
+      start_location: a.start_location, end_location: a.end_location,
       accommodation_location: accommodationLocation,
       hotel_location: accommodationLocation,
       hotel_latitude: normalizeCoordinate(accommodation?.latitude),
@@ -2902,35 +2847,31 @@ async function updateCommutesForCityDays(dayIds = []) {
       suggested_time: state.placements[a.id]?.time || parseTimeTo24(a.suggested_time || typeToTime(a.type))
     }));
 
-    // Prepend arrival chain (arrival → accommodation → first activity), append departure chain (last activity → accommodation → departure)
-    const fullPayload = [...payloadActivities];
-    if (arrivalPseudo && arrAccPseudo) {
-      fullPayload.unshift(arrAccPseudo);
-      fullPayload.unshift(arrivalPseudo);
-    } else if (arrivalPseudo && fullPayload.length > 0) {
-      fullPayload.unshift(arrivalPseudo);
-    }
-    if (departurePseudo && depAccPseudo) {
-      fullPayload.push(depAccPseudo);
-      fullPayload.push(departurePseudo);
-    } else if (departurePseudo && fullPayload.length > 0) {
-      fullPayload.push(departurePseudo);
-    }
+    const fullPayload = [
+      ...(arrival && arrivalAccommodation ? [arrival, arrivalAccommodation] : arrival ? [arrival] : []),
+      ...payloadActivities,
+      ...(departure && departureAccommodation ? [departureAccommodation, departure] : departure ? [departure] : [])
+    ];
 
     if (fullPayload.length < 2) continue;
+
+    // Clear all commute keys involving any ID in this payload
+    const payloadIds = new Set(fullPayload.map((p) => p.id));
+    Object.keys(state.commutes).forEach((key) => {
+      const [fromId, toId] = key.split('->');
+      if (payloadIds.has(fromId) || payloadIds.has(toId)) delete state.commutes[key];
+    });
 
     const commutes = await fetchCommutesForActivities(fullPayload);
     commutes.forEach((c) => {
       const selectedMode = resolveSelectedCommuteMode(c);
       const selected = c?.modes?.[selectedMode] || {};
       state.commutes[commutePairKey(c.fromId, c.toId)] = {
-        ...c,
-        selectedMode,
+        ...c, selectedMode,
         durationMinutes: Number.isFinite(Number(selected.durationMinutes)) ? Number(selected.durationMinutes) : null,
         modeIcon: selected.modeIcon || '🚇'
       };
     });
-
   }
 }
 
