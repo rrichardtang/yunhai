@@ -41,7 +41,8 @@ const PROFILE_QUESTIONS = [
   { key: 'livePerformances', label: 'Do you seek out live performances (concerts, theatre, shows)?', summary: 'Live performances' },
   { key: 'outdoorNature', label: 'Do you enjoy outdoor / nature activities?', summary: 'Outdoor / nature activities' },
   { key: 'nightlifeBars', label: 'Are you into nightlife and bars?', summary: 'Nightlife and bars' },
-  { key: 'structuredTours', label: 'Do you like structured tours?', summary: 'Structured tours' }
+  { key: 'structuredTours', label: 'Do you like structured tours?', summary: 'Structured tours' },
+  { key: 'pace', label: 'How packed do you like your days?', summary: 'Trip pace', labels: ['Very relaxed', 'Easy-going', 'Moderate', 'Active', 'Non-stop'] }
 ];
 const PROFILE_MIN = 1;
 const PROFILE_MAX = 5;
@@ -54,6 +55,15 @@ function profileLabel(value) {
   if (rating === 3) return 'Neutral';
   if (rating === 4) return 'Very interested';
   return 'Love this';
+}
+
+function paceLabel(value) {
+  const rating = Number(value);
+  if (rating <= 1) return 'Very relaxed';
+  if (rating === 2) return 'Easy-going';
+  if (rating === 3) return 'Moderate';
+  if (rating === 4) return 'Active';
+  return 'Non-stop';
 }
 
 const els = {
@@ -1480,7 +1490,7 @@ function renderPreferencesModal() {
 
   els.profileQuestions.innerHTML = PROFILE_QUESTIONS.map((q) => {
     const active = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Number(profile.answers[q.key] || PROFILE_DEFAULT)));
-    const label = profileLabel(active);
+    const label = q.key === 'pace' ? paceLabel(active) : profileLabel(active);
     return `
       <div class="profile-question" data-question="${esc(q.key)}">
         <p>${esc(q.label)}</p>
@@ -1534,7 +1544,7 @@ function renderPreferencesModal() {
       const valueEl = question.querySelector('.rating-value');
       const labelEl = question.querySelector('.rating-label');
       if (valueEl) valueEl.textContent = `${nextAnswer}/5`;
-      if (labelEl) labelEl.textContent = profileLabel(nextAnswer);
+      if (labelEl) labelEl.textContent = key === 'pace' ? paceLabel(nextAnswer) : profileLabel(nextAnswer);
     });
   });
 }
@@ -2883,7 +2893,8 @@ async function autoArrangeActiveCity() {
           if (loc) obj.location = loc;
           return obj;
         }),
-        userId: ensureUserId()
+        userId: ensureUserId(),
+        profile: getProfilePayload()
       })
     });
 

@@ -592,8 +592,11 @@ function formatProfileForEnrichment(profile = {}) {
     ['nightlifeBars', 'Nightlife and bars'],
     ['structuredTours', 'Structured tours']
   ];
+  const paceLabels = { 1: 'Very relaxed', 2: 'Easy-going', 3: 'Moderate', 4: 'Active', 5: 'Non-stop' };
 
   const lines = questionMap.map(([key, label]) => `- ${label}: ${sliderInterestLabel(answers[key])}`);
+  const paceValue = Math.max(1, Math.min(5, Math.round(Number(answers.pace) || 3)));
+  lines.push(`- Trip pace: ${paceLabels[paceValue]}`);
   const aboutMe = String(profile?.aboutMe || '').trim() || '(none provided)';
   return `${lines.join('\n')}\n- About me: ${aboutMe}`;
 }
@@ -675,7 +678,7 @@ app.post('/api/arrange', async (req, res) => {
     return res.status(503).json({ error: 'Anthropic API key not configured' });
   }
 
-  const { days, activities, userId: rawUserId } = req.body || {};
+  const { days, activities, userId: rawUserId, profile } = req.body || {};
   if (!Array.isArray(days) || !Array.isArray(activities)) {
     return res.status(400).json({ error: 'days and activities are required arrays' });
   }
@@ -703,7 +706,10 @@ app.post('/api/arrange', async (req, res) => {
   }).join('\n');
   const perDay = Math.ceil(activities.length / days.length);
 
-  const travelerBlock = prefSummary ? `\nTRAVELER PROFILE:\n${prefSummary}\n` : '';
+  const paceValue = Math.max(1, Math.min(5, Math.round(Number(profile?.answers?.pace) || 3)));
+  const paceLabels = { 1: 'very relaxed', 2: 'easy-going', 3: 'moderate', 4: 'active', 5: 'non-stop' };
+  const paceDesc = paceLabels[paceValue];
+  const travelerBlock = prefSummary ? `\nTRAVELER PROFILE:\n${prefSummary}\nPace preference: ${paceDesc}\n` : `\nPace preference: ${paceDesc}\n`;
 
   const prompt = `Schedule ${activities.length} activities across ${days.length} days. Target ~${perDay} activities per day — distribute evenly.
 
@@ -722,7 +728,7 @@ RULES (priority order):
 6. No overlaps — account for duration + 20min travel buffer between activities.
 7. Group nearby locations on the same day when possible.
 8. Honor preferred time hints when they fit.
-9. Respect the traveler profile when scheduling times and pacing.
+9. Respect the traveler's ${paceDesc} pace preference — ${paceValue <= 2 ? 'leave generous gaps between activities and favor fewer, longer experiences' : paceValue >= 4 ? 'pack days tightly with minimal downtime between activities' : 'balance activity with reasonable breaks'}.
 10. If an activity cannot fit, include it in unplaced with a reason.
 
 Respond ONLY with JSON:

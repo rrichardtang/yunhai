@@ -292,16 +292,20 @@ function getSummary(profile = null, userId = DEFAULT_USER_ID) {
   const questionMap = [
     ['museumPerson', 'Museum person'], ['foodTravel', 'Travels for food'],
     ['livePerformances', 'Live performances'], ['outdoorNature', 'Outdoor / nature activities'],
-    ['nightlifeBars', 'Nightlife and bars'], ['structuredTours', 'Structured tours']
+    ['nightlifeBars', 'Nightlife and bars'], ['structuredTours', 'Structured tours'],
+    ['pace', 'Trip pace']
   ];
   const sliderToLabel = { 1: 'Not interested', 2: 'Slightly interested', 3: 'Neutral', 4: 'Very interested', 5: 'Loves this' };
+  const paceToLabel = { 1: 'Very relaxed', 2: 'Easy-going', 3: 'Moderate', 4: 'Active', 5: 'Non-stop' };
 
   const profileLines = questionMap
     .map(([key, label]) => {
       const raw = Number(answers[key]);
       const value = Number.isFinite(raw) ? Math.max(1, Math.min(5, Math.round(raw))) : null;
-      if (!value || !sliderToLabel[value]) return null;
-      return `- ${label}: ${sliderToLabel[value]}`;
+      if (!value) return null;
+      const labelText = key === 'pace' ? paceToLabel[value] : sliderToLabel[value];
+      if (!labelText) return null;
+      return `- ${label}: ${labelText}`;
     })
     .filter(Boolean);
 
