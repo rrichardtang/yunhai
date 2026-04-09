@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-08] Arrival/departure logistics cards and auto-arrange constraints
+
+- Render fixed ✈️ arrival and 🛫 departure cards on arrival/departure days in the arrange view
+- Transit arrows shown: arrival location → accommodation, accommodation → departure location
+- `/api/arrange` prompt now includes FIXED FIRST/LAST annotations so Claude schedules no activities before arrival transit or after departure transit
+- Fixed Google Places library init: merge `importLibrary('places')` return value into `window.google.maps.places` so `PlaceAutocompleteElement` is found
+- Added editable AI-generated summary section in profile modal (hidden until first enrichment, user-editable)
+- Files: `public/app.js`, `public/styles.css`, `src/server.js`
+
 ## [2026-04-07] Fix activity images not loading at step 2
 
 - Moved `setStep(2)` before `renderActivities()` in the streaming city event handler so `enrichImages` fires on the first city arrival instead of waiting for user interaction
