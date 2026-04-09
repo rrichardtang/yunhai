@@ -530,7 +530,8 @@ Only include signals when the user clearly states a preference. Omit the array o
 function parseChatResponse(raw) {
   const fallback = { reply: raw || 'Sorry, I couldn\'t process that.', signals: [] };
   try {
-    const parsed = JSON.parse(raw);
+    const stripped = String(raw || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    const parsed = JSON.parse(stripped);
     if (typeof parsed.reply !== 'string') return fallback;
     return { reply: parsed.reply, signals: Array.isArray(parsed.signals) ? parsed.signals : [] };
   } catch {
