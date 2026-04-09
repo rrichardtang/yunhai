@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-08] Simplify auto-arrange: LLM-driven scheduling with commute-aware inputs
+
+- Pre-fetch arrival→accommodation and accommodation→departure commute times via Google Maps before `/api/arrange` call
+- fixedStart/fixedEnd times now offset by actual transit duration so LLM receives accurate available windows
+- Activity locations sent in arrange payload for LLM geographic clustering
+- Prompt updated: LLM estimates inter-activity travel time, groups nearby activities per day
+- Deleted `applyCommuteTimeAdjustments` — LLM scheduling trusted, hardcoded post-processing removed
+- `updateCommutesForCityDays` now fetches commutes for display only (no time shifting)
+- Files: `public/app.js`, `src/server.js`
+
 ## [2026-04-08] Real commute times for arrival/departure logistics legs
 
 - Logistics pseudo-activities (arrival→accommodation, accommodation→departure) injected into commute calculation pipeline
