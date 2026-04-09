@@ -1802,7 +1802,10 @@ function renderActivities() {
         </div>
         <label class="${review.approved ? '' : 'hidden'}">
           Notes
-          <textarea rows="2" class="notes">${esc(review.notes || '')}</textarea>
+          <div class="notes-row">
+            <textarea rows="2" class="notes">${esc(review.notes || '')}</textarea>
+            <button class="apply-note" title="Apply note to activity" ${(review.notes || '').trim() ? '' : 'disabled'}>✔</button>
+          </div>
         </label>
       </div>
     `;
@@ -1822,9 +1825,36 @@ function renderActivities() {
       renderActivities();
     });
     const notes = card.querySelector('.notes');
-    if (notes) notes.addEventListener('input', () => {
-      state.reviewed[a.id].notes = notes.value;
-    });
+    const applyBtn = card.querySelector('.apply-note');
+    if (notes) {
+      notes.addEventListener('input', () => {
+        state.reviewed[a.id].notes = notes.value;
+        if (applyBtn) applyBtn.disabled = !notes.value.trim();
+      });
+    }
+    if (applyBtn) {
+      applyBtn.addEventListener('click', async () => {
+        const note = (state.reviewed[a.id]?.notes || '').trim();
+        if (!note) return;
+        applyBtn.disabled = true;
+        applyBtn.textContent = '…';
+        try {
+          const resp = await fetch('/api/activity/refine', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activity: a, note })
+          });
+          if (!resp.ok) throw new Error('Refine failed');
+          const { updates } = await resp.json();
+          Object.assign(a, updates);
+          state.reviewed[a.id].notes = '';
+          renderActivities();
+        } catch {
+          applyBtn.textContent = '✔';
+          applyBtn.disabled = false;
+        }
+      });
+    }
 
     els.activitiesGrid.appendChild(card);
   });

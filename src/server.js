@@ -670,6 +670,48 @@ app.get('/api/status', (_req, res) => {
   });
 });
 
+app.post('/api/activity/refine', async (req, res) => {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: 'Anthropic API key not configured' });
+  }
+
+  const { activity, note } = req.body || {};
+  if (!activity?.name || !note) {
+    return res.status(400).json({ error: 'activity and note are required' });
+  }
+
+  try {
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: `You are updating a travel activity based on the traveler's note.
+
+Current activity:
+- Name: ${activity.name}
+- Type: ${activity.type}
+- City: ${activity.city}
+- Why it fits: ${activity.why_it_fits}
+- Pitfall: ${activity.pitfall}
+- Booking advice: ${activity.booking_advice}
+- Duration: ${activity.duration_hours}h
+- Opening hours: ${activity.opening_hours || 'unknown'}
+- Start location: ${activity.start_location || ''}
+- End location: ${activity.end_location || ''}
+
+Traveler's note: "${note}"
+
+Return a JSON object with ONLY the fields that should change based on the note. For example if the user specifies a restaurant, update name, start_location, end_location, booking_advice, why_it_fits, and pitfall to reflect that specific place. Keep fields that don't need changing out of the response. Preserve the same JSON field names. Return ONLY JSON, no markdown.` }]
+    });
+
+    const raw = extractText(response.content).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    const updates = JSON.parse(raw);
+    return res.json({ updates });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Failed to refine activity' });
+  }
+});
+
 app.get('/api/arrange-config', (_req, res) => {
   res.json({ categoryDefaults: DEFAULT_ACTIVITY_CATEGORY_CONFIG });
 });

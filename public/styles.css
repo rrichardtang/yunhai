@@ -271,6 +271,12 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .activity-card.approved { border-left: 4px solid #22c55e; background: rgba(34,197,94,0.05); }
 .activity-card.declined { border-left: 4px solid #ef4444; background: rgba(239,68,68,0.05); }
 
+.notes-row { display: flex; gap: 6px; align-items: flex-start; }
+.notes-row .notes { flex: 1; }
+.notes-row .apply-note { padding: 4px 10px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; cursor: pointer; font-size: 14px; line-height: 1; }
+.notes-row .apply-note:disabled { opacity: 0.3; cursor: default; }
+.notes-row .apply-note:not(:disabled):hover { background: #f0fdf4; border-color: #22c55e; }
+
 .hidden { display: none !important; }
 .between { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .day-columns { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 10px; }
