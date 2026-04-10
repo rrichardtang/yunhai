@@ -1,25 +1,27 @@
 # Current State
 
-_Last updated: 2026-04-09_
+_Last updated: 2026-04-10_
 
 ## Objective
-Continue local development of TravelPlanner and push changes to git for VPS deployment.
+Ship Robust Calendar & Sync Mode MVP for low-noise calendar export.
 
 ## Active Workstream
-Auth + privacy-first booking ingestion:
-- Clerk auth integrated (frontend + backend protected APIs)
-- Itinerary storage now user-scoped by authenticated Clerk user ID
-- Per-user forwarding inbox address + webhook-based forwarded-email parser
+Calendar sync reliability MVP:
+- Step 4 now includes metadata toggle (compact/full) for calendar export
+- ICS export supports metadata mode query (`?metadata=compact|full`)
+- Google Calendar one-way sync added with OAuth endpoints + token persistence
+- Pre-sync conflict detection endpoint checks overlaps with existing Google events
+- Dedupe-safe sync mapping prevents duplicate event creation per itinerary item fingerprint
 
 ## Constraints
-- Clerk + Resend + webhook envs must be configured on VPS (`CLERK_*`, `FORWARDING_EMAIL_DOMAIN`, `EMAIL_WEBHOOK_SECRET`, optional `RESEND_*`)
-- Local runtime currently has a `.git/objects` ownership mismatch from earlier root operations, which blocks additional commits until ownership is repaired
+- Google sync requires envs: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (optional `GOOGLE_REDIRECT_URI` override)
+- OAuth callback currently uses server route and stores per-user token JSON locally for MVP
 
 ## Risks
-- Booking email parser is heuristic MVP and may miss edge-case confirmation formats
-- Existing legacy itineraries without `userId` are intentionally not visible under new auth-scoped reads
+- No refresh-token renewal flow implemented yet; expired access tokens will need reconnect for now
+- Conflict precheck warns but still allows user to continue sync
 
 ## Next Actions
-- Configure Clerk (Google + email magic link) and verify sign-in/sign-out + persisted sessions across devices
-- Configure forwarding domain + webhook to `/api/email/inbound` and test end-to-end parsing into itinerary bookings
-- Repair git ownership (`.git/objects`) so remaining code changes can be committed cleanly
+- Add token refresh flow and graceful retry on expired Google access tokens
+- Add selective sync scope (city/date filters) and per-item conflict resolution UI
+- Add tests for calendar item fingerprint stability + sync dedupe behavior

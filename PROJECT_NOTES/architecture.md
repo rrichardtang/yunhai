@@ -2,6 +2,43 @@
 
 _Last updated: 2026-04-09_
 
+## Feature Contract: Robust Calendar & Sync Mode (MVP)
+
+### Objective
+Provide reliable, low-noise calendar export/sync so each itinerary activity maps to one clean calendar event with optional metadata depth.
+
+### Acceptance Criteria
+1. One event per itinerary activity, no duplicate event creation during repeated sync runs.
+2. Metadata mode toggle supported:
+   - Compact: title, time, location only
+   - Full: includes notes/booking guidance/confirmation context
+3. Google Calendar one-way export (TravelPlanner → Google) via OAuth 2.0 using env-backed credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`).
+4. Pre-sync conflict detection against existing Google events warns about overlaps before export.
+5. ICS export remains available as universal fallback and supports compact/full metadata modes.
+
+### Non-goals
+- Two-way sync
+- Apple Calendar API integration
+
+### Design
+- New server-side `calendarSync` module handles:
+  - itinerary activity normalization into calendar items
+  - Google OAuth config + token persistence
+  - Google Calendar API calls
+  - overlap precheck against calendar event windows
+  - sync state fingerprint mapping to avoid duplicate creates
+- Sync dedupe strategy:
+  - deterministic item fingerprint keyed by itinerary/activity/time/location/description+mode
+  - on sync, PATCH existing mapped Google event when fingerprint already seen; otherwise POST new event
+- API surface:
+  - `GET /api/calendar/google/status`
+  - `GET /api/calendar/google/auth-url`
+  - `GET /api/calendar/google/oauth/callback`
+  - `POST /api/itinerary/:id/calendar/google/precheck`
+  - `POST /api/itinerary/:id/calendar/google/sync`
+  - `GET /api/itinerary/:id/calendar.ics?metadata=compact|full`
+- UI integration in existing step 4 itinerary panel (no parallel view): metadata selector + Google connect/sync actions + conflict/sync status messaging.
+
 ## Feature Contract: Auth + Privacy-First Email Forwarding
 
 ### Objective

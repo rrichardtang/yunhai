@@ -133,8 +133,18 @@
       <section id="step4" class="panel step-panel">
         <div class="between">
           <h2>Final Itinerary</h2>
-          <button id="downloadCalendarBtn" class="secondary" type="button" disabled>📅 Export to Calendar (.ics)</button>
+          <div class="calendar-actions">
+            <label for="calendarMetadataMode" class="muted-text">Metadata</label>
+            <select id="calendarMetadataMode">
+              <option value="compact">Compact</option>
+              <option value="full">Full</option>
+            </select>
+            <button id="downloadCalendarBtn" class="secondary" type="button" disabled>📅 Export .ics</button>
+            <button id="connectGoogleCalendarBtn" class="secondary" type="button">🔐 Connect Google</button>
+            <button id="syncGoogleCalendarBtn" class="secondary" type="button" disabled>🔄 Sync Google</button>
+          </div>
         </div>
+        <div id="calendarSyncStatus" class="muted-text"></div>
         <div id="itineraryInsights" class="itinerary-insights"></div>
         <div id="itineraryGrid" class="day-columns"></div>
         <section class="saved-itineraries-panel">

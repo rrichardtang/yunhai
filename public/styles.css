@@ -1243,3 +1243,11 @@ button:disabled { opacity: .6; cursor: not-allowed; }
     padding: 0 !important;
   }
 }
+
+/* Calendar sync MVP */
+.calendar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}

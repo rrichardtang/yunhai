@@ -4,6 +4,18 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-10] Add Robust Calendar & Sync Mode MVP (Proposal A)
+
+- Added calendar metadata mode toggle (compact/full) in step 4 itinerary actions
+- Upgraded ICS export to accept `metadata` query param and conditionally include full notes fields
+- Added Google Calendar OAuth scaffolding endpoints using env credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, optional `GOOGLE_REDIRECT_URI`)
+- Added Google Calendar connection status endpoint
+- Added pre-export conflict detection endpoint that checks overlap against existing Google calendar events
+- Added one-way Google sync endpoint with dedupe-safe fingerprint mapping to avoid duplicate event creation
+- Added local persistence for Google tokens + sync fingerprints (`data/google-calendar-tokens.json`, `data/calendar-sync-state.json`)
+- Added UI controls: Connect Google, Sync Google, conflict warning/continue prompt, sync status message
+- Files: `src/server.js`, `src/calendarSync.js`, `public/planner.html`, `public/app.js`, `public/styles.css`, `PROJECT_NOTES/architecture.md`, `PROJECT_NOTES/current_state.md`, `PROJECT_NOTES/changelog.md`
+
 ## [2026-04-09] Add Clerk auth + user-scoped itineraries + email forwarding ingest
 
 - Integrated Clerk auth boundary in planner app (frontend sign-in gate + Bearer token API calls)

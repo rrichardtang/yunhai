@@ -33,7 +33,9 @@ const state = {
   authReady: false,
   authUserId: '',
   authUserEmail: '',
-  forwardingAddress: ''
+  forwardingAddress: '',
+  calendarMetadataMode: 'compact',
+  googleCalendarConnected: false
 };
 
 const PROFILES_KEY = 'travelplanner_profiles_v1';
@@ -97,6 +99,10 @@ const els = {
   itineraryInsights: document.getElementById('itineraryInsights'),
   itineraryGrid: document.getElementById('itineraryGrid'),
   downloadCalendarBtn: document.getElementById('downloadCalendarBtn'),
+  calendarMetadataMode: document.getElementById('calendarMetadataMode'),
+  connectGoogleCalendarBtn: document.getElementById('connectGoogleCalendarBtn'),
+  syncGoogleCalendarBtn: document.getElementById('syncGoogleCalendarBtn'),
+  calendarSyncStatus: document.getElementById('calendarSyncStatus'),
   savedItineraries: document.getElementById('savedItineraries'),
   editBtn: document.getElementById('editBtn'),
   apiBanner: document.getElementById('apiBanner'),
@@ -3563,7 +3569,7 @@ function renderSavedItineraries() {
           state.itinerary = null;
           els.itineraryGrid.innerHTML = '';
           if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
-          if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = true;
+          updateCalendarControls();
         }
         await fetchSavedItineraries();
         renderSavedItineraries();
@@ -3612,7 +3618,7 @@ async function loadItineraryById(id) {
     state.placements = placements;
     hydrateTravelIntoCities();
     renderCities();
-    if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = !state.currentItineraryId;
+    updateCalendarControls();
     renderItinerary();
     await fetchSavedItineraries();
     renderSavedItineraries();
@@ -3768,7 +3774,7 @@ async function generateItinerary() {
     map[state.currentItineraryId] = state.chatSessionId;
     saveChatSessionMap(map);
   }
-  if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = !state.currentItineraryId;
+  updateCalendarControls();
   renderItinerary();
   await fetchSavedItineraries();
   renderSavedItineraries();
@@ -4019,7 +4025,7 @@ function resetToFresh() {
   els.stagingArea.innerHTML = '';
   els.itineraryGrid.innerHTML = '';
   if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
-  if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = true;
+  updateCalendarControls();
   renderChatMessages();
   setStep(1);
 }
@@ -4116,6 +4122,77 @@ function renderAuthUi() {
   if (els.signOutBtn) els.signOutBtn.classList.toggle('hidden', !state.authUserId);
   if (els.forwardingPanel) els.forwardingPanel.classList.toggle('hidden', !state.forwardingAddress);
   if (els.forwardingAddress) els.forwardingAddress.textContent = state.forwardingAddress || 'Not available yet';
+  updateCalendarControls();
+}
+
+function updateCalendarControls() {
+  const hasItinerary = Boolean(state.currentItineraryId);
+  if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = !hasItinerary;
+  if (els.syncGoogleCalendarBtn) els.syncGoogleCalendarBtn.disabled = !(hasItinerary && state.googleCalendarConnected);
+  if (els.connectGoogleCalendarBtn) {
+    els.connectGoogleCalendarBtn.textContent = state.googleCalendarConnected ? '✅ Google Connected' : '🔐 Connect Google';
+  }
+}
+
+function setCalendarStatus(message = '') {
+  if (!els.calendarSyncStatus) return;
+  els.calendarSyncStatus.textContent = message;
+}
+
+async function connectGoogleCalendar() {
+  try {
+    const res = await apiFetch('/api/calendar/google/auth-url');
+    const data = await res.json();
+    if (!res.ok || !data?.authUrl) throw new Error(data.error || 'Failed to start Google OAuth');
+    window.open(data.authUrl, '_blank', 'noopener,noreferrer');
+    setCalendarStatus('Google OAuth opened. After connecting, return and click Sync Google.');
+  } catch (error) {
+    setCalendarStatus(error?.message || 'Failed to connect Google Calendar');
+  }
+}
+
+async function syncGoogleCalendar() {
+  if (!state.currentItineraryId) return;
+  const metadataMode = String(state.calendarMetadataMode || 'compact');
+
+  try {
+    setCalendarStatus('Checking for time conflicts…');
+    const precheckRes = await apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/calendar/google/precheck`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ metadataMode })
+    });
+    const precheck = await precheckRes.json();
+    if (!precheckRes.ok) throw new Error(precheck.error || 'Conflict check failed');
+
+    if (precheck.conflictCount > 0) {
+      const preview = (precheck.conflicts || []).slice(0, 5).map((c) => `${c.itemTitle} overlaps with ${c.existingTitle}`).join('\n');
+      const proceed = window.confirm(`Found ${precheck.conflictCount} potential overlap(s).\n\n${preview}${precheck.conflictCount > 5 ? '\n…' : ''}\n\nContinue sync anyway?`);
+      if (!proceed) {
+        setCalendarStatus('Sync cancelled due to conflicts.');
+        return;
+      }
+    }
+
+    setCalendarStatus('Syncing to Google Calendar…');
+    const syncRes = await apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/calendar/google/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ metadataMode })
+    });
+    const syncData = await syncRes.json();
+    if (!syncRes.ok) throw new Error(syncData.error || 'Google sync failed');
+
+    state.googleCalendarConnected = true;
+    updateCalendarControls();
+    setCalendarStatus(`Synced ${syncData.total} event(s): ${syncData.created} created, ${syncData.updated} updated.`);
+  } catch (error) {
+    if (String(error?.message || '').toLowerCase().includes('not connected')) {
+      state.googleCalendarConnected = false;
+      updateCalendarControls();
+    }
+    setCalendarStatus(error?.message || 'Google Calendar sync failed');
+  }
 }
 
 async function loadAuthSessionData() {
@@ -4127,6 +4204,15 @@ async function loadAuthSessionData() {
     state.forwardingAddress = String(data?.forwardingAddress || '');
     localStorage.setItem(USER_ID_KEY, state.authUserId);
   } catch {}
+
+  try {
+    const statusRes = await apiFetch('/api/calendar/google/status');
+    const statusData = await statusRes.json();
+    state.googleCalendarConnected = Boolean(statusData?.connected);
+  } catch {
+    state.googleCalendarConnected = false;
+  }
+
   renderAuthUi();
 }
 
@@ -4183,7 +4269,7 @@ function clearPlannedResultsKeepSetup() {
   els.stagingArea.innerHTML = '';
   els.itineraryGrid.innerHTML = '';
   if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
-  if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = true;
+  updateCalendarControls();
 }
 
 function validateLocationsBeforePlanning() {
@@ -4241,7 +4327,14 @@ els.saveProgressBtn.addEventListener('click', saveSnapshot);
 els.autoArrangeBtn?.addEventListener('click', autoArrangeActiveCity);
 els.downloadCalendarBtn?.addEventListener('click', () => {
   if (!state.currentItineraryId) return;
-  window.open(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/calendar.ics`, '_blank');
+  const metadataMode = encodeURIComponent(state.calendarMetadataMode || 'compact');
+  window.open(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/calendar.ics?metadata=${metadataMode}`, '_blank');
+});
+els.connectGoogleCalendarBtn?.addEventListener('click', connectGoogleCalendar);
+els.syncGoogleCalendarBtn?.addEventListener('click', syncGoogleCalendar);
+els.calendarMetadataMode?.addEventListener('change', (e) => {
+  state.calendarMetadataMode = e.target.value === 'full' ? 'full' : 'compact';
+  setCalendarStatus(`Metadata mode: ${state.calendarMetadataMode}`);
 });
 els.shareMinimalBtn?.addEventListener('click', shareMinimalItinerary);
 els.copyMinimalBtn?.addEventListener('click', copyMinimalItineraryText);
@@ -4352,6 +4445,10 @@ document.querySelectorAll('[data-nav-back]').forEach((btn) => {
   await fetchSavedItineraries();
   renderSavedItineraries();
   registerServiceWorker();
+  if (els.calendarMetadataMode) {
+    els.calendarMetadataMode.value = state.calendarMetadataMode;
+  }
+  updateCalendarControls();
   setViewMode(localStorage.getItem(VIEW_MODE_KEY) === 'execution' ? 'execution' : 'planning');
   const loadedFromShare = await maybeLoadSharedItineraryFromUrl();
   if (!loadedFromShare) maybePromptSnapshot();
