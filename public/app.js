@@ -386,6 +386,10 @@ function isGooglePlacesReady() {
   return Boolean(window.google?.maps?.places?.PlaceAutocompleteElement);
 }
 
+function isGoogleMapsReady() {
+  return Boolean(window.google?.maps?.Map);
+}
+
 function cityLocationBias(city) {
   if (!Number.isFinite(city?.latitude) || !Number.isFinite(city?.longitude)) return undefined;
   return { center: { lat: city.latitude, lng: city.longitude }, radius: 50000 };
@@ -438,9 +442,10 @@ function markTravelEntryUnvalidated(city) {
 }
 
 function buildGoogleMapsSdkUrl(apiKey = '') {
-  const defaultBase = 'https://maps.googleapis.com/maps/api/js?libraries=places&v=beta&loading=async';
+  const defaultBase = 'https://maps.googleapis.com/maps/api/js?libraries=places,marker&v=beta&loading=async';
   let base = String(window.TRAVELPLANNER_GOOGLE_MAPS_SDK_BASE_URL || defaultBase);
-  if (!base.includes('libraries=places')) base += `${base.includes('?') ? '&' : '?'}libraries=places`;
+  if (!base.includes('libraries=')) base += `${base.includes('?') ? '&' : '?'}libraries=places,marker`;
+  else if (!base.includes('marker')) base = base.replace('libraries=', 'libraries=marker,');
   if (!base.includes('v=')) base += '&v=beta';
   if (!base.includes('loading=')) base += '&loading=async';
   const separator = base.includes('?') ? '&' : '?';
@@ -460,9 +465,14 @@ async function loadGoogleMapsPlacesSDK(apiKey = '') {
     script.onload = async () => {
       try {
         if (window.google?.maps?.importLibrary) {
-          const lib = await window.google.maps.importLibrary('places');
+          const [placesLib, markerLib] = await Promise.all([
+            window.google.maps.importLibrary('places'),
+            window.google.maps.importLibrary('marker')
+          ]);
           if (!window.google.maps.places) window.google.maps.places = {};
-          if (lib) Object.assign(window.google.maps.places, lib);
+          if (placesLib) Object.assign(window.google.maps.places, placesLib);
+          if (!window.google.maps.marker) window.google.maps.marker = {};
+          if (markerLib) Object.assign(window.google.maps.marker, markerLib);
         }
         resolve(isGooglePlacesReady());
       } catch (err) {
@@ -1980,7 +1990,7 @@ function renderActivities() {
             <label class="${review.approved ? '' : 'hidden'}">
               Customize
               <div class="notes-row">
-                <textarea rows="2" class="notes" placeholder="e.g. I want to eat at (RESTAURANT NAME)">${esc(review.notes || '')}</textarea>
+                <textarea rows="2" class="notes" placeholder="What would you like to change?">${esc(review.notes || '')}</textarea>
                 <button class="apply-note" title="Apply note to activity" ${(review.notes || '').trim() ? '' : 'disabled'}>✔</button>
               </div>
             </label>
@@ -2070,24 +2080,17 @@ function renderActivities() {
 }
 
 function destroyMiniMaps() {
-  miniMapInstances.forEach((map) => {
-    try { map.remove(); } catch {}
-  });
   miniMapInstances.clear();
 }
 
 async function ensureMiniMapForCard(card, activity) {
-  if (!window.L) return;
+  if (!isGoogleMapsReady()) return;
   const holder = card.querySelector('.mini-map');
   if (!holder) return;
   const key = String(activity.id || '');
   if (!key) return;
 
-  const oldMap = miniMapInstances.get(key);
-  if (oldMap) {
-    try { oldMap.remove(); } catch {}
-    miniMapInstances.delete(key);
-  }
+  miniMapInstances.delete(key);
 
   holder.innerHTML = '<div class="mini-map-loading">Loading map…</div>';
   const geo = await geocodeActivity(activity);
@@ -2097,13 +2100,15 @@ async function ensureMiniMapForCard(card, activity) {
   }
 
   holder.innerHTML = '';
-  const map = window.L.map(holder, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false });
-  window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-  window.L.marker([geo.lat, geo.lng]).addTo(map);
-  map.setView([geo.lat, geo.lng], 13);
+  const center = { lat: geo.lat, lng: geo.lng };
+  const map = new google.maps.Map(holder, {
+    center,
+    zoom: 13,
+    disableDefaultUI: true,
+    gestureHandling: 'none',
+    mapId: 'travelplanner-mini'
+  });
+  new google.maps.marker.AdvancedMarkerElement({ map, position: center });
   miniMapInstances.set(key, map);
 }
 
@@ -2117,13 +2122,11 @@ function makeMapLabel(activity, activities) {
   return String(globalOrder);
 }
 
-function markerIcon(label, highlighted = false) {
-  return window.L.divIcon({
-    className: 'activity-map-marker-wrap',
-    html: `<div class="activity-map-marker ${highlighted ? 'star' : ''}">${highlighted ? '★' : esc(label)}</div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15]
-  });
+function markerContent(label, highlighted = false) {
+  const el = document.createElement('div');
+  el.className = 'activity-map-marker-wrap';
+  el.innerHTML = `<div class="activity-map-marker ${highlighted ? 'star' : ''}">${highlighted ? '★' : esc(label)}</div>`;
+  return el;
 }
 
 function mountActivityMapOverlay() {
@@ -2162,7 +2165,7 @@ function focusActivityCard(activityId) {
 }
 
 async function openActivityMapOverlay(selectedActivityId = null) {
-  if (!window.L) return;
+  if (!isGoogleMapsReady()) return;
   mountActivityMapOverlay();
   state.mapOverlaySelectedActivityId = selectedActivityId;
   activityMapOverlay.classList.remove('hidden');
@@ -2176,36 +2179,39 @@ async function openActivityMapOverlay(selectedActivityId = null) {
   }
 
   if (!activityMapOverlayMap) {
-    activityMapOverlayMap = window.L.map(mapCanvas, { zoomControl: true });
-    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(activityMapOverlayMap);
+    activityMapOverlayMap = new google.maps.Map(mapCanvas, {
+      zoom: 4,
+      center: { lat: 0, lng: 0 },
+      mapId: 'travelplanner-overlay'
+    });
   }
 
-  activityMapOverlayMarkers.forEach((m) => {
-    try { m.remove(); } catch {}
-  });
+  activityMapOverlayMarkers.forEach((m) => { m.map = null; });
   activityMapOverlayMarkers = [];
 
-  const bounds = [];
+  const gmBounds = new google.maps.LatLngBounds();
+  const infoWindow = new google.maps.InfoWindow();
+
   enriched.forEach(({ activity, geo }) => {
     const label = makeMapLabel(activity, activities);
     const selected = activity.id === state.mapOverlaySelectedActivityId;
-    const marker = window.L.marker([geo.lat, geo.lng], { icon: markerIcon(label, selected) })
-      .addTo(activityMapOverlayMap)
-      .bindPopup(`<strong>${esc(activity.name || 'Activity')}</strong><br>${esc(activity.city || '')}<br><small>#${esc(label)}</small>`);
-    marker.on('click', () => {
+    const position = { lat: geo.lat, lng: geo.lng };
+    const marker = new google.maps.marker.AdvancedMarkerElement({
+      map: activityMapOverlayMap,
+      position,
+      content: markerContent(label, selected)
+    });
+    marker.addListener('click', () => {
+      infoWindow.setContent(`<strong>${esc(activity.name || 'Activity')}</strong><br>${esc(activity.city || '')}<br><small>#${esc(label)}</small>`);
+      infoWindow.open({ anchor: marker, map: activityMapOverlayMap });
       state.mapOverlaySelectedActivityId = activity.id;
       focusActivityCard(activity.id);
-      openActivityMapOverlay(activity.id);
     });
     activityMapOverlayMarkers.push(marker);
-    bounds.push([geo.lat, geo.lng]);
+    gmBounds.extend(position);
   });
 
-  if (bounds.length) activityMapOverlayMap.fitBounds(bounds, { padding: [40, 40] });
-  setTimeout(() => activityMapOverlayMap.invalidateSize(), 0);
+  if (enriched.length) activityMapOverlayMap.fitBounds(gmBounds, { top: 40, right: 40, bottom: 40, left: 40 });
 }
 
 function expandDays(cities) {
@@ -4156,9 +4162,13 @@ function ensureChatSessionId() {
 
 function renderChatMessages() {
   if (!els.chatMessages) return;
-  els.chatMessages.innerHTML = state.chatHistory.map((msg) => `
-    <div class="${msg.role === 'user' ? 'chat-msg-user' : 'chat-msg-assistant'}">${esc(msg.content || '')}</div>
-  `).join('');
+  els.chatMessages.innerHTML = state.chatHistory.map((msg) => {
+    let html = esc(msg.content || '');
+    if (msg.role === 'assistant') {
+      html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    }
+    return `<div class="${msg.role === 'user' ? 'chat-msg-user' : 'chat-msg-assistant'}">${html}</div>`;
+  }).join('');
   els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
 }
 
