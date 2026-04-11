@@ -382,15 +382,13 @@ async function loadGoogleMapsPlacesSDK(apiKey = '') {
       try {
         if (window.google?.maps?.importLibrary) {
           const lib = await window.google.maps.importLibrary('places');
-          if (lib?.PlaceAutocompleteElement) {
-            if (!window.google.maps.places) window.google.maps.places = {};
-            Object.assign(window.google.maps.places, lib);
-          }
+          if (!window.google.maps.places) window.google.maps.places = {};
+          if (lib) Object.assign(window.google.maps.places, lib);
         }
-        if (isGooglePlacesReady()) resolve(true);
-        else reject(new Error('Google Places library failed to initialize.'));
+        resolve(isGooglePlacesReady());
       } catch (err) {
-        reject(err instanceof Error ? err : new Error('Google Places library failed to initialize.'));
+        console.warn('Google Places init:', err?.message || err);
+        resolve(false);
       }
     };
     script.onerror = () => reject(new Error('Failed to load Google Maps SDK.'));
