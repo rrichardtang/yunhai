@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-11] Replace resume popup with "My Trips" section on Step 1
+
+- Removed `resumeModal` dialog from `planner.html`
+- Added `#myTripsPanel` section inside Step 1 showing drafts + saved itineraries
+- Replaced `maybePromptSnapshot()` with `renderMyTrips()` in `app.js`
+- Draft trips shown with yellow badge; saved itineraries with Open/Delete actions
+- Panel auto-hides when no trips exist
+- Removed unused `.resume-card` / `.resume-actions` CSS
+- Files: `public/planner.html`, `public/app.js`, `public/styles.css`
+
 ## [2026-04-11] Add cross-device data sync for localStorage-only data
 
 - Created `src/userDataStore.js` — flat JSON store at `data/userdata.json` keyed by Clerk userId

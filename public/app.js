@@ -137,9 +137,8 @@ const els = {
   profileEditBtn: document.getElementById('profileEditBtn'),
   saveProgressBtn: document.getElementById('saveProgressBtn'),
   autoArrangeBtn: document.getElementById('autoArrangeBtn'),
-  resumeModal: document.getElementById('resumeModal'),
-  resumeTripBtn: document.getElementById('resumeTripBtn'),
-  startFreshBtn: document.getElementById('startFreshBtn'),
+  myTripsPanel: document.getElementById('myTripsPanel'),
+  myTripsList: document.getElementById('myTripsList'),
   chatBubble: document.getElementById('chatBubble'),
   chatPanel: document.getElementById('chatPanel'),
   chatClose: document.getElementById('chatClose'),
@@ -4365,24 +4364,115 @@ function hydrateFromSnapshot(snapshot) {
   setStep(3);
 }
 
-function maybePromptSnapshot() {
+function renderMyTrips() {
+  if (!els.myTripsPanel || !els.myTripsList) return;
+
   const snapshot = getSnapshot();
-  if (!snapshot) {
+  const trips = [];
+
+  if (snapshot) {
+    trips.push({
+      type: 'draft',
+      tripName: snapshot.tripName || 'Untitled Trip',
+      detail: 'In-progress draft',
+      snapshot
+    });
+  }
+
+  state.savedItineraries.forEach((item) => {
+    const generatedDate = item.generatedAt
+      ? new Date(item.generatedAt).toLocaleString()
+      : 'Unknown date';
+    trips.push({
+      type: 'saved',
+      id: item.id,
+      tripName: item.tripName || 'Untitled Trip',
+      detail: `${esc(generatedDate)} · ${Number(item.days || 0)} days · ${Number(item.activityCount || 0)} activities`
+    });
+  });
+
+  if (!trips.length) {
+    els.myTripsPanel.classList.add('hidden');
     resetToFresh();
     return;
   }
 
-  els.resumeModal.classList.remove('hidden');
-  els.resumeTripBtn.onclick = () => {
-    els.resumeModal.classList.add('hidden');
-    hydrateFromSnapshot(snapshot);
-  };
-  els.startFreshBtn.onclick = () => {
-    clearSnapshot();
-    els.resumeModal.classList.add('hidden');
-    resetChatSession();
-    resetToFresh();
-  };
+  els.myTripsPanel.classList.remove('hidden');
+
+  els.myTripsList.innerHTML = trips.map((trip) => {
+    if (trip.type === 'draft') {
+      return `
+        <article class="saved-itinerary-item draft-item">
+          <div>
+            <h4>${esc(trip.tripName)} <span class="draft-badge">Draft</span></h4>
+            <p>${esc(trip.detail)}</p>
+          </div>
+          <div class="saved-itinerary-actions">
+            <button type="button" class="primary" data-resume-draft>Resume</button>
+            <button type="button" class="secondary" data-delete-draft>Delete</button>
+          </div>
+        </article>`;
+    }
+    return `
+      <article class="saved-itinerary-item">
+        <div>
+          <h4>${esc(trip.tripName)}</h4>
+          <p>${trip.detail}</p>
+        </div>
+        <div class="saved-itinerary-actions">
+          <button type="button" class="secondary" data-load-trip="${esc(trip.id)}">Open</button>
+          <button type="button" class="secondary" data-delete-trip="${esc(trip.id)}">Delete</button>
+        </div>
+      </article>`;
+  }).join('');
+
+  const resumeBtn = els.myTripsList.querySelector('[data-resume-draft]');
+  if (resumeBtn) {
+    resumeBtn.addEventListener('click', () => {
+      hydrateFromSnapshot(snapshot);
+    });
+  }
+
+  const deleteDraftBtn = els.myTripsList.querySelector('[data-delete-draft]');
+  if (deleteDraftBtn) {
+    deleteDraftBtn.addEventListener('click', () => {
+      clearSnapshot();
+      resetChatSession();
+      renderMyTrips();
+      resetToFresh();
+    });
+  }
+
+  els.myTripsList.querySelectorAll('[data-load-trip]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      loadItineraryById(btn.dataset.loadTrip);
+    });
+  });
+
+  els.myTripsList.querySelectorAll('[data-delete-trip]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.deleteTrip;
+      if (!id) return;
+      const confirmed = window.confirm('Delete this trip?');
+      if (!confirmed) return;
+      try {
+        const res = await apiFetch(`/api/itinerary/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed to delete');
+        if (state.currentItineraryId === id) {
+          state.currentItineraryId = null;
+          state.itinerary = null;
+        }
+        await fetchSavedItineraries();
+        renderMyTrips();
+        renderSavedItineraries();
+        showToast('Trip deleted.', 'success');
+      } catch {
+        showToast('Could not delete trip.', 'error');
+      }
+    });
+  });
+
+  resetToFresh();
 }
 
 async function maybeLoadSharedItineraryFromUrl() {
@@ -4761,5 +4851,5 @@ document.querySelectorAll('[data-nav-back]').forEach((btn) => {
   updateCalendarControls();
   setViewMode(localStorage.getItem(VIEW_MODE_KEY) === 'execution' ? 'execution' : 'planning');
   const loadedFromShare = await maybeLoadSharedItineraryFromUrl();
-  if (!loadedFromShare) maybePromptSnapshot();
+  if (!loadedFromShare) renderMyTrips();
 })();

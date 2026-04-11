@@ -79,6 +79,14 @@
         <div id="locationValidationError" class="muted-text warn hidden"></div>
 
         <div id="setupInsights" class="setup-insights muted-text"></div>
+
+        <section id="myTripsPanel" class="my-trips-panel hidden">
+          <div class="between">
+            <h3>My Trips</h3>
+          </div>
+          <div id="myTripsList" class="saved-itineraries-list"></div>
+        </section>
+
         <div class="step-nav sticky-nav">
           <button id="planBtn" class="primary nav-primary" type="button" data-nav-next="1">Next →</button>
         </div>
@@ -188,16 +196,6 @@
         </section>
 
         <button id="deleteProfileBtn" class="secondary profile-delete-bottom" type="button">🗑 Delete</button>
-      </div>
-    </div>
-
-    <div id="resumeModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Resume saved trip">
-      <div class="modal-card resume-card">
-        <h3>You have a saved trip. Resume or start fresh?</h3>
-        <div class="resume-actions">
-          <button id="resumeTripBtn" class="primary" type="button">Resume</button>
-          <button id="startFreshBtn" class="secondary" type="button">Start Fresh</button>
-        </div>
       </div>
     </div>
 

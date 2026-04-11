@@ -3,10 +3,10 @@
 _Last updated: 2026-04-11_
 
 ## Objective
-Cross-device data sync — ensure profiles, snapshots, view mode, and chat session mappings are available on any device after Clerk sign-in.
+UX improvements — replace modal-based resume flow with inline "My Trips" section.
 
 ## Active Workstream
-Just shipped cross-device sync for all localStorage-only data:
+Replaced resume popup with "My Trips" panel on Step 1. Previously shipped cross-device sync for all localStorage-only data:
 - New `src/userDataStore.js` flat-file store at `data/userdata.json` keyed by Clerk userId
 - REST endpoints (`GET/PUT /api/userdata`, `GET/PUT /api/userdata/:field`) for per-user data
 - Frontend writes to both localStorage (fast cache) and server (durable sync) on every save

@@ -784,8 +784,6 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   border: 1px solid #dfe4ec;
 }
 
-.resume-card { max-width: 480px; }
-.resume-actions { display: flex; gap: 10px; margin-top: 12px; }
 
 .prefs-section { margin-bottom: 12px; }
 .prefs-divider { border: 0; border-top: 1px solid #e5eaf2; margin: 18px 0; }
@@ -1092,6 +1090,31 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .pace-pill.pace-light { background: #e7f6ee; color: #12653f; }
 .pace-pill.pace-balanced { background: #fff3df; color: #7b4f09; }
 .pace-pill.pace-packed { background: #fde8e8; color: #8f2422; }
+
+.my-trips-panel {
+  margin-top: 18px;
+  border: 1px solid #e1e7f0;
+  border-radius: 12px;
+  background: #fbfcff;
+  padding: 12px;
+}
+
+.draft-badge {
+  display: inline-block;
+  font-size: .75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #fff3df;
+  color: #7b4f09;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+.draft-item {
+  border-color: #e0c97a;
+  background: #fffdf5;
+}
 
 .saved-itineraries-panel {
   margin-top: 14px;
