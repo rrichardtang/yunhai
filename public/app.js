@@ -814,7 +814,57 @@ function saveProfiles(store) {
   const normalized = normalizeProfilesStore(store);
   localStorage.setItem(PROFILES_KEY, JSON.stringify(normalized));
   state.profilesStore = normalized;
+  syncToServer('profiles', normalized);
   return normalized;
+}
+
+function syncToServer(field, value) {
+  if (!state.authReady) return;
+  apiFetch(`/api/userdata/${field}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value })
+  }).catch(() => {});
+}
+
+async function syncFromServer() {
+  if (!state.authReady) return;
+  try {
+    const res = await apiFetch('/api/userdata');
+    if (!res.ok) return;
+    const { data } = await res.json();
+    if (!data) return;
+
+    if (data.profiles) {
+      const serverProfiles = normalizeProfilesStore(data.profiles);
+      const localRaw = localStorage.getItem(PROFILES_KEY);
+      const localProfiles = localRaw ? normalizeProfilesStore(JSON.parse(localRaw)) : null;
+      const serverTs = data.updatedAt || '';
+      const localTs = localProfiles?._syncedAt || '';
+      if (!localProfiles || serverTs > localTs) {
+        localStorage.setItem(PROFILES_KEY, JSON.stringify(serverProfiles));
+        state.profilesStore = serverProfiles;
+      }
+    }
+
+    if (data.snapshot) {
+      const localSnap = localStorage.getItem(SNAPSHOT_KEY);
+      if (!localSnap) {
+        localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(data.snapshot));
+      }
+    }
+
+    if (data.viewMode) {
+      localStorage.setItem(VIEW_MODE_KEY, data.viewMode);
+    }
+
+    if (data.chatSessions) {
+      const localMap = localStorage.getItem('chat_sessions');
+      if (!localMap || localMap === '{}') {
+        localStorage.setItem('chat_sessions', JSON.stringify(data.chatSessions));
+      }
+    }
+  } catch {}
 }
 
 function loadProfiles() {
@@ -3763,6 +3813,7 @@ function setViewMode(mode = 'planning') {
   const resolved = mode === 'execution' ? 'execution' : 'planning';
   state.viewMode = resolved;
   localStorage.setItem(VIEW_MODE_KEY, resolved);
+  syncToServer('viewMode', resolved);
   document.body.classList.toggle('execution-mode', resolved === 'execution');
   if (els.planningModeBtn) els.planningModeBtn.classList.toggle('active', resolved === 'planning');
   if (els.executionModeBtn) els.executionModeBtn.classList.toggle('active', resolved === 'execution');
@@ -4083,6 +4134,7 @@ function loadChatSessionMap() {
 
 function saveChatSessionMap(map) {
   localStorage.setItem('chat_sessions', JSON.stringify(map));
+  syncToServer('chatSessions', map);
 }
 
 function ensureChatSessionId() {
@@ -4236,6 +4288,7 @@ function step1Fingerprint() {
 
 function clearSnapshot() {
   localStorage.removeItem(SNAPSHOT_KEY);
+  syncToServer('snapshot', null);
 }
 
 function saveSnapshot() {
@@ -4252,6 +4305,7 @@ function saveSnapshot() {
     currentStep: 3
   };
   localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(payload));
+  syncToServer('snapshot', payload);
   showToast('Saved!', 'success');
 }
 
@@ -4506,6 +4560,7 @@ async function initClerkAuth() {
   }
 
   await loadAuthSessionData();
+  await syncFromServer();
 }
 
 function clearPlannedResultsKeepSetup() {

@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-11] Add cross-device data sync for localStorage-only data
+
+- Created `src/userDataStore.js` — flat JSON store at `data/userdata.json` keyed by Clerk userId
+- Added REST endpoints in `src/server.js`: `GET/PUT /api/userdata`, `GET/PUT /api/userdata/:field`
+- Updated `public/app.js`:
+  - `syncToServer()` pushes to server on every local save (profiles, snapshot, viewMode, chatSessions)
+  - `syncFromServer()` hydrates localStorage from server after Clerk auth completes
+  - Updated `saveProfiles`, `saveSnapshot`, `clearSnapshot`, `setViewMode`, `saveChatSessionMap` to dual-write
+- Files: `src/userDataStore.js` (new), `src/server.js`, `public/app.js`
+
 ## [2026-04-11] Add map-first activity review UX (Step 2 card flip + full-screen map)
 
 - Added Leaflet + OpenStreetMap to planner UI (CDN) for map rendering with no API key

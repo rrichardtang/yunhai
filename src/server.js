@@ -34,6 +34,7 @@ const {
   parseBookingEmail,
   sendIngestConfirmation
 } = require('./emailForwarding');
+const { getUserData, setUserData, getUserField, setUserField } = require('./userDataStore');
 const {
   buildCalendarItems,
   computeFingerprint,
@@ -1037,6 +1038,44 @@ app.post('/api/preferences/reset', (req, res) => {
     const userId = parseUserId(getAuthedUserId(req));
     const preferences = resetPreferences(userId);
     return res.json({ ok: true, preferences });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid userId' });
+  }
+});
+
+app.get('/api/userdata', (req, res) => {
+  try {
+    const userId = parseUserId(getAuthedUserId(req));
+    return res.json({ data: getUserData(userId) });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid userId' });
+  }
+});
+
+app.put('/api/userdata', (req, res) => {
+  try {
+    const userId = parseUserId(getAuthedUserId(req));
+    const data = setUserData(userId, req.body || {});
+    return res.json({ data });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid userId' });
+  }
+});
+
+app.get('/api/userdata/:field', (req, res) => {
+  try {
+    const userId = parseUserId(getAuthedUserId(req));
+    return res.json({ value: getUserField(userId, req.params.field) });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid userId' });
+  }
+});
+
+app.put('/api/userdata/:field', (req, res) => {
+  try {
+    const userId = parseUserId(getAuthedUserId(req));
+    const value = setUserField(userId, req.params.field, req.body?.value);
+    return res.json({ value });
   } catch (error) {
     return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid userId' });
   }
