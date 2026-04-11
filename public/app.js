@@ -4220,7 +4220,7 @@ async function initClerkAuth() {
   const clerk = window.Clerk;
   if (!clerk) throw new Error('Clerk SDK not loaded');
 
-  await clerk.load();
+  await clerk.load({ ui: { ClerkUI: window.__internal_ClerkUICtor } });
   const user = clerk.user;
   if (!user) {
     await clerk.openSignIn({

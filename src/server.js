@@ -54,7 +54,10 @@ app.use(clerkMiddleware());
 app.get('/planner.html', (_req, res) => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'planner.html'), 'utf8');
   const key = process.env.CLERK_PUBLISHABLE_KEY || '';
-  res.send(html.replace('data-clerk-publishable-key=""', `data-clerk-publishable-key="${key}"`));
+  const fapiDomain = key ? Buffer.from(key.replace(/^pk_(test|live)_/, ''), 'base64').toString().replace(/\$$/, '') : '';
+  res.send(html
+    .replace('data-clerk-publishable-key=""', `data-clerk-publishable-key="${key}"`)
+    .replace('__CLERK_FAPI_DOMAIN__', fapiDomain));
 });
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
