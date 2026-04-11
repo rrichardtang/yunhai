@@ -20,10 +20,15 @@ async function search(query, { count = 5, freshness } = {}) {
   const params = new URLSearchParams({ q: query, count: String(count) });
   if (freshness) params.set('freshness', freshness);
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+
   try {
     const res = await fetch(`${BRAVE_API_URL}?${params}`, {
-      headers: { 'Accept': 'application/json', 'Accept-Encoding': 'gzip', 'X-Subscription-Token': key }
+      headers: { 'Accept': 'application/json', 'Accept-Encoding': 'gzip', 'X-Subscription-Token': key },
+      signal: controller.signal
     });
+    clearTimeout(timer);
     if (!res.ok) {
       console.error(`[brave] search failed: ${res.status} ${res.statusText}`);
       return [];
@@ -36,6 +41,7 @@ async function search(query, { count = 5, freshness } = {}) {
       description: r.description || ''
     }));
   } catch (err) {
+    clearTimeout(timer);
     console.error('[brave] search error:', err.message);
     return [];
   }

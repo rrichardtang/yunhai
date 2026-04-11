@@ -1087,15 +1087,20 @@ app.post('/api/chat/message', async (req, res) => {
   addMessage(sessionId, 'user', message);
 
   try {
+    const systemPrompt = getCachedPrompt(sessionId, tripContext || {}, () => buildChatSystemPrompt(tripContext || {}, prefSummary));
+
     let searchContext = '';
     if (isBraveConfigured()) {
-      const searchResults = await searchForChat(message);
-      if (searchResults) {
-        searchContext = `\n\n## Web Search Results\nUse these if relevant to the user's question. Cite specifics (hours, prices, addresses) when available. Ignore if not relevant.\n${searchResults}`;
+      try {
+        const searchResults = await searchForChat(message);
+        if (searchResults) {
+          searchContext = `\n\n## Web Search Results\nUse these if relevant to the user's question. Cite specifics (hours, prices, addresses) when available. Ignore if not relevant.\n${searchResults}`;
+        }
+      } catch (e) {
+        console.error('[chat] brave search failed, continuing without:', e.message);
       }
     }
 
-    const systemPrompt = getCachedPrompt(sessionId, tripContext || {}, () => buildChatSystemPrompt(tripContext || {}, prefSummary));
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
