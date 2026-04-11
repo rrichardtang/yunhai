@@ -1,4 +1,5 @@
 require('dotenv').config();
+const fs = require('fs');
 const express = require('express');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
@@ -49,6 +50,13 @@ const PORT = Number(process.env.PORT || 3457);
 
 app.use(express.json({ limit: '1mb' }));
 app.use(clerkMiddleware());
+
+app.get('/planner.html', (_req, res) => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'planner.html'), 'utf8');
+  const key = process.env.CLERK_PUBLISHABLE_KEY || '';
+  res.send(html.replace('data-clerk-publishable-key=""', `data-clerk-publishable-key="${key}"`));
+});
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 function requireConfiguredAuth(req, res, next) {
