@@ -1978,9 +1978,9 @@ function renderActivities() {
               <button class="${declineBtnClass}">❌ Decline</button>
             </div>
             <label class="${review.approved ? '' : 'hidden'}">
-              Notes
+              Customize
               <div class="notes-row">
-                <textarea rows="2" class="notes">${esc(review.notes || '')}</textarea>
+                <textarea rows="2" class="notes" placeholder="e.g. I want to eat at (RESTAURANT NAME)">${esc(review.notes || '')}</textarea>
                 <button class="apply-note" title="Apply note to activity" ${(review.notes || '').trim() ? '' : 'disabled'}>✔</button>
               </div>
             </label>

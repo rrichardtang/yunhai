@@ -807,7 +807,7 @@ app.post('/api/activity/refine', async (req, res) => {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 500,
-      messages: [{ role: 'user', content: `You are updating a travel activity based on the traveler's note.
+      messages: [{ role: 'user', content: `You are refining a travel activity based on the traveler's customization request.
 
 Current activity:
 - Name: ${activity.name}
@@ -821,9 +821,14 @@ Current activity:
 - Start location: ${activity.start_location || ''}
 - End location: ${activity.end_location || ''}
 
-Traveler's note: "${note}"
+Traveler's customization: "${note}"
 
-Return a JSON object with ONLY the fields that should change based on the note. For example if the user specifies a restaurant, update name, start_location, end_location, booking_advice, why_it_fits, and pitfall to reflect that specific place. Keep fields that don't need changing out of the response. Preserve the same JSON field names. Return ONLY JSON, no markdown.` }]
+CRITICAL RULES:
+1. If the traveler names a SPECIFIC place (restaurant, venue, shop, hotel), the updated "name" field MUST include that exact place name. Do NOT generalize it back to a broad category.
+2. Update start_location and end_location to the specific place if one is named.
+3. Tailor why_it_fits, pitfall, and booking_advice to the SPECIFIC place, not the general category.
+4. Return ONLY the fields that should change. Preserve the same JSON field names.
+5. Return ONLY valid JSON, no markdown fences or explanation.` }]
     });
 
     const raw = extractText(response.content).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
