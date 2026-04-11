@@ -71,7 +71,7 @@ function requireConfiguredAuth(req, res, next) {
 }
 
 function getAuthedUserId(req) {
-  return String(req?.auth?.userId || '').trim();
+  return String(req?.auth?.userId || '').trim() || null;
 }
 
 function parseTimeForCalendar(raw = '') {
@@ -1079,14 +1079,13 @@ app.post('/api/chat/message', async (req, res) => {
     return res.status(503).json({ error: 'Anthropic API key not configured for chat.' });
   }
 
-  const userId = parseUserId(getAuthedUserId(req));
-  const prefSummary = getPreferenceSummary(tripContext?.profile || null, userId);
-
-  getSession(sessionId);
-  setTripContext(sessionId, tripContext || {});
-  addMessage(sessionId, 'user', message);
-
   try {
+    const userId = parseUserId(getAuthedUserId(req));
+    const prefSummary = getPreferenceSummary(tripContext?.profile || null, userId);
+
+    getSession(sessionId);
+    setTripContext(sessionId, tripContext || {});
+    addMessage(sessionId, 'user', message);
     const systemPrompt = getCachedPrompt(sessionId, tripContext || {}, () => buildChatSystemPrompt(tripContext || {}, prefSummary));
 
     let searchContext = '';
