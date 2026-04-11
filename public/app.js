@@ -864,6 +864,10 @@ async function syncFromServer() {
         localStorage.setItem('chat_sessions', JSON.stringify(data.chatSessions));
       }
     }
+
+    if (data.workingTrip && data.workingTrip.step > 1) {
+      state._serverWorkingTrip = data.workingTrip;
+    }
   } catch {}
 }
 
@@ -1010,6 +1014,24 @@ function setStep(n) {
   els.steps.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
   els.panels.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
   updateStepNavButtons();
+  syncWorkingTrip();
+}
+
+function syncWorkingTrip() {
+  const payload = {
+    step: state.step,
+    tripName: state.tripName,
+    cities: state.cities,
+    travels: state.travels,
+    activities: state.activities,
+    reviewed: state.reviewed,
+    days: state.days,
+    placements: state.placements,
+    commutes: state.commutes,
+    arrangeCity: state.arrangeCity,
+    currentItineraryId: state.currentItineraryId
+  };
+  syncToServer('workingTrip', payload);
 }
 
 function updateStepNavButtons() {
@@ -4357,16 +4379,21 @@ function hydrateFromSnapshot(snapshot) {
     : expandDays(state.cities);
   state.arrangeCity = snapshot.arrangeCity || state.days[0]?.city || null;
 
+  if (snapshot.currentItineraryId) state.currentItineraryId = snapshot.currentItineraryId;
+
   els.tripName.value = state.tripName;
   renderCities();
   renderActivities();
   renderArrange();
-  setStep(3);
+  setStep(snapshot.step || snapshot.currentStep || 3);
 }
 
 function maybePromptSnapshot() {
   const snapshot = getSnapshot();
-  if (!snapshot) {
+  const serverTrip = state._serverWorkingTrip || null;
+  const resumeSource = snapshot || serverTrip;
+
+  if (!resumeSource) {
     resetToFresh();
     return;
   }
@@ -4374,10 +4401,11 @@ function maybePromptSnapshot() {
   els.resumeModal.classList.remove('hidden');
   els.resumeTripBtn.onclick = () => {
     els.resumeModal.classList.add('hidden');
-    hydrateFromSnapshot(snapshot);
+    hydrateFromSnapshot(resumeSource);
   };
   els.startFreshBtn.onclick = () => {
     clearSnapshot();
+    syncToServer('workingTrip', null);
     els.resumeModal.classList.add('hidden');
     resetChatSession();
     resetToFresh();
