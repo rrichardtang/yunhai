@@ -1,27 +1,32 @@
 # Current State
 
-_Last updated: 2026-04-10_
+_Last updated: 2026-04-11_
 
 ## Objective
-Ship Robust Calendar & Sync Mode MVP for low-noise calendar export.
+Ship Map-First Step 2 review UX (card flip + full itinerary map overlay) while keeping Calendar & Sync MVP intact.
 
 ## Active Workstream
-Calendar sync reliability MVP:
-- Step 4 now includes metadata toggle (compact/full) for calendar export
-- ICS export supports metadata mode query (`?metadata=compact|full`)
-- Google Calendar one-way sync added with OAuth endpoints + token persistence
-- Pre-sync conflict detection endpoint checks overlaps with existing Google events
-- Dedupe-safe sync mapping prevents duplicate event creation per itinerary item fingerprint
+Step 2 map-first review enhancements:
+- Activity cards now support a Quizlet-style 3D flip with a map back face
+- Back face renders a Leaflet mini-map (OpenStreetMap tiles) with pinned activity location
+- Geocoding uses OpenStreetMap Nominatim (`/search`) with local cache (`localStorage`) and queued requests to reduce API hammering
+- Clicking a mini-map opens a full-screen Leaflet overlay map containing all activities
+- Overlay markers use numeric labels; selected activity gets a star-highlight marker
+- Pin clicks can cross-reference back to the card (scroll + temporary highlight)
+- Existing approve/decline/note behavior on the front face remains unchanged
 
 ## Constraints
-- Google sync requires envs: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (optional `GOOGLE_REDIRECT_URI` override)
-- OAuth callback currently uses server route and stores per-user token JSON locally for MVP
+- Leaflet loaded via CDN in planner page
+- OSM/Nominatim free-tier best-practice respected via caching + serialized fetches
+- Step 2 structure preserved (no new review page)
 
 ## Risks
-- No refresh-token renewal flow implemented yet; expired access tokens will need reconnect for now
-- Conflict precheck warns but still allows user to continue sync
+- Nominatim can throttle or return ambiguous hits for sparse location strings
+- Geocoding currently happens client-side on-demand; first open can feel slower on fresh cache
 
 ## Next Actions
+- Add lightweight fallback copy for map errors (network blocked / geocode failed)
+- Add marker clustering if activity count grows large in one itinerary
 - Add token refresh flow and graceful retry on expired Google access tokens
 - Add selective sync scope (city/date filters) and per-item conflict resolution UI
 - Add tests for calendar item fingerprint stability + sync dedupe behavior

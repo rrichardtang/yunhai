@@ -1,6 +1,11 @@
 # ROADMAP
 
 ## Now
+- Shipping **Map-first Step 2 review UX**:
+  - Quizlet-style card flip animation on activity cards.
+  - Back-face mini-map per activity using Leaflet + OpenStreetMap.
+  - Full-screen itinerary map overlay with all activities pinned.
+  - Selected activity highlighted with a star marker and pin-to-card cross-reference.
 - Shipping the **Robust Calendar & Sync Mode MVP** for low-noise calendar export.
 - Active build focus:
   - Metadata toggle support (compact/full) in calendar export flow.

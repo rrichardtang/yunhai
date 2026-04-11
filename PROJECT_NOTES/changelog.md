@@ -4,6 +4,23 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-11] Add map-first activity review UX (Step 2 card flip + full-screen map)
+
+- Added Leaflet + OpenStreetMap to planner UI (CDN) for map rendering with no API key
+- Reworked Step 2 activity cards into a 3D flip-card layout:
+  - Front keeps existing activity details/approve-decline/notes controls
+  - Back adds mini-map with pinned activity location and full-map launch action
+- Implemented client-side Nominatim geocoding (`https://nominatim.openstreetmap.org/search`) with:
+  - query candidate fallback (`start_location`, `end_location`, activity+city)
+  - localStorage cache (`travelplanner_geo_cache_v1`)
+  - serialized request queue + spacing to reduce API hammering
+- Added full-screen map overlay showing all activities in the current itinerary:
+  - numbered marker labels by city/order
+  - selected activity highlighted using star marker
+  - clickable pins that scroll/highlight corresponding activity card
+- Added supporting styles for smooth CSS 3D transforms and map UI overlays
+- Files: `public/app.js`, `public/styles.css`, `public/planner.html`, `PROJECT_NOTES/current_state.md`, `PROJECT_NOTES/ROADMAP.md`, `PROJECT_NOTES/changelog.md`
+
 ## [2026-04-11] Wire up Brave Web Search API for planning agent + chat concierge
 
 - Created `src/braveSearch.js` — thin wrapper around Brave Web Search API with `search()`, `searchCityActivities()`, `searchForChat()` helpers; graceful no-op when key missing
