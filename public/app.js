@@ -3515,6 +3515,7 @@ function setViewMode(mode = 'planning') {
 async function fetchSavedItineraries() {
   try {
     const res = await apiFetch('/api/itineraries');
+    if (!res.ok) return;
     const data = await res.json();
     state.savedItineraries = Array.isArray(data?.itineraries) ? data.itineraries : [];
   } catch {
@@ -4207,8 +4208,10 @@ async function loadAuthSessionData() {
 
   try {
     const statusRes = await apiFetch('/api/calendar/google/status');
-    const statusData = await statusRes.json();
-    state.googleCalendarConnected = Boolean(statusData?.connected);
+    if (statusRes.ok) {
+      const statusData = await statusRes.json();
+      state.googleCalendarConnected = Boolean(statusData?.connected);
+    }
   } catch {
     state.googleCalendarConnected = false;
   }
