@@ -10,6 +10,7 @@ const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('./arrangeConfig');
 const {
   recordSignal,
   recordConstraint,
+  recordPreference,
   needsDistillation,
   distill: distillProfile,
   load: loadPreferences,
@@ -561,6 +562,7 @@ function buildChatSystemPrompt(tripContext = {}, prefSummary = '') {
 Respond ONLY with valid JSON: {"reply":"your response","signals":[]}
 The "signals" array captures any travel preferences or constraints the user reveals. Each signal is one of:
 - Activity preference: {"type":"walk","verdict":"approved"} or {"type":"museum","verdict":"declined"}
+- Preference: {"preference":"Prefers local street food over fine dining"} — use this for nuanced tastes that don't fit a simple type approve/decline. Capture what they like AND what they don't, with specificity.
 - Constraint: {"constraint":"no activities before 9am"}
 Only include signals when the user clearly states a preference. Omit the array or leave it empty otherwise. Do NOT extract signals from your own suggestions.`;
   const profileBlock = prefSummary ? `\n\n## Traveler\n${prefSummary}` : '';
@@ -585,7 +587,9 @@ function parseChatResponse(raw) {
 function processChatSignals(signals, userId) {
   if (!signals.length) return;
   for (const sig of signals) {
-    if (sig.constraint) {
+    if (sig.preference) {
+      recordPreference(userId, sig.preference);
+    } else if (sig.constraint) {
       recordConstraint(userId, sig.constraint);
     } else if (sig.type && sig.verdict) {
       recordSignal({ userId, name: '', type: sig.type, verdict: sig.verdict, city: '', why_it_fits: '' });
@@ -1093,7 +1097,7 @@ app.post('/api/chat/message', async (req, res) => {
       try {
         const searchResults = await searchForChat(message);
         if (searchResults) {
-          searchContext = `\n\n## Web Search Results\nUse these if relevant to the user's question. Cite specifics (hours, prices, addresses) when available. Ignore if not relevant.\n${searchResults}`;
+          searchContext = `\n\n## Web Search Results\nThese are real-time search results for the user's question. When answering factual questions (recommendations, rankings, ratings, hours, prices), you MUST ground your answer in these results — name specific places, cite the source, and include the URL. Do not give vague or generic advice when the search results contain concrete answers.\n${searchResults}`;
         }
       } catch (e) {
         console.error('[chat] brave search failed, continuing without:', e.message);
@@ -1103,7 +1107,7 @@ app.post('/api/chat/message', async (req, res) => {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
-      max_tokens: 300,
+      max_tokens: 600,
       system: systemPrompt + searchContext,
       messages: toAnthropicMessages(getHistory(sessionId))
     });

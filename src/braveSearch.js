@@ -61,7 +61,7 @@ async function searchCityActivities(cityName, { count = 5 } = {}) {
  * General-purpose search for the chat concierge.
  * Returns compact text block from search results.
  */
-async function searchForChat(query, { count = 3 } = {}) {
+async function searchForChat(query, { count = 5 } = {}) {
   const results = await search(query, { count });
   if (!results.length) return '';
   return results.map(r => `- ${r.title} (${r.url}): ${r.description}`).join('\n');

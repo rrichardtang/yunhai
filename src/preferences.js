@@ -6,6 +6,7 @@ const DATA_DIR = path.join(__dirname, '..', 'data');
 const USERS_DIR = path.join(DATA_DIR, 'users');
 const MAX_SIGNALS = 100;
 const MAX_CONSTRAINTS = 20;
+const MAX_PREFERENCES = 30;
 const DISTILL_THRESHOLD = 10;
 const DEFAULT_USER_ID = 'default';
 
@@ -18,6 +19,7 @@ function defaults() {
     liked: { types: [], keywords: [] },
     disliked: { types: [], keywords: [] },
     constraints: [],
+    preferences: [],
     signals: [],
     distilledProfile: '',
     signalsSinceDistill: 0
@@ -52,6 +54,7 @@ function normalize(prefs) {
   if (!prefs || typeof prefs !== 'object') return safe;
   safe.signals = Array.isArray(prefs.signals) ? prefs.signals.slice(-MAX_SIGNALS) : [];
   safe.constraints = Array.isArray(prefs.constraints) ? prefs.constraints.slice(-MAX_CONSTRAINTS) : [];
+  safe.preferences = Array.isArray(prefs.preferences) ? prefs.preferences.slice(-MAX_PREFERENCES) : [];
   safe.distilledProfile = typeof prefs.distilledProfile === 'string' ? prefs.distilledProfile : '';
   safe.signalsSinceDistill = Number(prefs.signalsSinceDistill) || 0;
   if (prefs.liked && typeof prefs.liked === 'object') {
@@ -180,6 +183,19 @@ function recordConstraint(userId = DEFAULT_USER_ID, constraint) {
   return prefs;
 }
 
+function recordPreference(userId = DEFAULT_USER_ID, preference) {
+  const text = String(preference || '').trim();
+  if (!text) return null;
+  const prefs = load(userId);
+  const lower = text.toLowerCase();
+  if (prefs.preferences.some((p) => p.text.toLowerCase() === lower)) return prefs;
+  prefs.preferences.push({ text, ts: Math.floor(Date.now() / 1000) });
+  prefs.preferences = prefs.preferences.slice(-MAX_PREFERENCES);
+  prefs.signalsSinceDistill++;
+  save(prefs, userId);
+  return prefs;
+}
+
 function needsDistillation(userId = DEFAULT_USER_ID) {
   const prefs = load(userId);
   return prefs.signalsSinceDistill >= DISTILL_THRESHOLD;
@@ -221,6 +237,10 @@ function buildDistillPrompt(prefs, selfReportedProfile) {
     parts.push(`Recent activity signals:\n${signalLines.join('\n')}`);
   }
 
+  if (prefs.preferences.length) {
+    parts.push(`Expressed preferences (from conversation):\n${prefs.preferences.map((p) => `- ${p.text}`).join('\n')}`);
+  }
+
   if (prefs.constraints.length) {
     parts.push(`Stated constraints:\n${prefs.constraints.map((c) => `- ${c.text}`).join('\n')}`);
   }
@@ -258,6 +278,7 @@ async function distill(userId = DEFAULT_USER_ID, selfReportedProfile = null) {
   prefs.signalsSinceDistill = 0;
   prefs.signals = prefs.signals.slice(-10);
   prefs.constraints = [];
+  prefs.preferences = [];
 
   const summaries = deriveSummaries(prefs.signals);
   prefs.liked = summaries.liked;
@@ -273,6 +294,9 @@ function getSummary(profile = null, userId = DEFAULT_USER_ID) {
 
   if (prefs.distilledProfile) {
     const parts = [prefs.distilledProfile];
+    if (prefs.preferences.length) {
+      parts.push(`Recent preferences: ${prefs.preferences.map((p) => p.text).join('; ')}`);
+    }
     if (prefs.constraints.length) {
       parts.push(`Additional constraints: ${prefs.constraints.map((c) => c.text).join('; ')}`);
     }
@@ -323,6 +347,10 @@ function getSummary(profile = null, userId = DEFAULT_USER_ID) {
     parts.push(learned.join(' '));
   }
 
+  if (prefs.preferences.length) {
+    parts.push(`Preferences: ${prefs.preferences.map((p) => p.text).join('; ')}`);
+  }
+
   if (prefs.constraints.length) {
     parts.push(`Constraints: ${prefs.constraints.map((c) => c.text).join('; ')}`);
   }
@@ -336,4 +364,4 @@ function reset(userId = DEFAULT_USER_ID) {
   return fresh;
 }
 
-module.exports = { load, save, recordSignal, recordConstraint, needsDistillation, distill, getSummary, reset, resolveUserId, DEFAULT_USER_ID };
+module.exports = { load, save, recordSignal, recordConstraint, recordPreference, needsDistillation, distill, getSummary, reset, resolveUserId, DEFAULT_USER_ID };
