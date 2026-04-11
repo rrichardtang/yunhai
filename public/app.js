@@ -26,6 +26,7 @@ const state = {
     city: '',
     verdict: ''
   },
+  reviewCardFlips: {},
   viewMode: 'planning',
   arrangeConfig: null,
   arrangeDiagnostics: {},
@@ -35,7 +36,8 @@ const state = {
   authUserEmail: '',
   forwardingAddress: '',
   calendarMetadataMode: 'compact',
-  googleCalendarConnected: false
+  googleCalendarConnected: false,
+  mapOverlaySelectedActivityId: null
 };
 
 const PROFILES_KEY = 'travelplanner_profiles_v1';
@@ -149,9 +151,87 @@ const els = {
 const SNAPSHOT_KEY = 'travelplanner_snapshot';
 const VIEW_MODE_KEY = 'travelplanner_view_mode_v1';
 const MINIMAL_OFFLINE_KEY = 'travelplanner_minimal_offline_v1';
+const GEO_CACHE_KEY = 'travelplanner_geo_cache_v1';
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s='') => s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalizeCity = (str = '') => String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+const geocodeCache = loadGeocodeCache();
+let geocodeQueue = Promise.resolve();
+let activityMapOverlay = null;
+let activityMapOverlayMap = null;
+let activityMapOverlayMarkers = [];
+const miniMapInstances = new Map();
+
+function loadGeocodeCache() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistGeocodeCache() {
+  try {
+    localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geocodeCache));
+  } catch {}
+}
+
+function geocodeKey(value = '') {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getActivityLocationCandidates(activity = {}) {
+  const name = String(activity.name || '').trim();
+  const city = String(activity.city || '').trim();
+  const candidates = [
+    activity.start_location,
+    activity.end_location,
+    activity.location,
+    [name, city].filter(Boolean).join(', '),
+    city
+  ].map((x) => String(x || '').trim()).filter(Boolean);
+  return [...new Set(candidates)];
+}
+
+function geocodeQueryQueued(query) {
+  const key = geocodeKey(query);
+  if (geocodeCache[key]) return Promise.resolve(geocodeCache[key]);
+
+  geocodeQueue = geocodeQueue
+    .catch(() => null)
+    .then(async () => {
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`;
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new Error(`Geocode failed (${res.status})`);
+      const rows = await res.json();
+      const hit = Array.isArray(rows) ? rows[0] : null;
+      if (!hit?.lat || !hit?.lon) return null;
+      const coords = { lat: Number(hit.lat), lng: Number(hit.lon), label: hit.display_name || query };
+      if (Number.isFinite(coords.lat) && Number.isFinite(coords.lng)) {
+        geocodeCache[key] = coords;
+        persistGeocodeCache();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return coords;
+    });
+
+  return geocodeQueue.catch(() => null);
+}
+
+async function geocodeActivity(activity = {}) {
+  const candidates = getActivityLocationCandidates(activity);
+  for (const candidate of candidates) {
+    const cached = geocodeCache[geocodeKey(candidate)];
+    if (cached?.lat != null && cached?.lng != null) return cached;
+  }
+  for (const candidate of candidates) {
+    const result = await geocodeQueryQueued(candidate);
+    if (result?.lat != null && result?.lng != null) return result;
+  }
+  return null;
+}
 
 function cityVariants(value = '') {
   const raw = String(value || '').trim();
@@ -1794,6 +1874,7 @@ function enrichImages(items = []) {
 function renderActivities() {
   updateReviewNav();
   populateReviewCityFilter();
+  destroyMiniMaps();
 
   if (state.step === 2 && !reviewImageEnrichInFlight) {
     reviewImageEnrichInFlight = true;
@@ -1821,33 +1902,68 @@ function renderActivities() {
     const declineBtnClass = `secondary decline btn-decline ${isDeclined ? 'active' : ''} ${isApproved ? 'inactive' : ''}`.trim();
     const cardStateClass = isApproved ? 'approved' : isDeclined ? 'declined' : '';
     const verdictClass = `verdict-${(a.verdict || '').replace(/\s+/g, '-')}`;
+    const isFlipped = Boolean(state.reviewCardFlips[a.id]);
     const card = document.createElement('article');
-    card.className = `card activity-card ${cardStateClass}`.trim();
+    card.className = `card activity-card ${cardStateClass} ${isFlipped ? 'is-flipped' : ''}`.trim();
+    card.dataset.activityId = a.id;
     card.innerHTML = `
-      <img src="${esc(a.imageUrl || '')}" alt="${esc(a.name)}" />
-      <div class="card-content">
-        <div>
-          <span class="badge">${esc(a.type)}</span>
-          <span class="badge ${verdictClass}">${esc(a.verdict || 'N/A')}</span>
-        </div>
-        <h3>${esc(a.name)}</h3>
-        <p><strong>City:</strong> ${esc(a.city || '')}</p>
-        <p><strong>Why it fits:</strong> ${esc(a.why_it_fits || '')}</p>
-        <p><strong>Pitfall:</strong> ${esc(a.pitfall || '')}</p>
-        <p><strong>Booking advice:</strong> ${esc(a.booking_advice || '')}</p>
-        <div class="actions">
-          <button class="${approveBtnClass}">✅ Approve</button>
-          <button class="${declineBtnClass}">❌ Decline</button>
-        </div>
-        <label class="${review.approved ? '' : 'hidden'}">
-          Notes
-          <div class="notes-row">
-            <textarea rows="2" class="notes">${esc(review.notes || '')}</textarea>
-            <button class="apply-note" title="Apply note to activity" ${(review.notes || '').trim() ? '' : 'disabled'}>✔</button>
+      <div class="activity-card-inner">
+        <div class="activity-card-face activity-card-front">
+          <img src="${esc(a.imageUrl || '')}" alt="${esc(a.name)}" />
+          <div class="card-content">
+            <div class="activity-card-head-actions">
+              <div>
+                <span class="badge">${esc(a.type)}</span>
+                <span class="badge ${verdictClass}">${esc(a.verdict || 'N/A')}</span>
+              </div>
+              <button class="secondary flip-btn" type="button" title="Flip to map" aria-label="Flip card">🗺️</button>
+            </div>
+            <h3>${esc(a.name)}</h3>
+            <p><strong>City:</strong> ${esc(a.city || '')}</p>
+            <p><strong>Why it fits:</strong> ${esc(a.why_it_fits || '')}</p>
+            <p><strong>Pitfall:</strong> ${esc(a.pitfall || '')}</p>
+            <p><strong>Booking advice:</strong> ${esc(a.booking_advice || '')}</p>
+            <div class="actions">
+              <button class="${approveBtnClass}">✅ Approve</button>
+              <button class="${declineBtnClass}">❌ Decline</button>
+            </div>
+            <label class="${review.approved ? '' : 'hidden'}">
+              Notes
+              <div class="notes-row">
+                <textarea rows="2" class="notes">${esc(review.notes || '')}</textarea>
+                <button class="apply-note" title="Apply note to activity" ${(review.notes || '').trim() ? '' : 'disabled'}>✔</button>
+              </div>
+            </label>
           </div>
-        </label>
+        </div>
+        <div class="activity-card-face activity-card-back">
+          <div class="card-content map-back-content">
+            <div class="activity-card-head-actions">
+              <strong>Map view</strong>
+              <button class="secondary flip-btn" type="button" title="Flip back" aria-label="Flip card">↩️</button>
+            </div>
+            <p class="muted-text">${esc(a.name)}${a.city ? ` · ${esc(a.city)}` : ''}</p>
+            <button type="button" class="mini-map-wrap" title="Open full map">
+              <div class="mini-map" data-mini-map-for="${esc(a.id)}"></div>
+            </button>
+            <p class="muted-text">Tap map to open full-screen itinerary map.</p>
+          </div>
+        </div>
       </div>
     `;
+
+    card.querySelectorAll('.flip-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const next = !card.classList.contains('is-flipped');
+        state.reviewCardFlips[a.id] = next;
+        card.classList.toggle('is-flipped', next);
+        if (next) ensureMiniMapForCard(card, a);
+      });
+    });
+
+    if (isFlipped) {
+      setTimeout(() => ensureMiniMapForCard(card, a), 0);
+    }
 
     card.querySelector('.approve').addEventListener('click', () => {
       const current = state.reviewed[a.id]?.approved;
@@ -1895,8 +2011,151 @@ function renderActivities() {
       });
     }
 
+    card.querySelector('.mini-map-wrap')?.addEventListener('click', () => {
+      openActivityMapOverlay(a.id);
+    });
+
     els.activitiesGrid.appendChild(card);
   });
+}
+
+function destroyMiniMaps() {
+  miniMapInstances.forEach((map) => {
+    try { map.remove(); } catch {}
+  });
+  miniMapInstances.clear();
+}
+
+async function ensureMiniMapForCard(card, activity) {
+  if (!window.L) return;
+  const holder = card.querySelector('.mini-map');
+  if (!holder) return;
+  const key = String(activity.id || '');
+  if (!key) return;
+
+  const oldMap = miniMapInstances.get(key);
+  if (oldMap) {
+    try { oldMap.remove(); } catch {}
+    miniMapInstances.delete(key);
+  }
+
+  holder.innerHTML = '<div class="mini-map-loading">Loading map…</div>';
+  const geo = await geocodeActivity(activity);
+  if (!geo) {
+    holder.innerHTML = '<div class="mini-map-loading">Location unavailable</div>';
+    return;
+  }
+
+  holder.innerHTML = '';
+  const map = window.L.map(holder, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false });
+  window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+  window.L.marker([geo.lat, geo.lng]).addTo(map);
+  map.setView([geo.lat, geo.lng], 13);
+  miniMapInstances.set(key, map);
+}
+
+function makeMapLabel(activity, activities) {
+  const city = String(activity.city || '').trim();
+  const sameCity = activities.filter((a) => String(a.city || '').trim() === city);
+  const cityIndex = [...new Set(activities.map((a) => String(a.city || '').trim()))].filter(Boolean).indexOf(city) + 1;
+  const order = sameCity.findIndex((a) => a.id === activity.id) + 1;
+  if (cityIndex > 0 && order > 0) return `${cityIndex}.${order}`;
+  const globalOrder = activities.findIndex((a) => a.id === activity.id) + 1;
+  return String(globalOrder);
+}
+
+function markerIcon(label, highlighted = false) {
+  return window.L.divIcon({
+    className: 'activity-map-marker-wrap',
+    html: `<div class="activity-map-marker ${highlighted ? 'star' : ''}">${highlighted ? '★' : esc(label)}</div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15]
+  });
+}
+
+function mountActivityMapOverlay() {
+  if (activityMapOverlay) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'activity-map-overlay hidden';
+  overlay.innerHTML = `
+    <div class="activity-map-shell">
+      <div class="activity-map-topbar">
+        <strong>Itinerary map</strong>
+        <button class="secondary close-activity-map" type="button">Close ✕</button>
+      </div>
+      <div class="activity-map-canvas" id="activityMapCanvas"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('.close-activity-map')?.addEventListener('click', closeActivityMapOverlay);
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) closeActivityMapOverlay();
+  });
+  activityMapOverlay = overlay;
+}
+
+function closeActivityMapOverlay() {
+  if (!activityMapOverlay) return;
+  activityMapOverlay.classList.add('hidden');
+}
+
+function focusActivityCard(activityId) {
+  const selector = `[data-activity-id="${String(activityId).replace(/"/g, '\\"')}"]`;
+  const card = document.querySelector(selector);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.add('map-highlight');
+  setTimeout(() => card.classList.remove('map-highlight'), 1200);
+}
+
+async function openActivityMapOverlay(selectedActivityId = null) {
+  if (!window.L) return;
+  mountActivityMapOverlay();
+  state.mapOverlaySelectedActivityId = selectedActivityId;
+  activityMapOverlay.classList.remove('hidden');
+
+  const mapCanvas = activityMapOverlay.querySelector('#activityMapCanvas');
+  const activities = [...state.activities];
+  const enriched = [];
+  for (const activity of activities) {
+    const geo = await geocodeActivity(activity);
+    if (geo) enriched.push({ activity, geo });
+  }
+
+  if (!activityMapOverlayMap) {
+    activityMapOverlayMap = window.L.map(mapCanvas, { zoomControl: true });
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(activityMapOverlayMap);
+  }
+
+  activityMapOverlayMarkers.forEach((m) => {
+    try { m.remove(); } catch {}
+  });
+  activityMapOverlayMarkers = [];
+
+  const bounds = [];
+  enriched.forEach(({ activity, geo }) => {
+    const label = makeMapLabel(activity, activities);
+    const selected = activity.id === state.mapOverlaySelectedActivityId;
+    const marker = window.L.marker([geo.lat, geo.lng], { icon: markerIcon(label, selected) })
+      .addTo(activityMapOverlayMap)
+      .bindPopup(`<strong>${esc(activity.name || 'Activity')}</strong><br>${esc(activity.city || '')}<br><small>#${esc(label)}</small>`);
+    marker.on('click', () => {
+      state.mapOverlaySelectedActivityId = activity.id;
+      focusActivityCard(activity.id);
+      openActivityMapOverlay(activity.id);
+    });
+    activityMapOverlayMarkers.push(marker);
+    bounds.push([geo.lat, geo.lng]);
+  });
+
+  if (bounds.length) activityMapOverlayMap.fitBounds(bounds, { padding: [40, 40] });
+  setTimeout(() => activityMapOverlayMap.invalidateSize(), 0);
 }
 
 function expandDays(cities) {
@@ -4429,6 +4688,7 @@ document.querySelectorAll('[data-nav-back]').forEach((btn) => {
   state.profilesStore = loadProfiles();
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   mountPlanningOverlay();
+  mountActivityMapOverlay();
   mountToastHost();
   bindChatEvents();
   ensureUserId();

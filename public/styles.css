@@ -308,9 +308,19 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 }
 .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .card { border: 1px solid #d9dce3; border-radius: 14px; background: var(--card); overflow: hidden; display: flex; flex-direction: column; }
-.activity-card { transition: background .2s ease, border-left-color .2s ease; }
+.activity-card { transition: background .2s ease, border-left-color .2s ease; perspective: 1200px; min-height: 520px; }
+.activity-card-inner { position: relative; width: 100%; min-height: 520px; transition: transform .55s ease; transform-style: preserve-3d; }
+.activity-card.is-flipped .activity-card-inner { transform: rotateY(180deg); }
+.activity-card-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--card); overflow: auto; }
+.activity-card-back { transform: rotateY(180deg); }
 .card img { width: 100%; height: 160px; object-fit: cover; background: #edf1f6; }
 .card-content { padding: 12px; }
+.activity-card-head-actions { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.flip-btn { min-width: 42px; padding: 6px 8px; }
+.map-back-content { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+.mini-map-wrap { border: 1px solid #d9dce3; background: #f8fafc; padding: 0; border-radius: 10px; overflow: hidden; cursor: pointer; }
+.mini-map { width: 100%; height: 220px; display: block; }
+.mini-map-loading { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 13px; }
 .badge { display: inline-block; border-radius: 999px; padding: 5px 10px; font-size: 12px; margin-right: 6px; background: #eef2f8; }
 .badge.verdict-Recommend { background: #def5e9; color: #12653f; }
 .badge.verdict-Recommend-with-caveats { background: #fff1d9; color: #7b4f09; }
@@ -323,6 +333,14 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .btn-decline.inactive { opacity: 0.35; cursor: default; }
 .activity-card.approved { border-left: 4px solid #22c55e; background: rgba(34,197,94,0.05); }
 .activity-card.declined { border-left: 4px solid #ef4444; background: rgba(239,68,68,0.05); }
+.activity-card.map-highlight { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35); }
+
+.activity-map-overlay { position: fixed; inset: 0; z-index: 1600; background: rgba(11, 17, 28, 0.7); padding: 18px; }
+.activity-map-shell { height: 100%; background: #fff; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
+.activity-map-topbar { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e6ebf2; }
+.activity-map-canvas { flex: 1; min-height: 360px; }
+.activity-map-marker { width: 30px; height: 30px; border-radius: 999px; background: #1d4ed8; color: #fff; border: 2px solid #fff; box-shadow: 0 3px 12px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.activity-map-marker.star { background: #f59e0b; font-size: 15px; }
 
 .notes-row { display: flex; gap: 6px; align-items: flex-start; }
 .notes-row .notes { flex: 1; }
