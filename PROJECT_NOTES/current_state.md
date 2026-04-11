@@ -25,3 +25,4 @@ Calendar sync reliability MVP:
 - Add token refresh flow and graceful retry on expired Google access tokens
 - Add selective sync scope (city/date filters) and per-item conflict resolution UI
 - Add tests for calendar item fingerprint stability + sync dedupe behavior
+- Consider adding Brave search result caching (knowledgeStore) when free tier cap becomes a concern

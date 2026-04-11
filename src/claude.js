@@ -1,6 +1,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { getSummary } = require('./preferences');
 const { inferCategory, getCategoryDefaults } = require('./arrangeConfig');
+const { searchCityActivities } = require('./braveSearch');
 
 const MODEL = 'claude-sonnet-4-6';
 
@@ -222,7 +223,12 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   const paceLabels = { 1: 'very relaxed', 2: 'easy-going', 3: 'moderate', 4: 'active', 5: 'non-stop' };
   const paceDesc = paceLabels[pace];
 
-  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace. Generate a number of activities proportional to the length of stay and their pace preference — fewer for relaxed travelers, more for active ones. Use accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Respect the computed time windows exactly on arrival/departure/transfer days. Be concise.\n\nReturn JSON only.`;
+  const webResearch = await searchCityActivities(name);
+  const webBlock = webResearch
+    ? `\n\nWeb research (use as supplementary inspiration, not a strict list):\n${webResearch}`
+    : '';
+
+  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace. Generate a number of activities proportional to the length of stay and their pace preference — fewer for relaxed travelers, more for active ones. Use accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Respect the computed time windows exactly on arrival/departure/transfer days. Be concise.${webBlock}\n\nReturn JSON only.`;
 
   const learnedSummary = getSummary(profile, userId);
   const effectiveSystemPrompt = learnedSummary

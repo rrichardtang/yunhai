@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-11] Wire up Brave Web Search API for planning agent + chat concierge
+
+- Created `src/braveSearch.js` — thin wrapper around Brave Web Search API with `search()`, `searchCityActivities()`, `searchForChat()` helpers; graceful no-op when key missing
+- Wired into `src/claude.js` `planCity()` — fetches web research for the city before LLM call, injected as supplementary context in the user prompt
+- Wired into `src/server.js` chat endpoint — every chat message triggers a Brave search, results appended to system prompt so the concierge can cite real-time info
+- Added `BRAVE_API_KEY` to `.env.example` with comment (free tier: 2000/month)
+- Updated `CLAUDE.md` with new module and updated request flow
+- Files: `src/braveSearch.js` (new), `src/claude.js`, `src/server.js`, `.env.example`, `CLAUDE.md`
+
 ## [2026-04-10] Add Robust Calendar & Sync Mode MVP (Proposal A)
 
 - Added calendar metadata mode toggle (compact/full) in step 4 itinerary actions

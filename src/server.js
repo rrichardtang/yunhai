@@ -18,6 +18,7 @@ const {
   resolveUserId
 } = require('./preferences');
 const { getSession, setTripContext, addMessage, getHistory, compactHistory, clearSession, getCachedPrompt } = require('./chat');
+const { searchForChat, isConfigured: isBraveConfigured } = require('./braveSearch');
 const {
   saveItinerary,
   getLatestItinerary,
@@ -1086,11 +1087,20 @@ app.post('/api/chat/message', async (req, res) => {
   addMessage(sessionId, 'user', message);
 
   try {
+    let searchContext = '';
+    if (isBraveConfigured()) {
+      const searchResults = await searchForChat(message);
+      if (searchResults) {
+        searchContext = `\n\n## Web Search Results\nUse these if relevant to the user's question. Cite specifics (hours, prices, addresses) when available. Ignore if not relevant.\n${searchResults}`;
+      }
+    }
+
+    const systemPrompt = getCachedPrompt(sessionId, tripContext || {}, () => buildChatSystemPrompt(tripContext || {}, prefSummary));
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 300,
-      system: getCachedPrompt(sessionId, tripContext || {}, () => buildChatSystemPrompt(tripContext || {}, prefSummary)),
+      system: systemPrompt + searchContext,
       messages: toAnthropicMessages(getHistory(sessionId))
     });
 
