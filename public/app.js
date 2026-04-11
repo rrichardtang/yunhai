@@ -4220,14 +4220,7 @@ async function initClerkAuth() {
   const clerk = window.Clerk;
   if (!clerk) throw new Error('Clerk SDK not loaded');
 
-  const statusRes = await fetch('/api/status');
-  const statusData = await statusRes.json();
-  const publishableKey = String(statusData?.clerkPublishableKey || '').trim();
-  if (!publishableKey) {
-    throw new Error('Clerk publishable key missing on server');
-  }
-
-  await clerk.load({ publishableKey });
+  await clerk.load();
   const user = clerk.user;
   if (!user) {
     await clerk.openSignIn({
