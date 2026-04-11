@@ -4,6 +4,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-11] Tighten concierge chat prompt and add hyperlink rendering
+
+- Concierge system prompt: capped at 2-3 sentences, banned hedging phrases, added CRITICAL instruction to use markdown links instead of raw URLs inside JSON reply
+- Frontend `renderChatMessages`: converts markdown `[text](url)` to `<a>` tags, plus fallback auto-linking for raw URLs
+- Files: `src/server.js`, `public/app.js`
+
 ## [2026-04-11] Replace resume popup with "My Trips" section on Step 1
 
 - Removed `resumeModal` dialog from `planner.html`
