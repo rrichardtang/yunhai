@@ -4017,6 +4017,7 @@ async function loadItineraryById(id) {
     state.placements = placements;
     hydrateTravelIntoCities();
     renderCities();
+    state.lastPlannedFingerprint = step1Fingerprint();
     updateCalendarControls();
     renderItinerary();
     await fetchSavedItineraries();
@@ -4488,6 +4489,7 @@ function hydrateFromSnapshot(snapshot) {
   renderCities();
   renderActivities();
   renderArrange();
+  state.lastPlannedFingerprint = step1Fingerprint();
   setStep(3);
 }
 
