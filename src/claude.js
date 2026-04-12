@@ -246,18 +246,35 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     ? `${SYSTEM_PROMPT}\n\n${learnedSummary}`
     : SYSTEM_PROMPT;
 
+  const messages = [
+    { role: 'user', content: prompt },
+    { role: 'assistant', content: '[' }
+  ];
+
   const res = await client.messages.create({
     model: MODEL,
     max_tokens: 4096,
     system: effectiveSystemPrompt,
-    messages: [{ role: 'user', content: prompt }]
+    messages
   });
 
-  const response = extractTextBlock(res.content);
-  const parsed = tryParseJsonArray(response);
+  const response = '[' + extractTextBlock(res.content);
+  let parsed = tryParseJsonArray(response);
 
   if (!parsed) {
-    console.error('Failed to parse Claude JSON response (all parse strategies failed).');
+    console.error(`JSON parse failed for ${name}, retrying...`);
+    const retry = await client.messages.create({
+      model: MODEL,
+      max_tokens: 4096,
+      system: effectiveSystemPrompt,
+      messages: [{ role: 'user', content: prompt + '\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.' }, { role: 'assistant', content: '[' }]
+    });
+    const retryResponse = '[' + extractTextBlock(retry.content);
+    parsed = tryParseJsonArray(retryResponse);
+  }
+
+  if (!parsed) {
+    console.error('Failed to parse Claude JSON response after retry.');
     throw new Error(`Claude returned invalid JSON for ${name}.`);
   }
 
