@@ -139,7 +139,7 @@ const els = {
   profileAiSummary: document.getElementById('profileAiSummary'),
   aiSummarySection: document.getElementById('aiSummarySection'),
   profileEditBtn: document.getElementById('profileEditBtn'),
-  saveProgressBtn: document.getElementById('saveProgressBtn'),
+
   autoArrangeBtn: document.getElementById('autoArrangeBtn'),
   myTripsPanel: document.getElementById('myTripsPanel'),
   myTripsList: document.getElementById('myTripsList'),
@@ -4851,7 +4851,7 @@ els.reviewVerdictFilter?.addEventListener('change', (e) => {
 });
 els.approveVisibleBtn?.addEventListener('click', () => applyVerdictToVisibleActivities(true));
 
-els.saveProgressBtn.addEventListener('click', saveSnapshot);
+document.querySelectorAll('.save-progress-btn').forEach((btn) => btn.addEventListener('click', saveSnapshot));
 els.autoArrangeBtn?.addEventListener('click', autoArrangeActiveCity);
 els.downloadCalendarBtn?.addEventListener('click', () => {
   if (!state.currentItineraryId) return;
