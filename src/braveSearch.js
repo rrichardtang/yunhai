@@ -67,4 +67,41 @@ async function searchForChat(query, { count = 5 } = {}) {
   return results.map(r => `- ${r.title} (${r.url}): ${r.description}`).join('\n');
 }
 
-module.exports = { search, searchCityActivities, searchForChat, isConfigured };
+const CURRENCY_TO_USD = { '€': 1.1, '£': 1.3, '¥': 0.007, '₩': 0.00075 };
+
+function parseFirstPrice(text = '') {
+  // Matches: $45, €30, £25, ¥5,000, from $50, $40-60, USD 45
+  const pattern = /(?:from\s+)?([€£¥₩\$])\s*([\d,]+)(?:\s*[-–]\s*([\d,]+))?|USD\s+([\d,]+)/i;
+  const m = text.match(pattern);
+  if (!m) return null;
+
+  if (m[4]) return Math.round(Number(m[4].replace(/,/g, '')));
+
+  const symbol = m[1];
+  const low = Number(m[2].replace(/,/g, ''));
+  const high = m[3] ? Number(m[3].replace(/,/g, '')) : low;
+  const value = high; // take higher end of range (conservative)
+  const multiplier = symbol === '$' ? 1 : (CURRENCY_TO_USD[symbol] || 1);
+  return Math.round(value * multiplier);
+}
+
+async function searchActivityPrice(activityName, cityName) {
+  const results = await search(`"${activityName}" ${cityName} price`, { count: 3 });
+  for (const r of results) {
+    const price = parseFirstPrice(r.description) || parseFirstPrice(r.title);
+    if (price !== null && price > 0) return price;
+  }
+  return null;
+}
+
+async function searchActivityPricesBatch(activities, cityName) {
+  const bookable = activities.filter((a) => a.is_bookable);
+  const results = await Promise.all(
+    bookable.map((a) => searchActivityPrice(a.name, cityName))
+  );
+  const map = new Map();
+  bookable.forEach((a, i) => map.set(a.name, results[i]));
+  return map;
+}
+
+module.exports = { search, searchCityActivities, searchForChat, isConfigured, searchActivityPrice, searchActivityPricesBatch };

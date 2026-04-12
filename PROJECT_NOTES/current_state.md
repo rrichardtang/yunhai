@@ -1,17 +1,19 @@
 # Current State
 
-_Last updated: 2026-04-11_
+_Last updated: 2026-04-12_
 
 ## Objective
-UX improvements — replace modal-based resume flow with inline "My Trips" section.
+Budget feature — per-activity cost estimates, booking links, and a budget tracker in step 2.
 
 ## Active Workstream
-Replaced resume popup with "My Trips" panel on Step 1. Previously shipped cross-device sync for all localStorage-only data:
-- New `src/userDataStore.js` flat-file store at `data/userdata.json` keyed by Clerk userId
-- REST endpoints (`GET/PUT /api/userdata`, `GET/PUT /api/userdata/:field`) for per-user data
-- Frontend writes to both localStorage (fast cache) and server (durable sync) on every save
-- On sign-in, `syncFromServer()` hydrates localStorage from server if local is empty or stale
-- Synced fields: profiles, snapshot, viewMode, chatSessions
+Shipped budget feature:
+- Step 1: Total Budget (USD) + Number of Travelers inputs
+- LLM outputs `estimated_cost_usd`, `cost_type` (per_person/per_group), `is_bookable` per activity
+- Post-generation: parallel Brave search validates/overrides LLM cost estimates (takes higher value)
+- Booking links constructed per activity: GetYourGuide + Viator for tours, Google Maps for named restaurants
+- Booking link dates updated to actual scheduled date after auto-arrange
+- Step 2: cost display on cards with per-person multiplication, sticky budget tracker with color states
+- Customize (refine) endpoint re-enriches cost + links after activity changes
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
@@ -19,11 +21,10 @@ Replaced resume popup with "My Trips" panel on Step 1. Previously shipped cross-
 
 ## Risks
 - Concurrent writes from two devices could overwrite each other (last-write-wins)
-- Large userdata.json file if many users accumulate (single file for all users)
+- Brave price parsing relies on regex against snippets — may miss prices in non-standard formats
+- LLM cost estimates are rough; Brave validation helps but neither source is authoritative
 
 ## Next Actions
-- Test cross-device sync on VPS deployment
+- Test on VPS: verify Brave price searches fire correctly and booking links work
 - Add token refresh flow and graceful retry on expired Google access tokens
-- Add selective sync scope (city/date filters) and per-item conflict resolution UI
-- Add tests for calendar item fingerprint stability + sync dedupe behavior
-- Consider adding Brave search result caching (knowledgeStore) when free tier cap becomes a concern
+- Consider caching Brave search results to stay within free tier (2000 req/month)

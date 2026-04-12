@@ -1,6 +1,8 @@
 const state = {
   step: 1,
   tripName: '',
+  tripBudget: null,
+  numTravelers: 1,
   cities: [],
   travels: [],
   activities: [],
@@ -78,6 +80,8 @@ const els = {
   steps: [...document.querySelectorAll('#stepIndicator .step')],
   panels: [1,2,3,4].map((n) => document.getElementById(`step${n}`)),
   tripName: document.getElementById('tripName'),
+  tripBudget: document.getElementById('tripBudget'),
+  numTravelers: document.getElementById('numTravelers'),
   citiesContainer: document.getElementById('citiesContainer'),
   locationValidationError: document.getElementById('locationValidationError'),
   addCityBtn: document.getElementById('addCityBtn'),
@@ -1931,6 +1935,39 @@ function enrichImages(items = []) {
   }));
 }
 
+function computeApprovedCost(activities) {
+  const travelers = state.numTravelers || 1;
+  return (activities || state.activities.filter((a) => state.reviewed[a.id]?.approved === true))
+    .reduce((sum, a) => {
+      if (a.estimated_cost_usd === null || a.estimated_cost_usd === undefined) return sum;
+      return sum + (a.cost_type === 'per_group' ? a.estimated_cost_usd : a.estimated_cost_usd * travelers);
+    }, 0);
+}
+
+function renderBudgetTracker() {
+  const existing = document.getElementById('budgetTracker');
+  if (!state.tripBudget) { if (existing) existing.remove(); return; }
+
+  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true);
+  const used = computeApprovedCost(approved);
+  const remaining = state.tripBudget - used;
+  const pct = Math.min(used / state.tripBudget, 1);
+  const nullCount = approved.filter((a) => a.estimated_cost_usd === null || a.estimated_cost_usd === undefined).length;
+  const colorClass = pct < 0.6 ? 'budget-green' : pct < 0.9 ? 'budget-yellow' : 'budget-red';
+
+  const html = `<div id="budgetTracker" class="budget-tracker ${colorClass}">
+    <span class="budget-label">Budget</span>
+    <span class="budget-used">$${Math.round(used).toLocaleString()} / $${state.tripBudget.toLocaleString()}</span>
+    <span class="budget-remaining">${remaining >= 0 ? `$${Math.round(remaining).toLocaleString()} left` : `$${Math.round(-remaining).toLocaleString()} over`}</span>
+    ${nullCount > 0 ? `<span class="budget-caveat">${nullCount} activit${nullCount === 1 ? 'y has' : 'ies have'} no cost estimate</span>` : ''}
+  </div>`;
+
+  if (existing) { existing.outerHTML = html; } else {
+    const grid = els.activitiesGrid;
+    if (grid?.parentNode) grid.parentNode.insertAdjacentHTML('beforebegin', html);
+  }
+}
+
 function renderActivities() {
   updateReviewNav();
   populateReviewCityFilter();
@@ -1952,6 +1989,7 @@ function renderActivities() {
     return;
   }
 
+  renderBudgetTracker();
   els.activitiesGrid.innerHTML = '';
   filteredActivities.forEach((a) => {
     const review = state.reviewed[a.id] || { approved: null, notes: '' };
@@ -1980,6 +2018,27 @@ function renderActivities() {
             </div>
             <h3>${esc(a.name)}</h3>
             <p><strong>City:</strong> ${esc(a.city || '')}</p>
+            ${(() => {
+              const travelers = state.numTravelers || 1;
+              const isPerGroup = a.cost_type === 'per_group';
+              const cost = a.estimated_cost_usd;
+              let costHtml = '';
+              if (cost !== null && cost !== undefined) {
+                if (isPerGroup) {
+                  costHtml = `$${cost} (group)`;
+                } else if (travelers > 1) {
+                  costHtml = `$${cost} × ${travelers} = $${cost * travelers}`;
+                } else {
+                  costHtml = `$${cost} per person`;
+                }
+              } else {
+                costHtml = 'N/A';
+              }
+              const links = Array.isArray(a.booking_links) && a.booking_links.length
+                ? a.booking_links.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="booking-link">${esc(l.site)}</a>`).join('')
+                : '';
+              return `<p class="activity-cost"><strong>Est. cost:</strong> ${costHtml}${links ? `<span class="booking-links">${links}</span>` : ''}</p>`;
+            })()}
             <p><strong>Why it fits:</strong> ${esc(a.why_it_fits || '')}</p>
             <p><strong>Pitfall:</strong> ${esc(a.pitfall || '')}</p>
             <p><strong>Booking advice:</strong> ${esc(a.booking_advice || '')}</p>
@@ -3275,10 +3334,15 @@ async function autoArrangeActiveCity() {
           if (st && st !== '10:00am') obj.suggested_time = st;
           const loc = (a.start_location || a.end_location || '').trim();
           if (loc) obj.location = loc;
+          if (a.estimated_cost_usd !== null && a.estimated_cost_usd !== undefined) obj.estimated_cost_usd = a.estimated_cost_usd;
+          if (a.cost_type) obj.cost_type = a.cost_type;
           return obj;
         }),
         userId: ensureUserId(),
-        profile: getProfilePayload()
+        profile: getProfilePayload(),
+        budget: state.tripBudget,
+        numTravelers: state.numTravelers,
+        approvedCostTotal: computeApprovedCost(approvedInCity)
       })
     });
 
@@ -3288,7 +3352,19 @@ async function autoArrangeActiveCity() {
     const dateToDay = Object.fromEntries(activeDays.map((d) => [d.date, d]));
     for (const [id, placement] of Object.entries(placements || {})) {
       const day = dateToDay[placement.date];
-      if (day) state.placements[id] = { dayId: day.id, time: placement.time };
+      if (day) {
+        state.placements[id] = { dayId: day.id, time: placement.time };
+        // Update booking link dates to use the actual scheduled date
+        const activity = state.activities.find((a) => a.id === id);
+        if (activity && Array.isArray(activity.booking_links)) {
+          activity.booking_links = activity.booking_links.map((l) => {
+            const url = new URL(l.url);
+            if (l.site === 'GetYourGuide') url.searchParams.set('date_from', placement.date);
+            if (l.site === 'Viator') url.searchParams.set('startDate', placement.date);
+            return { ...l, url: url.toString() };
+          });
+        }
+      }
     }
 
     state.arrangeDiagnostics[activeCity] = unplaced.map((u) => {
@@ -3947,6 +4023,9 @@ async function loadItineraryById(id) {
 
 async function planTrip() {
   state.tripName = els.tripName.value.trim();
+  const budgetVal = parseFloat(els.tripBudget?.value);
+  state.tripBudget = Number.isFinite(budgetVal) && budgetVal > 0 ? budgetVal : null;
+  state.numTravelers = Math.max(1, parseInt(els.numTravelers?.value, 10) || 1);
   syncLegacyTravelsFromCities();
   const cities = state.cities.map(({name,startDate,endDate,leaveTime,notes,accommodations,travelEntry,logistics}) => ({
     name,
@@ -3959,7 +4038,7 @@ async function planTrip() {
     travelEntry: travelEntry ? { ...travelEntry } : null
   }));
   const travels = state.travels.map((travel) => ({ ...travel }));
-  const payload = { cities, travels, profile: state.profile || loadProfile(), userId: ensureUserId() };
+  const payload = { cities, travels, profile: state.profile || loadProfile(), userId: ensureUserId(), budget: state.tripBudget, numTravelers: state.numTravelers };
 
   state.activities = [];
   state.reviewed = {};

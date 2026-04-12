@@ -51,6 +51,9 @@ Return a JSON array of activity objects. Each object must have these fields:
 - duration (string, e.g. "2 hours")
 - category (string, e.g. museum / restaurant / park)
 - opening_hours (string, e.g. "10:00-18:00" or "12:00-14:30,19:00-22:00")
+- estimated_cost_usd (number — estimated cost in USD. Overestimate rather than underestimate. Scale to the city's cost of living. Return 0 for free activities like walks, parks, sunsets.)
+- cost_type (string: "per_person" or "per_group" — per_person examples: museum entry, meal, boat tour ticket, theme park admission; per_group examples: private airport transfer, car rental, private guided tour for the whole group, apartment rental)
+- is_bookable (boolean — true if this is a specific named venue or tour that can be booked, e.g. "Alhambra Guided Tour", "Sukiyabashi Jiro"; false if generic, e.g. "Dinner", "Morning walk in the old town")
 
 For each activity, provide realistic start and end locations based on the activity description and the city. Use recognizable landmarks, neighborhoods, or points of interest.
 
@@ -179,11 +182,15 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
     duration_hours: durationHours,
     duration: String(raw.duration || `${durationHours} hours`).trim(),
     category: normalizedCategory,
-    opening_hours: String(raw.opening_hours || defaults.openingHours || '').trim()
+    opening_hours: String(raw.opening_hours || defaults.openingHours || '').trim(),
+    estimated_cost_usd: (Number.isFinite(Number(raw.estimated_cost_usd)) && Number(raw.estimated_cost_usd) >= 0) ? Number(raw.estimated_cost_usd) : null,
+    cost_type: raw.cost_type === 'per_group' ? 'per_group' : 'per_person',
+    is_bookable: raw.is_bookable === false ? false : true,
+    booking_links: []
   };
 }
 
-async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null) {
+async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1) {
   const { name, startDate, endDate, leaveTime, notes, accommodations } = city;
   const client = getClient();
   if (!client) {
@@ -228,7 +235,11 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     ? `\n\nWeb research (use as supplementary inspiration, not a strict list):\n${webResearch}`
     : '';
 
-  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace. Generate a number of activities proportional to the length of stay and their pace preference — fewer for relaxed travelers, more for active ones. Use accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Respect the computed time windows exactly on arrival/departure/transfer days. Be concise.${webBlock}\n\nReturn JSON only.`;
+  const budgetBlock = budget && numTravelers && numCities
+    ? `\nBudget context: The traveler has a total trip budget of $${budget} for ${numTravelers} traveler${numTravelers > 1 ? 's' : ''} across ${numCities} cit${numCities > 1 ? 'ies' : 'y'} (~$${Math.round(budget / numCities)} per city). Be budget-conscious — prefer good-value activities and flag expensive options with a caveat in the verdict.`
+    : '';
+
+  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace. Generate a number of activities proportional to the length of stay and their pace preference — fewer for relaxed travelers, more for active ones. Use accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Respect the computed time windows exactly on arrival/departure/transfer days. Be concise.${budgetBlock}${webBlock}\n\nReturn JSON only.`;
 
   const learnedSummary = getSummary(profile, userId);
   const effectiveSystemPrompt = learnedSummary

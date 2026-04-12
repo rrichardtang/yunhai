@@ -19,7 +19,7 @@ const {
   resolveUserId
 } = require('./preferences');
 const { getSession, setTripContext, addMessage, getHistory, compactHistory, clearSession, getCachedPrompt } = require('./chat');
-const { searchForChat, isConfigured: isBraveConfigured } = require('./braveSearch');
+const { searchForChat, isConfigured: isBraveConfigured, searchActivityPricesBatch, searchActivityPrice } = require('./braveSearch');
 const {
   saveItinerary,
   getLatestItinerary,
@@ -821,6 +821,9 @@ Current activity:
 - Opening hours: ${activity.opening_hours || 'unknown'}
 - Start location: ${activity.start_location || ''}
 - End location: ${activity.end_location || ''}
+- Estimated cost (USD): ${activity.estimated_cost_usd ?? 'unknown'}
+- Cost type: ${activity.cost_type || 'per_person'}
+- Is bookable: ${activity.is_bookable !== false}
 
 Traveler's customization: "${note}"
 
@@ -829,11 +832,43 @@ CRITICAL RULES:
 2. Update start_location and end_location to the specific place if one is named.
 3. Tailor why_it_fits, pitfall, and booking_advice to the SPECIFIC place, not the general category.
 4. Return ONLY the fields that should change. Preserve the same JSON field names.
-5. Return ONLY valid JSON, no markdown fences or explanation.` }]
+5. Return ONLY valid JSON, no markdown fences or explanation.
+6. If the activity changes meaningfully, also return updated estimated_cost_usd (number, overestimate), cost_type ("per_person" or "per_group" — per_person: tickets/meals/admission; per_group: private transfers/car rentals/private guides), and is_bookable (boolean — true if specific named venue/tour, false if generic).
+Example of cost fields in response: {"name":"...","estimated_cost_usd":45,"cost_type":"per_person","is_bookable":true}` }]
     });
 
     const raw = extractText(response.content).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     const updates = JSON.parse(raw);
+
+    // Re-enrich cost and booking links if activity changed meaningfully
+    const updatedName = updates.name || activity.name;
+    const updatedCity = updates.city || activity.city;
+    const updatedIsBookable = Object.prototype.hasOwnProperty.call(updates, 'is_bookable') ? updates.is_bookable : (activity.is_bookable !== false);
+    const updatedCategory = updates.category || activity.category || '';
+
+    if (updatedIsBookable) {
+      const bravePrice = await searchActivityPrice(updatedName, updatedCity);
+      if (bravePrice !== null) {
+        const currentCost = updates.estimated_cost_usd ?? activity.estimated_cost_usd ?? null;
+        updates.estimated_cost_usd = currentCost !== null ? Math.max(currentCost, bravePrice) : bravePrice;
+      }
+
+      const foodCategories = new Set(['breakfast', 'lunch', 'dinner', 'restaurant', 'food']);
+      const encodedFull = encodeURIComponent(`${updatedName} ${updatedCity}`);
+      if (foodCategories.has(updatedCategory)) {
+        updates.booking_links = [{ site: 'Google Maps', url: `https://www.google.com/maps/search/${encodedFull}` }];
+      } else {
+        const q = encodeURIComponent(updatedName);
+        const date = activity.scheduled_date || '';
+        updates.booking_links = [
+          { site: 'GetYourGuide', url: `https://www.getyourguide.com/s/?q=${q}${date ? `&date_from=${date}` : ''}` },
+          { site: 'Viator', url: `https://www.viator.com/searchResults/all?text=${q}${date ? `&startDate=${date}` : ''}` }
+        ];
+      }
+    } else {
+      updates.booking_links = [];
+    }
+
     return res.json({ updates });
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Failed to refine activity' });
@@ -849,7 +884,7 @@ app.post('/api/arrange', async (req, res) => {
     return res.status(503).json({ error: 'Anthropic API key not configured' });
   }
 
-  const { days, activities, profile } = req.body || {};
+  const { days, activities, profile, budget, numTravelers, approvedCostTotal } = req.body || {};
   if (!Array.isArray(days) || !Array.isArray(activities)) {
     return res.status(400).json({ error: 'days and activities are required arrays' });
   }
@@ -873,6 +908,7 @@ app.post('/api/arrange', async (req, res) => {
     const suggested = String(a.suggested_time || '').trim();
     if (suggested && suggested !== '10:00am') parts.push(`preferred:${suggested}`);
     if (a.location) parts.push(`at:${a.location}`);
+    if (a.estimated_cost_usd !== null && a.estimated_cost_usd !== undefined) parts.push(`cost:$${a.estimated_cost_usd}${a.cost_type === 'per_group' ? '/group' : '/person'}`);
     return `- ${parts.join(' | ')}`;
   }).join('\n');
   const perDay = Math.ceil(activities.length / days.length);
@@ -901,6 +937,7 @@ RULES (priority order):
 8. Honor preferred time hints when they fit.
 9. Respect the traveler's ${paceDesc} pace preference — ${paceValue <= 2 ? 'leave generous gaps between activities and favor fewer, longer experiences' : paceValue >= 4 ? 'pack days tightly with minimal downtime between activities' : 'balance activity with reasonable breaks'}.
 10. If an activity cannot fit, include it in unplaced with a reason.
+${budget && approvedCostTotal !== undefined ? `11. Budget note: The traveler's total budget is $${budget} for ${numTravelers || 1} traveler(s). Total estimated cost of approved activities is $${approvedCostTotal}. If over budget, note it in a top-level "budget_warning" string field.` : ''}
 
 Respond ONLY with JSON:
 {"placements":{"<id>":{"date":"YYYY-MM-DD","time":"HH:MM"}},"unplaced":[{"id":"<id>","reason":"..."}]}`;
@@ -925,7 +962,9 @@ Respond ONLY with JSON:
 });
 
 app.post('/api/plan', async (req, res) => {
-  const { cities, travels, profile } = req.body || {};
+  const { cities, travels, profile, budget, numTravelers } = req.body || {};
+  const resolvedBudget = Number.isFinite(Number(budget)) && Number(budget) > 0 ? Number(budget) : null;
+  const resolvedTravelers = Math.max(1, Math.round(Number(numTravelers) || 1));
   if (!Array.isArray(cities) || cities.length === 0) {
     return res.status(400).json({ error: 'cities must be a non-empty array' });
   }
@@ -951,7 +990,34 @@ app.post('/api/plan', async (req, res) => {
     const cityTravelTiming = await buildCityTravelTiming(cities);
     for (const city of cities) {
       const timing = cityTravelTiming[String(city?.name || '').trim()] || null;
-      const activities = await planCity(city, profile, resolvedUserId, tripTravels, timing);
+      const activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers);
+
+      // Enrich with Brave prices and booking links in parallel
+      const priceMap = await searchActivityPricesBatch(activities, city.name);
+      const cityStartDate = city.startDate || '';
+      for (const a of activities) {
+        // Override cost with Brave price if higher (conservative)
+        const bravePrice = priceMap.get(a.name) ?? null;
+        if (bravePrice !== null) {
+          a.estimated_cost_usd = a.estimated_cost_usd !== null ? Math.max(a.estimated_cost_usd, bravePrice) : bravePrice;
+        }
+
+        // Construct booking links
+        if (a.is_bookable) {
+          const encodedName = encodeURIComponent(`${a.name} ${city.name}`);
+          const foodCategories = new Set(['breakfast', 'lunch', 'dinner', 'restaurant', 'food']);
+          if (foodCategories.has(a.category)) {
+            a.booking_links = [{ site: 'Google Maps', url: `https://www.google.com/maps/search/${encodedName}` }];
+          } else {
+            const q = encodeURIComponent(a.name);
+            a.booking_links = [
+              { site: 'GetYourGuide', url: `https://www.getyourguide.com/s/?q=${q}&date_from=${cityStartDate}&adults=${resolvedTravelers}` },
+              { site: 'Viator', url: `https://www.viator.com/searchResults/all?text=${q}&startDate=${cityStartDate}&adults=${resolvedTravelers}` }
+            ];
+          }
+        }
+      }
+
       sendEvent({ type: 'city', city: city.name, activities, travelTiming: timing });
     }
     sendEvent({ type: 'done' });
