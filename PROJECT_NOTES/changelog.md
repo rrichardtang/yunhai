@@ -4,6 +4,14 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-12] Add regenerate confirmation dialog on step 1 changes
+
+- `step1Fingerprint()` expanded to include `budget` and `travelers` (read from DOM inputs)
+- `goToNextStep()` step 1 branch: shows `showRegenerateConfirmDialog()` when fingerprint changed and activities exist
+- "No, keep existing" skips to step 2; "Yes, regenerate" proceeds with re-plan
+- `showRegenerateConfirmDialog()`: promise-based modal, backdrop-click dismisses as "No"
+- Files: `public/app.js`
+
 ## [2026-04-12] Add budget feature with per-activity costs and booking links
 
 - Added Total Budget (USD) and Number of Travelers inputs to Step 1 (`public/planner.html`, `public/app.js`)

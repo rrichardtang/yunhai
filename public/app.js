@@ -1086,6 +1086,14 @@ async function goToNextStep(fromStep = state.step) {
       return;
     }
 
+    if (hasExistingActivities && step1Changed) {
+      const confirmed = await showRegenerateConfirmDialog();
+      if (!confirmed) {
+        setStep(2);
+        return;
+      }
+    }
+
     if (!validateLocationsBeforePlanning()) {
       showToast('Please validate all locations before planning your trip.', 'error');
       return;
@@ -4372,8 +4380,37 @@ function getSnapshot() {
   }
 }
 
+function showRegenerateConfirmDialog() {
+  return new Promise((resolve) => {
+    const existing = document.getElementById('regenerateConfirmDialog');
+    if (existing) existing.remove();
+
+    const dialog = document.createElement('div');
+    dialog.id = 'regenerateConfirmDialog';
+    dialog.className = 'modal';
+    dialog.innerHTML = `
+      <div class="modal-card" style="max-width:380px;text-align:center;gap:16px">
+        <h3 style="margin:0">Trip modified</h3>
+        <p class="muted-text" style="margin:0">Your trip settings have changed. Do you want to regenerate the itinerary?</p>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button id="regenNo" class="secondary" type="button">No, keep existing</button>
+          <button id="regenYes" class="primary" type="button">Yes, regenerate</button>
+        </div>
+      </div>`;
+    document.body.appendChild(dialog);
+
+    const cleanup = (result) => { dialog.remove(); resolve(result); };
+    dialog.querySelector('#regenYes').addEventListener('click', () => cleanup(true));
+    dialog.querySelector('#regenNo').addEventListener('click', () => cleanup(false));
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(false); });
+  });
+}
+
 function step1Fingerprint() {
-  return JSON.stringify({ cities: state.cities, travels: state.travels });
+  const budgetVal = parseFloat(els.tripBudget?.value);
+  const budget = Number.isFinite(budgetVal) && budgetVal > 0 ? budgetVal : null;
+  const travelers = Math.max(1, parseInt(els.numTravelers?.value, 10) || 1);
+  return JSON.stringify({ cities: state.cities, travels: state.travels, budget, travelers });
 }
 
 function clearSnapshot() {
