@@ -127,6 +127,28 @@ function extractLikelyJsonArray(raw = '') {
   return null;
 }
 
+function repairTruncatedJson(raw = '') {
+  let text = raw.trim();
+  // Remove trailing comma
+  text = text.replace(/,\s*$/, '');
+  // Remove last incomplete key-value (e.g. trailing `"key": ` or `"key": "partial...`)
+  text = text.replace(/,?\s*"[^"]*"\s*:\s*(?:"[^"]*)?$/, '');
+  // Close unclosed braces/brackets
+  const opens = [];
+  let inStr = false, esc = false;
+  for (const ch of text) {
+    if (inStr) { if (esc) { esc = false; } else if (ch === '\\') { esc = true; } else if (ch === '"') { inStr = false; } continue; }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === '{' || ch === '[') opens.push(ch);
+    if (ch === '}' || ch === ']') opens.pop();
+  }
+  while (opens.length) {
+    const open = opens.pop();
+    text += open === '{' ? '}' : ']';
+  }
+  return text;
+}
+
 function tryParseJsonArray(raw = '') {
   const attempts = [];
   const stripped = stripCodeFences(raw);
@@ -142,6 +164,10 @@ function tryParseJsonArray(raw = '') {
       .replace(/[\u2018\u2019]/g, "'")
     : null;
   if (relaxed && !attempts.includes(relaxed)) attempts.push(relaxed);
+
+  // Truncation repair: try closing unclosed brackets
+  const repaired = repairTruncatedJson(stripped);
+  if (!attempts.includes(repaired)) attempts.push(repaired);
 
   for (const candidate of attempts) {
     try {
@@ -253,19 +279,22 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
 
   const res = await client.messages.create({
     model: MODEL,
-    max_tokens: 4096,
+    max_tokens: 8192,
     system: effectiveSystemPrompt,
     messages
   });
 
   const response = '[' + extractTextBlock(res.content);
+  console.log(`planCity(${name}): stop_reason=${res.stop_reason}, response_length=${response.length}`);
   let parsed = tryParseJsonArray(response);
 
   if (!parsed) {
-    console.error(`JSON parse failed for ${name}, retrying...`);
+    console.error(`JSON parse failed for ${name} (stop_reason=${res.stop_reason}), retrying...`);
+    console.error(`Raw response (first 500 chars): ${response.slice(0, 500)}`);
+    console.error(`Raw response (last 500 chars): ${response.slice(-500)}`);
     const retry = await client.messages.create({
       model: MODEL,
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: effectiveSystemPrompt,
       messages: [{ role: 'user', content: prompt + '\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.' }, { role: 'assistant', content: '[' }]
     });
