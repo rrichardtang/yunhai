@@ -4420,6 +4420,11 @@ function clearSnapshot() {
 }
 
 function saveSnapshot() {
+  state.tripName = els.tripName.value.trim();
+  const budgetVal = parseFloat(els.tripBudget?.value);
+  state.tripBudget = Number.isFinite(budgetVal) && budgetVal > 0 ? budgetVal : null;
+  state.numTravelers = Math.max(1, parseInt(els.numTravelers?.value, 10) || 1);
+
   const payload = {
     cities: state.cities,
     travels: state.travels,
@@ -4430,7 +4435,9 @@ function saveSnapshot() {
     tripName: state.tripName,
     days: state.days,
     arrangeCity: state.arrangeCity,
-    currentStep: 3
+    currentStep: state.step,
+    tripBudget: state.tripBudget,
+    numTravelers: state.numTravelers
   };
   localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(payload));
   syncToServer('snapshot', payload);
@@ -4485,12 +4492,21 @@ function hydrateFromSnapshot(snapshot) {
     : expandDays(state.cities);
   state.arrangeCity = snapshot.arrangeCity || state.days[0]?.city || null;
 
+  state.tripBudget = snapshot.tripBudget ?? null;
+  state.numTravelers = snapshot.numTravelers ?? 1;
+
   els.tripName.value = state.tripName;
+  if (els.tripBudget && state.tripBudget != null) els.tripBudget.value = state.tripBudget;
+  if (els.numTravelers) els.numTravelers.value = state.numTravelers;
   renderCities();
-  renderActivities();
-  renderArrange();
+
+  const targetStep = snapshot.currentStep || 3;
+  if (targetStep >= 2) renderActivities();
+  if (targetStep >= 3) renderArrange();
+  if (targetStep >= 4) renderItinerary();
+
   state.lastPlannedFingerprint = step1Fingerprint();
-  setStep(3);
+  setStep(targetStep);
 }
 
 function renderMyTrips() {
@@ -4503,7 +4519,7 @@ function renderMyTrips() {
     trips.push({
       type: 'draft',
       tripName: snapshot.tripName || 'Untitled Trip',
-      detail: 'In-progress draft',
+      detail: `In-progress draft · Step ${snapshot.currentStep || 3}`,
       snapshot
     });
   }
