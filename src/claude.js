@@ -272,19 +272,14 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     ? `${SYSTEM_PROMPT}\n\n${learnedSummary}`
     : SYSTEM_PROMPT;
 
-  const messages = [
-    { role: 'user', content: prompt },
-    { role: 'assistant', content: '[' }
-  ];
-
   const res = await client.messages.create({
     model: MODEL,
     max_tokens: 16384,
     system: effectiveSystemPrompt,
-    messages
+    messages: [{ role: 'user', content: prompt }]
   });
 
-  const response = '[' + extractTextBlock(res.content);
+  const response = extractTextBlock(res.content);
   console.log(`planCity(${name}): stop_reason=${res.stop_reason}, response_length=${response.length}`);
   let parsed = tryParseJsonArray(response);
 
@@ -296,9 +291,9 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
       model: MODEL,
       max_tokens: 16384,
       system: effectiveSystemPrompt,
-      messages: [{ role: 'user', content: prompt + '\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.' }, { role: 'assistant', content: '[' }]
+      messages: [{ role: 'user', content: prompt + '\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.' }]
     });
-    const retryResponse = '[' + extractTextBlock(retry.content);
+    const retryResponse = extractTextBlock(retry.content);
     parsed = tryParseJsonArray(retryResponse);
   }
 
