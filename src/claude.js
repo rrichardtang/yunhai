@@ -279,7 +279,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
 
   const res = await client.messages.create({
     model: MODEL,
-    max_tokens: 8192,
+    max_tokens: 16384,
     system: effectiveSystemPrompt,
     messages
   });
@@ -294,7 +294,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     console.error(`Raw response (last 500 chars): ${response.slice(-500)}`);
     const retry = await client.messages.create({
       model: MODEL,
-      max_tokens: 8192,
+      max_tokens: 16384,
       system: effectiveSystemPrompt,
       messages: [{ role: 'user', content: prompt + '\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.' }, { role: 'assistant', content: '[' }]
     });
