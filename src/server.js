@@ -1,6 +1,27 @@
 require('dotenv').config();
 const fs = require('fs');
 const express = require('express');
+
+// Global semaphore: cap total in-flight Anthropic calls across all users
+const MAX_CONCURRENT_LLM_CALLS = 10;
+let activeLlmCalls = 0;
+const llmQueue = [];
+const acquireLlmSlot = () => new Promise((resolve) => {
+  const tryAcquire = () => {
+    if (activeLlmCalls < MAX_CONCURRENT_LLM_CALLS) {
+      activeLlmCalls++;
+      resolve();
+    } else {
+      llmQueue.push(tryAcquire);
+    }
+  };
+  tryAcquire();
+});
+const releaseLlmSlot = () => {
+  activeLlmCalls--;
+  if (llmQueue.length > 0) llmQueue.shift()();
+};
+
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const { clerkMiddleware, requireAuth } = require('@clerk/express');
@@ -1048,36 +1069,45 @@ app.post('/api/plan', async (req, res) => {
   try {
     const tripTravels = Array.isArray(travels) ? travels.slice(0, 1) : [];
     const cityTravelTiming = await buildCityTravelTiming(cities);
-    for (const city of cities) {
+
+    const planAndEnrich = async (city) => {
       const timing = cityTravelTiming[String(city?.name || '').trim()] || null;
-      const activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren);
+      await acquireLlmSlot();
+      try {
+        const activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren);
 
-      // Enrich with Brave prices and booking links in parallel
-      const priceMap = await searchActivityPricesBatch(activities, city.name);
-      const cityStartDate = city.startDate || '';
-      for (const a of activities) {
-        // Override cost with Brave price if higher (conservative)
-        const bravePrice = priceMap.get(a.name) ?? null;
-        if (bravePrice !== null) {
-          a.estimated_cost_usd = a.estimated_cost_usd !== null ? Math.max(a.estimated_cost_usd, bravePrice) : bravePrice;
+        // Enrich with Brave prices and booking links in parallel
+        const priceMap = await searchActivityPricesBatch(activities, city.name);
+        const cityStartDate = city.startDate || '';
+        for (const a of activities) {
+          const bravePrice = priceMap.get(a.name) ?? null;
+          if (bravePrice !== null) {
+            a.estimated_cost_usd = a.estimated_cost_usd !== null ? Math.max(a.estimated_cost_usd, bravePrice) : bravePrice;
+          }
+
+          const q = encodeURIComponent(a.name);
+          const qCity = encodeURIComponent(`${a.name} ${city.name}`);
+          if (a.booking_type === 'tour') {
+            a.booking_links = [
+              { site: 'GetYourGuide', url: `https://www.getyourguide.com/s/?q=${q}&date_from=${cityStartDate}&adults=${resolvedTravelers}${resolvedChildren ? `&children=${resolvedChildren}` : ''}` },
+              { site: 'Viator', url: `https://www.viator.com/searchResults/all?text=${q}&startDate=${cityStartDate}&adults=${resolvedTravelers}${resolvedChildren ? `&children=${resolvedChildren}` : ''}` }
+            ];
+          } else if (a.booking_type === 'attraction') {
+            a.booking_links = [{ site: 'Tickets', url: `https://www.google.com/search?q=${qCity}+tickets` }];
+          } else if (a.booking_type === 'restaurant') {
+            a.booking_links = [{ site: 'Google Maps', url: `https://www.google.com/maps/search/${qCity}` }];
+          }
         }
 
-        // Construct booking links based on booking_type
-        const q = encodeURIComponent(a.name);
-        const qCity = encodeURIComponent(`${a.name} ${city.name}`);
-        if (a.booking_type === 'tour') {
-          a.booking_links = [
-            { site: 'GetYourGuide', url: `https://www.getyourguide.com/s/?q=${q}&date_from=${cityStartDate}&adults=${resolvedTravelers}${resolvedChildren ? `&children=${resolvedChildren}` : ''}` },
-            { site: 'Viator', url: `https://www.viator.com/searchResults/all?text=${q}&startDate=${cityStartDate}&adults=${resolvedTravelers}${resolvedChildren ? `&children=${resolvedChildren}` : ''}` }
-          ];
-        } else if (a.booking_type === 'attraction') {
-          a.booking_links = [{ site: 'Tickets', url: `https://www.google.com/search?q=${qCity}+tickets` }];
-        } else if (a.booking_type === 'restaurant') {
-          a.booking_links = [{ site: 'Google Maps', url: `https://www.google.com/maps/search/${qCity}` }];
-        }
+        sendEvent({ type: 'city', city: city.name, activities, travelTiming: timing });
+      } finally {
+        releaseLlmSlot();
       }
+    };
 
-      sendEvent({ type: 'city', city: city.name, activities, travelTiming: timing });
+    const CONCURRENCY = 3;
+    for (let i = 0; i < cities.length; i += CONCURRENCY) {
+      await Promise.all(cities.slice(i, i + CONCURRENCY).map(planAndEnrich));
     }
     sendEvent({ type: 'done' });
     res.end();

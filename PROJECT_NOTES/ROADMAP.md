@@ -20,6 +20,11 @@
 - Add per-item conflict resolution UI in sync flow.
 - Add tests for calendar item fingerprint stability and sync dedupe behavior.
 
+## Scalability
+
+- **Current:** Global semaphore caps total in-flight Anthropic calls at 10 across all users. Per-request concurrency of 3 cities in parallel. Sufficient for ~20–50 concurrent users.
+- **Later (100+ users):** Replace semaphore with a **job queue** (BullMQ + Redis). Requests enqueue a job per city; workers pull at a controlled rate; results stream back via polling or WebSockets. Decouples HTTP request handling from LLM throughput entirely and survives server restarts. Enables per-user queue priority and observable backlog metrics.
+
 ## Hosting & Infrastructure
 - **Current:** Self-hosted VPS with Docker + Traefik, env vars via `.env` file.
 - **Next:** Migrate to Railway — deploys from GitHub, env vars in dashboard, persistent volume at `/app/data`, no PM2 needed. ~$5/mo. Render is fallback (free tier but spins down).

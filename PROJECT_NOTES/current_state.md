@@ -3,15 +3,13 @@
 _Last updated: 2026-04-12_
 
 ## Objective
-Improve the Decline button UX — require feedback before declining, generate a replacement activity, and capture learnable preference signals.
+Improve API throughput and scalability for multi-user load.
 
 ## Active Workstream
-Shipped decline-with-feedback feature:
-- Decline button now reveals an inline feedback form (textarea, maxlength 200, Cancel + Replace Activity)
-- On submit: calls new `/api/activity/replace` → generates one replacement activity via claude-haiku-4-5
-- LLM response includes `signals[]` array (same schema as concierge bot) — learnable signals written via `processChatSignals()`
-- Non-learnable decline reasons (one-off/situational) produce empty signals array — not persisted
-- `normalizeActivity` and `SYSTEM_PROMPT` exported from `src/claude.js` for reuse in new endpoint
+Shipped LLM concurrency improvements:
+- City planning now runs up to 3 cities in parallel per request (was sequential)
+- Global semaphore caps total in-flight Anthropic calls at 10 across all users
+- ROADMAP.md updated with job queue plan (BullMQ + Redis) for 100+ user scale
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
@@ -20,9 +18,9 @@ Shipped decline-with-feedback feature:
 ## Risks
 - Concurrent writes from two devices could overwrite each other (last-write-wins)
 - Brave price parsing relies on regex against snippets — may miss prices in non-standard formats
-- LLM cost estimates are rough; Brave validation helps but neither source is authoritative
+- Global semaphore is in-memory — resets on server restart, no cross-process coordination if multi-instance
 
 ## Next Actions
-- Test on VPS: verify replacement activities generate correctly, signals persist to user profile
+- Test on VPS: verify parallel city generation works correctly end-to-end
 - Add token refresh flow and graceful retry on expired Google access tokens
 - Consider caching Brave search results to stay within free tier (2000 req/month)

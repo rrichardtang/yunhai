@@ -4,6 +4,14 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-12] Parallel city planning with global LLM semaphore
+
+- `/api/plan` now processes cities in parallel batches of 3 (was sequential)
+- Added global semaphore (`MAX_CONCURRENT_LLM_CALLS = 10`) in `server.js` to cap total in-flight Anthropic calls across all users
+- `releaseLlmSlot()` called in `finally` block to prevent slot leaks on error
+- Added Scalability section to `PROJECT_NOTES/ROADMAP.md` documenting job queue path for 100+ users
+- Files: `src/server.js`, `PROJECT_NOTES/ROADMAP.md`
+
 ## [2026-04-12] Decline with feedback and activity replacement
 
 - Decline button now shows inline feedback form instead of immediately declining; textarea capped at 200 chars
