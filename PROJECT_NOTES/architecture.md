@@ -9,10 +9,10 @@ Add an always-on trip reliability layer that continuously validates itinerary co
 
 ### Acceptance Criteria
 1. Live validation runs whenever trip data changes and flags: overlapping dates, overlapping activities, missing date/time fields, conflicting reservations, and suspicious timing gaps.
-2. Users can manage a persistent checklist (add/edit/delete, set status, notes, booking details) for trip-critical reservations.
+2. Users can manage a persistent checklist (add/edit/delete) for trip-critical reservations with fields: type, name, date/time, verified state, source, notes, optional booking reference.
 3. Confidence status is always visible as a top-level badge and as a full review workflow step.
 4. Badge click opens compact popover with status, issue count, top issue, checklist progress, and CTA to full review.
-5. Full review page supports issue list, checklist editing, and optional email summary trigger.
+5. Full review page keeps checklist as a core visible block and clearly answers: what still needs booking, what is confirmed, what is broken, and what can be fixed now.
 6. In-app warnings appear immediately when new conflicts are detected.
 
 ### Non-goals
@@ -21,7 +21,7 @@ Add an always-on trip reliability layer that continuously validates itinerary co
 - Complex scheduling engine for reminders
 
 ### Design
-- New shared confidence engine (`src/confidenceCheck.js`) computes issues, checklist progress, and status.
+- New shared confidence engine (`src/confidenceCheck.js`) computes issues, checklist progress, status, and booking-summary buckets driven by checklist state.
 - Server endpoints:
   - `GET /api/itinerary/:id/confidence`
   - `PUT /api/itinerary/:id/confidence`

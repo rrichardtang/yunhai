@@ -1,3 +1,14 @@
+const CRITICAL_BOOKING_TYPES = [
+  'flight',
+  'hotel',
+  'car_rental',
+  'train',
+  'attraction',
+  'restaurant',
+  'tour',
+  'transfer'
+];
+
 function toDate(value = '') {
   const text = String(value || '').trim();
   if (!text) return null;
@@ -20,29 +31,66 @@ function createIssue(type, severity, message, context = {}) {
   return { id: `${type}:${message}`.slice(0, 160), type, severity, message, context };
 }
 
+function normalizeType(raw = 'other') {
+  const text = String(raw || 'other').trim().toLowerCase();
+  return text || 'other';
+}
+
+function normalizeChecklistState(raw = '') {
+  const value = String(raw || '').trim().toLowerCase();
+  if (['missing', 'needs_booking', 'booked_unverified', 'verified', 'problem'].includes(value)) return value;
+  if (value === 'pending') return 'needs_booking';
+  if (value === 'broken') return 'problem';
+  return 'needs_booking';
+}
+
 function normalizeChecklistItem(item = {}) {
+  const state = normalizeChecklistState(item.state || item.status);
+  const name = String(item.name || item.title || '').trim() || 'Untitled item';
+  const type = normalizeType(item.type || item.kind);
+  const dateTime = String(item.dateTime || item.when || item.date || '').trim();
+  const source = String(item.source || '').trim();
+  const notes = String(item.notes || '').trim();
+  const bookingReference = String(item.bookingReference || item.confirmationCode || '').trim();
+  const verified = item.verified === true || state === 'verified';
+
   return {
     id: String(item.id || `chk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
-    type: String(item.type || 'other').toLowerCase(),
-    title: String(item.title || '').trim() || 'Untitled item',
-    status: ['missing', 'pending', 'verified'].includes(String(item.status || '').toLowerCase())
-      ? String(item.status).toLowerCase()
-      : 'pending',
-    notes: String(item.notes || '').trim(),
-    details: String(item.details || '').trim(),
+    type,
+    name,
+    dateTime,
+    state,
+    verified,
+    source,
+    notes,
+    bookingReference,
     updatedAt: item.updatedAt || new Date().toISOString()
   };
 }
 
 function buildChecklistFromBookings(bookings = []) {
-  return (Array.isArray(bookings) ? bookings : []).map((booking) => normalizeChecklistItem({
+  const normalized = (Array.isArray(bookings) ? bookings : []).map((booking) => normalizeChecklistItem({
     id: booking.id,
     type: booking.kind || 'reservation',
-    title: booking.title || `${booking.kind || 'Booking'} reservation`,
-    status: 'pending',
-    details: [booking.provider, booking.confirmationCode].filter(Boolean).join(' · '),
-    notes: [booking.startDate, booking.endDate].filter(Boolean).join(' → ')
+    name: booking.title || `${booking.kind || 'Booking'} reservation`,
+    dateTime: booking.startDate || '',
+    state: booking.confirmationCode ? 'booked_unverified' : 'needs_booking',
+    source: booking.provider || '',
+    notes: [booking.startDate, booking.endDate].filter(Boolean).join(' → '),
+    bookingReference: booking.confirmationCode || ''
   }));
+
+  const seenTypes = new Set(normalized.map((item) => item.type));
+  for (const type of CRITICAL_BOOKING_TYPES) {
+    if (seenTypes.has(type)) continue;
+    normalized.push(normalizeChecklistItem({
+      type,
+      name: `${type.replace(/_/g, ' ')} booking`,
+      state: 'missing',
+      notes: 'Critical trip item not yet captured in plan.'
+    }));
+  }
+  return normalized;
 }
 
 function ensureChecklist(itinerary = {}) {
@@ -126,23 +174,45 @@ function collectIssues(itinerary = {}, checklist = []) {
   }
 
   checklist.forEach((item) => {
-    if (!item.title) issues.push(createIssue('missing_details', 'medium', 'A checklist item is missing a title.'));
+    if (!item.name) issues.push(createIssue('missing_details', 'medium', 'A checklist item is missing a name.'));
+    if (!item.dateTime) issues.push(createIssue('missing_details', 'medium', `${item.name || 'Checklist item'} is missing date/time.`));
+    if (item.state === 'problem') issues.push(createIssue('booking_problem', 'high', `${item.name || 'Checklist item'} is marked as broken and needs a fix.`));
   });
 
   return issues;
 }
 
+function deriveChecklistSummary(checklist = []) {
+  const needsBooking = checklist.filter((item) => item.state === 'missing' || item.state === 'needs_booking');
+  const confirmed = checklist.filter((item) => item.state === 'verified');
+  const broken = checklist.filter((item) => item.state === 'problem');
+  const canFixNow = checklist.filter((item) => item.state === 'booked_unverified' || item.state === 'problem' || !item.dateTime);
+
+  return {
+    needsBooking,
+    confirmed,
+    broken,
+    canFixNow,
+    counts: {
+      total: checklist.length,
+      needsBooking: needsBooking.length,
+      confirmed: confirmed.length,
+      broken: broken.length,
+      canFixNow: canFixNow.length
+    }
+  };
+}
+
 function computeConfidence(itinerary = {}) {
   const checklist = ensureChecklist(itinerary);
   const issues = collectIssues(itinerary, checklist);
-  const verified = checklist.filter((item) => item.status === 'verified').length;
-  const missing = issues.filter((item) => item.type === 'missing_datetime' || item.type === 'missing_details').length;
-  const hasConflict = issues.some((item) => ['overlapping_dates', 'overlapping_activities', 'conflicting_reservations', 'impossible_timing'].includes(item.type));
+  const summary = deriveChecklistSummary(checklist);
+  const hasHighConflicts = issues.some((item) => ['overlapping_dates', 'overlapping_activities', 'conflicting_reservations', 'impossible_timing', 'booking_problem'].includes(item.type));
 
   let status = 'Needs review';
-  if (hasConflict) status = 'Conflicts found';
-  else if (missing > 0) status = 'Missing details';
-  else if (checklist.length && verified === checklist.length && issues.length === 0) status = 'Ready';
+  if (hasHighConflicts || summary.counts.broken > 0) status = 'Conflicts found';
+  else if (summary.counts.needsBooking > 0 || issues.some((item) => item.type === 'missing_datetime' || item.type === 'missing_details')) status = 'Missing details';
+  else if (summary.counts.total > 0 && summary.counts.confirmed === summary.counts.total && issues.length === 0) status = 'Ready';
 
   return {
     status,
@@ -150,7 +220,12 @@ function computeConfidence(itinerary = {}) {
     issueCount: issues.length,
     topIssue: issues[0]?.message || 'No issues detected',
     checklist,
-    checklistProgress: { verified, total: checklist.length },
+    checklistProgress: { verified: summary.counts.confirmed, total: checklist.length },
+    bookingSummary: summary,
+    immediateActions: [
+      ...summary.needsBooking.map((item) => `Book: ${item.name}`),
+      ...summary.canFixNow.map((item) => `Fix now: ${item.name}`)
+    ].slice(0, 6),
     notificationPrefs: {
       emailSummary: Boolean(itinerary?.confidence?.notificationPrefs?.emailSummary),
       reminderBeforeDeparture: Boolean(itinerary?.confidence?.notificationPrefs?.reminderBeforeDeparture)
@@ -160,6 +235,7 @@ function computeConfidence(itinerary = {}) {
 }
 
 module.exports = {
+  CRITICAL_BOOKING_TYPES,
   computeConfidence,
   ensureChecklist,
   normalizeChecklistItem
