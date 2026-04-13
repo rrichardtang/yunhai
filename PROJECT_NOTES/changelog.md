@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-13] Fix Confidence Check checklist hidden by `.panel` CSS rule
+
+- Root cause: inner `<section class="panel confidence-checklist-panel">` and `<section class="panel confidence-issues-panel">` inside step 5 were invisible because `.panel { display: none }` applies globally — `setStep` only adds `.active` to top-level step panels, never nested ones
+- Fix: replaced `class="panel"` on both inner sections with `class="card-panel"` in `public/planner.html`
+- Added `.card-panel` to `public/styles.css` — same visual style as `.panel` but always visible
+- Files: `public/planner.html`, `public/styles.css`
+
 ## [2026-04-13] Strengthen Confidence Check checklist and checklist-driven summary
 
 - Verified existing checklist existed, but it was too shallow (title/status/notes/details only) and summary was mostly a status card

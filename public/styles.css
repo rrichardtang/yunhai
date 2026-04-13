@@ -47,6 +47,7 @@ body {
 .step.active { background: var(--accent); color: #fff; }
 .panel { background: rgba(255,255,255,.9); border: 1px solid #e7e2d8; border-radius: 16px; padding: 18px; display: none; }
 .panel.active { display: block; }
+.card-panel { background: rgba(255,255,255,.9); border: 1px solid #e7e2d8; border-radius: 16px; padding: 18px; }
 .execution-panel { margin-bottom: 14px; }
 .execution-head p { margin: 0; }
 .execution-toolbar {
