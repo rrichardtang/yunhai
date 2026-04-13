@@ -2257,10 +2257,48 @@ function makeMapLabel(activity, activities) {
   return String(globalOrder);
 }
 
-function markerContent(label, highlighted = false) {
+const CATEGORY_ICONS = {
+  museum: '🏛️', gallery: '🖼️', landmark: '🗿', park: '🌳', neighborhood: '🏘️',
+  market: '🛒', food: '🍴', restaurant: '🍴', breakfast: '☕', lunch: '🍴',
+  dinner: '🍷', nightlife: '🍸', show: '🎭', tour: '🎧', walk: '🚶',
+  sunset: '🌅', sports: '⚽', cultural: '🎨', shopping: '🛍️', spa: '💆',
+  default: '📍'
+};
+
+const CATEGORY_HINTS_CLIENT = [
+  [/\b(museum|exhibit)\b/i, 'museum'], [/\b(gallery|art)\b/i, 'gallery'],
+  [/\b(park|garden)\b/i, 'park'], [/\b(neighborhood|district|quarter)\b/i, 'neighborhood'],
+  [/\b(market|bazaar|souq)\b/i, 'market'], [/\b(breakfast|brunch|cafe)\b/i, 'breakfast'],
+  [/\b(lunch)\b/i, 'lunch'], [/\b(dinner|supper)\b/i, 'dinner'],
+  [/\b(bar|cocktail|nightlife|club)\b/i, 'nightlife'],
+  [/\b(show|concert|theatre|theater|performance)\b/i, 'show'],
+  [/\b(tour|day trip|excursion)\b/i, 'tour'], [/\b(walk|hike|stroll)\b/i, 'walk'],
+  [/\b(sunset)\b/i, 'sunset'], [/\b(restaurant|dining)\b/i, 'restaurant'],
+  [/\b(landmark|monument|castle|palace|cathedral|church)\b/i, 'landmark'],
+];
+
+function inferCategoryClient(activity = {}) {
+  const raw = String(activity.category || activity.type || '').trim().toLowerCase();
+  if (CATEGORY_ICONS[raw]) return raw;
+  const haystack = `${activity.name || ''} ${activity.type || ''}`;
+  const hit = CATEGORY_HINTS_CLIENT.find(([re]) => re.test(haystack));
+  return hit ? hit[1] : (raw || 'default');
+}
+
+function markerContent(activity, highlighted = false) {
   const el = document.createElement('div');
   el.className = 'activity-map-marker-wrap';
-  el.innerHTML = `<div class="activity-map-marker ${highlighted ? 'star' : ''}">${highlighted ? '★' : esc(label)}</div>`;
+  const icon = highlighted ? '★' : (CATEGORY_ICONS[inferCategoryClient(activity)] || CATEGORY_ICONS.default);
+  el.innerHTML = `<div class="activity-map-marker ${highlighted ? 'star' : ''}">${icon}</div>`;
+  return el;
+}
+
+function logisticsMarkerContent(type) {
+  const icons = { accommodation: '🏨', arrival: '✈️', departure: '🛫' };
+  const colors = { accommodation: '#0f766e', arrival: '#7c3aed', departure: '#b45309' };
+  const el = document.createElement('div');
+  el.className = 'activity-map-marker-wrap';
+  el.innerHTML = `<div class="activity-map-marker logistics-marker" style="background:${colors[type] || '#374151'}">${icons[type] || '📍'}</div>`;
   return el;
 }
 
@@ -2307,15 +2345,45 @@ async function openActivityMapOverlay(selectedActivityId = null) {
 
   const mapCanvas = activityMapOverlay.querySelector('#activityMapCanvas');
   const activities = [...state.activities];
+
+  // Determine which city to focus on
+  const selectedActivity = activities.find((a) => a.id === selectedActivityId);
+  const focusCity = String(selectedActivity?.city || '').trim();
+
+  // Geocode activities for the focused city only
+  const cityActivities = focusCity ? activities.filter((a) => String(a.city || '').trim() === focusCity) : activities;
   const enriched = [];
-  for (const activity of activities) {
+  for (const activity of cityActivities) {
     const geo = await geocodeActivity(activity);
     if (geo) enriched.push({ activity, geo });
   }
 
+  // Geocode logistics (accommodation, arrival, departure) for the focused city
+  const cityObj = focusCity ? state.cities.find((c) => cityMatches(c.name, focusCity)) : null;
+  const logisticsPoints = [];
+  if (cityObj?.logistics) {
+    const { accommodation, arrival, departure } = cityObj.logistics;
+    const tryLogistics = async (type, obj) => {
+      if (!obj) return;
+      // Use stored coords if available, otherwise geocode the location string
+      if (obj.latitude && obj.longitude) {
+        logisticsPoints.push({ type, lat: Number(obj.latitude), lng: Number(obj.longitude), label: obj.address || obj.location || type });
+      } else {
+        const query = obj.address || obj.location;
+        if (query) {
+          const geo = await geocodeQueryQueued(`${query}, ${focusCity}`);
+          if (geo) logisticsPoints.push({ type, lat: geo.lat, lng: geo.lng, label: query });
+        }
+      }
+    };
+    await tryLogistics('accommodation', accommodation);
+    await tryLogistics('arrival', arrival);
+    await tryLogistics('departure', departure);
+  }
+
   if (!activityMapOverlayMap) {
     activityMapOverlayMap = new google.maps.Map(mapCanvas, {
-      zoom: 4,
+      zoom: 13,
       center: { lat: 0, lng: 0 },
       mapId: 'travelplanner-overlay'
     });
@@ -2328,16 +2396,15 @@ async function openActivityMapOverlay(selectedActivityId = null) {
   const infoWindow = new google.maps.InfoWindow();
 
   enriched.forEach(({ activity, geo }) => {
-    const label = makeMapLabel(activity, activities);
     const selected = activity.id === state.mapOverlaySelectedActivityId;
     const position = { lat: geo.lat, lng: geo.lng };
     const marker = new google.maps.marker.AdvancedMarkerElement({
       map: activityMapOverlayMap,
       position,
-      content: markerContent(label, selected)
+      content: markerContent(activity, selected)
     });
     marker.addListener('click', () => {
-      infoWindow.setContent(`<strong>${esc(activity.name || 'Activity')}</strong><br>${esc(activity.city || '')}<br><small>#${esc(label)}</small>`);
+      infoWindow.setContent(`<strong>${esc(activity.name || 'Activity')}</strong><br>${esc(activity.city || '')}`);
       infoWindow.open({ anchor: marker, map: activityMapOverlayMap });
       state.mapOverlaySelectedActivityId = activity.id;
       focusActivityCard(activity.id);
@@ -2346,7 +2413,24 @@ async function openActivityMapOverlay(selectedActivityId = null) {
     gmBounds.extend(position);
   });
 
-  if (enriched.length) activityMapOverlayMap.fitBounds(gmBounds, { top: 40, right: 40, bottom: 40, left: 40 });
+  logisticsPoints.forEach(({ type, lat, lng, label }) => {
+    const position = { lat, lng };
+    const marker = new google.maps.marker.AdvancedMarkerElement({
+      map: activityMapOverlayMap,
+      position,
+      content: logisticsMarkerContent(type)
+    });
+    marker.addListener('click', () => {
+      infoWindow.setContent(`<strong>${esc(label)}</strong><br><small>${esc(type)}</small>`);
+      infoWindow.open({ anchor: marker, map: activityMapOverlayMap });
+    });
+    activityMapOverlayMarkers.push(marker);
+    gmBounds.extend(position);
+  });
+
+  if (enriched.length || logisticsPoints.length) {
+    activityMapOverlayMap.fitBounds(gmBounds, { top: 60, right: 60, bottom: 60, left: 60 });
+  }
 }
 
 function expandDays(cities) {

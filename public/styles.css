@@ -340,8 +340,9 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .activity-map-shell { height: 100%; background: #fff; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
 .activity-map-topbar { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e6ebf2; }
 .activity-map-canvas { flex: 1; min-height: 360px; }
-.activity-map-marker { width: 30px; height: 30px; border-radius: 999px; background: #1d4ed8; color: #fff; border: 2px solid #fff; box-shadow: 0 3px 12px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
-.activity-map-marker.star { background: #f59e0b; font-size: 15px; }
+.activity-map-marker { width: 36px; height: 36px; border-radius: 999px; background: #1d4ed8; color: #fff; border: 2px solid #fff; box-shadow: 0 3px 12px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.activity-map-marker.star { background: #f59e0b; font-size: 18px; }
+.activity-map-marker.logistics-marker { font-size: 16px; }
 
 .notes-row { display: flex; gap: 6px; align-items: flex-start; }
 .notes-row .notes { flex: 1; }
