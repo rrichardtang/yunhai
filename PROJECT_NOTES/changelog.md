@@ -4,6 +4,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-12] Fix geocoding rate limits causing "Location unavailable" on last city
+
+- Added server-side Nominatim queue (`nominatimFetch`) enforcing 1.1s spacing between requests — prevents 429s when geocoding all activities across multiple cities
+- Removed redundant 500ms client-side delay in `geocodeQueryQueued` (server now owns rate limiting)
+- Files: `src/server.js`, `public/app.js`
+
 ## [2026-04-12] Fix map overlay blank screen — proxy Nominatim geocoding through server
 
 - Added `GET /api/geocode?q=...` proxy endpoint in `src/server.js` to forward Nominatim requests server-side (fixes CORS block on VPS domain + 429 rate limit from browser IP)

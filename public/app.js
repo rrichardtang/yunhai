@@ -218,7 +218,6 @@ function geocodeQueryQueued(query) {
         geocodeCache[key] = coords;
         persistGeocodeCache();
       }
-      await new Promise((resolve) => setTimeout(resolve, 500));
       return coords;
     });
 

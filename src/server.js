@@ -2,6 +2,17 @@ require('dotenv').config();
 const fs = require('fs');
 const express = require('express');
 
+// Nominatim requires max 1 req/sec — serialize all geocode requests server-side
+let nominatimQueue = Promise.resolve();
+const nominatimFetch = (url) => {
+  nominatimQueue = nominatimQueue.then(async () => {
+    const r = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'TravelPlannerApp/1.0' } });
+    await new Promise((res) => setTimeout(res, 1100));
+    return r;
+  });
+  return nominatimQueue;
+};
+
 // Global semaphore: cap total in-flight Anthropic calls across all users
 const MAX_CONCURRENT_LLM_CALLS = 10;
 let activeLlmCalls = 0;
@@ -817,7 +828,7 @@ app.get('/api/geocode', async (req, res) => {
   if (!q) return res.status(400).json({ error: 'Missing q parameter' });
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`;
-    const r = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'TravelPlannerApp/1.0' } });
+    const r = await nominatimFetch(url);
     if (!r.ok) return res.status(r.status).json({ error: `Nominatim error ${r.status}` });
     const data = await r.json();
     res.json(data);
