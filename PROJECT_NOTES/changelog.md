@@ -4,6 +4,23 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-13] Build Confidence Check Mode MVP
+
+- Added `src/confidenceCheck.js` with always-on validation for overlapping dates/activities, missing date-time fields, conflicting reservations, and suspicious gaps/impossible timing
+- Added persistent confidence checklist + notification preference persistence to itinerary records (`updateItineraryConfidence` in `src/itineraryStore.js`)
+- Added confidence API endpoints in `src/server.js`:
+  - `GET /api/itinerary/:id/confidence`
+  - `PUT /api/itinerary/:id/confidence`
+  - `POST /api/itinerary/:id/confidence/email-summary`
+- Added optional email summary sender via Resend for unresolved confidence issues
+- Added UI confidence surfaces in `public/planner.html` + `public/app.js`:
+  - Step 5 workflow panel (“Confidence Check Mode”)
+  - global confidence status badge and compact popover with CTA
+  - editable checklist rows (status/notes/details + add/delete)
+  - immediate in-app warnings when new issues appear
+- Added dedicated styles in `public/confidence.css`
+- Added tests in `src/confidenceCheck.test.js`
+
 ## [2026-04-12] Fix geocoding rate limits causing "Location unavailable" on last city
 
 - Added server-side Nominatim queue (`nominatimFetch`) enforcing 1.1s spacing between requests — prevents 429s when geocoding all activities across multiple cities

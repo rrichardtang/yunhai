@@ -40,7 +40,11 @@ const state = {
   forwardingAddress: '',
   calendarMetadataMode: 'compact',
   googleCalendarConnected: false,
-  mapOverlaySelectedActivityId: null
+  mapOverlaySelectedActivityId: null,
+  confidence: null,
+  confidenceChecklist: [],
+  confidenceNotificationPrefs: { emailSummary: false, reminderBeforeDeparture: false },
+  confidenceIssueSignatures: []
 };
 
 const PROFILES_KEY = 'travelplanner_profiles_v1';
@@ -79,7 +83,7 @@ function pacePrefLabel(value) {
 
 const els = {
   steps: [...document.querySelectorAll('#stepIndicator .step')],
-  panels: [1,2,3,4].map((n) => document.getElementById(`step${n}`)),
+  panels: [1,2,3,4,5].map((n) => document.getElementById(`step${n}`)),
   tripName: document.getElementById('tripName'),
   tripBudget: document.getElementById('tripBudget'),
   numTravelers: document.getElementById('numTravelers'),
@@ -150,7 +154,20 @@ const els = {
   chatClose: document.getElementById('chatClose'),
   chatMessages: document.getElementById('chatMessages'),
   chatInput: document.getElementById('chatInput'),
-  chatSend: document.getElementById('chatSend')
+  chatSend: document.getElementById('chatSend'),
+  confidenceBadge: document.getElementById('confidenceBadge'),
+  confidencePopover: document.getElementById('confidencePopover'),
+  confidencePopoverStatus: document.getElementById('confidencePopoverStatus'),
+  confidencePopoverIssues: document.getElementById('confidencePopoverIssues'),
+  confidencePopoverTopIssue: document.getElementById('confidencePopoverTopIssue'),
+  confidencePopoverProgress: document.getElementById('confidencePopoverProgress'),
+  openConfidenceReviewBtn: document.getElementById('openConfidenceReviewBtn'),
+  confidenceSummary: document.getElementById('confidenceSummary'),
+  confidenceIssuesList: document.getElementById('confidenceIssuesList'),
+  confidenceChecklist: document.getElementById('confidenceChecklist'),
+  addChecklistItemBtn: document.getElementById('addChecklistItemBtn'),
+  confidenceEmailSummary: document.getElementById('confidenceEmailSummary'),
+  sendConfidenceEmailBtn: document.getElementById('sendConfidenceEmailBtn')
 };
 
 const SNAPSHOT_KEY = 'travelplanner_snapshot';
@@ -993,6 +1010,7 @@ function setStep(n) {
   els.steps.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
   els.panels.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
   updateStepNavButtons();
+  renderConfidence();
 }
 
 function updateStepNavButtons() {
@@ -1006,6 +1024,110 @@ function updateStepNavButtons() {
 
   backButtons.forEach((btn) => btn.classList.toggle('hidden', isFirstStep));
   nextButtons.forEach((btn) => btn.classList.toggle('hidden', isLastStep));
+}
+
+function computeConfidenceLocal() {
+  const issues = [];
+  const byDay = state.days.map((day) => ({ ...day, activities: state.activities.filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === day.id) }));
+  byDay.forEach((day) => {
+    const sorted = day.activities
+      .map((a) => ({ name: a.name, start: minutesFromTime(parseTimeTo24(state.placements[a.id]?.time || a.suggested_time || typeToTime(a.type))), end: minutesFromTime(parseTimeTo24(state.placements[a.id]?.time || a.suggested_time || typeToTime(a.type))) + (Number(a.duration_hours || 1) * 60) }))
+      .sort((a, b) => a.start - b.start);
+    sorted.forEach((item) => {
+      if (!Number.isFinite(item.start)) issues.push({ type: 'missing_datetime', message: `${item.name} is missing time.` });
+    });
+    for (let i = 1; i < sorted.length; i += 1) {
+      if (sorted[i].start < sorted[i - 1].end) issues.push({ type: 'overlapping_activities', message: `${sorted[i].name} overlaps ${sorted[i - 1].name}.` });
+      const gap = sorted[i].start - sorted[i - 1].end;
+      if (gap > 8 * 60) issues.push({ type: 'suspicious_gap', message: `Large gap between ${sorted[i - 1].name} and ${sorted[i].name}.` });
+    }
+  });
+
+  state.cities.forEach((city) => {
+    if (!city.startDate || !city.endDate) issues.push({ type: 'missing_datetime', message: `${city.name || 'City'} is missing dates.` });
+  });
+
+  const checklist = (state.confidenceChecklist || []).map((x) => ({ ...x }));
+  const verified = checklist.filter((item) => item.status === 'verified').length;
+  const hasConflict = issues.some((item) => ['overlapping_activities'].includes(item.type));
+  const hasMissing = issues.some((item) => item.type === 'missing_datetime');
+  let status = 'Needs review';
+  if (hasConflict) status = 'Conflicts found';
+  else if (hasMissing) status = 'Missing details';
+  else if (checklist.length && verified === checklist.length && !issues.length) status = 'Ready';
+
+  return {
+    status,
+    issues,
+    issueCount: issues.length,
+    topIssue: issues[0]?.message || 'No issues detected',
+    checklist,
+    checklistProgress: { verified, total: checklist.length }
+  };
+}
+
+function renderConfidence() {
+  state.confidence = computeConfidenceLocal();
+  const statusClass = String(state.confidence.status || '').toLowerCase().replace(/\s+/g, '-');
+  if (els.confidenceBadge) {
+    els.confidenceBadge.className = `confidence-badge ${statusClass}`;
+    els.confidenceBadge.textContent = `${state.confidence.status} · ${state.confidence.issueCount} issues`;
+  }
+  if (els.confidencePopoverStatus) els.confidencePopoverStatus.innerHTML = `<strong>${esc(state.confidence.status)}</strong>`;
+  if (els.confidencePopoverIssues) els.confidencePopoverIssues.textContent = `${state.confidence.issueCount} issue${state.confidence.issueCount === 1 ? '' : 's'}`;
+  if (els.confidencePopoverTopIssue) els.confidencePopoverTopIssue.textContent = state.confidence.topIssue;
+  if (els.confidencePopoverProgress) els.confidencePopoverProgress.textContent = `${state.confidence.checklistProgress.verified} of ${state.confidence.checklistProgress.total} items verified`;
+
+  if (els.confidenceSummary) {
+    els.confidenceSummary.innerHTML = `<article class="itinerary-insight-card"><h4>Status</h4><p><strong>${esc(state.confidence.status)}</strong></p><p>${state.confidence.issueCount} issues</p><p>${state.confidence.checklistProgress.verified}/${state.confidence.checklistProgress.total} verified</p></article>`;
+  }
+  if (els.confidenceIssuesList) {
+    els.confidenceIssuesList.innerHTML = state.confidence.issues.length
+      ? state.confidence.issues.map((issue) => `<article class="saved-itinerary-item"><p>${esc(issue.message)}</p></article>`).join('')
+      : '<p class="muted-text">No issues detected.</p>';
+  }
+
+  if (els.confidenceChecklist) {
+    els.confidenceChecklist.innerHTML = (state.confidenceChecklist || []).map((item) => `
+      <div class="confidence-checklist-row" data-check-item="${esc(item.id)}">
+        <input data-check-title value="${esc(item.title || '')}" placeholder="Checklist item" />
+        <select data-check-status>
+          <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>Pending</option>
+          <option value="verified" ${item.status === 'verified' ? 'selected' : ''}>Verified</option>
+          <option value="missing" ${item.status === 'missing' ? 'selected' : ''}>Missing</option>
+        </select>
+        <input data-check-notes value="${esc(item.notes || '')}" placeholder="Notes" />
+        <input data-check-details value="${esc(item.details || '')}" placeholder="Booking details" />
+        <button type="button" class="secondary" data-check-delete>Delete</button>
+      </div>
+    `).join('');
+
+    els.confidenceChecklist.querySelectorAll('[data-check-item]').forEach((row) => {
+      const id = row.getAttribute('data-check-item');
+      row.querySelectorAll('input,select').forEach((input) => input.addEventListener('change', () => {
+        const item = state.confidenceChecklist.find((x) => x.id === id);
+        if (!item) return;
+        item.title = row.querySelector('[data-check-title]').value.trim();
+        item.status = row.querySelector('[data-check-status]').value;
+        item.notes = row.querySelector('[data-check-notes]').value.trim();
+        item.details = row.querySelector('[data-check-details]').value.trim();
+        renderConfidence();
+      }));
+      row.querySelector('[data-check-delete]')?.addEventListener('click', () => {
+        state.confidenceChecklist = state.confidenceChecklist.filter((x) => x.id !== id);
+        renderConfidence();
+      });
+    });
+  }
+
+  if (els.confidenceEmailSummary) {
+    els.confidenceEmailSummary.checked = Boolean(state.confidenceNotificationPrefs?.emailSummary);
+  }
+
+  const signatures = state.confidence.issues.map((x) => x.message);
+  const newlyAdded = signatures.filter((x) => !(state.confidenceIssueSignatures || []).includes(x));
+  if (newlyAdded.length) showToast(`Confidence warning: ${newlyAdded[0]}`, 'error');
+  state.confidenceIssueSignatures = signatures;
 }
 
 function setPlanningLoading(isLoading) {
@@ -1096,12 +1218,18 @@ async function goToNextStep(fromStep = state.step) {
     } catch (e) {
       showToast(e?.message || 'Failed to generate itinerary.', 'error');
     }
+    return;
+  }
+
+  if (fromStep === 4) {
+    setStep(5);
   }
 }
 
 function goToPreviousStep(fromStep = state.step) {
   if (fromStep <= 1) return;
   if (fromStep === 4) renderArrange();
+  if (fromStep === 5) renderItinerary();
   setStep(fromStep - 1);
 }
 
@@ -3759,6 +3887,7 @@ function renderItinerary() {
   }).join('');
 
   renderExecutionMode();
+  renderConfidence();
 }
 
 function getExecutionRows() {
@@ -4091,6 +4220,8 @@ async function loadItineraryById(id) {
     state.itinerary = itinerary;
     state.currentItineraryId = itinerary.id || null;
     state.tripName = itinerary.tripName || state.tripName;
+    state.confidenceChecklist = Array.isArray(itinerary?.confidence?.checklist) ? itinerary.confidence.checklist : [];
+    state.confidenceNotificationPrefs = itinerary?.confidence?.notificationPrefs || state.confidenceNotificationPrefs;
     state.cities = Array.isArray(itinerary.cities)
       ? itinerary.cities.map(normalizeCityData)
       : state.cities;
@@ -4263,7 +4394,11 @@ async function generateItinerary() {
     tripName: state.tripName,
     cities: state.cities,
     travels: state.travels,
-    days: byDay
+    days: byDay,
+    confidence: {
+      checklist: state.confidenceChecklist,
+      notificationPrefs: state.confidenceNotificationPrefs
+    }
   };
   const res = await apiFetch('/api/itinerary', {
     method: 'POST',
@@ -4566,7 +4701,9 @@ function saveSnapshot() {
     arrangeCity: state.arrangeCity,
     currentStep: state.step,
     tripBudget: state.tripBudget,
-    numTravelers: state.numTravelers
+    numTravelers: state.numTravelers,
+    confidenceChecklist: state.confidenceChecklist,
+    confidenceNotificationPrefs: state.confidenceNotificationPrefs
   };
   localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(payload));
   syncToServer('snapshot', payload);
@@ -4589,6 +4726,9 @@ function resetToFresh() {
   state.chatHistory = [];
   state.chatLoading = false;
   state.reviewFilters = { search: '', city: '', verdict: '' };
+  state.confidenceChecklist = [];
+  state.confidence = null;
+  state.confidenceIssueSignatures = [];
 
   els.tripName.value = '';
   if (els.reviewSearch) els.reviewSearch.value = '';
@@ -4623,6 +4763,8 @@ function hydrateFromSnapshot(snapshot) {
 
   state.tripBudget = snapshot.tripBudget ?? null;
   state.numTravelers = snapshot.numTravelers ?? 1;
+  state.confidenceChecklist = Array.isArray(snapshot.confidenceChecklist) ? snapshot.confidenceChecklist : [];
+  state.confidenceNotificationPrefs = snapshot.confidenceNotificationPrefs || state.confidenceNotificationPrefs;
 
   els.tripName.value = state.tripName;
   if (els.tripBudget && state.tripBudget != null) els.tripBudget.value = state.tripBudget;
@@ -5071,6 +5213,37 @@ els.profileSelector?.addEventListener('change', (e) => {
 
 els.newProfileBtn?.addEventListener('click', createNewProfile);
 els.deleteProfileBtn?.addEventListener('click', deleteActiveProfile);
+els.confidenceBadge?.addEventListener('click', () => els.confidencePopover?.classList.toggle('hidden'));
+els.openConfidenceReviewBtn?.addEventListener('click', () => {
+  els.confidencePopover?.classList.add('hidden');
+  setStep(5);
+});
+els.addChecklistItemBtn?.addEventListener('click', () => {
+  state.confidenceChecklist.push({ id: uid(), type: 'other', title: '', status: 'pending', notes: '', details: '' });
+  renderConfidence();
+});
+els.confidenceEmailSummary?.addEventListener('change', (e) => {
+  state.confidenceNotificationPrefs.emailSummary = Boolean(e.target.checked);
+});
+els.sendConfidenceEmailBtn?.addEventListener('click', async () => {
+  if (!state.currentItineraryId) {
+    showToast('Save itinerary first.', 'info');
+    return;
+  }
+  try {
+    const syncRes = await apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/confidence`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ checklist: state.confidenceChecklist, notificationPrefs: state.confidenceNotificationPrefs })
+    });
+    if (!syncRes.ok) throw new Error('Could not save confidence checklist');
+    const emailRes = await apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/confidence/email-summary`, { method: 'POST' });
+    if (!emailRes.ok) throw new Error('Could not send summary email');
+    showToast('Confidence summary email sent.', 'success');
+  } catch (error) {
+    showToast(error?.message || 'Failed to send confidence email.', 'error');
+  }
+});
 
 els.activitiesGrid.addEventListener('change', () => {
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);

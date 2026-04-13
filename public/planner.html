@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/confidence.css" />
   </head>
   <body>
     <header class="topbar">
@@ -25,6 +26,14 @@
           <div class="mode-toggle" role="group" aria-label="View mode">
             <button id="planningModeBtn" class="link-btn mode-btn active" type="button">Planning</button>
             <button id="executionModeBtn" class="link-btn mode-btn" type="button">Execution</button>
+          </div>
+          <button id="confidenceBadge" class="confidence-badge needs-review" type="button">Needs review · 0 issues</button>
+          <div id="confidencePopover" class="confidence-popover hidden">
+            <p id="confidencePopoverStatus"><strong>Needs review</strong></p>
+            <p id="confidencePopoverIssues">0 issues</p>
+            <p id="confidencePopoverTopIssue">No issues detected</p>
+            <p id="confidencePopoverProgress">0 of 0 items verified</p>
+            <button id="openConfidenceReviewBtn" class="primary" type="button">Open full review</button>
           </div>
           <button id="preferencesLink" class="link-btn" type="button">My Profile</button>
         </div>
@@ -65,6 +74,7 @@
         <div class="step">2. Review</div>
         <div class="step">3. Arrange</div>
         <div class="step">4. Itinerary</div>
+        <div class="step">5. Confidence</div>
       </nav>
 
       <section id="step1" class="panel step-panel active">
@@ -170,6 +180,29 @@
         </section>
         <div class="step-nav sticky-nav step-nav-split">
           <button id="editBtn" class="secondary nav-secondary" type="button" data-nav-back="4">← Back</button>
+          <button class="secondary save-progress-btn" type="button">💾 Save Progress</button>
+          <button class="primary nav-primary" type="button" data-nav-next="4">Next →</button>
+        </div>
+      </section>
+
+      <section id="step5" class="panel step-panel">
+        <div class="between"><h2>Confidence Check Mode</h2></div>
+        <div id="confidenceSummary" class="itinerary-insights"></div>
+        <section class="panel confidence-issues-panel">
+          <h3>Live issues</h3>
+          <div id="confidenceIssuesList" class="saved-itineraries-list"></div>
+        </section>
+        <section class="panel confidence-checklist-panel">
+          <div class="between">
+            <h3>Checklist</h3>
+            <button id="addChecklistItemBtn" class="secondary" type="button">+ Add item</button>
+          </div>
+          <div id="confidenceChecklist" class="saved-itineraries-list"></div>
+          <label><input id="confidenceEmailSummary" type="checkbox" /> Email critical summary</label>
+          <button id="sendConfidenceEmailBtn" class="secondary" type="button">Send summary now</button>
+        </section>
+        <div class="step-nav sticky-nav step-nav-split">
+          <button class="secondary nav-secondary" type="button" data-nav-back="5">← Back</button>
           <button class="secondary save-progress-btn" type="button">💾 Save Progress</button>
         </div>
       </section>

@@ -1,26 +1,30 @@
 # Current State
 
-_Last updated: 2026-04-12_
+_Last updated: 2026-04-13_
 
 ## Objective
-Improve API throughput and scalability for multi-user load.
+Ship Confidence Check Mode as an always-on reliability layer inside TravelPlanner.
 
 ## Active Workstream
-Shipped LLM concurrency improvements:
-- City planning now runs up to 3 cities in parallel per request (was sequential)
-- Global semaphore caps total in-flight Anthropic calls at 10 across all users
-- ROADMAP.md updated with job queue plan (BullMQ + Redis) for 100+ user scale
+Implemented Confidence Check Mode MVP:
+- New live confidence engine (`src/confidenceCheck.js`) detects overlapping activities/dates, missing time fields, conflicting reservations, and suspicious gaps
+- Added persistent confidence checklist support on itinerary records (`confidence.checklist`, `confidence.notificationPrefs`)
+- Added server endpoints for confidence read/update/email summary
+- Added workflow Step 5: full Confidence review page with issue list and editable checklist
+- Added global topbar confidence badge + popover (status, issue count, top issue, checklist progress, CTA)
+- Added in-app warnings when new conflicts appear
+- Added optional email summary trigger for unresolved critical issues
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
 - localStorage kept as local cache for offline/low-latency access
 
 ## Risks
-- Concurrent writes from two devices could overwrite each other (last-write-wins)
-- Brave price parsing relies on regex against snippets — may miss prices in non-standard formats
-- Global semaphore is in-memory — resets on server restart, no cross-process coordination if multi-instance
+- Confidence validation is heuristic-based and intentionally lightweight for MVP
+- Email summary depends on Resend env configuration and authenticated user email claim
+- Concurrent writes from two devices remain last-write-wins
 
 ## Next Actions
-- Test on VPS: verify parallel city generation works correctly end-to-end
-- Add token refresh flow and graceful retry on expired Google access tokens
-- Consider caching Brave search results to stay within free tier (2000 req/month)
+- Expand reservation conflict rules with richer booking-type-specific logic
+- Add “reminder before departure” scheduling behavior behind a simple server-side cron/passive worker
+- Add visual issue deep-links from confidence step to specific itinerary items/cards
