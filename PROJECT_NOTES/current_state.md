@@ -3,14 +3,15 @@
 _Last updated: 2026-04-12_
 
 ## Objective
-Budget feature polish — booking type taxonomy, children travelers, cost accuracy fixes.
+Improve the Decline button UX — require feedback before declining, generate a replacement activity, and capture learnable preference signals.
 
 ## Active Workstream
-Shipped two follow-up fixes to the budget feature:
-- Replaced `is_bookable` boolean with `booking_type` enum (`tour`/`attraction`/`restaurant`/`none`) — tours get GetYourGuide+Viator, attractions get Google tickets search, restaurants get Google Maps
-- Strengthened `cost_type` prompt examples to prevent misclassification (e.g. teamLab is per_person not per_group)
-- Added Children input (separate from Adults) to Step 1; children estimated at 60% of adult price
-- Children count threaded through plan payload, LLM budget context, booking link params, cost display, and arrange prompt
+Shipped decline-with-feedback feature:
+- Decline button now reveals an inline feedback form (textarea, maxlength 200, Cancel + Replace Activity)
+- On submit: calls new `/api/activity/replace` → generates one replacement activity via claude-haiku-4-5
+- LLM response includes `signals[]` array (same schema as concierge bot) — learnable signals written via `processChatSignals()`
+- Non-learnable decline reasons (one-off/situational) produce empty signals array — not persisted
+- `normalizeActivity` and `SYSTEM_PROMPT` exported from `src/claude.js` for reuse in new endpoint
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
@@ -22,6 +23,6 @@ Shipped two follow-up fixes to the budget feature:
 - LLM cost estimates are rough; Brave validation helps but neither source is authoritative
 
 ## Next Actions
-- Test on VPS: verify booking_type classification is accurate, booking links route correctly
+- Test on VPS: verify replacement activities generate correctly, signals persist to user profile
 - Add token refresh flow and graceful retry on expired Google access tokens
 - Consider caching Brave search results to stay within free tier (2000 req/month)

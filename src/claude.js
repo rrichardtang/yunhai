@@ -306,4 +306,4 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   return parsed.map((item) => normalizeActivity(item, name));
 }
 
-module.exports = { planCity };
+module.exports = { planCity, normalizeActivity, SYSTEM_PROMPT };

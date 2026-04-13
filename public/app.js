@@ -1542,7 +1542,9 @@ function renderCities() {
       });
     }
 
-    row.querySelector('[data-remove-city]')?.addEventListener('click', () => {
+    row.querySelector('[data-remove-city]')?.addEventListener('click', async () => {
+      const confirmed = await showConfirmDialog('Remove city?', `Remove ${city.name} from your trip?`, 'Remove');
+      if (!confirmed) return;
       if (cityAutocomplete.activeCityId === city.id) closeCityAutocomplete();
       state.cities = state.cities.filter((c) => c.id !== city.id);
       syncTravelDateTimes();
@@ -1629,7 +1631,7 @@ async function apiFetch(url, options = {}) {
   return fetch(url, next);
 }
 
-function postPreferenceSignal(activity, verdict) {
+function postPreferenceSignal(activity, verdict, reason) {
   apiFetch('/api/preferences/signal', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1639,7 +1641,8 @@ function postPreferenceSignal(activity, verdict) {
       type: activity.type,
       verdict,
       city: activity.city,
-      why_it_fits: activity.why_it_fits
+      why_it_fits: activity.why_it_fits,
+      ...(reason ? { reason } : {})
     })
   }).catch(() => {});
 }
@@ -1786,12 +1789,14 @@ function createNewProfile() {
   showToast('Profile created.', 'success');
 }
 
-function deleteActiveProfile() {
+async function deleteActiveProfile() {
   const store = state.profilesStore || loadProfiles();
   if (store.profiles.length <= 1) {
     showToast('At least one profile is required.', 'info');
     return;
   }
+  const confirmed = await showConfirmDialog('Delete profile?', 'This will permanently delete this profile and its preferences.', 'Delete');
+  if (!confirmed) return;
   const remaining = store.profiles.filter((p) => p.id !== store.activeId);
   const nextStore = {
     activeId: remaining[0].id,
@@ -2064,6 +2069,13 @@ function renderActivities() {
               <button class="${approveBtnClass}">✅ Approve</button>
               <button class="${declineBtnClass}">❌ Decline</button>
             </div>
+            <div class="decline-feedback hidden">
+              <textarea class="decline-reason" rows="2" maxlength="200" placeholder="Why are you declining? What would you prefer instead? (required)"></textarea>
+              <div class="decline-feedback-actions">
+                <button class="secondary cancel-decline" type="button">Cancel</button>
+                <button class="primary confirm-decline" type="button" disabled>Replace Activity</button>
+              </div>
+            </div>
             <label class="${review.approved ? '' : 'hidden'}">
               Customize
               <div class="notes-row">
@@ -2109,12 +2121,57 @@ function renderActivities() {
       if (nextApproved === true) postPreferenceSignal(a, 'approved');
       renderActivities();
     });
-    card.querySelector('.decline').addEventListener('click', () => {
-      const current = state.reviewed[a.id]?.approved;
-      const nextApproved = current === false ? null : false;
-      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: nextApproved, notes: nextApproved === false ? '' : (state.reviewed[a.id]?.notes || '') };
-      if (nextApproved === false) postPreferenceSignal(a, 'declined');
-      renderActivities();
+    const declineFeedback = card.querySelector('.decline-feedback');
+    const declineReason = card.querySelector('.decline-reason');
+    const confirmDecline = card.querySelector('.confirm-decline');
+    const cancelDecline = card.querySelector('.cancel-decline');
+    const declineBtn = card.querySelector('.decline');
+
+    declineBtn.addEventListener('click', () => {
+      if (state.reviewed[a.id]?.approved === false) {
+        // Already declined — toggle back to unreviewed
+        state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: null };
+        renderActivities();
+        return;
+      }
+      declineFeedback.classList.remove('hidden');
+      declineBtn.disabled = true;
+    });
+
+    cancelDecline.addEventListener('click', () => {
+      declineFeedback.classList.add('hidden');
+      declineReason.value = '';
+      confirmDecline.disabled = true;
+      declineBtn.disabled = false;
+    });
+
+    declineReason.addEventListener('input', () => {
+      confirmDecline.disabled = !declineReason.value.trim();
+    });
+
+    confirmDecline.addEventListener('click', async () => {
+      const reason = declineReason.value.trim();
+      if (!reason) return;
+      confirmDecline.disabled = true;
+      confirmDecline.textContent = '…';
+      try {
+        const resp = await apiFetch('/api/activity/replace', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activity: a, reason, userId: ensureUserId() })
+        });
+        if (!resp.ok) throw new Error('Replace failed');
+        const { activity: replacement } = await resp.json();
+        const idx = state.activities.indexOf(a);
+        if (idx !== -1) state.activities.splice(idx, 1, replacement);
+        delete state.reviewed[a.id];
+        state.reviewed[replacement.id] = { approved: null, notes: '' };
+        postPreferenceSignal(a, 'declined', reason);
+        renderActivities();
+      } catch {
+        confirmDecline.textContent = 'Replace Activity';
+        confirmDecline.disabled = false;
+      }
     });
     const notes = card.querySelector('.notes');
     const applyBtn = card.querySelector('.apply-note');
@@ -3281,7 +3338,10 @@ async function autoArrangeActiveCity() {
     .map((a) => normalizeActivityMetadata(a));
 
   const hasExistingPlacements = approvedInCity.some((a) => state.placements[a.id]?.dayId);
-  if (hasExistingPlacements && !window.confirm('This will replace your current arrangement. Continue?')) return;
+  if (hasExistingPlacements) {
+    const confirmed = await showConfirmDialog('Replace arrangement?', 'This will replace your current schedule for this city.', 'Replace');
+    if (!confirmed) return;
+  }
 
   const cityPlan = state.cities.find((c) => cityMatches(c.name, activeCity));
 
@@ -3968,7 +4028,7 @@ function renderSavedItineraries() {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.deleteItinerary;
       if (!id) return;
-      const confirmed = window.confirm('Delete this saved itinerary?');
+      const confirmed = await showConfirmDialog('Delete itinerary?', 'This saved itinerary will be permanently deleted.', 'Delete');
       if (!confirmed) return;
 
       try {
@@ -4191,6 +4251,7 @@ async function generateItinerary() {
   }
   updateCalendarControls();
   renderItinerary();
+  clearSnapshot();
   await fetchSavedItineraries();
   renderSavedItineraries();
   setStep(4);
@@ -4419,6 +4480,32 @@ function showRegenerateConfirmDialog() {
   });
 }
 
+function showConfirmDialog(title, message, confirmLabel = 'Confirm') {
+  return new Promise((resolve) => {
+    const existing = document.getElementById('confirmDialog');
+    if (existing) existing.remove();
+
+    const dialog = document.createElement('div');
+    dialog.id = 'confirmDialog';
+    dialog.className = 'modal';
+    dialog.innerHTML = `
+      <div class="modal-card" style="max-width:380px;text-align:center;gap:16px">
+        <h3 style="margin:0">${esc(title)}</h3>
+        <p class="muted-text" style="margin:0">${esc(message)}</p>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button id="confirmNo" class="secondary" type="button">Cancel</button>
+          <button id="confirmYes" class="danger" type="button">${esc(confirmLabel)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(dialog);
+
+    const cleanup = (result) => { dialog.remove(); resolve(result); };
+    dialog.querySelector('#confirmYes').addEventListener('click', () => cleanup(true));
+    dialog.querySelector('#confirmNo').addEventListener('click', () => cleanup(false));
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(false); });
+  });
+}
+
 function step1Fingerprint() {
   const budgetVal = parseFloat(els.tripBudget?.value);
   const budget = Number.isFinite(budgetVal) && budgetVal > 0 ? budgetVal : null;
@@ -4593,7 +4680,9 @@ function renderMyTrips() {
 
   const deleteDraftBtn = els.myTripsList.querySelector('[data-delete-draft]');
   if (deleteDraftBtn) {
-    deleteDraftBtn.addEventListener('click', () => {
+    deleteDraftBtn.addEventListener('click', async () => {
+      const confirmed = await showConfirmDialog('Delete draft?', 'Your in-progress draft will be permanently deleted.', 'Delete');
+      if (!confirmed) return;
       clearSnapshot();
       resetChatSession();
       renderMyTrips();
@@ -4611,7 +4700,7 @@ function renderMyTrips() {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.deleteTrip;
       if (!id) return;
-      const confirmed = window.confirm('Delete this trip?');
+      const confirmed = await showConfirmDialog('Delete trip?', 'This saved trip will be permanently deleted.', 'Delete');
       if (!confirmed) return;
       try {
         const res = await apiFetch(`/api/itinerary/${encodeURIComponent(id)}`, { method: 'DELETE' });

@@ -4,7 +4,7 @@ const express = require('express');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const { clerkMiddleware, requireAuth } = require('@clerk/express');
-const { planCity } = require('./claude');
+const { planCity, normalizeActivity, SYSTEM_PROMPT: ACTIVITY_SYSTEM_PROMPT } = require('./claude');
 const { fetchUnsplashImage } = require('./unsplash');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('./arrangeConfig');
 const {
@@ -872,6 +872,65 @@ Example: {"name":"teamLab Borderless","estimated_cost_usd":35,"cost_type":"per_p
     return res.json({ updates });
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Failed to refine activity' });
+  }
+});
+
+app.post('/api/activity/replace', async (req, res) => {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: 'Anthropic API key not configured' });
+  }
+
+  const { activity, reason, userId } = req.body || {};
+  if (!activity?.name || !activity?.city || !reason) {
+    return res.status(400).json({ error: 'activity, reason, and userId are required' });
+  }
+
+  const resolvedUserId = parseUserId(userId);
+  const prefSummary = getPreferenceSummary(null, resolvedUserId);
+  const systemPrompt = prefSummary ? `${ACTIVITY_SYSTEM_PROMPT}\n\n${prefSummary}` : ACTIVITY_SYSTEM_PROMPT;
+
+  try {
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 600,
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content: `The traveler declined this activity: "${activity.name}" (${activity.type}, ${activity.city}).
+Their reason: "${reason}"
+
+Generate exactly ONE replacement activity for ${activity.city} that directly addresses their feedback. It must be different from the declined activity.
+
+Also extract any learnable preference signals from the reason (omit signals if the reason is one-off or situational, e.g. "already did this", "too expensive this trip").
+
+Return ONLY valid JSON in this exact shape (no markdown fences):
+{
+  "activity": { ...single activity object matching the standard activity schema... },
+  "signals": [
+    // zero or more of:
+    // {"type":"<activity_type>","verdict":"declined"}
+    // {"preference":"<nuanced preference string>"}
+    // {"constraint":"<hard constraint string>"}
+  ]
+}`
+      }]
+    });
+
+    const raw = extractText(response.content).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    const parsed = JSON.parse(raw);
+
+    if (!parsed.activity || typeof parsed.activity !== 'object') {
+      return res.status(500).json({ error: 'LLM returned unexpected shape' });
+    }
+
+    const normalized = normalizeActivity(parsed.activity, activity.city);
+    const signals = Array.isArray(parsed.signals) ? parsed.signals : [];
+    processChatSignals(signals, resolvedUserId);
+
+    return res.json({ activity: normalized });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Failed to replace activity' });
   }
 });
 
