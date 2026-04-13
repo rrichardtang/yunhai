@@ -2350,8 +2350,11 @@ async function openActivityMapOverlay(selectedActivityId = null) {
   const selectedActivity = activities.find((a) => a.id === selectedActivityId);
   const focusCity = String(selectedActivity?.city || '').trim();
 
-  // Geocode activities for the focused city only
-  const cityActivities = focusCity ? activities.filter((a) => String(a.city || '').trim() === focusCity) : activities;
+  // Geocode approved activities for the focused city only
+  const cityActivities = activities.filter((a) =>
+    state.reviewed[a.id]?.approved === true &&
+    (!focusCity || String(a.city || '').trim() === focusCity)
+  );
   const enriched = [];
   for (const activity of cityActivities) {
     const geo = await geocodeActivity(activity);
@@ -2361,11 +2364,9 @@ async function openActivityMapOverlay(selectedActivityId = null) {
   // Geocode logistics (accommodation, arrival, departure) for the focused city
   const cityObj = focusCity ? state.cities.find((c) => cityMatches(c.name, focusCity)) : null;
   const logisticsPoints = [];
-  if (cityObj?.logistics) {
-    const { accommodation, arrival, departure } = cityObj.logistics;
+  if (cityObj) {
     const tryLogistics = async (type, obj) => {
       if (!obj) return;
-      // Use stored coords if available, otherwise geocode the location string
       if (obj.latitude && obj.longitude) {
         logisticsPoints.push({ type, lat: Number(obj.latitude), lng: Number(obj.longitude), label: obj.address || obj.location || type });
       } else {
@@ -2376,9 +2377,10 @@ async function openActivityMapOverlay(selectedActivityId = null) {
         }
       }
     };
-    await tryLogistics('accommodation', accommodation);
-    await tryLogistics('arrival', arrival);
-    await tryLogistics('departure', departure);
+    // Accommodation lives on city.accommodations[0], not city.logistics.accommodation
+    await tryLogistics('accommodation', cityObj.accommodations?.[0]);
+    await tryLogistics('arrival', cityObj.logistics?.arrival);
+    await tryLogistics('departure', cityObj.logistics?.departure);
   }
 
   if (!activityMapOverlayMap) {
