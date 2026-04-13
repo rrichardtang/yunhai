@@ -2161,8 +2161,9 @@ function renderActivities() {
           body: JSON.stringify({ activity: a, reason, userId: ensureUserId() })
         });
         if (!resp.ok) throw new Error('Replace failed');
-        const { activity: replacement } = await resp.json();
-        const idx = state.activities.indexOf(a);
+        const { activity: rawReplacement } = await resp.json();
+        const replacement = { id: `${rawReplacement.city || a.city}-replacement-${uid()}`, ...normalizeActivityMetadata(rawReplacement) };
+        const idx = state.activities.findIndex((x) => x.id === a.id);
         if (idx !== -1) state.activities.splice(idx, 1, replacement);
         delete state.reviewed[a.id];
         state.reviewed[replacement.id] = { approved: null, notes: '' };
