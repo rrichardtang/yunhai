@@ -812,6 +812,20 @@ app.post('/api/email/inbound', async (req, res) => {
   return res.json({ ok: true, parsed: attached.added, itineraryId: attached.itineraryId });
 });
 
+app.get('/api/geocode', async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.status(400).json({ error: 'Missing q parameter' });
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`;
+    const r = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'TravelPlannerApp/1.0' } });
+    if (!r.ok) return res.status(r.status).json({ error: `Nominatim error ${r.status}` });
+    const data = await r.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use('/api', requireConfiguredAuth);
 
 app.post('/api/activity/refine', async (req, res) => {

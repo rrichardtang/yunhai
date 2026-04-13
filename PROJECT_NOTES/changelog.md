@@ -4,6 +4,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-12] Fix map overlay blank screen — proxy Nominatim geocoding through server
+
+- Added `GET /api/geocode?q=...` proxy endpoint in `src/server.js` to forward Nominatim requests server-side (fixes CORS block on VPS domain + 429 rate limit from browser IP)
+- Updated `geocodeQueryQueued` in `public/app.js` to call `/api/geocode` instead of Nominatim directly
+- Files: `src/server.js`, `public/app.js`
+
 ## [2026-04-12] Parallel city planning with global LLM semaphore
 
 - `/api/plan` now processes cities in parallel batches of 3 (was sequential)

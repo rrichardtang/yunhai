@@ -207,8 +207,8 @@ function geocodeQueryQueued(query) {
   geocodeQueue = geocodeQueue
     .catch(() => null)
     .then(async () => {
-      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`;
-      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      const url = `/api/geocode?q=${encodeURIComponent(query)}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`Geocode failed (${res.status})`);
       const rows = await res.json();
       const hit = Array.isArray(rows) ? rows[0] : null;
