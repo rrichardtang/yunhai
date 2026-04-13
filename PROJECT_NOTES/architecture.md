@@ -1,6 +1,37 @@
 # Architecture
 
-_Last updated: 2026-04-09_
+_Last updated: 2026-04-13_
+
+## Feature Contract: Confidence Check Mode (MVP)
+
+### Objective
+Add an always-on trip reliability layer that continuously validates itinerary consistency, tracks reservation readiness with an editable checklist, and surfaces a simple confidence state everywhere in the trip workspace.
+
+### Acceptance Criteria
+1. Live validation runs whenever trip data changes and flags: overlapping dates, overlapping activities, missing date/time fields, conflicting reservations, and suspicious timing gaps.
+2. Users can manage a persistent checklist (add/edit/delete, set status, notes, booking details) for trip-critical reservations.
+3. Confidence status is always visible as a top-level badge and as a full review workflow step.
+4. Badge click opens compact popover with status, issue count, top issue, checklist progress, and CTA to full review.
+5. Full review page supports issue list, checklist editing, and optional email summary trigger.
+6. In-app warnings appear immediately when new conflicts are detected.
+
+### Non-goals
+- Full automatic ingestion/verification for every booking source
+- AI-heavy verification heuristics
+- Complex scheduling engine for reminders
+
+### Design
+- New shared confidence engine (`src/confidenceCheck.js`) computes issues, checklist progress, and status.
+- Server endpoints:
+  - `GET /api/itinerary/:id/confidence`
+  - `PUT /api/itinerary/:id/confidence`
+  - `POST /api/itinerary/:id/confidence/email-summary`
+- `itineraryStore` persists confidence payload under itinerary records (`confidence.checklist`, `confidence.notificationPrefs`).
+- UI embeds confidence in two places:
+  - Workflow Step 5: dedicated “Confidence Check Mode” page
+  - Global topbar badge + popover available from any step
+- Client-side live checks run on state updates and show toasts for newly introduced issues.
+
 
 ## Feature Contract: Robust Calendar & Sync Mode (MVP)
 

@@ -156,11 +156,28 @@ function addParsedBookings({ userId, itineraryId = '', bookings = [], source = {
   };
 }
 
+function updateItineraryConfidence(id, userId, confidence = {}) {
+  if (!id || !userId) return null;
+  const store = readStore();
+  const itinerary = store.items.find((item) => item.id === id && item.userId === userId);
+  if (!itinerary) return null;
+
+  itinerary.confidence = {
+    ...(itinerary.confidence || {}),
+    ...confidence,
+    updatedAt: new Date().toISOString()
+  };
+  itinerary.updatedAt = new Date().toISOString();
+  writeStore(store);
+  return itinerary;
+}
+
 module.exports = {
   saveItinerary,
   getLatestItinerary,
   getItineraryById,
   listItineraries,
   deleteItinerary,
-  addParsedBookings
+  addParsedBookings,
+  updateItineraryConfidence
 };

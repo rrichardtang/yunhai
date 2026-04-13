@@ -58,7 +58,8 @@ const {
   getItineraryById,
   listItineraries,
   deleteItinerary,
-  addParsedBookings
+  addParsedBookings,
+  updateItineraryConfidence
 } = require('./itineraryStore');
 const {
   getOrCreateForwardingAddress,
@@ -66,6 +67,8 @@ const {
   parseBookingEmail,
   sendIngestConfirmation
 } = require('./emailForwarding');
+const { Resend } = require('resend');
+const { computeConfidence, normalizeChecklistItem } = require('./confidenceCheck');
 const { getUserData, setUserData, getUserField, setUserField } = require('./userDataStore');
 const {
   buildCalendarItems,
@@ -547,6 +550,19 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
 
 function parseUserId(rawUserId) {
   return resolveUserId(rawUserId);
+}
+
+async function sendConfidenceSummaryEmail({ toEmail, tripName, confidence }) {
+  if (!toEmail || !process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) return false;
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const unresolved = (confidence?.issues || []).slice(0, 5).map((issue) => `- ${issue.message}`).join('\n');
+  await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL,
+    to: [toEmail],
+    subject: `TravelPlanner confidence summary: ${tripName || 'Your trip'}`,
+    text: `${confidence.status} (${confidence.issueCount} issues)\n\nTop issue: ${confidence.topIssue}\nChecklist: ${confidence.checklistProgress.verified}/${confidence.checklistProgress.total} verified\n\nUnresolved:\n${unresolved || '- None'}`
+  });
+  return true;
 }
 
 function formatCityLine(city) {
@@ -1388,6 +1404,50 @@ app.delete('/api/itinerary/:id', (req, res) => {
   const deleted = deleteItinerary(req.params.id, userId);
   if (!deleted) return res.status(404).json({ error: 'Itinerary not found' });
   return res.json({ ok: true });
+});
+
+app.get('/api/itinerary/:id/confidence', (req, res) => {
+  const userId = parseUserId(getAuthedUserId(req));
+  const itinerary = getItineraryById(req.params.id, userId);
+  if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
+  const confidence = computeConfidence(itinerary);
+  return res.json({ confidence });
+});
+
+app.put('/api/itinerary/:id/confidence', (req, res) => {
+  const userId = parseUserId(getAuthedUserId(req));
+  const itinerary = getItineraryById(req.params.id, userId);
+  if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
+
+  const checklist = Array.isArray(req.body?.checklist)
+    ? req.body.checklist.map(normalizeChecklistItem)
+    : (itinerary?.confidence?.checklist || []);
+  const notificationPrefs = {
+    emailSummary: Boolean(req.body?.notificationPrefs?.emailSummary),
+    reminderBeforeDeparture: Boolean(req.body?.notificationPrefs?.reminderBeforeDeparture)
+  };
+
+  const updated = updateItineraryConfidence(req.params.id, userId, { checklist, notificationPrefs });
+  const confidence = computeConfidence(updated || itinerary);
+  return res.json({ ok: true, confidence });
+});
+
+app.post('/api/itinerary/:id/confidence/email-summary', async (req, res) => {
+  try {
+    const userId = parseUserId(getAuthedUserId(req));
+    const itinerary = getItineraryById(req.params.id, userId);
+    if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
+
+    const session = req.auth?.sessionClaims || {};
+    const toEmail = String(session?.email || session?.email_address || '').trim();
+    if (!toEmail) return res.status(400).json({ error: 'No authenticated email found for this account' });
+
+    const confidence = computeConfidence(itinerary);
+    await sendConfidenceSummaryEmail({ toEmail, tripName: itinerary.tripName, confidence });
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Failed to send confidence summary email' });
+  }
 });
 
 app.get('/api/calendar/google/auth-url', (req, res) => {
