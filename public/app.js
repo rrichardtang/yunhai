@@ -2161,23 +2161,16 @@ function renderActivities() {
           body: JSON.stringify({ activity: a, reason, userId: ensureUserId() })
         });
         if (!resp.ok) throw new Error('Replace failed');
-        const responseJson = await resp.json();
-        console.log('[replace] raw response:', JSON.stringify(responseJson));
-        const rawReplacement = responseJson.activity;
-        console.log('[replace] rawReplacement:', rawReplacement);
-        console.log('[replace] a.id:', a.id, 'activities ids:', state.activities.map((x) => x.id));
+        const { activity: rawReplacement } = await resp.json();
         if (!rawReplacement) throw new Error('No activity in response');
-        const replacement = { id: `${rawReplacement.city || a.city}-replacement-${uid()}`, ...normalizeActivityMetadata(rawReplacement) };
-        console.log('[replace] replacement.id:', replacement.id);
+        const replacement = { id: `${rawReplacement.city || a.city}-replacement-${uid()}`, ...normalizeActivityMetadata(rawReplacement), city: canonicalizeActivityCity(rawReplacement.city, a.city) };
         const idx = state.activities.findIndex((x) => x.id === a.id);
-        console.log('[replace] splice idx:', idx);
         if (idx !== -1) state.activities.splice(idx, 1, replacement);
         delete state.reviewed[a.id];
         state.reviewed[replacement.id] = { approved: null, notes: '' };
         postPreferenceSignal(a, 'declined', reason);
         renderActivities();
-      } catch (err) {
-        console.error('[replace] error:', err);
+      } catch {
         confirmDecline.textContent = 'Replace Activity';
         confirmDecline.disabled = false;
       }
