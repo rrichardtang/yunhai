@@ -1239,21 +1239,41 @@ function renderConfidence() {
           <div class="confidence-city-block">
             <h5>${esc(cityGroup.city)}</h5>
             ${cityGroup.items.map((item) => `
-              <div class="confidence-checklist-row" data-check-item="${esc(item.id)}">
-                <select data-check-type>
-                  ${[...CONFIDENCE_CRITICAL_TYPES, 'other'].map((type) => `<option value="${type}" ${item.type === type ? 'selected' : ''}>${confidenceLabelForType(type)}</option>`).join('')}
-                </select>
-                <input data-check-city value="${esc(item.city || '')}" placeholder="City / location" />
-                <input data-check-name value="${esc(item.name || '')}" placeholder="Reservation name" />
-                <input data-check-datetime value="${esc(item.dateTime || '')}" placeholder="Date/time" />
-                <select data-check-ui-state>
-                  <option value="needs_review" ${confidenceUiStateFromInternal(item.state) === 'needs_review' ? 'selected' : ''}>Needs review</option>
-                  <option value="verified" ${confidenceUiStateFromInternal(item.state) === 'verified' ? 'selected' : ''}>Verified</option>
-                  <option value="broken" ${confidenceUiStateFromInternal(item.state) === 'broken' ? 'selected' : ''}>Broken</option>
-                </select>
-                <input data-check-notes value="${esc(item.notes || item.bookingReference || '')}" placeholder="Resolution notes (link, confirmation #, details)" />
-                <button type="button" class="secondary" data-check-delete>Delete</button>
-              </div>
+              <form class="confidence-checklist-row" data-check-item="${esc(item.id)}" onsubmit="return false;">
+                <label class="confidence-field">
+                  <span>Type</span>
+                  <select data-check-type>
+                    ${[...CONFIDENCE_CRITICAL_TYPES, 'other'].map((type) => `<option value="${type}" ${item.type === type ? 'selected' : ''}>${confidenceLabelForType(type)}</option>`).join('')}
+                  </select>
+                </label>
+                <label class="confidence-field">
+                  <span>City / location</span>
+                  <input data-check-city value="${esc(item.city || '')}" placeholder="City / location" />
+                </label>
+                <label class="confidence-field">
+                  <span>Reservation</span>
+                  <input data-check-name value="${esc(item.name || '')}" placeholder="Reservation name" />
+                </label>
+                <label class="confidence-field">
+                  <span>Date / time</span>
+                  <input data-check-datetime value="${esc(item.dateTime || '')}" placeholder="Date/time" />
+                </label>
+                <label class="confidence-field">
+                  <span>Status</span>
+                  <select data-check-ui-state>
+                    <option value="needs_review" ${confidenceUiStateFromInternal(item.state) === 'needs_review' ? 'selected' : ''}>Needs review</option>
+                    <option value="verified" ${confidenceUiStateFromInternal(item.state) === 'verified' ? 'selected' : ''}>Verified</option>
+                    <option value="broken" ${confidenceUiStateFromInternal(item.state) === 'broken' ? 'selected' : ''}>Broken</option>
+                  </select>
+                </label>
+                <label class="confidence-field confidence-notes-field">
+                  <span>Resolution notes</span>
+                  <textarea data-check-notes rows="2" placeholder="Resolution notes (link, confirmation #, details)">${esc(item.notes || item.bookingReference || '')}</textarea>
+                </label>
+                <div class="confidence-row-actions">
+                  <button type="button" class="secondary" data-check-delete>Delete</button>
+                </div>
+              </form>
             `).join('')}
           </div>
         `).join('')}
@@ -1262,7 +1282,7 @@ function renderConfidence() {
 
     els.confidenceChecklist.querySelectorAll('[data-check-item]').forEach((row) => {
       const id = row.getAttribute('data-check-item');
-      row.querySelectorAll('input,select').forEach((input) => input.addEventListener('change', () => {
+      const syncItemFromRow = () => {
         const item = state.confidenceChecklist.find((x) => x.id === id);
         if (!item) return;
         item.type = row.querySelector('[data-check-type]').value;
@@ -1278,7 +1298,12 @@ function renderConfidence() {
         item.source = '';
         item.updatedAt = new Date().toISOString();
         renderConfidence();
-      }));
+      };
+
+      row.querySelectorAll('input,select,textarea').forEach((input) => {
+        input.addEventListener('change', syncItemFromRow);
+      });
+      row.querySelector('[data-check-ui-state]')?.addEventListener('input', syncItemFromRow);
       row.querySelector('[data-check-delete]')?.addEventListener('click', () => {
         state.confidenceChecklist = state.confidenceChecklist.filter((x) => x.id !== id);
         renderConfidence();
