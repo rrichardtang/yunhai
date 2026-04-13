@@ -5347,6 +5347,20 @@ els.reviewVerdictFilter?.addEventListener('change', (e) => {
 els.approveVisibleBtn?.addEventListener('click', () => applyVerdictToVisibleActivities(true));
 
 document.querySelectorAll('.save-progress-btn').forEach((btn) => btn.addEventListener('click', saveSnapshot));
+document.getElementById('saveConfidenceBtn')?.addEventListener('click', async () => {
+  if (!state.currentItineraryId) { saveSnapshot(); return; }
+  try {
+    const res = await apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/confidence`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ checklist: state.confidenceChecklist, notificationPrefs: state.confidenceNotificationPrefs })
+    });
+    if (!res.ok) throw new Error('Save failed');
+    showToast('Saved!', 'success');
+  } catch {
+    showToast('Failed to save confidence data', 'error');
+  }
+});
 els.autoArrangeBtn?.addEventListener('click', autoArrangeActiveCity);
 els.downloadCalendarBtn?.addEventListener('click', () => {
   if (!state.currentItineraryId) return;
