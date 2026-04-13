@@ -253,23 +253,11 @@ function extractTimeFromDateTime(value = '') {
 }
 
 function pickFirstAccommodation(city = {}) {
-  const accommodations = Array.isArray(city?.accommodations) ? city.accommodations : [];
-  if (!accommodations.length) return null;
-  return accommodations.slice().sort((a, b) => {
-    const aDate = String(a?.checkIn || a?.checkOut || '9999-12-31');
-    const bDate = String(b?.checkIn || b?.checkOut || '9999-12-31');
-    return aDate.localeCompare(bDate);
-  })[0] || null;
+  return city?.accommodation?.address ? city.accommodation : null;
 }
 
 function pickLastAccommodation(city = {}) {
-  const accommodations = Array.isArray(city?.accommodations) ? city.accommodations : [];
-  if (!accommodations.length) return null;
-  return accommodations.slice().sort((a, b) => {
-    const aDate = String(a?.checkOut || a?.checkIn || '0000-01-01');
-    const bDate = String(b?.checkOut || b?.checkIn || '0000-01-01');
-    return bDate.localeCompare(aDate);
-  })[0] || null;
+  return city?.accommodation?.address ? city.accommodation : null;
 }
 
 function resolveLocationQuery({ lat, lng, fallbackText }) {
@@ -562,10 +550,8 @@ function parseUserId(rawUserId) {
 }
 
 function formatCityLine(city) {
-  const accoms = Array.isArray(city.accommodations) && city.accommodations.length
-    ? city.accommodations.join('; ')
-    : 'none listed';
-  return `${city.name} (${city.startDate} → ${city.endDate}, leaving ${city.leaveTime || '18:00'}) — staying: ${accoms}`;
+  const accomLabel = city.accommodation?.address || 'none listed';
+  return `${city.name} (${city.startDate} → ${city.endDate}, leaving ${city.leaveTime || '18:00'}) — staying: ${accomLabel}`;
 }
 
 function formatScheduleBlock(scheduledByDay) {
