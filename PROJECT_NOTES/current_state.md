@@ -10,10 +10,11 @@ Implemented Confidence Check Mode MVP:
 - New live confidence engine (`src/confidenceCheck.js`) detects overlapping activities/dates, missing time fields, conflicting reservations, and suspicious gaps
 - Added persistent confidence checklist support on itinerary records (`confidence.checklist`, `confidence.notificationPrefs`)
 - Checklist is now a required core block of Confidence Check Mode with trip-critical booking rows (flight/hotel/car/train/attraction/restaurant/tour/transfer) always present
-- Checklist rows now support: type, name, date/time, verified state, source, notes, and optional booking reference
+- Checklist rows are now grouped by category (Travel, Accommodations, Tickets, Restaurants) and city/location for faster scan-and-fix workflows
+- Checklist rows now support a streamlined actionable editor: type, city/location, name, date/time, state (needs review / verified / broken), and one freeform resolution notes field
 - Confidence summary is now checklist-driven (needs booking vs confirmed vs broken vs fix-now), not only a static status card
 - Added server endpoints for confidence read/update/email summary
-- Added workflow Step 5: full Confidence review page with issue list and editable checklist
+- Added workflow Step 5: full Confidence review page with grouped editable checklist directly under summary, plus issue list
 - Added global topbar confidence badge + popover (status, issue count, top issue, checklist progress, CTA)
 - Added in-app warnings when new conflicts appear
 - Added optional email summary trigger for unresolved critical issues

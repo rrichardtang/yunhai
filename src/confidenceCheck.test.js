@@ -33,13 +33,14 @@ test('computeConfidence returns Ready when checklist verified and no issues', ()
       activities: [{ name: 'Walk', time: '10:00', duration_hours: 2 }]
     }],
     confidence: {
-      checklist: [{ name: 'Flight', dateTime: '2026-07-01T09:00:00', state: 'verified' }]
+      checklist: [{ type: 'flight', name: 'Flight', dateTime: '2026-07-01T09:00:00', state: 'verified' }]
     }
   });
 
   assert.equal(result.status, 'Ready');
   assert.equal(result.issueCount, 0);
   assert.equal(result.bookingSummary.counts.confirmed, 1);
+  assert.equal(result.bookingSummary.groupedChecklist[0].category, 'Travel');
 });
 
 test('computeConfidence auto-seeds critical booking checklist types', () => {

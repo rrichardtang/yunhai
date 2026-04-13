@@ -1037,8 +1037,51 @@ const CONFIDENCE_CRITICAL_TYPES = [
   'transfer'
 ];
 
+const CONFIDENCE_CATEGORIES = ['Travel', 'Accommodations', 'Tickets', 'Restaurants', 'Other'];
+
 function confidenceLabelForType(type = 'other') {
   return String(type || 'other').replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function confidenceCategoryForType(type = 'other') {
+  const value = String(type || 'other').toLowerCase();
+  if (['flight', 'train', 'car_rental', 'transfer'].includes(value)) return 'Travel';
+  if (value === 'hotel') return 'Accommodations';
+  if (['attraction', 'tour'].includes(value)) return 'Tickets';
+  if (value === 'restaurant') return 'Restaurants';
+  return 'Other';
+}
+
+function confidenceUiStateFromInternal(state = 'needs_booking') {
+  if (state === 'verified') return 'verified';
+  if (state === 'problem') return 'broken';
+  return 'needs_review';
+}
+
+function confidenceInternalStateFromUi(uiState = 'needs_review', item = {}) {
+  if (uiState === 'verified') return 'verified';
+  if (uiState === 'broken') return 'problem';
+  return item.dateTime ? 'booked_unverified' : 'needs_booking';
+}
+
+function groupConfidenceChecklist(items = []) {
+  const grouped = new Map();
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const category = item.category || confidenceCategoryForType(item.type);
+    const city = String(item.city || item.location || '').trim() || 'General';
+    if (!grouped.has(category)) grouped.set(category, new Map());
+    const byCity = grouped.get(category);
+    if (!byCity.has(city)) byCity.set(city, []);
+    byCity.get(city).push(item);
+  });
+
+  const categoryOrder = new Map(CONFIDENCE_CATEGORIES.map((c, index) => [c, index]));
+  return [...grouped.entries()]
+    .sort((a, b) => (categoryOrder.get(a[0]) ?? 999) - (categoryOrder.get(b[0]) ?? 999))
+    .map(([category, byCity]) => ({
+      category,
+      cities: [...byCity.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([city, cityItems]) => ({ city, items: cityItems }))
+    }));
 }
 
 function normalizeConfidenceChecklistItem(item = {}) {
@@ -1052,6 +1095,8 @@ function normalizeConfidenceChecklistItem(item = {}) {
   return {
     id: String(item.id || uid()),
     type,
+    category: String(item.category || confidenceCategoryForType(type)),
+    city: String(item.city || item.location || '').trim(),
     name,
     dateTime: String(item.dateTime || item.when || '').trim(),
     state: nextState,
@@ -1120,6 +1165,7 @@ function computeConfidenceLocal() {
     canFixNow: bookingSummary.canFixNow.length,
     total: checklist.length
   };
+  bookingSummary.groupedChecklist = groupConfidenceChecklist(checklist);
 
   const hasConflict = issues.some((item) => ['overlapping_activities', 'booking_problem'].includes(item.type));
   const hasMissing = issues.some((item) => ['missing_datetime', 'missing_details'].includes(item.type)) || bookingSummary.counts.needsBooking > 0;
@@ -1137,8 +1183,8 @@ function computeConfidenceLocal() {
     checklistProgress: { verified: bookingSummary.counts.confirmed, total: checklist.length },
     bookingSummary,
     immediateActions: [
-      ...bookingSummary.needsBooking.map((item) => `Book: ${item.name}`),
-      ...bookingSummary.canFixNow.map((item) => `Fix now: ${item.name}`)
+      ...bookingSummary.needsBooking.map((item) => `Book: ${item.name}${item.city ? ` (${item.city})` : ''}`),
+      ...bookingSummary.canFixNow.map((item) => `Fix now: ${item.name}${item.city ? ` (${item.city})` : ''}`)
     ].slice(0, 6)
   };
 }
@@ -1185,25 +1231,33 @@ function renderConfidence() {
   }
 
   if (els.confidenceChecklist) {
-    els.confidenceChecklist.innerHTML = (state.confidenceChecklist || []).map((item) => `
-      <div class="confidence-checklist-row" data-check-item="${esc(item.id)}">
-        <select data-check-type>
-          ${[...CONFIDENCE_CRITICAL_TYPES, 'other'].map((type) => `<option value="${type}" ${item.type === type ? 'selected' : ''}>${confidenceLabelForType(type)}</option>`).join('')}
-        </select>
-        <input data-check-name value="${esc(item.name || '')}" placeholder="Reservation name" />
-        <input data-check-datetime value="${esc(item.dateTime || '')}" placeholder="Date/time" />
-        <select data-check-state>
-          <option value="missing" ${item.state === 'missing' ? 'selected' : ''}>Missing</option>
-          <option value="needs_booking" ${item.state === 'needs_booking' ? 'selected' : ''}>Needs booking</option>
-          <option value="booked_unverified" ${item.state === 'booked_unverified' ? 'selected' : ''}>Booked, verify</option>
-          <option value="verified" ${item.state === 'verified' ? 'selected' : ''}>Verified</option>
-          <option value="problem" ${item.state === 'problem' ? 'selected' : ''}>Broken</option>
-        </select>
-        <input data-check-source value="${esc(item.source || '')}" placeholder="Source" />
-        <input data-check-ref value="${esc(item.bookingReference || '')}" placeholder="Booking reference (optional)" />
-        <input data-check-notes value="${esc(item.notes || '')}" placeholder="Notes" />
-        <button type="button" class="secondary" data-check-delete>Delete</button>
-      </div>
+    const groupedChecklist = groupConfidenceChecklist(state.confidenceChecklist || []);
+    els.confidenceChecklist.innerHTML = groupedChecklist.map((group) => `
+      <section class="confidence-group-block">
+        <h4>${esc(group.category)}</h4>
+        ${group.cities.map((cityGroup) => `
+          <div class="confidence-city-block">
+            <h5>${esc(cityGroup.city)}</h5>
+            ${cityGroup.items.map((item) => `
+              <div class="confidence-checklist-row" data-check-item="${esc(item.id)}">
+                <select data-check-type>
+                  ${[...CONFIDENCE_CRITICAL_TYPES, 'other'].map((type) => `<option value="${type}" ${item.type === type ? 'selected' : ''}>${confidenceLabelForType(type)}</option>`).join('')}
+                </select>
+                <input data-check-city value="${esc(item.city || '')}" placeholder="City / location" />
+                <input data-check-name value="${esc(item.name || '')}" placeholder="Reservation name" />
+                <input data-check-datetime value="${esc(item.dateTime || '')}" placeholder="Date/time" />
+                <select data-check-ui-state>
+                  <option value="needs_review" ${confidenceUiStateFromInternal(item.state) === 'needs_review' ? 'selected' : ''}>Needs review</option>
+                  <option value="verified" ${confidenceUiStateFromInternal(item.state) === 'verified' ? 'selected' : ''}>Verified</option>
+                  <option value="broken" ${confidenceUiStateFromInternal(item.state) === 'broken' ? 'selected' : ''}>Broken</option>
+                </select>
+                <input data-check-notes value="${esc(item.notes || item.bookingReference || '')}" placeholder="Resolution notes (link, confirmation #, details)" />
+                <button type="button" class="secondary" data-check-delete>Delete</button>
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
+      </section>
     `).join('');
 
     els.confidenceChecklist.querySelectorAll('[data-check-item]').forEach((row) => {
@@ -1212,13 +1266,16 @@ function renderConfidence() {
         const item = state.confidenceChecklist.find((x) => x.id === id);
         if (!item) return;
         item.type = row.querySelector('[data-check-type]').value;
+        item.category = confidenceCategoryForType(item.type);
+        item.city = row.querySelector('[data-check-city]').value.trim();
         item.name = row.querySelector('[data-check-name]').value.trim();
         item.dateTime = row.querySelector('[data-check-datetime]').value.trim();
-        item.state = row.querySelector('[data-check-state]').value;
+        const uiState = row.querySelector('[data-check-ui-state]').value;
+        item.state = confidenceInternalStateFromUi(uiState, item);
         item.verified = item.state === 'verified';
-        item.source = row.querySelector('[data-check-source]').value.trim();
-        item.bookingReference = row.querySelector('[data-check-ref]').value.trim();
         item.notes = row.querySelector('[data-check-notes]').value.trim();
+        item.bookingReference = '';
+        item.source = '';
         item.updatedAt = new Date().toISOString();
         renderConfidence();
       }));
@@ -5335,6 +5392,8 @@ els.addChecklistItemBtn?.addEventListener('click', () => {
   state.confidenceChecklist.push(normalizeConfidenceChecklistItem({
     id: uid(),
     type: 'other',
+    category: 'Other',
+    city: '',
     name: '',
     dateTime: '',
     state: 'needs_booking',
