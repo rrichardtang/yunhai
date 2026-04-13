@@ -1190,6 +1190,14 @@ function computeConfidenceLocal() {
 }
 
 function renderConfidence() {
+  const tripLoaded = Boolean(state.currentItineraryId || (state.activities && state.activities.length));
+  if (els.confidenceBadge) els.confidenceBadge.classList.toggle('hidden', !tripLoaded);
+  if (!tripLoaded) {
+    if (els.confidenceSummary) els.confidenceSummary.innerHTML = '<p class="muted-text">Load or create a trip to see the confidence check.</p>';
+    if (els.confidenceChecklist) els.confidenceChecklist.innerHTML = '';
+    if (els.confidenceIssuesList) els.confidenceIssuesList.innerHTML = '';
+    return;
+  }
   state.confidence = computeConfidenceLocal();
   const statusClass = String(state.confidence.status || '').toLowerCase().replace(/\s+/g, '-');
   if (els.confidenceBadge) {
