@@ -95,7 +95,7 @@ async function searchActivityPrice(activityName, cityName) {
 }
 
 async function searchActivityPricesBatch(activities, cityName) {
-  const bookable = activities.filter((a) => a.is_bookable);
+  const bookable = activities.filter((a) => a.booking_type && a.booking_type !== 'none');
   const results = await Promise.all(
     bookable.map((a) => searchActivityPrice(a.name, cityName))
   );

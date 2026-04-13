@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-12] Fix booking type taxonomy and add children traveler support
+
+- Replaced `is_bookable` boolean with `booking_type` enum in LLM schema: `tour` (GetYourGuide+Viator), `attraction` (Google tickets search), `restaurant` (Google Maps), `none` (no links)
+- Strengthened `cost_type` prompt with explicit per_person/per_group examples to fix misclassifications (e.g. teamLab, theme parks)
+- Added Children input to Step 1 alongside Adults; children cost estimated at 60% of adult price
+- `computeApprovedCost()` applies children discount; card display shows adult + child breakdown
+- `numChildren` threaded through plan/arrange API payloads, LLM budget context, and GetYourGuide/Viator booking link params
+- Files: `src/claude.js`, `src/server.js`, `src/braveSearch.js`, `public/planner.html`, `public/app.js`
+
 ## [2026-04-12] Add regenerate confirmation dialog on step 1 changes
 
 - `step1Fingerprint()` expanded to include `budget` and `travelers` (read from DOM inputs)

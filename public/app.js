@@ -3,6 +3,7 @@ const state = {
   tripName: '',
   tripBudget: null,
   numTravelers: 1,
+  numChildren: 0,
   cities: [],
   travels: [],
   activities: [],
@@ -82,6 +83,7 @@ const els = {
   tripName: document.getElementById('tripName'),
   tripBudget: document.getElementById('tripBudget'),
   numTravelers: document.getElementById('numTravelers'),
+  numChildren: document.getElementById('numChildren'),
   citiesContainer: document.getElementById('citiesContainer'),
   locationValidationError: document.getElementById('locationValidationError'),
   addCityBtn: document.getElementById('addCityBtn'),
@@ -1944,11 +1946,13 @@ function enrichImages(items = []) {
 }
 
 function computeApprovedCost(activities) {
-  const travelers = state.numTravelers || 1;
+  const adults = state.numTravelers || 1;
+  const children = state.numChildren || 0;
   return (activities || state.activities.filter((a) => state.reviewed[a.id]?.approved === true))
     .reduce((sum, a) => {
       if (a.estimated_cost_usd === null || a.estimated_cost_usd === undefined) return sum;
-      return sum + (a.cost_type === 'per_group' ? a.estimated_cost_usd : a.estimated_cost_usd * travelers);
+      if (a.cost_type === 'per_group') return sum + a.estimated_cost_usd;
+      return sum + (a.estimated_cost_usd * adults) + (a.estimated_cost_usd * 0.6 * children);
     }, 0);
 }
 
@@ -2027,15 +2031,21 @@ function renderActivities() {
             <h3>${esc(a.name)}</h3>
             <p><strong>City:</strong> ${esc(a.city || '')}</p>
             ${(() => {
-              const travelers = state.numTravelers || 1;
+              const adults = state.numTravelers || 1;
+              const children = state.numChildren || 0;
               const isPerGroup = a.cost_type === 'per_group';
               const cost = a.estimated_cost_usd;
               let costHtml = '';
               if (cost !== null && cost !== undefined) {
                 if (isPerGroup) {
                   costHtml = `$${cost} (group)`;
-                } else if (travelers > 1) {
-                  costHtml = `$${cost} × ${travelers} = $${cost * travelers}`;
+                } else if (adults + children > 1) {
+                  const adultTotal = cost * adults;
+                  const childTotal = Math.round(cost * 0.6 * children);
+                  const total = adultTotal + childTotal;
+                  const parts = [`$${cost} × ${adults} adult${adults > 1 ? 's' : ''}`];
+                  if (children > 0) parts.push(`$${Math.round(cost * 0.6)} × ${children} child${children > 1 ? 'ren' : ''}`);
+                  costHtml = `${parts.join(' + ')} = $${total}`;
                 } else {
                   costHtml = `$${cost} per person`;
                 }
@@ -3350,6 +3360,7 @@ async function autoArrangeActiveCity() {
         profile: getProfilePayload(),
         budget: state.tripBudget,
         numTravelers: state.numTravelers,
+        numChildren: state.numChildren,
         approvedCostTotal: computeApprovedCost(approvedInCity)
       })
     });
@@ -4035,6 +4046,7 @@ async function planTrip() {
   const budgetVal = parseFloat(els.tripBudget?.value);
   state.tripBudget = Number.isFinite(budgetVal) && budgetVal > 0 ? budgetVal : null;
   state.numTravelers = Math.max(1, parseInt(els.numTravelers?.value, 10) || 1);
+  state.numChildren = Math.max(0, parseInt(els.numChildren?.value, 10) || 0);
   syncLegacyTravelsFromCities();
   const cities = state.cities.map(({name,startDate,endDate,leaveTime,notes,accommodations,travelEntry,logistics}) => ({
     name,
@@ -4047,7 +4059,7 @@ async function planTrip() {
     travelEntry: travelEntry ? { ...travelEntry } : null
   }));
   const travels = state.travels.map((travel) => ({ ...travel }));
-  const payload = { cities, travels, profile: state.profile || loadProfile(), userId: ensureUserId(), budget: state.tripBudget, numTravelers: state.numTravelers };
+  const payload = { cities, travels, profile: state.profile || loadProfile(), userId: ensureUserId(), budget: state.tripBudget, numTravelers: state.numTravelers, numChildren: state.numChildren };
 
   state.activities = [];
   state.reviewed = {};
@@ -4411,7 +4423,8 @@ function step1Fingerprint() {
   const budgetVal = parseFloat(els.tripBudget?.value);
   const budget = Number.isFinite(budgetVal) && budgetVal > 0 ? budgetVal : null;
   const travelers = Math.max(1, parseInt(els.numTravelers?.value, 10) || 1);
-  return JSON.stringify({ cities: state.cities, travels: state.travels, budget, travelers });
+  const children = Math.max(0, parseInt(els.numChildren?.value, 10) || 0);
+  return JSON.stringify({ cities: state.cities, travels: state.travels, budget, travelers, children });
 }
 
 function clearSnapshot() {
