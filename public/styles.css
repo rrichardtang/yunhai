@@ -757,21 +757,30 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .profile-label { margin-bottom: 8px; }
 .ai-summary-hint { margin: 0 0 8px; font-size: 0.85rem; color: var(--gray); }
 
-.profile-textarea-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.profile-textarea-header h4, .profile-textarea-header .profile-label { margin: 0; }
 .profile-textarea-fixed { resize: none !important; }
+.textarea-expand-wrap {
+  position: relative;
+}
+.textarea-expand-wrap .profile-textarea-fixed {
+  display: block;
+  width: 100%;
+}
 .textarea-expand-btn {
-  background: none;
-  border: none;
-  padding: 2px 4px;
-  font-size: 1rem;
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(255,255,255,.85);
+  border: 1px solid #dde3ed;
+  padding: 3px 6px;
+  font-size: .85rem;
   color: var(--gray);
   cursor: pointer;
   line-height: 1;
-  border-radius: 4px;
-  transition: color .15s, background .15s;
+  border-radius: 6px;
+  backdrop-filter: blur(2px);
+  transition: color .15s, background .15s, border-color .15s;
 }
-.textarea-expand-btn:hover { color: var(--accent); background: rgba(26,111,244,.08); }
+.textarea-expand-btn:hover { color: var(--accent); border-color: var(--accent); background: #fff; }
 
 /* ── Textarea expand modal ── */
 .textarea-expand-modal { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; }
@@ -853,22 +862,21 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .panel .muted-text { color: var(--gray); }
 
 .profile-delete-bottom { width: 100%; margin-top: 12px; }
-.profile-questions { display: flex; flex-direction: column; gap: 14px; margin-bottom: 10px; }
-.profile-question p { margin: 0 0 8px; font-weight: 600; text-align: center; }
+.profile-questions { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.profile-question { display: flex; align-items: center; gap: 12px; }
+.profile-question p { margin: 0; font-weight: 600; font-size: .88rem; flex: 1; min-width: 0; }
 
 /* ── Dot scale ── */
 .dot-scale-wrap {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 .dot-scale {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
-  justify-content: center;
 }
 .dot-scale-dot {
   width: 10px;
