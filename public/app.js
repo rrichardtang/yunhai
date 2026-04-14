@@ -4988,7 +4988,8 @@ function saveSnapshot() {
     numTravelers: state.numTravelers,
     numChildren: state.numChildren,
     confidenceChecklist: state.confidenceChecklist,
-    confidenceNotificationPrefs: state.confidenceNotificationPrefs
+    confidenceNotificationPrefs: state.confidenceNotificationPrefs,
+    currentItineraryId: state.currentItineraryId || null
   };
   localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(payload));
   syncToServer('snapshot', payload);
@@ -5047,6 +5048,7 @@ function hydrateFromSnapshot(snapshot) {
     : expandDays(state.cities);
   state.arrangeCity = snapshot.arrangeCity || state.days[0]?.city || null;
 
+  state.currentItineraryId = snapshot.currentItineraryId || null;
   state.tripBudget = snapshot.tripBudget ?? null;
   state.numTravelers = snapshot.numTravelers ?? 1;
   state.numChildren = snapshot.numChildren ?? 0;
@@ -5077,12 +5079,16 @@ function renderMyTrips() {
   const trips = [];
 
   if (snapshot) {
-    trips.push({
-      type: 'draft',
-      tripName: snapshot.tripName || 'Untitled Trip',
-      detail: `In-progress draft · Step ${snapshot.currentStep || 3}`,
-      snapshot
-    });
+    const snapshotMatchesSaved = snapshot.currentItineraryId &&
+      state.savedItineraries.some((item) => item.id === snapshot.currentItineraryId);
+    if (!snapshotMatchesSaved) {
+      trips.push({
+        type: 'draft',
+        tripName: snapshot.tripName || 'Untitled Trip',
+        detail: `In-progress draft · Step ${snapshot.currentStep || 3}`,
+        snapshot
+      });
+    }
   }
 
   state.savedItineraries.forEach((item) => {
