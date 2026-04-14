@@ -4,6 +4,23 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-13] Replace profile sliders with dot scale in My Profile
+
+- Replaced `<input type="range">` sliders in My Profile with a 5-dot clickable scale (`public/app.js`)
+- Added dot-scale CSS (`.dot-scale-wrap`, `.dot-scale`, `.dot-scale-dot`, `.dot-scale-label`, `.dot-scale-end-label`) to `public/styles.css`
+- Removed old `.rating-slider`, `.rating-slider-wrap`, `.rating-meta`, `.rating-value`, `.rating-label` styles
+- Dot scale shows low-end label on left, current value label on right; supports click and keyboard (Enter/Space)
+
+## [2026-04-11] Replace Leaflet with Google Maps on activity cards
+
+- Removed Leaflet CSS/JS CDN from `public/planner.html`
+- Updated Google Maps SDK loading to include `marker` library (`public/app.js`, `public/planner.html`)
+- Replaced `ensureMiniMapForCard()` with Google Maps implementation using `AdvancedMarkerElement`
+- Replaced `openActivityMapOverlay()` with Google Maps, `AdvancedMarkerElement`, `InfoWindow`, `LatLngBounds`
+- Renamed `markerIcon()` to `markerContent()` returning DOM element for AdvancedMarkerElement
+- Simplified `destroyMiniMaps()` (Google Maps doesn't need explicit removal)
+- Added `isGoogleMapsReady()` helper
+
 ## [2026-04-13] Polish Confidence Check checklist UI
 
 - Checklist sections reordered: Transportation → Accommodation → Cities (for activity items)

@@ -4472,6 +4472,13 @@ async function loadItineraryById(id) {
     state.itinerary = itinerary;
     state.currentItineraryId = itinerary.id || null;
     state.tripName = itinerary.tripName || state.tripName;
+    state.tripBudget = itinerary.tripBudget ?? state.tripBudget;
+    state.numTravelers = itinerary.numTravelers ?? state.numTravelers;
+    state.numChildren = itinerary.numChildren ?? state.numChildren;
+    if (els.tripName) els.tripName.value = state.tripName;
+    if (els.tripBudget && state.tripBudget != null) els.tripBudget.value = state.tripBudget;
+    if (els.numTravelers) els.numTravelers.value = state.numTravelers;
+    if (els.numChildren) els.numChildren.value = state.numChildren;
     state.confidenceChecklist = Array.isArray(itinerary?.confidence?.checklist)
       ? itinerary.confidence.checklist.map(normalizeChecklistItem)
       : [];
@@ -4646,6 +4653,9 @@ async function generateItinerary() {
 
   const payload = {
     tripName: state.tripName,
+    tripBudget: state.tripBudget,
+    numTravelers: state.numTravelers,
+    numChildren: state.numChildren,
     cities: state.cities,
     travels: state.travels,
     days: byDay,
@@ -4961,6 +4971,7 @@ function saveSnapshot() {
   const budgetVal = parseFloat(els.tripBudget?.value);
   state.tripBudget = Number.isFinite(budgetVal) && budgetVal > 0 ? budgetVal : null;
   state.numTravelers = Math.max(1, parseInt(els.numTravelers?.value, 10) || 1);
+  state.numChildren = Math.max(0, parseInt(els.numChildren?.value, 10) || 0);
 
   const payload = {
     cities: state.cities,
@@ -4975,6 +4986,7 @@ function saveSnapshot() {
     currentStep: state.step,
     tripBudget: state.tripBudget,
     numTravelers: state.numTravelers,
+    numChildren: state.numChildren,
     confidenceChecklist: state.confidenceChecklist,
     confidenceNotificationPrefs: state.confidenceNotificationPrefs
   };
@@ -5037,6 +5049,7 @@ function hydrateFromSnapshot(snapshot) {
 
   state.tripBudget = snapshot.tripBudget ?? null;
   state.numTravelers = snapshot.numTravelers ?? 1;
+  state.numChildren = snapshot.numChildren ?? 0;
   state.confidenceChecklist = Array.isArray(snapshot.confidenceChecklist)
     ? snapshot.confidenceChecklist.map(normalizeChecklistItem)
     : [];
@@ -5045,6 +5058,7 @@ function hydrateFromSnapshot(snapshot) {
   els.tripName.value = state.tripName;
   if (els.tripBudget && state.tripBudget != null) els.tripBudget.value = state.tripBudget;
   if (els.numTravelers) els.numTravelers.value = state.numTravelers;
+  if (els.numChildren) els.numChildren.value = state.numChildren;
   renderCities();
 
   const targetStep = snapshot.currentStep || 3;

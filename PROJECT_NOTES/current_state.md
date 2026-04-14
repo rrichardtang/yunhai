@@ -26,3 +26,4 @@ Confidence Check Mode checklist UI polished and functionally complete:
 ## Next Actions
 - Add visual issue deep-links from confidence step to specific itinerary items/cards
 - Add “reminder before departure” scheduling behavior behind a simple server-side cron/passive worker
+- Verify Google Maps API key has Maps JavaScript API + Map Tiles API enabled in Google Cloud Console
