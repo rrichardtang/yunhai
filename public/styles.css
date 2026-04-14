@@ -54,6 +54,8 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--primary);
   color: var(--text-on-dark);
   border-bottom: none;
+  position: relative;
+  z-index: 100;
 }
 .topbar h1 { margin: 0 0 2px; font-size: 1.15rem; letter-spacing: -0.02em; color: var(--text-on-dark); }
 .topbar p { margin: 0; font-size: .85rem; color: rgba(245,240,235,.6); }
@@ -1195,7 +1197,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   .steps { flex-wrap: wrap; }
   button { min-height: 44px; }
   .modal-card { border-radius: 20px 20px 0 0; max-height: 92vh; position: fixed; bottom: 0; }
-  #chatPanel { width: 100vw; height: 70vh; right: -24px; bottom: 70px; border-radius: 20px 20px 0 0; }
+  #chatPanel { width: 100vw; height: 70vh; right: 0; bottom: 70px; border-radius: 20px 20px 0 0; left: 0; }
 }
 
 /* ── Responsive: Medium (768–1024px) ── */

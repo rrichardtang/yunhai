@@ -1008,7 +1008,7 @@ function updatePlanningStatus(status = '', progress = '') {
   overlay.querySelector('[data-progress]').textContent = progress;
 }
 
-function setStep(n) {
+function setStep(n, { pushHistory = true } = {}) {
   state.step = n;
   if (n > state.maxStep) state.maxStep = n;
   els.steps.forEach((el, i) => {
@@ -1016,9 +1016,19 @@ function setStep(n) {
     el.classList.toggle('reachable', i + 1 <= state.maxStep);
   });
   els.panels.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
+  if (pushHistory) history.pushState({ step: n }, '', '');
   updateStepNavButtons();
   renderConfidence();
 }
+
+window.addEventListener('popstate', (e) => {
+  const step = e.state?.step ?? 1;
+  if (step >= 1 && step <= els.panels.length) {
+    if (step === 4 && state.step !== 4) renderItinerary();
+    if (step === 3 && state.step !== 3) renderArrange();
+    setStep(step, { pushHistory: false });
+  }
+});
 
 function updateStepNavButtons() {
   const activePanel = els.panels[state.step - 1];
@@ -1484,7 +1494,7 @@ function setPlanningLoading(isLoading) {
 
   state.isPlanning = isLoading;
   els.planBtn.disabled = isLoading;
-  els.planBtn.textContent = isLoading ? 'Planning…' : 'Next →';
+  els.planBtn.innerHTML = isLoading ? 'Planning…' : 'Next <i class="ph-bold ph-arrow-right" aria-hidden="true"></i>';
 
   if (!isLoading) {
     overlay.classList.add('hidden');
@@ -2505,8 +2515,8 @@ function renderActivities() {
             <p><strong>Pitfall:</strong> ${esc(a.pitfall || '')}</p>
             <p><strong>Booking advice:</strong> ${esc(a.booking_advice || '')}</p>
             <div class="actions">
-              <button class="${approveBtnClass}">✅ Approve</button>
-              <button class="${declineBtnClass}">❌ Decline</button>
+              <button class="${approveBtnClass}"><i class="ph-bold ph-check-circle" aria-hidden="true"></i> Approve</button>
+              <button class="${declineBtnClass}"><i class="ph-bold ph-x-circle" aria-hidden="true"></i> Decline</button>
             </div>
             <div class="decline-feedback hidden">
               <textarea class="decline-reason" rows="2" maxlength="200" placeholder="Why are you declining? What would you prefer instead? (required)"></textarea>
@@ -2753,7 +2763,7 @@ function mountActivityMapOverlay() {
     <div class="activity-map-shell">
       <div class="activity-map-topbar">
         <strong>Itinerary map</strong>
-        <button class="secondary close-activity-map" type="button">Close ✕</button>
+        <button class="secondary close-activity-map" type="button">Close <i class="ph-bold ph-x" aria-hidden="true"></i></button>
       </div>
       <div class="activity-map-canvas" id="activityMapCanvas"></div>
     </div>
@@ -3130,7 +3140,7 @@ function renderArrangeCityNav(cityGroups) {
 
   const activeIndex = cityGroups.findIndex((g) => normalizeCity(g.city) === normalizeCity(state.arrangeCity));
   els.arrangeCityNav.innerHTML = `
-    <button type="button" class="secondary arrange-city-arrow" data-city-prev ${activeIndex <= 0 ? 'disabled' : ''}>←</button>
+    <button type="button" class="secondary arrange-city-arrow" data-city-prev ${activeIndex <= 0 ? 'disabled' : ''}><i class="ph-bold ph-arrow-left" aria-hidden="true"></i></button>
     <div class="arrange-city-tabs">
       ${cityGroups.map((g) => {
         const start = parseYmdAsLocal(g.days[0].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -3138,7 +3148,7 @@ function renderArrangeCityNav(cityGroups) {
         return `<button type="button" class="arrange-city-tab ${normalizeCity(g.city) === normalizeCity(state.arrangeCity) ? 'active' : ''}" data-city-tab="${esc(g.city)}">${esc(g.city)} (${start}–${end})</button>`;
       }).join('')}
     </div>
-    <button type="button" class="secondary arrange-city-arrow" data-city-next ${activeIndex >= cityGroups.length - 1 ? 'disabled' : ''}>→</button>
+    <button type="button" class="secondary arrange-city-arrow" data-city-next ${activeIndex >= cityGroups.length - 1 ? 'disabled' : ''}><i class="ph-bold ph-arrow-right" aria-hidden="true"></i></button>
   `;
 
   els.arrangeCityNav.querySelectorAll('[data-city-tab]').forEach((btn) => {
@@ -5381,7 +5391,9 @@ function updateCalendarControls() {
   if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = !hasItinerary;
   if (els.syncGoogleCalendarBtn) els.syncGoogleCalendarBtn.disabled = !(hasItinerary && state.googleCalendarConnected);
   if (els.connectGoogleCalendarBtn) {
-    els.connectGoogleCalendarBtn.textContent = state.googleCalendarConnected ? '✅ Google Connected' : '🔐 Connect Google';
+    els.connectGoogleCalendarBtn.innerHTML = state.googleCalendarConnected
+      ? '<i class="ph-bold ph-check-circle" aria-hidden="true"></i> Google Connected'
+      : '<i class="ph-bold ph-lock-key" aria-hidden="true"></i> Connect Google';
   }
 }
 

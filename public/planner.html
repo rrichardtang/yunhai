@@ -74,10 +74,10 @@
             <p class="muted-text">Lightweight, shareable, and ready offline.</p>
           </div>
           <div class="execution-toolbar">
-            <button id="shareMinimalBtn" class="secondary" type="button">🔗 Share</button>
-            <button id="copyMinimalBtn" class="secondary" type="button">📋 Copy</button>
-            <button id="saveOfflineMinimalBtn" class="secondary" type="button">📥 Save Offline</button>
-            <button id="printMinimalBtn" class="secondary" type="button">🖨 Print</button>
+            <button id="shareMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-share-network"></i> Share</button>
+            <button id="copyMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-clipboard"></i> Copy</button>
+            <button id="saveOfflineMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-download-simple"></i> Save Offline</button>
+            <button id="printMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-printer"></i> Print</button>
           </div>
         </div>
         <div id="executionSummary" class="execution-summary"></div>
@@ -106,7 +106,7 @@
         </div>
         <div class="setup-actions">
           <button id="addCityBtn" class="secondary">+ Add City</button>
-          <button id="sortCitiesBtn" class="secondary" type="button">↕ Sort cities by date</button>
+          <button id="sortCitiesBtn" class="secondary" type="button"><i class="ph-bold ph-arrows-down-up"></i> Sort cities by date</button>
         </div>
         <div id="citiesContainer"></div>
         <div id="locationValidationError" class="muted-text warn hidden"></div>
@@ -121,8 +121,8 @@
         </section>
 
         <div class="step-nav sticky-nav step-nav-split">
-          <button class="secondary save-progress-btn" type="button">💾 Save Progress</button>
-          <button id="planBtn" class="primary nav-primary" type="button" data-nav-next="1">Next →</button>
+          <button class="secondary save-progress-btn" type="button"><i class="ph-bold ph-floppy-disk"></i> Save Progress</button>
+          <button id="planBtn" class="primary nav-primary" type="button" data-nav-next="1">Next <i class="ph-bold ph-arrow-right"></i></button>
         </div>
       </section>
 
@@ -141,13 +141,13 @@
             <option value="approved">Approved</option>
             <option value="declined">Declined</option>
           </select>
-          <button id="approveVisibleBtn" class="secondary" type="button">✅ Approve visible</button>
+          <button id="approveVisibleBtn" class="secondary" type="button"><i class="ph-bold ph-check-circle"></i> Approve visible</button>
         </div>
         <div id="activitiesGrid" class="cards-grid"></div>
         <div class="step-nav sticky-nav step-nav-split">
-          <button id="backToSetupBtn" class="secondary nav-secondary" type="button" data-nav-back="2">← Back</button>
-          <button class="secondary save-progress-btn" type="button">💾 Save Progress</button>
-          <button id="continueArrangeBtn" class="primary nav-primary" type="button" data-nav-next="2" title="Approve at least one activity to continue">Next →</button>
+          <button id="backToSetupBtn" class="secondary nav-secondary" type="button" data-nav-back="2"><i class="ph-bold ph-arrow-left"></i> Back</button>
+          <button class="secondary save-progress-btn" type="button"><i class="ph-bold ph-floppy-disk"></i> Save Progress</button>
+          <button id="continueArrangeBtn" class="primary nav-primary" type="button" data-nav-next="2" title="Approve at least one activity to continue">Next <i class="ph-bold ph-arrow-right"></i></button>
           <p id="continueArrangeHint" class="nav-hint muted-text">Approve at least one activity to continue</p>
         </div>
       </section>
@@ -156,7 +156,7 @@
         <div class="between arrange-header">
           <h2>Arrange Approved Activities</h2>
           <div class="arrange-actions">
-            <button id="autoArrangeBtn" class="secondary auto-arrange-btn" type="button">✨ Auto-arrange</button>
+            <button id="autoArrangeBtn" class="secondary auto-arrange-btn" type="button"><i class="ph-bold ph-magic-wand"></i> Auto-arrange</button>
           </div>
         </div>
         <div id="arrangeCityNav" class="arrange-city-nav"></div>
@@ -168,9 +168,9 @@
         <h3>Days</h3>
         <div id="dayColumns" class="day-columns"></div>
         <div class="step-nav sticky-nav step-nav-split">
-          <button id="backToReviewBtn" class="secondary nav-secondary" type="button" data-nav-back="3">← Back</button>
-          <button id="saveProgressBtn" class="secondary save-progress-btn" type="button">💾 Save Progress</button>
-          <button id="generateBtn" class="primary nav-primary" type="button" data-nav-next="3">Next →</button>
+          <button id="backToReviewBtn" class="secondary nav-secondary" type="button" data-nav-back="3"><i class="ph-bold ph-arrow-left"></i> Back</button>
+          <button id="saveProgressBtn" class="secondary save-progress-btn" type="button"><i class="ph-bold ph-floppy-disk"></i> Save Progress</button>
+          <button id="generateBtn" class="primary nav-primary" type="button" data-nav-next="3">Next <i class="ph-bold ph-arrow-right"></i></button>
         </div>
       </section>
 
@@ -183,9 +183,9 @@
               <option value="compact">Compact</option>
               <option value="full">Full</option>
             </select>
-            <button id="downloadCalendarBtn" class="secondary" type="button" disabled>📅 Export .ics</button>
-            <button id="connectGoogleCalendarBtn" class="secondary" type="button">🔐 Connect Google</button>
-            <button id="syncGoogleCalendarBtn" class="secondary" type="button" disabled>🔄 Sync Google</button>
+            <button id="downloadCalendarBtn" class="secondary" type="button" disabled><i class="ph-bold ph-calendar"></i> Export .ics</button>
+            <button id="connectGoogleCalendarBtn" class="secondary" type="button"><i class="ph-bold ph-lock-key"></i> Connect Google</button>
+            <button id="syncGoogleCalendarBtn" class="secondary" type="button" disabled><i class="ph-bold ph-arrows-clockwise"></i> Sync Google</button>
           </div>
         </div>
         <div id="calendarSyncStatus" class="muted-text"></div>
@@ -198,9 +198,9 @@
           <div id="savedItineraries" class="saved-itineraries-list"></div>
         </section>
         <div class="step-nav sticky-nav step-nav-split">
-          <button id="editBtn" class="secondary nav-secondary" type="button" data-nav-back="4">← Back</button>
-          <button class="secondary save-progress-btn" type="button">💾 Save Progress</button>
-          <button class="primary nav-primary" type="button" data-nav-next="4">Next →</button>
+          <button id="editBtn" class="secondary nav-secondary" type="button" data-nav-back="4"><i class="ph-bold ph-arrow-left"></i> Back</button>
+          <button class="secondary save-progress-btn" type="button"><i class="ph-bold ph-floppy-disk"></i> Save Progress</button>
+          <button class="primary nav-primary" type="button" data-nav-next="4">Next <i class="ph-bold ph-arrow-right"></i></button>
         </div>
       </section>
 
@@ -227,8 +227,8 @@
         </section>
 
         <div class="step-nav sticky-nav step-nav-split">
-          <button class="secondary nav-secondary" type="button" data-nav-back="5">← Back</button>
-          <button id="saveConfidenceBtn" class="secondary" type="button">💾 Save Progress</button>
+          <button class="secondary nav-secondary" type="button" data-nav-back="5"><i class="ph-bold ph-arrow-left"></i> Back</button>
+          <button id="saveConfidenceBtn" class="secondary" type="button"><i class="ph-bold ph-floppy-disk"></i> Save Progress</button>
         </div>
       </section>
     </main>
@@ -253,7 +253,7 @@
           <p class="ai-summary-hint">Tell the planner your preferences as a traveler</p>
           <div class="textarea-expand-wrap">
             <textarea id="profileTravelNotes" rows="5" class="profile-textarea-fixed" placeholder="e.g. I'm not a morning person, I have a smaller budget, avoid things with lots of walking..."></textarea>
-            <button class="textarea-expand-btn" type="button" data-expand="profileTravelNotes" data-title="About me" aria-label="Expand About me">⤢</button>
+            <button class="textarea-expand-btn" type="button" data-expand="profileTravelNotes" data-title="About me" aria-label="Expand About me"><i class="ph-bold ph-arrows-out-simple"></i></button>
           </div>
         </section>
 
@@ -262,7 +262,7 @@
           <p class="ai-summary-hint">This is how the planner sees you. Edit if it doesn't feel right.</p>
           <div class="textarea-expand-wrap">
             <textarea id="profileAiSummary" rows="5" class="profile-textarea-fixed" placeholder="Save your profile to generate a summary..."></textarea>
-            <button class="textarea-expand-btn" type="button" data-expand="profileAiSummary" data-title="AI-generated summary" aria-label="Expand AI-generated summary">⤢</button>
+            <button class="textarea-expand-btn" type="button" data-expand="profileAiSummary" data-title="AI-generated summary" aria-label="Expand AI-generated summary"><i class="ph-bold ph-arrows-out-simple"></i></button>
           </div>
         </section>
 
@@ -272,7 +272,7 @@
           <div class="textarea-expand-dialog">
             <div class="textarea-expand-dialog-header">
               <span id="textareaExpandTitle" class="textarea-expand-dialog-title"></span>
-              <button id="textareaExpandClose" class="textarea-expand-close" type="button" aria-label="Close">✕</button>
+              <button id="textareaExpandClose" class="textarea-expand-close" type="button" aria-label="Close"><i class="ph-bold ph-x"></i></button>
             </div>
             <textarea id="textareaExpandEditor" class="textarea-expand-editor"></textarea>
             <div class="textarea-expand-actions">
@@ -281,16 +281,16 @@
           </div>
         </div>
 
-        <button id="deleteProfileBtn" class="secondary profile-delete-bottom" type="button">🗑 Delete</button>
+        <button id="deleteProfileBtn" class="secondary profile-delete-bottom" type="button"><i class="ph-bold ph-trash"></i> Delete</button>
       </div>
     </div>
 
     <div id="chatWidget">
-      <div id="chatBubble">💬</div>
+      <div id="chatBubble"><i class="ph-bold ph-chats"></i></div>
       <div id="chatPanel" class="hidden">
         <div id="chatHeader">
           <span>Travel Assistant</span>
-          <button id="chatClose" type="button">✕</button>
+          <button id="chatClose" type="button"><i class="ph-bold ph-x"></i></button>
         </div>
         <div id="chatMessages"></div>
         <div id="chatInputArea">
