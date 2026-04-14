@@ -14,17 +14,17 @@ test('computeConfidence flags overlapping activities and missing times', () => {
       ]
     }],
     confidence: {
-      checklist: [{ name: 'Hotel', dateTime: '2026-06-01T15:00:00', state: 'needs_booking' }]
+      checklist: [{ type: 'accommodation', city: 'Tokyo', dateTime: '2026-06-01T15:00:00', status: 'open', notes: 'Hotel' }]
     }
   });
 
   assert.equal(result.status, 'Conflicts found');
   assert.ok(result.issues.some((x) => x.type === 'overlapping_activities'));
   assert.ok(result.issues.some((x) => x.type === 'missing_datetime'));
-  assert.equal(result.bookingSummary.counts.needsBooking, 1);
+  assert.equal(result.checklistSummary.counts.open, 1);
 });
 
-test('computeConfidence returns Ready when checklist verified and no issues', () => {
+test('computeConfidence returns Ready when checklist finalized and no issues', () => {
   const result = computeConfidence({
     cities: [{ name: 'Lisbon', startDate: '2026-07-01', endDate: '2026-07-03' }],
     days: [{
@@ -33,19 +33,34 @@ test('computeConfidence returns Ready when checklist verified and no issues', ()
       activities: [{ name: 'Walk', time: '10:00', duration_hours: 2 }]
     }],
     confidence: {
-      checklist: [{ type: 'flight', name: 'Flight', dateTime: '2026-07-01T09:00:00', state: 'verified' }]
+      checklist: [{ type: 'transportation', city: 'Lisbon', dateTime: '2026-07-01T09:00:00', status: 'finalized', notes: 'Flight' }]
     }
   });
 
   assert.equal(result.status, 'Ready');
   assert.equal(result.issueCount, 0);
-  assert.equal(result.bookingSummary.counts.confirmed, 1);
-  assert.equal(result.bookingSummary.groupedChecklist[0].category, 'Travel');
+  assert.equal(result.checklistSummary.counts.finalized, 1);
+  assert.equal(result.checklistSummary.groupedChecklist[0].city, 'Lisbon');
 });
 
-test('computeConfidence auto-seeds critical booking checklist types', () => {
-  const result = computeConfidence({ bookings: [] });
-  assert.ok(result.checklist.length >= 8);
-  assert.ok(result.checklist.some((item) => item.type === 'flight'));
-  assert.ok(result.checklist.some((item) => item.type === 'hotel'));
+test('computeConfidence returns empty checklist when no data provided', () => {
+  const result = computeConfidence({});
+  assert.equal(result.checklist.length, 0);
+});
+
+test('computeConfidence migrates old checklist format', () => {
+  const result = computeConfidence({
+    confidence: {
+      checklist: [
+        { type: 'flight', name: 'SFO to NRT', state: 'verified', dateTime: '2026-06-01', bookingReference: 'ABC123' },
+        { type: 'hotel', name: 'Tokyo Hotel', state: 'needs_booking', dateTime: '2026-06-01' }
+      ]
+    }
+  });
+  assert.equal(result.checklist[0].type, 'transportation');
+  assert.equal(result.checklist[0].status, 'finalized');
+  assert.ok(result.checklist[0].notes.includes('SFO to NRT'));
+  assert.ok(result.checklist[0].notes.includes('ABC123'));
+  assert.equal(result.checklist[1].type, 'accommodation');
+  assert.equal(result.checklist[1].status, 'open');
 });

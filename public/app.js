@@ -1026,103 +1026,111 @@ function updateStepNavButtons() {
   nextButtons.forEach((btn) => btn.classList.toggle('hidden', isLastStep));
 }
 
-const CONFIDENCE_CRITICAL_TYPES = [
-  'flight',
-  'hotel',
-  'car_rental',
-  'train',
-  'attraction',
-  'restaurant',
-  'tour',
-  'transfer'
-];
+const CHECKLIST_TYPES = ['transportation', 'accommodation', 'dining', 'activity', 'other'];
 
-const CONFIDENCE_CATEGORIES = ['Travel', 'Accommodations', 'Tickets', 'Restaurants', 'Other'];
-
-function confidenceLabelForType(type = 'other') {
+function checklistLabelForType(type = 'other') {
   return String(type || 'other').replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-function confidenceCategoryForType(type = 'other') {
-  const value = String(type || 'other').toLowerCase();
-  if (['flight', 'train', 'car_rental', 'transfer'].includes(value)) return 'Travel';
-  if (value === 'hotel') return 'Accommodations';
-  if (['attraction', 'tour'].includes(value)) return 'Tickets';
-  if (value === 'restaurant') return 'Restaurants';
-  return 'Other';
+function migrateChecklistType(type = 'other') {
+  const v = String(type || 'other').toLowerCase();
+  if (['flight', 'train', 'car_rental', 'transfer'].includes(v)) return 'transportation';
+  if (v === 'hotel') return 'accommodation';
+  if (v === 'restaurant') return 'dining';
+  if (['attraction', 'tour'].includes(v)) return 'activity';
+  if (CHECKLIST_TYPES.includes(v)) return v;
+  return 'other';
 }
 
-function confidenceUiStateFromInternal(state = 'needs_booking') {
-  if (state === 'verified') return 'verified';
-  if (state === 'problem') return 'broken';
-  return 'needs_review';
+function migrateChecklistStatus(item = {}) {
+  const v = String(item.state || item.status || 'open').toLowerCase();
+  if (v === 'verified' || v === 'finalized') return 'finalized';
+  return 'open';
 }
 
-function confidenceInternalStateFromUi(uiState = 'needs_review', item = {}) {
-  if (uiState === 'verified') return 'verified';
-  if (uiState === 'broken') return 'problem';
-  return item.dateTime ? 'booked_unverified' : 'needs_booking';
+function mapActivityTypeToChecklist(type = '') {
+  const v = String(type || '').toLowerCase();
+  if (['restaurant', 'food', 'cafe', 'bar', 'dining'].includes(v)) return 'dining';
+  if (['attraction', 'tour', 'museum', 'park', 'landmark', 'entertainment', 'shopping', 'nightlife'].includes(v)) return 'activity';
+  if (['transfer', 'transport'].includes(v)) return 'transportation';
+  return 'activity';
 }
 
-function groupConfidenceChecklist(items = []) {
+function groupChecklistByCity(items = []) {
   const grouped = new Map();
   (Array.isArray(items) ? items : []).forEach((item) => {
-    const category = item.category || confidenceCategoryForType(item.type);
-    const city = String(item.city || item.location || '').trim() || 'General';
-    if (!grouped.has(category)) grouped.set(category, new Map());
-    const byCity = grouped.get(category);
-    if (!byCity.has(city)) byCity.set(city, []);
-    byCity.get(city).push(item);
+    const city = String(item.city || '').trim() || 'General';
+    if (!grouped.has(city)) grouped.set(city, []);
+    grouped.get(city).push(item);
   });
-
-  const categoryOrder = new Map(CONFIDENCE_CATEGORIES.map((c, index) => [c, index]));
   return [...grouped.entries()]
-    .sort((a, b) => (categoryOrder.get(a[0]) ?? 999) - (categoryOrder.get(b[0]) ?? 999))
-    .map(([category, byCity]) => ({
-      category,
-      cities: [...byCity.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([city, cityItems]) => ({ city, items: cityItems }))
-    }));
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([city, items]) => ({ city, items }));
 }
 
-function normalizeConfidenceChecklistItem(item = {}) {
-  const stateValue = String(item.state || item.status || 'needs_booking').toLowerCase();
-  const nextState = ['missing', 'needs_booking', 'booked_unverified', 'verified', 'problem'].includes(stateValue)
-    ? stateValue
-    : (stateValue === 'pending' ? 'needs_booking' : 'needs_booking');
-  const type = String(item.type || 'other').toLowerCase() || 'other';
-  const name = String(item.name || item.title || '').trim() || `${confidenceLabelForType(type)} booking`;
-
+function normalizeChecklistItem(item = {}) {
+  const type = migrateChecklistType(item.type);
+  const status = migrateChecklistStatus(item);
+  const noteParts = [item.name, item.bookingReference, item.notes].map((v) => String(v || '').trim()).filter(Boolean);
   return {
     id: String(item.id || uid()),
     type,
-    category: String(item.category || confidenceCategoryForType(type)),
     city: String(item.city || item.location || '').trim(),
-    name,
     dateTime: String(item.dateTime || item.when || '').trim(),
-    state: nextState,
-    verified: Boolean(item.verified) || nextState === 'verified',
-    source: String(item.source || '').trim(),
-    notes: String(item.notes || '').trim(),
-    bookingReference: String(item.bookingReference || '').trim(),
+    notes: noteParts.join(' — '),
+    status,
     updatedAt: item.updatedAt || new Date().toISOString()
   };
 }
 
-function ensureConfidenceChecklist() {
-  const stored = Array.isArray(state.confidenceChecklist) ? state.confidenceChecklist.map(normalizeConfidenceChecklistItem) : [];
-  const byType = new Set(stored.map((item) => item.type));
-  CONFIDENCE_CRITICAL_TYPES.forEach((type) => {
-    if (!byType.has(type)) {
-      stored.push(normalizeConfidenceChecklistItem({
-        type,
-        name: `${confidenceLabelForType(type)} booking`,
-        state: 'missing',
-        notes: 'Critical reservation item. Add booking details or confirm not needed.'
-      }));
+function buildChecklistFromState() {
+  const existing = Array.isArray(state.confidenceChecklist) ? state.confidenceChecklist.map(normalizeChecklistItem) : [];
+  const keyOf = (item) => `${item.type}|${item.city}|${item.dateTime}`;
+  const existingKeys = new Set(existing.map(keyOf));
+  const items = [...existing];
+
+  // Approved activities
+  (state.activities || []).forEach((a) => {
+    if (!state.reviewed[a.id]?.approved) return;
+    const placement = state.placements[a.id];
+    if (!placement) return;
+    const day = state.days.find((d) => d.id === placement.dayId);
+    if (!day) return;
+    const time = parseTimeTo24(placement.time || a.suggested_time || typeToTime(a.type));
+    const dateTime = day.date && time ? `${day.date}T${time}` : (day.date || '');
+    const item = { type: mapActivityTypeToChecklist(a.type || a.category), city: day.city || '', dateTime, notes: a.name || '', status: 'open' };
+    if (!existingKeys.has(keyOf(item))) {
+      items.push(normalizeChecklistItem(item));
+      existingKeys.add(keyOf(normalizeChecklistItem(item)));
     }
   });
-  state.confidenceChecklist = stored;
-  return stored;
+
+  // Accommodations per city
+  (state.cities || []).forEach((city) => {
+    const acc = city.accommodation || city.logistics?.accommodation;
+    if (!acc || acc.type === 'none') return;
+    const checkIn = acc.checkIn || city.startDate || '';
+    const item = { type: 'accommodation', city: city.name || '', dateTime: checkIn, notes: acc.type ? `${checklistLabelForType(acc.type)}` : '', status: 'open' };
+    if (!existingKeys.has(keyOf(item))) {
+      items.push(normalizeChecklistItem(item));
+      existingKeys.add(keyOf(normalizeChecklistItem(item)));
+    }
+  });
+
+  // Transportation per city
+  (state.cities || []).forEach((city) => {
+    const te = city.travelEntry;
+    if (!te) return;
+    const dateTime = te.dateTime || '';
+    const item = { type: 'transportation', city: city.name || '', dateTime, notes: te.mode ? `${checklistLabelForType(te.mode)}` : '', status: 'open' };
+    if (!existingKeys.has(keyOf(item))) {
+      items.push(normalizeChecklistItem(item));
+      existingKeys.add(keyOf(normalizeChecklistItem(item)));
+    }
+  });
+
+  state.confidenceChecklist = items;
+  return items;
 }
 
 function computeConfidenceLocal() {
@@ -1146,33 +1154,25 @@ function computeConfidenceLocal() {
     if (!city.startDate || !city.endDate) issues.push({ type: 'missing_datetime', message: `${city.name || 'City'} is missing dates.` });
   });
 
-  const checklist = ensureConfidenceChecklist();
+  const checklist = buildChecklistFromState();
   checklist.forEach((item) => {
-    if (!item.dateTime) issues.push({ type: 'missing_details', message: `${item.name} is missing date/time.` });
-    if (item.state === 'problem') issues.push({ type: 'booking_problem', message: `${item.name} is broken and needs a fix now.` });
+    if (!item.dateTime) issues.push({ type: 'missing_details', message: `${checklistLabelForType(item.type)} in ${item.city || 'unknown city'} is missing date/time.` });
   });
 
-  const bookingSummary = {
-    needsBooking: checklist.filter((item) => item.state === 'missing' || item.state === 'needs_booking'),
-    confirmed: checklist.filter((item) => item.state === 'verified'),
-    broken: checklist.filter((item) => item.state === 'problem'),
-    canFixNow: checklist.filter((item) => item.state === 'booked_unverified' || item.state === 'problem' || !item.dateTime)
+  const open = checklist.filter((item) => item.status === 'open');
+  const finalized = checklist.filter((item) => item.status === 'finalized');
+  const checklistSummary = {
+    open,
+    finalized,
+    counts: { open: open.length, finalized: finalized.length, total: checklist.length }
   };
-  bookingSummary.counts = {
-    needsBooking: bookingSummary.needsBooking.length,
-    confirmed: bookingSummary.confirmed.length,
-    broken: bookingSummary.broken.length,
-    canFixNow: bookingSummary.canFixNow.length,
-    total: checklist.length
-  };
-  bookingSummary.groupedChecklist = groupConfidenceChecklist(checklist);
 
-  const hasConflict = issues.some((item) => ['overlapping_activities', 'booking_problem'].includes(item.type));
-  const hasMissing = issues.some((item) => ['missing_datetime', 'missing_details'].includes(item.type)) || bookingSummary.counts.needsBooking > 0;
+  const hasConflict = issues.some((item) => ['overlapping_activities'].includes(item.type));
+  const hasMissing = issues.some((item) => ['missing_datetime', 'missing_details'].includes(item.type)) || checklistSummary.counts.open > 0;
   let status = 'Needs review';
-  if (hasConflict || bookingSummary.counts.broken > 0) status = 'Conflicts found';
+  if (hasConflict) status = 'Conflicts found';
   else if (hasMissing) status = 'Missing details';
-  else if (checklist.length && bookingSummary.counts.confirmed === checklist.length && !issues.length) status = 'Ready';
+  else if (checklist.length && checklistSummary.counts.finalized === checklist.length && !issues.length) status = 'Ready';
 
   return {
     status,
@@ -1180,12 +1180,8 @@ function computeConfidenceLocal() {
     issueCount: issues.length,
     topIssue: issues[0]?.message || 'No issues detected',
     checklist,
-    checklistProgress: { verified: bookingSummary.counts.confirmed, total: checklist.length },
-    bookingSummary,
-    immediateActions: [
-      ...bookingSummary.needsBooking.map((item) => `Book: ${item.name}${item.city ? ` (${item.city})` : ''}`),
-      ...bookingSummary.canFixNow.map((item) => `Fix now: ${item.name}${item.city ? ` (${item.city})` : ''}`)
-    ].slice(0, 6)
+    checklistProgress: { verified: checklistSummary.counts.finalized, total: checklist.length },
+    checklistSummary
   };
 }
 
@@ -1210,25 +1206,18 @@ function renderConfidence() {
   if (els.confidencePopoverProgress) els.confidencePopoverProgress.textContent = `${state.confidence.checklistProgress.verified} of ${state.confidence.checklistProgress.total} items verified`;
 
   if (els.confidenceSummary) {
-    const counts = state.confidence.bookingSummary?.counts || { needsBooking: 0, confirmed: 0, broken: 0, canFixNow: 0, total: 0 };
-    const actions = Array.isArray(state.confidence.immediateActions) ? state.confidence.immediateActions : [];
+    const counts = state.confidence.checklistSummary?.counts || { open: 0, finalized: 0, total: 0 };
     els.confidenceSummary.innerHTML = `
       <article class="itinerary-insight-card">
         <h4>Confidence summary</h4>
         <p><strong>${esc(state.confidence.status)}</strong></p>
         <p>${state.confidence.issueCount} issue${state.confidence.issueCount === 1 ? '' : 's'}</p>
-        <p>${state.confidence.checklistProgress.verified}/${state.confidence.checklistProgress.total} confirmed</p>
+        <p>${counts.finalized}/${counts.total} finalized</p>
       </article>
       <article class="itinerary-insight-card">
-        <h4>Booking state</h4>
-        <p>Still needs booking: <strong>${counts.needsBooking}</strong></p>
-        <p>Confirmed: <strong>${counts.confirmed}</strong></p>
-        <p>Broken: <strong>${counts.broken}</strong></p>
-        <p>Can fix now: <strong>${counts.canFixNow}</strong></p>
-      </article>
-      <article class="itinerary-insight-card">
-        <h4>Fix now</h4>
-        ${actions.length ? `<ul>${actions.map((action) => `<li>${esc(action)}</li>`).join('')}</ul>` : '<p>Nothing urgent right now.</p>'}
+        <h4>Checklist status</h4>
+        <p>Open: <strong>${counts.open}</strong></p>
+        <p>Finalized: <strong>${counts.finalized}</strong></p>
       </article>
     `;
   }
@@ -1239,59 +1228,56 @@ function renderConfidence() {
   }
 
   if (els.confidenceChecklist) {
-    const groupedChecklist = groupConfidenceChecklist(state.confidenceChecklist || []);
+    const cityGroups = groupChecklistByCity(state.confidenceChecklist || []);
     const totalItems = (state.confidenceChecklist || []).length;
+    const parseDT = (dt) => {
+      const s = String(dt || '');
+      const d = s.slice(0, 10);
+      const t = s.length > 10 ? s.slice(11, 16) : '';
+      return { date: d, time: t };
+    };
     els.confidenceChecklist.innerHTML = `
       <div class="confidence-editor-toolbar">
         <strong>Interactive checklist editor</strong>
-        <span>${totalItems} item${totalItems === 1 ? '' : 's'} • click any field to edit instantly</span>
+        <span>${totalItems} item${totalItems === 1 ? '' : 's'}</span>
       </div>
-      ${groupedChecklist.map((group) => `
-        <section class="confidence-group-block">
-          <h4>${esc(group.category)}</h4>
-          ${group.cities.map((cityGroup) => `
-            <div class="confidence-city-block">
-              <h5>${esc(cityGroup.city)}</h5>
-              ${cityGroup.items.map((item, itemIndex) => `
-                <form class="confidence-checklist-row" data-check-item="${esc(item.id)}" onsubmit="return false;">
-                  <div class="confidence-row-title">Item ${itemIndex + 1}</div>
-                  <label class="confidence-field">
-                    <span>Type</span>
-                    <select data-check-type>
-                      ${[...CONFIDENCE_CRITICAL_TYPES, 'other'].map((type) => `<option value="${type}" ${item.type === type ? 'selected' : ''}>${confidenceLabelForType(type)}</option>`).join('')}
-                    </select>
-                  </label>
-                  <label class="confidence-field">
-                    <span>City / location</span>
-                    <input data-check-city value="${esc(item.city || '')}" placeholder="City / location" />
-                  </label>
-                  <label class="confidence-field">
-                    <span>Reservation</span>
-                    <input data-check-name value="${esc(item.name || '')}" placeholder="Reservation name" />
-                  </label>
-                  <label class="confidence-field">
-                    <span>Date / time</span>
-                    <input data-check-datetime value="${esc(item.dateTime || '')}" placeholder="Date/time" />
-                  </label>
-                  <label class="confidence-field">
-                    <span>Status</span>
-                    <select data-check-ui-state>
-                      <option value="needs_review" ${confidenceUiStateFromInternal(item.state) === 'needs_review' ? 'selected' : ''}>Needs review</option>
-                      <option value="verified" ${confidenceUiStateFromInternal(item.state) === 'verified' ? 'selected' : ''}>Verified</option>
-                      <option value="broken" ${confidenceUiStateFromInternal(item.state) === 'broken' ? 'selected' : ''}>Broken</option>
-                    </select>
-                  </label>
-                  <label class="confidence-field confidence-notes-field">
-                    <span>Resolution notes</span>
-                    <textarea data-check-notes rows="2" placeholder="Resolution notes (link, confirmation #, details)">${esc(item.notes || item.bookingReference || '')}</textarea>
-                  </label>
-                  <div class="confidence-row-actions">
-                    <button type="button" class="secondary" data-check-delete>Delete</button>
+      ${cityGroups.map((cityGroup) => `
+        <section class="confidence-city-block">
+          <h4>${esc(cityGroup.city)}</h4>
+          ${cityGroup.items.map((item) => {
+            const dt = parseDT(item.dateTime);
+            return `
+              <form class="confidence-checklist-row" data-check-item="${esc(item.id)}" onsubmit="return false;">
+                <label class="confidence-field">
+                  <span>Type</span>
+                  <select data-check-type>
+                    ${CHECKLIST_TYPES.map((type) => `<option value="${type}" ${item.type === type ? 'selected' : ''}>${checklistLabelForType(type)}</option>`).join('')}
+                  </select>
+                </label>
+                <label class="confidence-field confidence-datetime-field">
+                  <span>Date &amp; time</span>
+                  <div class="confidence-datetime-inputs">
+                    <input type="date" data-check-date value="${esc(dt.date)}" />
+                    <input type="time" data-check-time value="${esc(dt.time)}" />
                   </div>
-                </form>
-              `).join('')}
-            </div>
-          `).join('')}
+                </label>
+                <label class="confidence-field confidence-notes-field">
+                  <span>Notes</span>
+                  <textarea data-check-notes rows="2" placeholder="Any details — confirmation #, links, reminders…">${esc(item.notes || '')}</textarea>
+                </label>
+                <label class="confidence-field">
+                  <span>Status</span>
+                  <select data-check-status>
+                    <option value="open" ${item.status === 'open' ? 'selected' : ''}>Open</option>
+                    <option value="finalized" ${item.status === 'finalized' ? 'selected' : ''}>Finalized</option>
+                  </select>
+                </label>
+                <div class="confidence-row-actions">
+                  <button type="button" class="secondary" data-check-delete>Delete</button>
+                </div>
+              </form>
+            `;
+          }).join('')}
         </section>
       `).join('')}
     `;
@@ -1302,16 +1288,11 @@ function renderConfidence() {
         const item = state.confidenceChecklist.find((x) => x.id === id);
         if (!item) return;
         item.type = row.querySelector('[data-check-type]').value;
-        item.category = confidenceCategoryForType(item.type);
-        item.city = row.querySelector('[data-check-city]').value.trim();
-        item.name = row.querySelector('[data-check-name]').value.trim();
-        item.dateTime = row.querySelector('[data-check-datetime]').value.trim();
-        const uiState = row.querySelector('[data-check-ui-state]').value;
-        item.state = confidenceInternalStateFromUi(uiState, item);
-        item.verified = item.state === 'verified';
+        const dateVal = row.querySelector('[data-check-date]').value.trim();
+        const timeVal = row.querySelector('[data-check-time]').value.trim();
+        item.dateTime = dateVal && timeVal ? `${dateVal}T${timeVal}` : dateVal;
         item.notes = row.querySelector('[data-check-notes]').value.trim();
-        item.bookingReference = '';
-        item.source = '';
+        item.status = row.querySelector('[data-check-status]').value;
         item.updatedAt = new Date().toISOString();
         if (shouldRerender) renderConfidence();
       };
@@ -4431,7 +4412,7 @@ async function loadItineraryById(id) {
     state.currentItineraryId = itinerary.id || null;
     state.tripName = itinerary.tripName || state.tripName;
     state.confidenceChecklist = Array.isArray(itinerary?.confidence?.checklist)
-      ? itinerary.confidence.checklist.map(normalizeConfidenceChecklistItem)
+      ? itinerary.confidence.checklist.map(normalizeChecklistItem)
       : [];
     state.confidenceNotificationPrefs = itinerary?.confidence?.notificationPrefs || state.confidenceNotificationPrefs;
     state.cities = Array.isArray(itinerary.cities)
@@ -4979,7 +4960,7 @@ function hydrateFromSnapshot(snapshot) {
   state.tripBudget = snapshot.tripBudget ?? null;
   state.numTravelers = snapshot.numTravelers ?? 1;
   state.confidenceChecklist = Array.isArray(snapshot.confidenceChecklist)
-    ? snapshot.confidenceChecklist.map(normalizeConfidenceChecklistItem)
+    ? snapshot.confidenceChecklist.map(normalizeChecklistItem)
     : [];
   state.confidenceNotificationPrefs = snapshot.confidenceNotificationPrefs || state.confidenceNotificationPrefs;
 
@@ -5450,18 +5431,7 @@ els.openConfidenceReviewBtn?.addEventListener('click', () => {
   setStep(5);
 });
 els.addChecklistItemBtn?.addEventListener('click', () => {
-  state.confidenceChecklist.push(normalizeConfidenceChecklistItem({
-    id: uid(),
-    type: 'other',
-    category: 'Other',
-    city: '',
-    name: '',
-    dateTime: '',
-    state: 'needs_booking',
-    source: '',
-    notes: '',
-    bookingReference: ''
-  }));
+  state.confidenceChecklist.push(normalizeChecklistItem({ type: 'other', city: '', dateTime: '', notes: '', status: 'open' }));
   renderConfidence();
 });
 els.confidenceEmailSummary?.addEventListener('change', (e) => {
