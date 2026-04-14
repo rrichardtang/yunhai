@@ -356,9 +356,32 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .activity-map-shell { height: 100%; background: #fff; border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; }
 .activity-map-topbar { padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e8ecf2; }
 .activity-map-canvas { flex: 1; min-height: 360px; }
-.activity-map-marker { width: 36px; height: 36px; border-radius: 999px; background: var(--accent); color: #fff; border: 2px solid #fff; box-shadow: 0 3px 12px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; font-size: 16px; }
-.activity-map-marker.star { background: var(--warn); font-size: 18px; }
-.activity-map-marker.logistics-marker { font-size: 16px; }
+.activity-map-marker { width: 38px; height: 38px; border-radius: 999px; background: var(--accent); color: #fff; border: 2.5px solid rgba(255,255,255,0.9); box-shadow: 0 4px 10px rgba(0,0,0,0.28), 0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; }
+.activity-map-marker i { font-size: 17px; line-height: 1; }
+.activity-map-marker.star { background: #f59e0b; box-shadow: 0 4px 12px rgba(245,158,11,0.5), 0 1px 3px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-museum    { background: #6366f1; box-shadow: 0 4px 10px rgba(99,102,241,0.45), 0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-gallery   { background: #ec4899; box-shadow: 0 4px 10px rgba(236,72,153,0.45), 0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-landmark  { background: #8b5cf6; box-shadow: 0 4px 10px rgba(139,92,246,0.45), 0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-park      { background: #22c55e; box-shadow: 0 4px 10px rgba(34,197,94,0.45),  0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-neighborhood { background: #0ea5e9; box-shadow: 0 4px 10px rgba(14,165,233,0.45), 0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-market    { background: #f97316; box-shadow: 0 4px 10px rgba(249,115,22,0.45),  0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-food,
+.activity-map-marker.cat-restaurant,
+.activity-map-marker.cat-lunch     { background: #ef4444; box-shadow: 0 4px 10px rgba(239,68,68,0.45),   0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-breakfast { background: #f59e0b; box-shadow: 0 4px 10px rgba(245,158,11,0.45),  0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-dinner    { background: #be123c; box-shadow: 0 4px 10px rgba(190,18,60,0.45),   0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-nightlife { background: #7c3aed; box-shadow: 0 4px 10px rgba(124,58,237,0.45),  0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-show      { background: #db2777; box-shadow: 0 4px 10px rgba(219,39,119,0.45),  0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-tour      { background: #0891b2; box-shadow: 0 4px 10px rgba(8,145,178,0.45),   0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-walk      { background: #16a34a; box-shadow: 0 4px 10px rgba(22,163,74,0.45),   0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-sunset    { background: #ea580c; box-shadow: 0 4px 10px rgba(234,88,12,0.45),   0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-sports    { background: #16a34a; box-shadow: 0 4px 10px rgba(22,163,74,0.45),   0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-cultural  { background: #d97706; box-shadow: 0 4px 10px rgba(217,119,6,0.45),   0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-shopping  { background: #e11d48; box-shadow: 0 4px 10px rgba(225,29,72,0.45),   0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.cat-spa       { background: #0d9488; box-shadow: 0 4px 10px rgba(13,148,136,0.45),  0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.log-accommodation { background: #0f766e; box-shadow: 0 4px 10px rgba(15,118,110,0.45), 0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.log-arrival   { background: #7c3aed; box-shadow: 0 4px 10px rgba(124,58,237,0.45),  0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
+.activity-map-marker.log-departure { background: #b45309; box-shadow: 0 4px 10px rgba(180,83,9,0.45),    0 1px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25); }
 
 /* ── Notes row ── */
 .notes-row { display: flex; gap: 6px; align-items: flex-start; }

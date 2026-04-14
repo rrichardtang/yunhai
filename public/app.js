@@ -2530,11 +2530,13 @@ function makeMapLabel(activity, activities) {
 }
 
 const CATEGORY_ICONS = {
-  museum: '🏛️', gallery: '🖼️', landmark: '🗿', park: '🌳', neighborhood: '🏘️',
-  market: '🛒', food: '🍴', restaurant: '🍴', breakfast: '☕', lunch: '🍴',
-  dinner: '🍷', nightlife: '🍸', show: '🎭', tour: '🎧', walk: '🚶',
-  sunset: '🌅', sports: '⚽', cultural: '🎨', shopping: '🛍️', spa: '💆',
-  default: '📍'
+  museum: 'ph-columns', gallery: 'ph-paint-brush', landmark: 'ph-buildings',
+  park: 'ph-tree', neighborhood: 'ph-map-trifold', market: 'ph-storefront',
+  food: 'ph-fork-knife', restaurant: 'ph-fork-knife', breakfast: 'ph-coffee',
+  lunch: 'ph-fork-knife', dinner: 'ph-wine', nightlife: 'ph-martini',
+  show: 'ph-ticket', tour: 'ph-compass', walk: 'ph-person-simple-walk',
+  sunset: 'ph-sun-horizon', sports: 'ph-soccer-ball', cultural: 'ph-palette',
+  shopping: 'ph-bag', spa: 'ph-sparkle', default: 'ph-map-pin'
 };
 
 const CATEGORY_HINTS_CLIENT = [
@@ -2560,17 +2562,18 @@ function inferCategoryClient(activity = {}) {
 function markerContent(activity, highlighted = false) {
   const el = document.createElement('div');
   el.className = 'activity-map-marker-wrap';
-  const icon = highlighted ? '★' : (CATEGORY_ICONS[inferCategoryClient(activity)] || CATEGORY_ICONS.default);
-  el.innerHTML = `<div class="activity-map-marker ${highlighted ? 'star' : ''}">${icon}</div>`;
+  const cat = inferCategoryClient(activity);
+  const iconClass = highlighted ? 'ph-star' : (CATEGORY_ICONS[cat] || CATEGORY_ICONS.default);
+  const catClass = highlighted ? 'star' : `cat-${cat}`;
+  el.innerHTML = `<div class="activity-map-marker ${catClass}"><i class="ph-bold ${iconClass}"></i></div>`;
   return el;
 }
 
 function logisticsMarkerContent(type) {
-  const icons = { accommodation: '🏨', arrival: '✈️', departure: '🛫' };
-  const colors = { accommodation: '#0f766e', arrival: '#7c3aed', departure: '#b45309' };
+  const icons = { accommodation: 'ph-bed', arrival: 'ph-airplane-landing', departure: 'ph-airplane-takeoff' };
   const el = document.createElement('div');
   el.className = 'activity-map-marker-wrap';
-  el.innerHTML = `<div class="activity-map-marker logistics-marker" style="background:${colors[type] || '#374151'}">${icons[type] || '📍'}</div>`;
+  el.innerHTML = `<div class="activity-map-marker log-${type}"><i class="ph-bold ${icons[type] || 'ph-map-pin'}"></i></div>`;
   return el;
 }
 
