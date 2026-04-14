@@ -1,5 +1,6 @@
 const state = {
   step: 1,
+  maxStep: 1,
   tripName: '',
   tripBudget: null,
   numTravelers: 1,
@@ -1007,7 +1008,11 @@ function updatePlanningStatus(status = '', progress = '') {
 
 function setStep(n) {
   state.step = n;
-  els.steps.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
+  if (n > state.maxStep) state.maxStep = n;
+  els.steps.forEach((el, i) => {
+    el.classList.toggle('active', i + 1 === n);
+    el.classList.toggle('reachable', i + 1 <= state.maxStep);
+  });
   els.panels.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
   updateStepNavButtons();
   renderConfidence();
@@ -1061,23 +1066,38 @@ function groupChecklist(items = []) {
   const accommodation = [];
   const cityMap = new Map();
 
+  // Pre-seed city map from planned cities so sections always appear in trip order
+  (state.cities || []).forEach((c) => {
+    const name = String(c.name || '').trim();
+    if (name) cityMap.set(name, []);
+  });
+
   (Array.isArray(items) ? items : []).forEach((item) => {
     if (item.type === 'transportation') {
       transportation.push(item);
     } else if (item.type === 'accommodation') {
       accommodation.push(item);
     } else {
-      const city = String(item.city || '').trim() || 'Other';
-      if (!cityMap.has(city)) cityMap.set(city, []);
-      cityMap.get(city).push(item);
+      const city = String(item.city || '').trim();
+      const key = cityMap.has(city) ? city : '';
+      if (!cityMap.has(key)) cityMap.set(key, []);
+      cityMap.get(key).push(item);
     }
   });
 
   const sortByDT = (a, b) => String(a.dateTime || '').localeCompare(String(b.dateTime || ''));
 
-  const cityGroups = [...cityMap.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([city, items]) => ({ label: city, items: [...items].sort(sortByDT) }));
+  // Planned cities come first in trip order; unnamed items trail as "Other"
+  const plannedNames = new Set((state.cities || []).map((c) => String(c.name || '').trim()).filter(Boolean));
+  const cityGroups = [];
+  cityMap.forEach((cityItems, city) => {
+    if (!city) return; // handle below
+    cityGroups.push({ label: city, items: [...cityItems].sort(sortByDT), planned: plannedNames.has(city) });
+  });
+  cityGroups.sort((a, b) => {
+    if (a.planned !== b.planned) return a.planned ? -1 : 1;
+    return a.label.localeCompare(b.label);
+  });
 
   transportation.sort(sortByDT);
   accommodation.sort(sortByDT);
@@ -1085,7 +1105,9 @@ function groupChecklist(items = []) {
   const groups = [];
   if (transportation.length) groups.push({ label: 'Transportation', items: transportation });
   if (accommodation.length) groups.push({ label: 'Accommodation', items: accommodation });
-  groups.push(...cityGroups);
+  groups.push(...cityGroups.map(({ label, items }) => ({ label, items })));
+  const unnamed = cityMap.get('') || [];
+  if (unnamed.length) groups.push({ label: 'Other', items: [...unnamed].sort(sortByDT) });
   return groups;
 }
 
@@ -2150,20 +2172,29 @@ async function fetchArrangeConfig() {
 
 function getActivityStyle(type = '') {
   const normalized = String(type || '').toLowerCase().trim();
+  const ph = (name) => `<i class="ph-bold ${name}" aria-hidden="true"></i>`;
   const map = {
-    food: { icon: '🍴', colorClass: 'activity-food' },
-    breakfast: { icon: '🍴', colorClass: 'activity-food' },
-    lunch: { icon: '🍴', colorClass: 'activity-food' },
-    dinner: { icon: '🍴', colorClass: 'activity-food' },
-    show: { icon: '🎭', colorClass: 'activity-show' },
-    tour: { icon: '🗺️', colorClass: 'activity-tour' },
-    cultural: { icon: '🏛️', colorClass: 'activity-cultural' },
-    walk: { icon: '🚶', colorClass: 'activity-walk' },
-    neighborhood: { icon: '🚶', colorClass: 'activity-neighborhood' },
-    sports: { icon: '⚽', colorClass: 'activity-sports' },
-    sunset: { icon: '🌅', colorClass: 'activity-sunset' }
+    food:         { icon: ph('ph-fork-knife'),          colorClass: 'activity-food' },
+    breakfast:    { icon: ph('ph-coffee'),              colorClass: 'activity-food' },
+    lunch:        { icon: ph('ph-fork-knife'),          colorClass: 'activity-food' },
+    dinner:       { icon: ph('ph-wine'),                colorClass: 'activity-food' },
+    show:         { icon: ph('ph-ticket'),              colorClass: 'activity-show' },
+    tour:         { icon: ph('ph-compass'),             colorClass: 'activity-tour' },
+    cultural:     { icon: ph('ph-palette'),             colorClass: 'activity-cultural' },
+    walk:         { icon: ph('ph-person-simple-walk'),  colorClass: 'activity-walk' },
+    neighborhood: { icon: ph('ph-map-trifold'),         colorClass: 'activity-neighborhood' },
+    sports:       { icon: ph('ph-soccer-ball'),         colorClass: 'activity-sports' },
+    sunset:       { icon: ph('ph-sun-horizon'),         colorClass: 'activity-sunset' },
+    museum:       { icon: ph('ph-columns'),             colorClass: 'activity-cultural' },
+    gallery:      { icon: ph('ph-paint-brush'),         colorClass: 'activity-show' },
+    landmark:     { icon: ph('ph-buildings'),           colorClass: 'activity-tour' },
+    park:         { icon: ph('ph-tree'),                colorClass: 'activity-walk' },
+    market:       { icon: ph('ph-storefront'),          colorClass: 'activity-default' },
+    nightlife:    { icon: ph('ph-martini'),             colorClass: 'activity-show' },
+    shopping:     { icon: ph('ph-bag'),                 colorClass: 'activity-default' },
+    spa:          { icon: ph('ph-sparkle'),             colorClass: 'activity-default' },
   };
-  return map[normalized] || { icon: '📍', colorClass: 'activity-default' };
+  return map[normalized] || { icon: ph('ph-map-pin'), colorClass: 'activity-default' };
 }
 
 
@@ -3408,7 +3439,7 @@ function renderArrange() {
     if (dayLogistics?.isArrival) {
       const arrivalLabel = dayLogistics.arrivalLocation || 'Arrival';
       // 1. Arrival location card
-      html += makeLogisticsCard(`Arrive: ${arrivalLabel}`, '✈️', dayLogistics.arrivalTime);
+      html += makeLogisticsCard(`Arrive: ${arrivalLabel}`, '<i class="ph-bold ph-airplane-landing" aria-hidden="true"></i>', dayLogistics.arrivalTime);
       // 2. Commute: arrival → accommodation
       html += makeLogisticsCommuteIndicator(arrId, arrAccId, dayLogistics.arrivalTime, cardH);
       // 3. Accommodation card (positioned after arrival + commute)
@@ -3416,7 +3447,7 @@ function renderArrange() {
       const arrToAccMins = resolveSelectedCommuteDetails(arrToAccCommute)?.durationMinutes || 0;
       const accArrivalMins = minutesFromTime(dayLogistics.arrivalTime) + arrToAccMins;
       const accArrivalTime = timeFromMinutes(accArrivalMins);
-      html += makeLogisticsCard(accLabel, '🏨', accArrivalTime);
+      html += makeLogisticsCard(accLabel, '<i class="ph-bold ph-bed" aria-hidden="true"></i>', accArrivalTime);
       // 4. Commute: accommodation → first activity
       if (items.length > 0) {
         html += makeLogisticsCommuteIndicator(arrAccId, items[0].id, accArrivalTime, cardH);
@@ -3445,11 +3476,11 @@ function renderArrange() {
       const accToDepMins = resolveSelectedCommuteDetails(accToDepCommute)?.durationMinutes || 0;
       const accDepartureMins = minutesFromTime(dayLogistics.departureTime) - accToDepMins;
       const accDepartureTime = timeFromMinutes(Math.max(0, accDepartureMins));
-      html += makeLogisticsCard(accLabel, '🏨', accDepartureTime);
+      html += makeLogisticsCard(accLabel, '<i class="ph-bold ph-bed" aria-hidden="true"></i>', accDepartureTime);
       // 3. Commute: accommodation → departure
       html += makeLogisticsCommuteIndicator(depAccId, depId, accDepartureTime, cardH);
       // 4. Departure location card
-      html += makeLogisticsCard(`Depart: ${departureLabel}`, '🛫', dayLogistics.departureTime);
+      html += makeLogisticsCard(`Depart: ${departureLabel}`, '<i class="ph-bold ph-airplane-takeoff" aria-hidden="true"></i>', dayLogistics.departureTime);
     }
 
     schedule.innerHTML = html;
@@ -4617,14 +4648,30 @@ async function generateItinerary() {
       notificationPrefs: state.confidenceNotificationPrefs
     }
   };
-  const url = state.currentItineraryId
-    ? `/api/itinerary/${encodeURIComponent(state.currentItineraryId)}`
-    : '/api/itinerary';
-  const res = await apiFetch(url, {
-    method: state.currentItineraryId ? 'PUT' : 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+  let res;
+  if (state.currentItineraryId) {
+    res = await apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.status === 404) {
+      // Stale ID — fall back to creating a new itinerary
+      state.currentItineraryId = null;
+      res = await apiFetch('/api/itinerary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+  } else {
+    res = await apiFetch('/api/itinerary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
+  if (!res.ok) throw new Error('Failed to save itinerary');
   const data = await res.json();
   state.itinerary = data.itinerary;
   state.currentItineraryId = data?.itinerary?.id || null;
@@ -4932,6 +4979,7 @@ function saveSnapshot() {
 
 function resetToFresh() {
   state.step = 1;
+  state.maxStep = 1;
   state.tripName = '';
   state.cities = [];
   state.travels = [];
@@ -5502,6 +5550,16 @@ document.querySelectorAll('[data-nav-back]').forEach((btn) => {
   btn.addEventListener('click', () => {
     const fromStep = Number(btn.dataset.navBack || state.step);
     goToPreviousStep(fromStep);
+  });
+});
+
+els.steps.forEach((el, i) => {
+  el.addEventListener('click', () => {
+    const target = i + 1;
+    if (target === state.step || target > state.maxStep) return;
+    if (target === 4 && state.step !== 4) renderItinerary();
+    if (target === 3 && state.step !== 3) renderArrange();
+    setStep(target);
   });
 });
 
