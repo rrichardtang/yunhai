@@ -1135,7 +1135,10 @@ function buildChecklistFromState() {
   // Approved activities
   (state.activities || []).forEach((a) => {
     if (!state.reviewed[a.id]?.approved) return;
-    if (!['tour', 'attraction'].includes(a.booking_type)) return;
+    const bt = a.booking_type;
+    const requiresBooking = ['tour', 'attraction'].includes(bt) ||
+      (!bt && ['attraction', 'tour', 'museum'].includes(String(a.type || a.category || '').toLowerCase()));
+    if (!requiresBooking) return;
     const placement = state.placements[a.id];
     if (!placement) return;
     const day = state.days.find((d) => d.id === placement.dayId);
@@ -1998,28 +2001,28 @@ function renderPreferencesModal() {
 
   const profile = state.profile;
 
+  const dotsHtml = (active, key) => {
+    const dots = Array.from({ length: 5 }, (_, i) => {
+      const v = i + 1;
+      return `<span class="dot-scale-dot${v === active ? ' active' : ''}" data-value="${v}" aria-label="${v}" role="button" tabindex="0"></span>`;
+    }).join('');
+    const label = key === 'pace' ? pacePrefLabel(active) : profileLabel(active);
+    const lowLabel = key === 'pace' ? 'Relaxed' : 'Not interested';
+    return `
+      <div class="dot-scale-wrap">
+        <span class="dot-scale-end-label">${esc(lowLabel)}</span>
+        <div class="dot-scale" data-rating>${dots}</div>
+        <span class="dot-scale-label">${esc(label)}</span>
+      </div>
+    `;
+  };
+
   els.profileQuestions.innerHTML = PROFILE_QUESTIONS.map((q) => {
     const active = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Number(profile.answers[q.key] || PROFILE_DEFAULT)));
-    const label = q.key === 'pace' ? pacePrefLabel(active) : profileLabel(active);
     return `
       <div class="profile-question" data-question="${esc(q.key)}">
         <p>${esc(q.label)}</p>
-        <div class="rating-slider-wrap">
-          <input
-            type="range"
-            class="rating-slider"
-            min="${PROFILE_MIN}"
-            max="${PROFILE_MAX}"
-            step="1"
-            value="${active}"
-            data-rating
-            aria-label="${esc(q.label)} rating"
-          />
-          <div class="rating-meta">
-            <span class="rating-value">${active}/5</span>
-            <span class="rating-label">${esc(label)}</span>
-          </div>
-        </div>
+        ${dotsHtml(active, q.key)}
       </div>
     `;
   }).join('');
@@ -2038,23 +2041,26 @@ function renderPreferencesModal() {
     }
   }
 
-  els.profileQuestions.querySelectorAll('[data-rating]').forEach((slider) => {
-    slider.addEventListener('input', () => {
-      const key = slider.closest('.profile-question')?.dataset.question;
+  els.profileQuestions.querySelectorAll('[data-rating]').forEach((scaleEl) => {
+    scaleEl.addEventListener('click', (e) => {
+      const dot = e.target.closest('.dot-scale-dot');
+      if (!dot) return;
+      const key = scaleEl.closest('.profile-question')?.dataset.question;
       if (!key) return;
 
-      const nextAnswer = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Number(slider.value || PROFILE_DEFAULT)));
+      const nextAnswer = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Number(dot.dataset.value)));
       state.profile = normalizeProfile({
         ...(state.profile || defaultProfile()),
         answers: { ...(state.profile?.answers || {}), [key]: nextAnswer }
       });
 
-      const question = slider.closest('.profile-question');
-      if (!question) return;
-      const valueEl = question.querySelector('.rating-value');
-      const labelEl = question.querySelector('.rating-label');
-      if (valueEl) valueEl.textContent = `${nextAnswer}/5`;
+      scaleEl.querySelectorAll('.dot-scale-dot').forEach((d) => d.classList.toggle('active', Number(d.dataset.value) === nextAnswer));
+      const labelEl = scaleEl.nextElementSibling;
       if (labelEl) labelEl.textContent = key === 'pace' ? pacePrefLabel(nextAnswer) : profileLabel(nextAnswer);
+    });
+
+    scaleEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') e.target.click();
     });
   });
 }
