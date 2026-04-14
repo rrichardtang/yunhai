@@ -4,6 +4,20 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-14] Full UI overhaul — premium light theme per UI.md design system
+
+- Replaced dark theme (navy bg) with egg-shell light base (#F5F0EB) + navy navigation anchors (#0B2545)
+- Added Plus Jakarta Sans for headings, kept Inter for body; three-tier shadow system (sm/md/lg)
+- Restyled all components per UI.md: pill buttons, outlined secondary buttons, generous card padding, soft shadows, no heavy borders
+- Updated landing page (index.html) Tailwind config and all utility classes to light palette
+- Updated planner.html inline styles for Trip Health panels to use new tokens
+- Rewrote home.css hero gradient for light theme
+- Rewrote confidence.css with new palette tokens
+- Added three-tier responsive breakpoints: compact (<768), medium (768-1024), wide (>1024)
+- 44px min touch targets on compact, bottom-sheet modals on mobile, pill search inputs in chat
+- No functional changes — all IDs, JS class references, and core behavior preserved
+- Files: `public/styles.css`, `public/styles/home.css`, `public/confidence.css`, `public/index.html`, `public/planner.html`
+
 ## [2026-04-14] Trip Health refresh (Confidence Check reposition)
 
 - Reframed Confidence Check UI to Trip Health (same core feature, refreshed IA/UX)

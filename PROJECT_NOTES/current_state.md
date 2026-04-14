@@ -1,21 +1,18 @@
 # Current State
 
-_Last updated: 2026-04-14 (session 8)_
+_Last updated: 2026-04-14 (session 9)_
 
 ## Objective
-Ship Trip Health (refresh of Confidence Check) as an always-on reliability workspace inside TravelPlanner.
+Ship Trip Health as an always-on reliability workspace; overhaul UI to premium light theme per UI.md.
 
 ## Active Workstream
-Trip Health UI refresh shipped on top of existing Confidence Check core:
-- Topbar text badge replaced with Phosphor heartbeat icon entrypoint
-- Step 5 relabeled from Confidence to Trip Health; popover CTA updated
-- Trip Health page reorganized into:
-  1) Health summary (status, open issues, unresolved bookings, verified count, biggest issue)
-  2) Budget summary (checklist running total, trip budget, over/under)
-  3) Editable checklist (expanded direct-entry fields)
-  4) Issue review area with explicit actions (fix/verify/dismiss/note)
-- Checklist data model expanded to include: `name`, `bookingReference`, `verified`, `budgetUsd`, richer status states
-- Confidence API/store path updated to persist `issueMeta` triage annotations
+Full UI overhaul completed per PROJECT_NOTES/UI.md design system:
+- Dark theme replaced with egg-shell light base (#F5F0EB) + navy navigation anchors (#0B2545)
+- Plus Jakarta Sans headings, Inter body, three-tier shadow system (sm/md/lg)
+- All components restyled: buttons (pill-shaped, outlined secondary), cards, inputs, modals, chat, toasts, tooltips
+- Three-tier responsive breakpoints (compact <768, medium 768-1024, wide >1024)
+- Landing page (index.html) fully converted to light theme with Tailwind config updated
+- No functional changes — all IDs, JS class references, and core behavior preserved
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture

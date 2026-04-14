@@ -6,23 +6,23 @@
     <title>TravelPlanner</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/confidence.css" />
     <style>
-      .topbar-actions .confidence-badge { border: 1px solid #dbe5f5; border-radius: 999px; width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: #f8fbff; color: #475569; }
+      .topbar-actions .confidence-badge { border: 1px solid rgba(245,240,235,.2); border-radius: 999px; width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: rgba(245,240,235,.1); color: rgba(245,240,235,.7); }
       .topbar-actions .confidence-badge i { font-size: 18px; }
       .topbar-actions .confidence-badge.ready { color: #166534; border-color: #86efac; background: #dcfce7; }
       .topbar-actions .confidence-badge.needs-review { color: #92400e; border-color: #fcd34d; background: #fef3c7; }
       .topbar-actions .confidence-badge.conflicts-found { color: #991b1b; border-color: #fda4af; background: #fee2e2; }
       .topbar-actions .confidence-badge.missing-details { color: #9f1239; border-color: #fda4af; background: #ffe4e6; }
       .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
-      .trip-health-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
-      .trip-health-summary-card, .confidence-issues-panel, .confidence-checklist-panel { border: 1px solid #dbe5f5; border-radius: 14px; background: #f8fbff; padding: 12px; }
+      .trip-health-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+      .trip-health-summary-card, .confidence-issues-panel, .confidence-checklist-panel { border: 1px solid var(--secondary-light, #E2E8F0); border-radius: 16px; background: var(--base-light, #FAF8F5); padding: 14px; box-shadow: var(--shadow-sm, 0 1px 3px rgba(11,37,69,.06)); }
       .trip-health-metrics p { margin: 6px 0; }
-      .confidence-issue-card { border: 1px solid #d8e2f0; border-radius: 12px; background: #fff; padding: 10px; margin-bottom: 10px; }
+      .confidence-issue-card { border: 1px solid var(--secondary-light, #E2E8F0); border-radius: 14px; background: var(--base-light, #FAF8F5); padding: 12px; margin-bottom: 10px; box-shadow: var(--shadow-sm, 0 1px 3px rgba(11,37,69,.06)); }
       .confidence-issue-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
-      .confidence-issue-card textarea { width: 100%; border: 1px solid #dde3ed; border-radius: 10px; padding: 8px 10px; }
+      .confidence-issue-card textarea { width: 100%; border: 1px solid var(--secondary, #C4CDD5); border-radius: 10px; padding: 8px 10px; background: var(--base-light, #FAF8F5); }
       .confidence-checklist-row { grid-template-columns: repeat(4, minmax(140px, 1fr)); }
       @media (max-width: 1100px) { .trip-health-summary { grid-template-columns: 1fr; } .confidence-checklist-row { grid-template-columns: 1fr 1fr; } }
     </style>
