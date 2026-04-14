@@ -4,6 +4,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-14] Fix snapshot not persisting budget/travelers to saved itinerary
+
+- Root cause: `saveSnapshot()` only wrote to localStorage and server snapshot — never updated the actual itinerary record, so budget/travelers edits were lost on reload
+- Fix: when `currentItineraryId` exists, `saveSnapshot()` now also PUTs tripName, tripBudget, numTravelers, numChildren, and cities to the server itinerary
+- File: `public/app.js`
+
 ## [2026-04-14] Fix snapshot causing duplicate trip on My Trips after editing existing trip
 
 - Root cause: `saveSnapshot()` didn't include `currentItineraryId` in the payload, so a snapshot saved while viewing an existing trip appeared as an orphaned draft — `renderMyTrips` showed it as a separate "Draft" entry alongside the real saved itinerary

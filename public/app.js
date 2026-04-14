@@ -4993,6 +4993,21 @@ function saveSnapshot() {
   };
   localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(payload));
   syncToServer('snapshot', payload);
+
+  if (state.currentItineraryId) {
+    apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tripName: state.tripName,
+        tripBudget: state.tripBudget,
+        numTravelers: state.numTravelers,
+        numChildren: state.numChildren,
+        cities: state.cities
+      })
+    }).catch(() => {});
+  }
+
   showToast('Saved!', 'success');
 }
 
