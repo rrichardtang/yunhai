@@ -54,6 +54,7 @@ const { getSession, setTripContext, addMessage, getHistory, compactHistory, clea
 const { searchForChat, isConfigured: isBraveConfigured, searchActivityPricesBatch, searchActivityPrice } = require('./braveSearch');
 const {
   saveItinerary,
+  updateItinerary,
   getLatestItinerary,
   getItineraryById,
   listItineraries,
@@ -1395,6 +1396,13 @@ app.get('/api/itineraries', (req, res) => {
 app.get('/api/itinerary/:id', (req, res) => {
   const userId = parseUserId(getAuthedUserId(req));
   const itinerary = getItineraryById(req.params.id, userId);
+  if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
+  return res.json({ itinerary });
+});
+
+app.put('/api/itinerary/:id', (req, res) => {
+  const userId = parseUserId(getAuthedUserId(req));
+  const itinerary = updateItinerary(req.params.id, req.body || {}, userId);
   if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
   return res.json({ itinerary });
 });

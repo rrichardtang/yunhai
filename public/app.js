@@ -4612,8 +4612,11 @@ async function generateItinerary() {
       notificationPrefs: state.confidenceNotificationPrefs
     }
   };
-  const res = await apiFetch('/api/itinerary', {
-    method: 'POST',
+  const url = state.currentItineraryId
+    ? `/api/itinerary/${encodeURIComponent(state.currentItineraryId)}`
+    : '/api/itinerary';
+  const res = await apiFetch(url, {
+    method: state.currentItineraryId ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });

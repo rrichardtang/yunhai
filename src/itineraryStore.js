@@ -78,6 +78,27 @@ function saveItinerary(payload = {}, userId) {
   return itinerary;
 }
 
+function updateItinerary(id, payload = {}, userId) {
+  if (!id || !userId) return null;
+  const store = readStore();
+  const idx = store.items.findIndex((item) => item.id === id && item.userId === userId);
+  if (idx === -1) return null;
+
+  const existing = store.items[idx];
+  store.items[idx] = {
+    ...existing,
+    ...payload,
+    id: existing.id,
+    userId: existing.userId,
+    bookings: Array.isArray(payload.bookings) ? payload.bookings : existing.bookings,
+    generatedAt: existing.generatedAt,
+    updatedAt: new Date().toISOString()
+  };
+  store.latestByUser[userId] = id;
+  writeStore(store);
+  return store.items[idx];
+}
+
 function getLatestItinerary(userId) {
   if (!userId) return null;
   const store = readStore();
@@ -174,6 +195,7 @@ function updateItineraryConfidence(id, userId, confidence = {}) {
 
 module.exports = {
   saveItinerary,
+  updateItinerary,
   getLatestItinerary,
   getItineraryById,
   listItineraries,
