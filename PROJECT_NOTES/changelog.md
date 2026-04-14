@@ -4,6 +4,17 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-13] Polish Confidence Check checklist UI
+
+- Checklist sections reordered: Transportation → Accommodation → Cities (for activity items)
+- "General" section eliminated — items with no city fall under their type section or "Other" city group
+- Only activities with `booking_type` of `tour` or `attraction` auto-added (restaurants/none excluded)
+- Items sorted by date/time ascending within each section
+- Each section has its own "+ Add item" button; pre-fills type and city for the section
+- "Conflicts found" card at top lists each issue message; shows "No conflicts found" when clean
+- Removed "Live issues" panel from `planner.html` and all dead references (`confidenceIssuesList`)
+- Files: `public/app.js`, `public/planner.html`
+
 ## [2026-04-13] Simplify checklist editor: 4 fields, auto-populate from itinerary, city-only grouping
 
 - Replaced 9-type / 5-state checklist model with 5 types (transportation, accommodation, dining, activity, other) and 2 statuses (open, finalized)

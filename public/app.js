@@ -163,7 +163,7 @@ const els = {
   confidencePopoverProgress: document.getElementById('confidencePopoverProgress'),
   openConfidenceReviewBtn: document.getElementById('openConfidenceReviewBtn'),
   confidenceSummary: document.getElementById('confidenceSummary'),
-  confidenceIssuesList: document.getElementById('confidenceIssuesList'),
+
   confidenceChecklist: document.getElementById('confidenceChecklist'),
   addChecklistItemBtn: document.getElementById('addChecklistItemBtn'),
   confidenceEmailSummary: document.getElementById('confidenceEmailSummary'),
@@ -1056,16 +1056,37 @@ function mapActivityTypeToChecklist(type = '') {
   return 'activity';
 }
 
-function groupChecklistByCity(items = []) {
-  const grouped = new Map();
+function groupChecklist(items = []) {
+  const transportation = [];
+  const accommodation = [];
+  const cityMap = new Map();
+
   (Array.isArray(items) ? items : []).forEach((item) => {
-    const city = String(item.city || '').trim() || 'General';
-    if (!grouped.has(city)) grouped.set(city, []);
-    grouped.get(city).push(item);
+    if (item.type === 'transportation') {
+      transportation.push(item);
+    } else if (item.type === 'accommodation') {
+      accommodation.push(item);
+    } else {
+      const city = String(item.city || '').trim() || 'Other';
+      if (!cityMap.has(city)) cityMap.set(city, []);
+      cityMap.get(city).push(item);
+    }
   });
-  return [...grouped.entries()]
+
+  const sortByDT = (a, b) => String(a.dateTime || '').localeCompare(String(b.dateTime || ''));
+
+  const cityGroups = [...cityMap.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([city, items]) => ({ city, items }));
+    .map(([city, items]) => ({ label: city, items: [...items].sort(sortByDT) }));
+
+  transportation.sort(sortByDT);
+  accommodation.sort(sortByDT);
+
+  const groups = [];
+  if (transportation.length) groups.push({ label: 'Transportation', items: transportation });
+  if (accommodation.length) groups.push({ label: 'Accommodation', items: accommodation });
+  groups.push(...cityGroups);
+  return groups;
 }
 
 function normalizeChecklistItem(item = {}) {
@@ -1092,6 +1113,7 @@ function buildChecklistFromState() {
   // Approved activities
   (state.activities || []).forEach((a) => {
     if (!state.reviewed[a.id]?.approved) return;
+    if (!['tour', 'attraction'].includes(a.booking_type)) return;
     const placement = state.placements[a.id];
     if (!placement) return;
     const day = state.days.find((d) => d.id === placement.dayId);
@@ -1191,7 +1213,6 @@ function renderConfidence() {
   if (!tripLoaded) {
     if (els.confidenceSummary) els.confidenceSummary.innerHTML = '<p class="muted-text">Load or create a trip to see the confidence check.</p>';
     if (els.confidenceChecklist) els.confidenceChecklist.innerHTML = '';
-    if (els.confidenceIssuesList) els.confidenceIssuesList.innerHTML = '';
     return;
   }
   state.confidence = computeConfidenceLocal();
@@ -1206,29 +1227,17 @@ function renderConfidence() {
   if (els.confidencePopoverProgress) els.confidencePopoverProgress.textContent = `${state.confidence.checklistProgress.verified} of ${state.confidence.checklistProgress.total} items verified`;
 
   if (els.confidenceSummary) {
-    const counts = state.confidence.checklistSummary?.counts || { open: 0, finalized: 0, total: 0 };
-    els.confidenceSummary.innerHTML = `
-      <article class="itinerary-insight-card">
-        <h4>Confidence summary</h4>
-        <p><strong>${esc(state.confidence.status)}</strong></p>
-        <p>${state.confidence.issueCount} issue${state.confidence.issueCount === 1 ? '' : 's'}</p>
-        <p>${counts.finalized}/${counts.total} finalized</p>
-      </article>
-      <article class="itinerary-insight-card">
-        <h4>Checklist status</h4>
-        <p>Open: <strong>${counts.open}</strong></p>
-        <p>Finalized: <strong>${counts.finalized}</strong></p>
-      </article>
-    `;
-  }
-  if (els.confidenceIssuesList) {
-    els.confidenceIssuesList.innerHTML = state.confidence.issues.length
-      ? state.confidence.issues.map((issue) => `<article class="saved-itinerary-item"><p>${esc(issue.message)}</p></article>`).join('')
-      : '<p class="muted-text">No issues detected.</p>';
+    const issues = state.confidence.issues || [];
+    els.confidenceSummary.innerHTML = issues.length
+      ? `<article class="itinerary-insight-card">
+          <h4>Conflicts found</h4>
+          ${issues.map((issue) => `<p>${esc(issue.message)}</p>`).join('')}
+        </article>`
+      : `<article class="itinerary-insight-card"><h4>No conflicts found</h4></article>`;
   }
 
   if (els.confidenceChecklist) {
-    const cityGroups = groupChecklistByCity(state.confidenceChecklist || []);
+    const cityGroups = groupChecklist(state.confidenceChecklist || []);
     const totalItems = (state.confidenceChecklist || []).length;
     const parseDT = (dt) => {
       const s = String(dt || '');
@@ -1243,7 +1252,7 @@ function renderConfidence() {
       </div>
       ${cityGroups.map((cityGroup) => `
         <section class="confidence-city-block">
-          <h4>${esc(cityGroup.city)}</h4>
+          <h4>${esc(cityGroup.label)}</h4>
           ${cityGroup.items.map((item) => {
             const dt = parseDT(item.dateTime);
             return `
@@ -1278,6 +1287,7 @@ function renderConfidence() {
               </form>
             `;
           }).join('')}
+          <button type="button" class="secondary confidence-add-item" data-add-section="${esc(cityGroup.label)}">+ Add item</button>
         </section>
       `).join('')}
     `;
@@ -1306,6 +1316,17 @@ function renderConfidence() {
       });
       row.querySelector('[data-check-delete]')?.addEventListener('click', () => {
         state.confidenceChecklist = state.confidenceChecklist.filter((x) => x.id !== id);
+        renderConfidence();
+      });
+    });
+
+    els.confidenceChecklist.querySelectorAll('[data-add-section]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const section = btn.getAttribute('data-add-section');
+        const typeDefault = section === 'Transportation' ? 'transportation' : section === 'Accommodation' ? 'accommodation' : 'activity';
+        const cityDefault = ['Transportation', 'Accommodation'].includes(section) ? '' : section;
+        const item = normalizeChecklistItem({ id: uid(), type: typeDefault, city: cityDefault, dateTime: '', notes: '', status: 'open' });
+        state.confidenceChecklist = [...(state.confidenceChecklist || []), item];
         renderConfidence();
       });
     });

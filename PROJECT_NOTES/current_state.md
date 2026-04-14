@@ -1,17 +1,18 @@
 # Current State
 
-_Last updated: 2026-04-13 (session 5)_
+_Last updated: 2026-04-13 (session 6)_
 
 ## Objective
 Ship Confidence Check Mode as an always-on reliability layer inside TravelPlanner.
 
 ## Active Workstream
-Simplified checklist editor to 4 fields with auto-population from itinerary data:
-- Checklist now has 5 types (Transportation, Accommodation, Dining, Activity, Other) and 2 statuses (Open, Finalized)
-- Auto-populated from approved activities, city accommodations, and travel entries — no manual re-entry needed
-- Grouped by city only (removed category nesting)
-- Editor fields: Type, Date/Time (native date+time pickers), Notes (freeform), Status
-- Migration logic for old saved checklists (type mapping + field merging)
+Confidence Check Mode checklist UI polished and functionally complete:
+- Sections in order: Transportation → Accommodation → Cities (activities)
+- Only activities with `booking_type` of `tour` or `attraction` are auto-added
+- Items sorted by date/time ascending within each section
+- Each section has an "+ Add item" button; pre-fills type/city for the section
+- "Conflicts found" summary at top lists each issue; "No conflicts found" when clean
+- "Live issues" panel removed
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
