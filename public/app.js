@@ -5096,14 +5096,17 @@ function renderMyTrips() {
   if (snapshot) {
     const snapshotMatchesSaved = snapshot.currentItineraryId &&
       state.savedItineraries.some((item) => item.id === snapshot.currentItineraryId);
-    if (!snapshotMatchesSaved) {
-      trips.push({
-        type: 'draft',
-        tripName: snapshot.tripName || 'Untitled Trip',
-        detail: `In-progress draft · Step ${snapshot.currentStep || 3}`,
-        snapshot
-      });
+    if (snapshotMatchesSaved) {
+      hydrateFromSnapshot(snapshot);
+      els.myTripsPanel.classList.add('hidden');
+      return;
     }
+    trips.push({
+      type: 'draft',
+      tripName: snapshot.tripName || 'Untitled Trip',
+      detail: `In-progress draft · Step ${snapshot.currentStep || 3}`,
+      snapshot
+    });
   }
 
   state.savedItineraries.forEach((item) => {

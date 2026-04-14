@@ -4,10 +4,18 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
-## [2026-04-14] Fix snapshot not persisting budget/travelers to saved itinerary
+## [2026-04-14] Fix budget/travelers lost on reload for existing trips
 
-- Root cause: `saveSnapshot()` only wrote to localStorage and server snapshot — never updated the actual itinerary record, so budget/travelers edits were lost on reload
-- Fix: when `currentItineraryId` exists, `saveSnapshot()` now also PUTs tripName, tripBudget, numTravelers, numChildren, and cities to the server itinerary
+- Root cause: snapshot saved budget/travelers locally but the page reload showed the My Trips list instead of auto-resuming — user had to click "Open" which loaded stale server data
+- Fix 1: `saveSnapshot()` now PUTs trip metadata to the server when `currentItineraryId` exists
+- Fix 2: `renderMyTrips()` now auto-hydrates from the snapshot when it matches a saved itinerary, immediately restoring the user's edits instead of showing the trip list
+- File: `public/app.js`
+
+## [2026-04-14] Fix budget/travelers lost on reload for existing trips
+
+- Root cause: when snapshot matched a saved itinerary, the draft was suppressed from My Trips — user had to click "Open" which loaded stale server data, losing edits
+- Fix 1: `saveSnapshot()` now PUTs trip metadata to the server when `currentItineraryId` exists
+- Fix 2: `renderMyTrips()` auto-hydrates from the snapshot when it matches a saved itinerary, restoring the user's in-progress edits (including the step they were on) instead of forcing them through the trip list
 - File: `public/app.js`
 
 ## [2026-04-14] Fix snapshot causing duplicate trip on My Trips after editing existing trip
