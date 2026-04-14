@@ -54,10 +54,10 @@ const USER_ID_KEY = 'travelplanner_user_id';
 const PROFILE_QUESTIONS = [
   { key: 'museumPerson', label: 'Are you a museum person?', summary: 'Museum person' },
   { key: 'foodTravel', label: 'Do you travel for food?', summary: 'Travels for food' },
-  { key: 'livePerformances', label: 'Do you seek out live performances (concerts, theatre, shows)?', summary: 'Live performances' },
+  { key: 'livePerformances', label: 'Do you enjoy live performances?', summary: 'Live performances' },
   { key: 'outdoorNature', label: 'Do you enjoy outdoor / nature activities?', summary: 'Outdoor / nature activities' },
   { key: 'nightlifeBars', label: 'Are you into nightlife and bars?', summary: 'Nightlife and bars' },
-  { key: 'structuredTours', label: 'Do you like structured tours?', summary: 'Structured tours' },
+  { key: 'structuredTours', label: 'Do you like guided tours?', summary: 'Structured tours' },
   { key: 'pace', label: 'How packed do you like your days?', summary: 'Trip pace' }
 ];
 const PROFILE_MIN = 1;
@@ -1410,6 +1410,7 @@ async function goToNextStep(fromStep = state.step) {
     const step1Changed = state.lastPlannedFingerprint && state.lastPlannedFingerprint !== step1Fingerprint();
 
     if (hasExistingActivities && hasReviewedState && !step1Changed) {
+      syncTripMetaFromInputs();
       setStep(2);
       return;
     }
@@ -1417,6 +1418,7 @@ async function goToNextStep(fromStep = state.step) {
     if (hasExistingActivities && step1Changed) {
       const confirmed = await showRegenerateConfirmDialog();
       if (!confirmed) {
+        syncTripMetaFromInputs();
         setStep(2);
         return;
       }
@@ -4519,12 +4521,16 @@ async function loadItineraryById(id) {
   }
 }
 
-async function planTrip() {
+function syncTripMetaFromInputs() {
   state.tripName = els.tripName.value.trim();
   const budgetVal = parseFloat(els.tripBudget?.value);
   state.tripBudget = Number.isFinite(budgetVal) && budgetVal > 0 ? budgetVal : null;
   state.numTravelers = Math.max(1, parseInt(els.numTravelers?.value, 10) || 1);
   state.numChildren = Math.max(0, parseInt(els.numChildren?.value, 10) || 0);
+}
+
+async function planTrip() {
+  syncTripMetaFromInputs();
   syncLegacyTravelsFromCities();
   const cities = state.cities.map(({name,startDate,endDate,leaveTime,notes,accommodation,travelEntry,logistics}) => ({
     name,
@@ -4634,6 +4640,7 @@ async function planTrip() {
 }
 
 async function generateItinerary() {
+  syncTripMetaFromInputs();
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
   const arranged = approved.map((a) => ({
     ...a,
@@ -4964,11 +4971,7 @@ function clearSnapshot() {
 }
 
 function saveSnapshot() {
-  state.tripName = els.tripName.value.trim();
-  const budgetVal = parseFloat(els.tripBudget?.value);
-  state.tripBudget = Number.isFinite(budgetVal) && budgetVal > 0 ? budgetVal : null;
-  state.numTravelers = Math.max(1, parseInt(els.numTravelers?.value, 10) || 1);
-  state.numChildren = Math.max(0, parseInt(els.numChildren?.value, 10) || 0);
+  syncTripMetaFromInputs();
 
   const payload = {
     cities: state.cities,

@@ -4,6 +4,18 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-14] Fix transit pills lost on Arrange step re-entry
+
+- Root cause: `state.commutes = {}` on every step 2→3 transition wiped all commute data, including user-selected transit modes and previously fetched pills
+- Fix: removed the unconditional `state.commutes = {}` from the step 2→3 path in `goToNextStep()` — commutes are preserved across Review↔Arrange navigation; full resets still occur in `resetToFresh()` and `clearPlannedResultsKeepSetup()`
+- File: `public/app.js`
+
+## [2026-04-14] Fix budget and traveler count not saved correctly
+
+- Root cause: `state.tripBudget`/`numTravelers`/`numChildren` were only read from DOM inputs inside `planTrip()` and `saveSnapshot()`. Two paths in `goToNextStep()` that skip replanning (no-change shortcut, user declines regeneration) went directly to `setStep(2)` without syncing state. `generateItinerary()` then used stale state values.
+- Fix: extracted `syncTripMetaFromInputs()` helper; called at start of all step-advance paths (both shortcut branches, `planTrip`, `generateItinerary`, `saveSnapshot`)
+- File: `public/app.js`
+
 ## [2026-04-13] Replace profile sliders with dot scale in My Profile
 
 - Replaced `<input type="range">` sliders in My Profile with a 5-dot clickable scale (`public/app.js`)
