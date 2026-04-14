@@ -1,18 +1,21 @@
 # Current State
 
-_Last updated: 2026-04-14 (session 7)_
+_Last updated: 2026-04-14 (session 8)_
 
 ## Objective
-Ship Confidence Check Mode as an always-on reliability layer inside TravelPlanner.
+Ship Trip Health (refresh of Confidence Check) as an always-on reliability workspace inside TravelPlanner.
 
 ## Active Workstream
-Confidence Check Mode checklist UI polished and functionally complete:
-- Sections in order: Transportation → Accommodation → Cities (activities)
-- Only activities with `booking_type` of `tour` or `attraction` are auto-added
-- Items sorted by date/time ascending within each section
-- Each section has an "+ Add item" button; pre-fills type/city for the section
-- "Conflicts found" summary at top lists each issue; "No conflicts found" when clean
-- "Live issues" panel removed
+Trip Health UI refresh shipped on top of existing Confidence Check core:
+- Topbar text badge replaced with Phosphor heartbeat icon entrypoint
+- Step 5 relabeled from Confidence to Trip Health; popover CTA updated
+- Trip Health page reorganized into:
+  1) Health summary (status, open issues, unresolved bookings, verified count, biggest issue)
+  2) Budget summary (checklist running total, trip budget, over/under)
+  3) Editable checklist (expanded direct-entry fields)
+  4) Issue review area with explicit actions (fix/verify/dismiss/note)
+- Checklist data model expanded to include: `name`, `bookingReference`, `verified`, `budgetUsd`, richer status states
+- Confidence API/store path updated to persist `issueMeta` triage annotations
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture

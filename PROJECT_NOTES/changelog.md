@@ -4,6 +4,22 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-14] Trip Health refresh (Confidence Check reposition)
+
+- Reframed Confidence Check UI to Trip Health (same core feature, refreshed IA/UX)
+- Replaced topbar text badge with Phosphor heartbeat icon entrypoint and status-tinted state styling
+- Renamed step label and page content from Confidence to Trip Health
+- Reorganized Trip Health into separate surfaces:
+  - health summary (status, open issues, unresolved bookings, verified count, top issue)
+  - budget summary (checklist running total, total budget, over/under)
+  - editable checklist area
+  - issue review area with fix/verify/dismiss/note actions
+- Expanded checklist editor fields: type, location, reservation name, date/time, notes, booking reference, budget USD, status, verified
+- Added issue triage persistence (`confidence.issueMeta`) through snapshot, itinerary payload, and confidence API save route
+- Extended checklist normalization in frontend/server confidence modules to preserve richer fields
+- Updated confidence tests for new status migration model (`resolved`) and richer migrated field expectations
+- Files: `public/planner.html`, `public/app.js`, `src/confidenceCheck.js`, `src/server.js`, `src/confidenceCheck.test.js`, `PROJECT_NOTES/architecture.md`, `PROJECT_NOTES/current_state.md`
+
 ## [2026-04-14] Fix budget/travelers lost on reload for existing trips
 
 - Root cause: snapshot saved budget/travelers locally but the page reload showed the My Trips list instead of auto-resuming — user had to click "Open" which loaded stale server data

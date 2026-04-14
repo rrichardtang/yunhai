@@ -1,6 +1,28 @@
 # Architecture
 
-_Last updated: 2026-04-13_
+_Last updated: 2026-04-14_
+
+## Feature Contract: Trip Health refresh (Confidence Check reposition)
+
+### Objective
+Reframe existing Confidence Check Mode into a standalone Trip Health workspace that remains always accessible, while preserving existing reliability logic and persistence.
+
+### Acceptance Criteria
+1. Top bar replaces text badge with a clean Phosphor icon entrypoint (heartbeat icon) and status tinting.
+2. Step 5 is renamed/reframed as Trip Health and is directly reachable from any planning stage via the topbar entry.
+3. Trip Health page layout is split into: Health summary, Budget summary, editable checklist, issue review area.
+4. Checklist is visibly interactive with direct-edit fields for type, location, reservation title, date/time, status, verified state, notes, booking ref, and budget.
+5. Budget summary live-rolls checklist budgets and compares against trip budget when present.
+6. Issue review exposes explicit actions per issue: fix, verify, dismiss, and add note.
+
+### Non-goals
+- Rebuilding confidence detection logic from scratch
+- Adding new backend services or DB layers
+
+### Design Notes
+- Keep existing `confidence` persistence surface and APIs; extend checklist normalization to preserve richer UI fields.
+- Keep compute logic lightweight and local for immediate feedback while retaining server compatibility.
+- Persist issue review annotations under `confidence.issueMeta` so issue triage survives reload/save.
 
 ## Feature Contract: Confidence Check Mode (MVP)
 
