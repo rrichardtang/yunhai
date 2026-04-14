@@ -1016,13 +1016,15 @@ function setStep(n, { pushHistory = true } = {}) {
     el.classList.toggle('reachable', i + 1 <= state.maxStep);
   });
   els.panels.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
-  if (pushHistory) history.pushState({ step: n }, '', '');
+  if (pushHistory) history.pushState({ spa: true, step: n }, '');
   updateStepNavButtons();
   renderConfidence();
 }
 
 window.addEventListener('popstate', (e) => {
-  const step = e.state?.step ?? 1;
+  // Guard: if there's no SPA state, this is the real page entry — let the browser navigate normally
+  if (!e.state?.spa) return;
+  const step = e.state.step;
   if (step >= 1 && step <= els.panels.length) {
     if (step === 4 && state.step !== 4) renderItinerary();
     if (step === 3 && state.step !== 3) renderArrange();
@@ -5766,6 +5768,9 @@ els.steps.forEach((el, i) => {
     setStep(target);
   });
 });
+
+// Seed the initial history entry so the browser back button never leaves the SPA
+history.replaceState({ spa: true, step: 1 }, '');
 
 (async function init() {
   try {
