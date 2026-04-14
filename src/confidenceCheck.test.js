@@ -58,9 +58,10 @@ test('computeConfidence migrates old checklist format', () => {
     }
   });
   assert.equal(result.checklist[0].type, 'transportation');
-  assert.equal(result.checklist[0].status, 'finalized');
-  assert.ok(result.checklist[0].notes.includes('SFO to NRT'));
-  assert.ok(result.checklist[0].notes.includes('ABC123'));
+  assert.equal(result.checklist[0].status, 'resolved');
+  assert.equal(result.checklist[0].name, 'SFO to NRT');
+  assert.equal(result.checklist[0].bookingReference, 'ABC123');
+  assert.equal(result.checklist[0].verified, true);
   assert.equal(result.checklist[1].type, 'accommodation');
   assert.equal(result.checklist[1].status, 'open');
 });

@@ -45,7 +45,8 @@ const state = {
   confidence: null,
   confidenceChecklist: [],
   confidenceNotificationPrefs: { emailSummary: false, reminderBeforeDeparture: false },
-  confidenceIssueSignatures: []
+  confidenceIssueSignatures: [],
+  confidenceIssueMeta: {}
 };
 
 const PROFILES_KEY = 'travelplanner_profiles_v1';
@@ -164,6 +165,7 @@ const els = {
   confidencePopoverProgress: document.getElementById('confidencePopoverProgress'),
   openConfidenceReviewBtn: document.getElementById('openConfidenceReviewBtn'),
   confidenceSummary: document.getElementById('confidenceSummary'),
+  confidenceIssues: document.getElementById('confidenceIssues'),
 
   confidenceChecklist: document.getElementById('confidenceChecklist'),
   addChecklistItemBtn: document.getElementById('addChecklistItemBtn'),
@@ -1032,6 +1034,7 @@ function updateStepNavButtons() {
 }
 
 const CHECKLIST_TYPES = ['transportation', 'accommodation', 'dining', 'activity', 'other'];
+const CHECKLIST_STATUSES = ['open', 'in_progress', 'resolved'];
 
 function checklistLabelForType(type = 'other') {
   return String(type || 'other').replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
@@ -1049,8 +1052,15 @@ function migrateChecklistType(type = 'other') {
 
 function migrateChecklistStatus(item = {}) {
   const v = String(item.state || item.status || 'open').toLowerCase();
-  if (v === 'verified' || v === 'finalized') return 'finalized';
+  if (['verified', 'finalized', 'resolved'].includes(v)) return 'resolved';
+  if (v === 'in_progress') return 'in_progress';
   return 'open';
+}
+
+function checklistStatusLabel(status = 'open') {
+  if (status === 'in_progress') return 'In progress';
+  if (status === 'resolved') return 'Resolved';
+  return 'Open';
 }
 
 function mapActivityTypeToChecklist(type = '') {
@@ -1114,13 +1124,20 @@ function groupChecklist(items = []) {
 function normalizeChecklistItem(item = {}) {
   const type = migrateChecklistType(item.type);
   const status = migrateChecklistStatus(item);
-  const noteParts = [item.name, item.bookingReference, item.notes].map((v) => String(v || '').trim()).filter(Boolean);
+  const name = String(item.name || item.title || '').trim();
+  const bookingReference = String(item.bookingReference || item.reference || '').trim();
+  const notes = String(item.notes || '').trim();
+  const budgetRaw = Number(item.budgetUsd ?? item.budget ?? item.budget_usd);
   return {
     id: String(item.id || uid()),
     type,
     city: String(item.city || item.location || '').trim(),
+    name,
     dateTime: String(item.dateTime || item.when || '').trim(),
-    notes: noteParts.join(' — '),
+    notes,
+    bookingReference,
+    verified: Boolean(item.verified || status === 'resolved' || item.state === 'verified'),
+    budgetUsd: Number.isFinite(budgetRaw) && budgetRaw >= 0 ? budgetRaw : null,
     status,
     updatedAt: item.updatedAt || new Date().toISOString()
   };
@@ -1145,7 +1162,7 @@ function buildChecklistFromState() {
     if (!day) return;
     const time = parseTimeTo24(placement.time || a.suggested_time || typeToTime(a.type));
     const dateTime = day.date && time ? `${day.date}T${time}` : (day.date || '');
-    const item = { type: mapActivityTypeToChecklist(a.type || a.category), city: day.city || '', dateTime, notes: a.name || '', status: 'open' };
+    const item = { type: mapActivityTypeToChecklist(a.type || a.category), city: day.city || '', name: a.name || '', dateTime, notes: '', bookingReference: '', verified: false, budgetUsd: null, status: 'open' };
     if (!existingKeys.has(keyOf(item))) {
       items.push(normalizeChecklistItem(item));
       existingKeys.add(keyOf(normalizeChecklistItem(item)));
@@ -1157,7 +1174,7 @@ function buildChecklistFromState() {
     const acc = city.accommodation || city.logistics?.accommodation;
     if (!acc || acc.type === 'none') return;
     const checkIn = acc.checkIn || city.startDate || '';
-    const item = { type: 'accommodation', city: city.name || '', dateTime: checkIn, notes: acc.type ? `${checklistLabelForType(acc.type)}` : '', status: 'open' };
+    const item = { type: 'accommodation', city: city.name || '', name: '', dateTime: checkIn, notes: acc.type ? `${checklistLabelForType(acc.type)}` : '', bookingReference: '', verified: false, budgetUsd: null, status: 'open' };
     if (!existingKeys.has(keyOf(item))) {
       items.push(normalizeChecklistItem(item));
       existingKeys.add(keyOf(normalizeChecklistItem(item)));
@@ -1169,7 +1186,7 @@ function buildChecklistFromState() {
     const te = city.travelEntry;
     if (!te) return;
     const dateTime = te.dateTime || '';
-    const item = { type: 'transportation', city: city.name || '', dateTime, notes: te.mode ? `${checklistLabelForType(te.mode)}` : '', status: 'open' };
+    const item = { type: 'transportation', city: city.name || '', name: '', dateTime, notes: te.mode ? `${checklistLabelForType(te.mode)}` : '', bookingReference: '', verified: false, budgetUsd: null, status: 'open' };
     if (!existingKeys.has(keyOf(item))) {
       items.push(normalizeChecklistItem(item));
       existingKeys.add(keyOf(normalizeChecklistItem(item)));
@@ -1206,15 +1223,19 @@ function computeConfidenceLocal() {
     if (!item.dateTime) issues.push({ type: 'missing_details', message: `${checklistLabelForType(item.type)} in ${item.city || 'unknown city'} is missing date/time.` });
   });
 
-  const open = checklist.filter((item) => item.status === 'open');
-  const finalized = checklist.filter((item) => item.status === 'finalized');
+  const open = checklist.filter((item) => item.status !== 'resolved');
+  const finalized = checklist.filter((item) => item.verified || item.status === 'resolved');
   const checklistSummary = {
     open,
     finalized,
     counts: { open: open.length, finalized: finalized.length, total: checklist.length }
   };
 
-  const hasConflict = issues.some((item) => ['overlapping_activities'].includes(item.type));
+  const unresolvedIssues = issues.filter((item) => {
+    const meta = state.confidenceIssueMeta[item.message] || {};
+    return !['verified', 'dismissed'].includes(meta.action);
+  });
+  const hasConflict = unresolvedIssues.some((item) => ['overlapping_activities', 'overlapping_dates', 'conflicting_details'].includes(item.type));
   const hasMissing = issues.some((item) => ['missing_datetime', 'missing_details'].includes(item.type)) || checklistSummary.counts.open > 0;
   let status = 'Needs review';
   if (hasConflict) status = 'Conflicts found';
@@ -1224,8 +1245,9 @@ function computeConfidenceLocal() {
   return {
     status,
     issues,
-    issueCount: issues.length,
-    topIssue: issues[0]?.message || 'No issues detected',
+    unresolvedIssues,
+    issueCount: unresolvedIssues.length,
+    topIssue: unresolvedIssues[0]?.message || 'No issues detected',
     checklist,
     checklistProgress: { verified: checklistSummary.counts.finalized, total: checklist.length },
     checklistSummary
@@ -1236,15 +1258,16 @@ function renderConfidence() {
   const tripLoaded = Boolean(state.currentItineraryId || (state.activities && state.activities.length));
   if (els.confidenceBadge) els.confidenceBadge.classList.toggle('hidden', !tripLoaded);
   if (!tripLoaded) {
-    if (els.confidenceSummary) els.confidenceSummary.innerHTML = '<p class="muted-text">Load or create a trip to see the confidence check.</p>';
+    if (els.confidenceSummary) els.confidenceSummary.innerHTML = '<p class="muted-text">Load or create a trip to open Trip Health.</p>';
     if (els.confidenceChecklist) els.confidenceChecklist.innerHTML = '';
+    if (els.confidenceIssues) els.confidenceIssues.innerHTML = '';
     return;
   }
   state.confidence = computeConfidenceLocal();
   const statusClass = String(state.confidence.status || '').toLowerCase().replace(/\s+/g, '-');
   if (els.confidenceBadge) {
     els.confidenceBadge.className = `confidence-badge ${statusClass}`;
-    els.confidenceBadge.textContent = `${state.confidence.status} · ${state.confidence.issueCount} issues`;
+    els.confidenceBadge.innerHTML = `<i class="ph-bold ph-heartbeat" aria-hidden="true"></i><span class="sr-only">Trip Health: ${esc(state.confidence.status)} · ${state.confidence.issueCount} issues</span>`;
   }
   if (els.confidencePopoverStatus) els.confidencePopoverStatus.innerHTML = `<strong>${esc(state.confidence.status)}</strong>`;
   if (els.confidencePopoverIssues) els.confidencePopoverIssues.textContent = `${state.confidence.issueCount} issue${state.confidence.issueCount === 1 ? '' : 's'}`;
@@ -1252,13 +1275,73 @@ function renderConfidence() {
   if (els.confidencePopoverProgress) els.confidencePopoverProgress.textContent = `${state.confidence.checklistProgress.verified} of ${state.confidence.checklistProgress.total} items verified`;
 
   if (els.confidenceSummary) {
-    const issues = state.confidence.issues || [];
-    els.confidenceSummary.innerHTML = issues.length
-      ? `<article class="itinerary-insight-card">
-          <h4>Conflicts found</h4>
-          ${issues.map((issue) => `<p>${esc(issue.message)}</p>`).join('')}
-        </article>`
-      : `<article class="itinerary-insight-card"><h4>No conflicts found</h4></article>`;
+    const checklist = state.confidenceChecklist || [];
+    const verifiedCount = checklist.filter((item) => item.verified || item.status === 'resolved').length;
+    const unresolvedBookings = checklist.length - verifiedCount;
+    const runningBudget = checklist.reduce((sum, item) => sum + (Number(item.budgetUsd) || 0), 0);
+    const totalBudget = Number(state.tripBudget) || 0;
+    const delta = totalBudget > 0 ? totalBudget - runningBudget : null;
+    els.confidenceSummary.innerHTML = `
+      <section class="trip-health-summary-card">
+        <h3>Health summary</h3>
+        <div class="trip-health-metrics">
+          <p><strong>Status:</strong> ${esc(state.confidence.status)}</p>
+          <p><strong>Open issues:</strong> ${state.confidence.issueCount}</p>
+          <p><strong>Unresolved bookings:</strong> ${unresolvedBookings}</p>
+          <p><strong>Verified items:</strong> ${verifiedCount}</p>
+          <p><strong>Biggest issue:</strong> ${esc(state.confidence.topIssue)}</p>
+        </div>
+      </section>
+      <section class="trip-health-summary-card">
+        <h3>Budget summary</h3>
+        <div class="trip-health-metrics">
+          <p><strong>Checklist running total:</strong> $${runningBudget.toFixed(2)}</p>
+          <p><strong>Total trip budget:</strong> ${totalBudget > 0 ? `$${totalBudget.toFixed(2)}` : 'Not set'}</p>
+          <p><strong>Over / under:</strong> ${delta == null ? 'N/A' : (delta >= 0 ? `$${delta.toFixed(2)} under` : `$${Math.abs(delta).toFixed(2)} over`)}</p>
+        </div>
+      </section>
+    `;
+  }
+
+  if (els.confidenceIssues) {
+    const unresolved = state.confidence.unresolvedIssues || [];
+    els.confidenceIssues.innerHTML = unresolved.length
+      ? unresolved.map((issue) => {
+          const meta = state.confidenceIssueMeta[issue.message] || {};
+          return `<article class="confidence-issue-card" data-issue="${esc(issue.message)}">
+            <p><strong>${esc(issue.message)}</strong></p>
+            <div class="confidence-issue-actions">
+              <button type="button" class="secondary" data-issue-action="fix">Fix</button>
+              <button type="button" class="secondary" data-issue-action="verify">Verify</button>
+              <button type="button" class="secondary" data-issue-action="dismiss">Dismiss</button>
+            </div>
+            <textarea rows="2" data-issue-note placeholder="Add note">${esc(meta.note || '')}</textarea>
+          </article>`;
+        }).join('')
+      : '<p class="muted-text">No unresolved issues.</p>';
+
+    els.confidenceIssues.querySelectorAll('[data-issue]').forEach((node) => {
+      const key = node.getAttribute('data-issue');
+      const setMeta = (patch = {}) => {
+        state.confidenceIssueMeta[key] = { ...(state.confidenceIssueMeta[key] || {}), ...patch };
+        renderConfidence();
+      };
+      node.querySelectorAll('[data-issue-action]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const action = btn.getAttribute('data-issue-action');
+          if (action === 'fix') {
+            const target = document.querySelector('.confidence-checklist-panel');
+            target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+          }
+          if (action === 'verify') setMeta({ action: 'verified' });
+          if (action === 'dismiss') setMeta({ action: 'dismissed' });
+        });
+      });
+      node.querySelector('[data-issue-note]')?.addEventListener('input', (e) => {
+        state.confidenceIssueMeta[key] = { ...(state.confidenceIssueMeta[key] || {}), note: e.target.value };
+      });
+    });
   }
 
   if (els.confidenceChecklist) {
@@ -1295,15 +1378,37 @@ function renderConfidence() {
                     <input type="time" data-check-time value="${esc(dt.time)}" />
                   </div>
                 </label>
+                <label class="confidence-field">
+                  <span>Location</span>
+                  <input data-check-city value="${esc(item.city || '')}" placeholder="City / location" />
+                </label>
+                <label class="confidence-field">
+                  <span>Name / reservation</span>
+                  <input data-check-name value="${esc(item.name || '')}" placeholder="Booking or reservation title" />
+                </label>
                 <label class="confidence-field confidence-notes-field">
                   <span>Notes</span>
                   <textarea data-check-notes rows="2" placeholder="Any details — confirmation #, links, reminders…">${esc(item.notes || '')}</textarea>
                 </label>
                 <label class="confidence-field">
+                  <span>Booking ref (optional)</span>
+                  <input data-check-reference value="${esc(item.bookingReference || '')}" placeholder="Confirmation # / PNR" />
+                </label>
+                <label class="confidence-field">
+                  <span>Budget (USD)</span>
+                  <input type="number" min="0" step="0.01" data-check-budget value="${item.budgetUsd == null ? '' : esc(String(item.budgetUsd))}" placeholder="0.00" />
+                </label>
+                <label class="confidence-field">
                   <span>Status</span>
                   <select data-check-status>
-                    <option value="open" ${item.status === 'open' ? 'selected' : ''}>Open</option>
-                    <option value="finalized" ${item.status === 'finalized' ? 'selected' : ''}>Finalized</option>
+                    ${CHECKLIST_STATUSES.map((status) => `<option value="${status}" ${item.status === status ? 'selected' : ''}>${checklistStatusLabel(status)}</option>`).join('')}
+                  </select>
+                </label>
+                <label class="confidence-field">
+                  <span>Verified</span>
+                  <select data-check-verified>
+                    <option value="false" ${item.verified ? '' : 'selected'}>No</option>
+                    <option value="true" ${item.verified ? 'selected' : ''}>Yes</option>
                   </select>
                 </label>
                 <div class="confidence-row-actions">
@@ -1326,8 +1431,14 @@ function renderConfidence() {
         const dateVal = row.querySelector('[data-check-date]').value.trim();
         const timeVal = row.querySelector('[data-check-time]').value.trim();
         item.dateTime = dateVal && timeVal ? `${dateVal}T${timeVal}` : dateVal;
+        item.city = row.querySelector('[data-check-city]').value.trim();
+        item.name = row.querySelector('[data-check-name]').value.trim();
         item.notes = row.querySelector('[data-check-notes]').value.trim();
+        item.bookingReference = row.querySelector('[data-check-reference]').value.trim();
+        const budgetVal = Number(row.querySelector('[data-check-budget]').value);
+        item.budgetUsd = Number.isFinite(budgetVal) && budgetVal >= 0 ? budgetVal : null;
         item.status = row.querySelector('[data-check-status]').value;
+        item.verified = row.querySelector('[data-check-verified]').value === 'true';
         item.updatedAt = new Date().toISOString();
         if (shouldRerender) renderConfidence();
       };
@@ -1350,7 +1461,7 @@ function renderConfidence() {
         const section = btn.getAttribute('data-add-section');
         const typeDefault = section === 'Transportation' ? 'transportation' : section === 'Accommodation' ? 'accommodation' : 'activity';
         const cityDefault = ['Transportation', 'Accommodation'].includes(section) ? '' : section;
-        const item = normalizeChecklistItem({ id: uid(), type: typeDefault, city: cityDefault, dateTime: '', notes: '', status: 'open' });
+        const item = normalizeChecklistItem({ id: uid(), type: typeDefault, city: cityDefault, name: '', dateTime: '', notes: '', bookingReference: '', budgetUsd: null, verified: false, status: 'open' });
         state.confidenceChecklist = [...(state.confidenceChecklist || []), item];
         renderConfidence();
       });
@@ -1361,7 +1472,7 @@ function renderConfidence() {
     els.confidenceEmailSummary.checked = Boolean(state.confidenceNotificationPrefs?.emailSummary);
   }
 
-  const signatures = state.confidence.issues.map((x) => x.message);
+  const signatures = state.confidence.unresolvedIssues.map((x) => x.message);
   const newlyAdded = signatures.filter((x) => !(state.confidenceIssueSignatures || []).includes(x));
   if (newlyAdded.length) showToast(`Confidence warning: ${newlyAdded[0]}`, 'error');
   state.confidenceIssueSignatures = signatures;
@@ -4482,6 +4593,7 @@ async function loadItineraryById(id) {
       ? itinerary.confidence.checklist.map(normalizeChecklistItem)
       : [];
     state.confidenceNotificationPrefs = itinerary?.confidence?.notificationPrefs || state.confidenceNotificationPrefs;
+    state.confidenceIssueMeta = itinerary?.confidence?.issueMeta || {};
     state.cities = Array.isArray(itinerary.cities)
       ? itinerary.cities.map(normalizeCityData)
       : state.cities;
@@ -4665,7 +4777,8 @@ async function generateItinerary() {
     days: byDay,
     confidence: {
       checklist: state.confidenceChecklist,
-      notificationPrefs: state.confidenceNotificationPrefs
+      notificationPrefs: state.confidenceNotificationPrefs,
+      issueMeta: state.confidenceIssueMeta
     }
   };
   let res;
@@ -4989,6 +5102,7 @@ function saveSnapshot() {
     numChildren: state.numChildren,
     confidenceChecklist: state.confidenceChecklist,
     confidenceNotificationPrefs: state.confidenceNotificationPrefs,
+    confidenceIssueMeta: state.confidenceIssueMeta,
     currentItineraryId: state.currentItineraryId || null
   };
   localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(payload));
@@ -5031,6 +5145,7 @@ function resetToFresh() {
   state.confidenceChecklist = [];
   state.confidence = null;
   state.confidenceIssueSignatures = [];
+  state.confidenceIssueMeta = {};
 
   els.tripName.value = '';
   if (els.reviewSearch) els.reviewSearch.value = '';
@@ -5071,6 +5186,7 @@ function hydrateFromSnapshot(snapshot) {
     ? snapshot.confidenceChecklist.map(normalizeChecklistItem)
     : [];
   state.confidenceNotificationPrefs = snapshot.confidenceNotificationPrefs || state.confidenceNotificationPrefs;
+  state.confidenceIssueMeta = snapshot.confidenceIssueMeta || {};
 
   els.tripName.value = state.tripName;
   if (els.tripBudget && state.tripBudget != null) els.tripBudget.value = state.tripBudget;
@@ -5461,7 +5577,7 @@ document.getElementById('saveConfidenceBtn')?.addEventListener('click', async ()
     const res = await apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/confidence`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ checklist: state.confidenceChecklist, notificationPrefs: state.confidenceNotificationPrefs })
+      body: JSON.stringify({ checklist: state.confidenceChecklist, notificationPrefs: state.confidenceNotificationPrefs, issueMeta: state.confidenceIssueMeta })
     });
     if (!res.ok) throw new Error('Save failed');
     showToast('Saved!', 'success');
@@ -5579,7 +5695,7 @@ els.openConfidenceReviewBtn?.addEventListener('click', () => {
   setStep(5);
 });
 els.addChecklistItemBtn?.addEventListener('click', () => {
-  state.confidenceChecklist.push(normalizeChecklistItem({ type: 'other', city: '', dateTime: '', notes: '', status: 'open' }));
+  state.confidenceChecklist.push(normalizeChecklistItem({ type: 'other', city: '', name: '', dateTime: '', notes: '', bookingReference: '', budgetUsd: null, verified: false, status: 'open' }));
   renderConfidence();
 });
 els.confidenceEmailSummary?.addEventListener('change', (e) => {
@@ -5594,7 +5710,7 @@ els.sendConfidenceEmailBtn?.addEventListener('click', async () => {
     const syncRes = await apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/confidence`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ checklist: state.confidenceChecklist, notificationPrefs: state.confidenceNotificationPrefs })
+      body: JSON.stringify({ checklist: state.confidenceChecklist, notificationPrefs: state.confidenceNotificationPrefs, issueMeta: state.confidenceIssueMeta })
     });
     if (!syncRes.ok) throw new Error('Could not save confidence checklist');
     const emailRes = await apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/confidence/email-summary`, { method: 'POST' });

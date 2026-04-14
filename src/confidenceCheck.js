@@ -34,20 +34,25 @@ function migrateType(raw = 'other') {
 
 function migrateStatus(item = {}) {
   const v = String(item.state || item.status || 'open').toLowerCase();
-  if (v === 'verified' || v === 'finalized') return 'finalized';
+  if (['verified', 'finalized', 'resolved'].includes(v)) return 'resolved';
+  if (v === 'in_progress') return 'in_progress';
   return 'open';
 }
 
 function normalizeChecklistItem(item = {}) {
   const type = migrateType(item.type || item.kind);
   const status = migrateStatus(item);
-  const noteParts = [item.name, item.bookingReference, item.notes].map((v) => String(v || '').trim()).filter(Boolean);
+  const budgetRaw = Number(item.budgetUsd ?? item.budget ?? item.budget_usd);
   return {
     id: String(item.id || `chk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
     type,
     city: String(item.city || item.location || '').trim(),
+    name: String(item.name || item.title || '').trim(),
     dateTime: String(item.dateTime || item.when || item.date || '').trim(),
-    notes: noteParts.join(' — '),
+    notes: String(item.notes || '').trim(),
+    bookingReference: String(item.bookingReference || item.reference || '').trim(),
+    verified: Boolean(item.verified || status === 'resolved' || item.state === 'verified'),
+    budgetUsd: Number.isFinite(budgetRaw) && budgetRaw >= 0 ? budgetRaw : null,
     status,
     updatedAt: item.updatedAt || new Date().toISOString()
   };
@@ -153,8 +158,8 @@ function collectIssues(itinerary = {}, checklist = []) {
 }
 
 function deriveChecklistSummary(checklist = []) {
-  const open = checklist.filter((item) => item.status === 'open');
-  const finalized = checklist.filter((item) => item.status === 'finalized');
+  const open = checklist.filter((item) => item.status !== 'resolved');
+  const finalized = checklist.filter((item) => item.status === 'resolved' || item.verified);
   return {
     open,
     finalized,

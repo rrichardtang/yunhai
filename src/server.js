@@ -1434,8 +1434,11 @@ app.put('/api/itinerary/:id/confidence', (req, res) => {
     emailSummary: Boolean(req.body?.notificationPrefs?.emailSummary),
     reminderBeforeDeparture: Boolean(req.body?.notificationPrefs?.reminderBeforeDeparture)
   };
+  const issueMeta = req.body?.issueMeta && typeof req.body.issueMeta === 'object'
+    ? req.body.issueMeta
+    : (itinerary?.confidence?.issueMeta || {});
 
-  const updated = updateItineraryConfidence(req.params.id, userId, { checklist, notificationPrefs });
+  const updated = updateItineraryConfidence(req.params.id, userId, { checklist, notificationPrefs, issueMeta });
   const confidence = computeConfidence(updated || itinerary);
   return res.json({ ok: true, confidence });
 });
