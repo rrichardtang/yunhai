@@ -1009,6 +1009,7 @@ function updatePlanningStatus(status = '', progress = '') {
 }
 
 function setStep(n, { pushHistory = true } = {}) {
+  const prev = state.step;
   state.step = n;
   if (n > state.maxStep) state.maxStep = n;
   els.steps.forEach((el, i) => {
@@ -1017,17 +1018,23 @@ function setStep(n, { pushHistory = true } = {}) {
   });
   els.panels.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
   if (pushHistory) history.pushState({ spa: true, step: n }, '');
+
+  // Ensure the target step's content is rendered regardless of navigation source
+  if (n !== prev) {
+    if (n === 1) renderCities();
+    if (n === 2) renderActivities();
+    if (n === 3) renderArrange();
+    if (n === 4) renderItinerary();
+  }
+
   updateStepNavButtons();
   renderConfidence();
 }
 
 window.addEventListener('popstate', (e) => {
-  // Guard: if there's no SPA state, this is the real page entry — let the browser navigate normally
   if (!e.state?.spa) return;
   const step = e.state.step;
   if (step >= 1 && step <= els.panels.length) {
-    if (step === 4 && state.step !== 4) renderItinerary();
-    if (step === 3 && state.step !== 3) renderArrange();
     setStep(step, { pushHistory: false });
   }
 });
@@ -1568,7 +1575,6 @@ async function goToNextStep(fromStep = state.step) {
     approved.forEach((a) => {
       state.placements[a.id] = state.placements[a.id] || { dayId: null, time: parseTimeTo24(a.suggested_time || typeToTime(a.type)) };
     });
-    renderArrange();
     setStep(3);
     return;
   }
@@ -1589,8 +1595,6 @@ async function goToNextStep(fromStep = state.step) {
 
 function goToPreviousStep(fromStep = state.step) {
   if (fromStep <= 1) return;
-  if (fromStep === 4) renderArrange();
-  if (fromStep === 5) renderItinerary();
   setStep(fromStep - 1);
 }
 
@@ -5763,8 +5767,6 @@ els.steps.forEach((el, i) => {
   el.addEventListener('click', () => {
     const target = i + 1;
     if (target === state.step || target > state.maxStep) return;
-    if (target === 4 && state.step !== 4) renderItinerary();
-    if (target === 3 && state.step !== 3) renderArrange();
     setStep(target);
   });
 });

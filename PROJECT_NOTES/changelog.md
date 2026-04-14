@@ -4,6 +4,21 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-14] Fix structural navigation bug — setStep() as single source of truth for step rendering
+
+- Root cause: 3 independent navigation systems (Next/Back buttons, step tab clicks, browser back/popstate) each had their own ad-hoc render logic; step tabs and browser back only handled steps 3/4, never step 2 — navigating to Review via tab or browser back showed a blank/stale panel
+- Fix: `setStep()` now owns all step-entry rendering (`renderCities` for step 1, `renderActivities` for step 2, `renderArrange` for step 3, `renderItinerary` for step 4) gated on `n !== prev`
+- Removed redundant render calls from `goToPreviousStep()`, step tab click handler, and `popstate` handler — all three now just call `setStep()`
+- File: `public/app.js`
+
+## [2026-04-14] Fix mobile navigation and layout bugs (iOS WebKit / Brave on iPhone)
+
+- Back button caused full page reload on iOS: added `history.replaceState({ spa: true, step: 1 })` seed at init; `setStep()` now calls `pushState({ spa: true, step: n }, '')` (null URL, no address bar change); `popstate` handler guards on `e.state?.spa` to prevent real navigation
+- Header buttons unclickable on mobile: added `position: relative; z-index: 100` to `.topbar`
+- Chat concierge panel shifted off-screen: changed mobile `#chatPanel` from `right: -24px` to `right: 0; left: 0`
+- City card row layout collapsed to unlabeled stacked fields: replaced `grid-template-columns: 1fr` with explicit `nth-child` grid placement — toggle+city+remove on row 1, dates side-by-side on row 2, notes full-width on row 3
+- Files: `public/app.js`, `public/styles.css`
+
 ## [2026-04-14] Full UI overhaul — premium light theme per UI.md design system
 
 - Replaced dark theme (navy bg) with egg-shell light base (#F5F0EB) + navy navigation anchors (#0B2545)
