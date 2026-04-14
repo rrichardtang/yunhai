@@ -1438,7 +1438,6 @@ async function goToNextStep(fromStep = state.step) {
   if (fromStep === 2) {
     const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
     if (!approved.length) return;
-    state.commutes = {};
     state.days = expandDays(state.cities);
     state.arrangeCity = state.days[0]?.city || null;
     approved.forEach((a) => {
@@ -2007,10 +2006,8 @@ function renderPreferencesModal() {
       return `<span class="dot-scale-dot${v === active ? ' active' : ''}" data-value="${v}" aria-label="${v}" role="button" tabindex="0"></span>`;
     }).join('');
     const label = key === 'pace' ? pacePrefLabel(active) : profileLabel(active);
-    const lowLabel = key === 'pace' ? 'Relaxed' : 'Not interested';
     return `
       <div class="dot-scale-wrap">
-        <span class="dot-scale-end-label">${esc(lowLabel)}</span>
         <div class="dot-scale" data-rating>${dots}</div>
         <span class="dot-scale-label">${esc(label)}</span>
       </div>
@@ -5467,6 +5464,38 @@ els.preferencesLink.addEventListener('click', openPreferencesModal);
 els.prefsClose.addEventListener('click', closePreferencesModal);
 els.prefsModal.addEventListener('click', (e) => {
   if (e.target === els.prefsModal) closePreferencesModal();
+});
+
+// Textarea expand modal
+const expandModal = document.getElementById('textareaExpandModal');
+const expandTitle = document.getElementById('textareaExpandTitle');
+const expandEditor = document.getElementById('textareaExpandEditor');
+let expandTargetId = null;
+
+function openExpandModal(targetId, title) {
+  expandTargetId = targetId;
+  expandTitle.textContent = title;
+  expandEditor.value = document.getElementById(targetId)?.value || '';
+  expandModal.classList.remove('hidden');
+  expandEditor.focus();
+}
+
+function closeExpandModal(save) {
+  if (save && expandTargetId) {
+    const target = document.getElementById(expandTargetId);
+    if (target) target.value = expandEditor.value;
+  }
+  expandModal.classList.add('hidden');
+  expandTargetId = null;
+}
+
+document.getElementById('textareaExpandClose').addEventListener('click', () => closeExpandModal(false));
+document.getElementById('textareaExpandSave').addEventListener('click', () => closeExpandModal(true));
+expandModal.querySelector('.textarea-expand-backdrop').addEventListener('click', () => closeExpandModal(false));
+expandModal.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeExpandModal(false); });
+
+document.querySelectorAll('.textarea-expand-btn').forEach((btn) => {
+  btn.addEventListener('click', () => openExpandModal(btn.dataset.expand, btn.dataset.title));
 });
 els.profileEditBtn.addEventListener('click', async () => {
   const next = getProfilePayload();
