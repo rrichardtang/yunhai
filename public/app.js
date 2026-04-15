@@ -2730,7 +2730,64 @@ function renderActivities() {
       openActivityMapOverlay(a.id);
     });
 
+    // Mobile: tap card to expand fullscreen
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('button, a, textarea, input, .decline-feedback')) return;
+        openCardExpand(a, card);
+      });
+    }
+
     return card;
+  }
+
+  function openCardExpand(a, sourceCard) {
+    const existing = document.querySelector('.card-expand-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'card-expand-overlay';
+
+    // Clone the front face content for the expanded view
+    const front = sourceCard.querySelector('.activity-card-front');
+    if (!front) return;
+
+    const body = document.createElement('div');
+    body.className = 'card-expand-body';
+    body.innerHTML = front.innerHTML;
+    // Ensure all content visible in expanded view
+    body.querySelectorAll('.card-content > *').forEach((el) => { el.style.display = ''; });
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'card-expand-close';
+    closeBtn.innerHTML = '<i class="ph-bold ph-x" aria-hidden="true"></i>';
+    closeBtn.setAttribute('aria-label', 'Close');
+
+    overlay.appendChild(closeBtn);
+    overlay.appendChild(body);
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    function close() {
+      overlay.classList.add('closing');
+      document.body.style.overflow = '';
+      overlay.addEventListener('animationend', () => overlay.remove(), { once: true });
+    }
+    closeBtn.addEventListener('click', close);
+
+    // Wire up approve/decline/notes in the expanded view back to the source card
+    body.querySelector('.approve')?.addEventListener('click', () => {
+      sourceCard.querySelector('.approve')?.click();
+      close();
+    });
+    body.querySelector('.decline')?.addEventListener('click', () => {
+      sourceCard.querySelector('.decline')?.click();
+      close();
+    });
+    body.querySelector('.flip-btn')?.addEventListener('click', () => {
+      close();
+      openActivityMapOverlay(a.id);
+    });
   }
 }
 
