@@ -2182,13 +2182,15 @@ async function goToNextStep(fromStep = state.step) {
       return;
     }
 
+    let citiesToRegenerate = null;
     if (hasExistingActivities && step1Changed) {
-      const confirmed = await showRegenerateConfirmDialog();
-      if (!confirmed) {
+      const selected = await showRegenerateConfirmDialog();
+      if (!selected) {
         syncTripMetaFromInputs();
         setStep(2);
         return;
       }
+      citiesToRegenerate = selected;
     }
 
     if (!validateLocationsBeforePlanning()) {
@@ -2196,9 +2198,9 @@ async function goToNextStep(fromStep = state.step) {
       return;
     }
     clearSnapshot();
-    clearPlannedResultsKeepSetup();
+    if (!citiesToRegenerate) clearPlannedResultsKeepSetup();
     setPlanningLoading(true);
-    try { await planTrip(); }
+    try { await planTrip(citiesToRegenerate); }
     catch (e) { showToast(e?.message || 'Failed to plan trip.', 'error'); }
     finally { setPlanningLoading(false); }
     return;
@@ -5465,10 +5467,10 @@ function syncTripMetaFromInputs() {
   state.numChildren = Math.max(0, parseInt(els.numChildren?.value, 10) || 0);
 }
 
-async function planTrip() {
+async function planTrip(citiesToRegenerate = null) {
   syncTripMetaFromInputs();
   syncLegacyTravelsFromCities();
-  const cities = state.cities.map(({name,startDate,endDate,leaveTime,notes,accommodation,travelEntry,logistics}) => ({
+  const allCities = state.cities.map(({name,startDate,endDate,leaveTime,notes,accommodation,travelEntry,logistics}) => ({
     name,
     startDate,
     endDate,
@@ -5479,10 +5481,23 @@ async function planTrip() {
     travelEntry: travelEntry ? { ...travelEntry } : null
   }));
   const travels = state.travels.map((travel) => ({ ...travel }));
+
+  // When regenerating only specific cities, keep existing activities for unselected cities
+  const regenSet = citiesToRegenerate ? new Set(citiesToRegenerate) : null;
+  const cities = regenSet ? allCities.filter((c) => regenSet.has(c.name)) : allCities;
+  if (regenSet) {
+    state.activities = state.activities.filter((a) => !regenSet.has(a.city));
+    Object.keys(state.reviewed).forEach((id) => {
+      const act = state.activities.find((a) => a.id === id);
+      if (!act) delete state.reviewed[id];
+    });
+  } else {
+    state.activities = [];
+    state.reviewed = {};
+  }
+
   const payload = { cities, travels, profile: state.profile || loadProfile(), userId: ensureUserId(), budget: state.tripBudget, numTravelers: state.numTravelers, numChildren: state.numChildren };
 
-  state.activities = [];
-  state.reviewed = {};
   renderActivities();
 
   const res = await apiFetch('/api/plan', {
@@ -5851,21 +5866,39 @@ function showRegenerateConfirmDialog() {
     const existing = document.getElementById('regenerateConfirmDialog');
     if (existing) existing.remove();
 
+    const cities = state.cities.map((c) => c.name);
+    const cityCheckboxes = cities.map((name, i) => `
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
+        <input type="checkbox" class="regen-city-cb" data-index="${i}" checked style="width:16px;height:16px;cursor:pointer">
+        <span>${esc(name)}</span>
+      </label>`).join('');
+
     const dialog = document.createElement('div');
     dialog.id = 'regenerateConfirmDialog';
     dialog.className = 'modal';
     dialog.innerHTML = `
-      <div class="modal-card" style="max-width:380px;text-align:center;gap:16px">
-        <h3 style="margin:0">Trip modified</h3>
-        <p class="muted-text" style="margin:0">Your trip settings have changed. Do you want to regenerate the itinerary?</p>
-        <div style="display:flex;gap:10px;justify-content:center">
-          <button id="regenNo" class="secondary" type="button">No, keep existing</button>
-          <button id="regenYes" class="primary" type="button">Yes, regenerate</button>
+      <div class="modal-card" style="max-width:400px;gap:16px">
+        <h3 style="margin:0">Regenerate trip</h3>
+        <p class="muted-text" style="margin:0">Your trip settings have changed. Select which cities to regenerate:</p>
+        <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">${cityCheckboxes}</div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+          <button id="regenNo" class="secondary" type="button">Cancel</button>
+          <button id="regenYes" class="primary" type="button">Regenerate selected</button>
         </div>
       </div>`;
     document.body.appendChild(dialog);
     refreshOverlayInterlocks();
 
+<<<<<<< HEAD
+    const cleanup = (result) => { dialog.remove(); resolve(result); };
+
+    dialog.querySelector('#regenYes').addEventListener('click', () => {
+      const checked = [...dialog.querySelectorAll('.regen-city-cb:checked')].map((cb) => cities[parseInt(cb.dataset.index, 10)]);
+      cleanup(checked.length ? checked : null);
+    });
+    dialog.querySelector('#regenNo').addEventListener('click', () => cleanup(null));
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(null); });
+=======
     const cleanup = (result) => {
       dialog.remove();
       refreshOverlayInterlocks();
@@ -5874,6 +5907,7 @@ function showRegenerateConfirmDialog() {
     dialog.querySelector('#regenYes').addEventListener('click', () => cleanup(true));
     dialog.querySelector('#regenNo').addEventListener('click', () => cleanup(false));
     dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(false); });
+>>>>>>> 922fc86879c16ff76b92ee635eb143853142c26c
   });
 }
 
