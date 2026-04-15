@@ -1,12 +1,12 @@
 # Current State
 
-_Last updated: 2026-04-14 (session 12)_
+_Last updated: 2026-04-15_
 
 ## Objective
-Mobile experience polish — fix navigation bugs and responsive layout issues on iOS WebKit (Brave on iPhone).
+Activity card UX polish — decline flow improvements and mobile card interaction fixes.
 
 ## Active Workstream
-All mobile fixes complete and pushed. Latest fix addresses mobile UI scaling: buttons too large, fields clipped, and chat panel cut off — all caused by missing or incorrect mobile CSS overrides in `styles.css`.
+All changes complete and pushed. This session: replaced Cancel with Save Notes on decline flow, switched checkmark to Phosphor floppy-disk icon, fixed mobile map button position, added full-screen map overlay close button on mobile, and fixed approve/decline buttons in mobile expanded card overlay not persisting state.
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture

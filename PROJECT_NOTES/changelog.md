@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-15] Activity card UX — decline flow, mobile map button, mobile card state fix
+
+- Replaced "Cancel" button in decline feedback panel with "Save Notes" — marks card as declined with reason saved, no API call or replacement fetched (`public/app.js`)
+- "Replace Activity" button remains as the only path that triggers the replace API
+- Switched apply-note checkmark `✔` to Phosphor `ph-floppy-disk` icon (`public/app.js`)
+- Showed `flip-btn` (map icon) on mobile so it sits in the same row as type/verdict badges — was `display: none` (`public/styles.css`)
+- Map overlay goes full edge-to-edge on mobile (`padding: 0`, `border-radius: 0`) with larger close button tap target (`public/styles.css`)
+- Fixed approve/decline in mobile expanded card overlay: buttons now mutate `state` directly instead of delegating to source card DOM clicks — source card is destroyed by `renderActivities()` before delegation could complete (`public/app.js`)
+- Full decline flow (Save Notes + Replace Activity) wired in expanded overlay, not just approve/decline
+
 ## [2026-04-14] Fix mobile UI scaling — buttons oversized, fields clipped, chat panel cut off
 
 - Root cause: the `@media (max-width: 767px)` block in `styles.css` applied `min-height: 44px` globally to all buttons with no padding reduction, causing them to stack large; drawer grid sections (`accommodation-row`, `arrival-row`, `departure-row`) used `minmax` columns that overflowed on narrow screens; chat panel used `position: absolute` relative to its `position: fixed; right: 24px` parent, causing `left: 0; right: 0` to be offset and clip the panel

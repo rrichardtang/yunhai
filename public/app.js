@@ -2602,7 +2602,7 @@ function renderActivities() {
             <div class="decline-feedback hidden">
               <textarea class="decline-reason" rows="2" maxlength="200" placeholder="Why are you declining? What would you prefer instead? (required)"></textarea>
               <div class="decline-feedback-actions">
-                <button class="secondary cancel-decline" type="button">Cancel</button>
+                <button class="secondary save-decline-notes" type="button" disabled>Save Notes</button>
                 <button class="primary confirm-decline" type="button" disabled>Replace Activity</button>
               </div>
             </div>
@@ -2610,7 +2610,7 @@ function renderActivities() {
               Customize
               <div class="notes-row">
                 <textarea rows="2" class="notes" placeholder="What would you like to change?">${esc(review.notes || '')}</textarea>
-                <button class="apply-note" title="Apply note to activity" ${(review.notes || '').trim() ? '' : 'disabled'}>✔</button>
+                <button class="apply-note" title="Apply note to activity" ${(review.notes || '').trim() ? '' : 'disabled'}><i class="ph-bold ph-floppy-disk" aria-hidden="true"></i></button>
               </div>
             </label>
           </div>
@@ -2654,7 +2654,7 @@ function renderActivities() {
     const declineFeedback = card.querySelector('.decline-feedback');
     const declineReason = card.querySelector('.decline-reason');
     const confirmDecline = card.querySelector('.confirm-decline');
-    const cancelDecline = card.querySelector('.cancel-decline');
+    const saveDeclineNotes = card.querySelector('.save-decline-notes');
     const declineBtn = card.querySelector('.decline');
 
     declineBtn.addEventListener('click', () => {
@@ -2667,15 +2667,18 @@ function renderActivities() {
       declineBtn.disabled = true;
     });
 
-    cancelDecline.addEventListener('click', () => {
-      declineFeedback.classList.add('hidden');
-      declineReason.value = '';
-      confirmDecline.disabled = true;
-      declineBtn.disabled = false;
+    saveDeclineNotes.addEventListener('click', () => {
+      const reason = declineReason.value.trim();
+      if (!reason) return;
+      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: false, declineReason: reason };
+      postPreferenceSignal(a, 'declined', reason);
+      renderActivities();
     });
 
     declineReason.addEventListener('input', () => {
-      confirmDecline.disabled = !declineReason.value.trim();
+      const hasText = !!declineReason.value.trim();
+      confirmDecline.disabled = !hasText;
+      saveDeclineNotes.disabled = !hasText;
     });
 
     confirmDecline.addEventListener('click', async () => {
@@ -2730,7 +2733,7 @@ function renderActivities() {
           state.reviewed[a.id].notes = '';
           renderActivities();
         } catch {
-          applyBtn.textContent = '✔';
+          applyBtn.innerHTML = '<i class="ph-bold ph-floppy-disk" aria-hidden="true"></i>';
           applyBtn.disabled = false;
         }
       });
@@ -2785,15 +2788,75 @@ function renderActivities() {
     }
     closeBtn.addEventListener('click', close);
 
-    // Wire up approve/decline/notes in the expanded view back to the source card
+    // Wire up actions directly against state (source card may be re-rendered)
     body.querySelector('.approve')?.addEventListener('click', () => {
-      sourceCard.querySelector('.approve')?.click();
+      const current = state.reviewed[a.id]?.approved;
+      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: current === true ? null : true };
+      if (state.reviewed[a.id].approved === true) postPreferenceSignal(a, 'approved');
       close();
+      renderActivities();
     });
-    body.querySelector('.decline')?.addEventListener('click', () => {
-      sourceCard.querySelector('.decline')?.click();
+
+    const expandDeclineBtn = body.querySelector('.decline');
+    const expandDeclineFeedback = body.querySelector('.decline-feedback');
+    const expandDeclineReason = body.querySelector('.decline-reason');
+    const expandSaveNotes = body.querySelector('.save-decline-notes');
+    const expandConfirmDecline = body.querySelector('.confirm-decline');
+
+    expandDeclineBtn?.addEventListener('click', () => {
+      if (state.reviewed[a.id]?.approved === false) {
+        state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: null };
+        close();
+        renderActivities();
+        return;
+      }
+      expandDeclineFeedback?.classList.remove('hidden');
+      expandDeclineBtn.disabled = true;
+    });
+
+    expandDeclineReason?.addEventListener('input', () => {
+      const hasText = !!expandDeclineReason.value.trim();
+      if (expandSaveNotes) expandSaveNotes.disabled = !hasText;
+      if (expandConfirmDecline) expandConfirmDecline.disabled = !hasText;
+    });
+
+    expandSaveNotes?.addEventListener('click', () => {
+      const reason = expandDeclineReason.value.trim();
+      if (!reason) return;
+      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: false, declineReason: reason };
+      postPreferenceSignal(a, 'declined', reason);
       close();
+      renderActivities();
     });
+
+    expandConfirmDecline?.addEventListener('click', async () => {
+      const reason = expandDeclineReason.value.trim();
+      if (!reason) return;
+      expandConfirmDecline.disabled = true;
+      expandConfirmDecline.textContent = '…';
+      try {
+        const resp = await apiFetch('/api/activity/replace', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activity: a, reason, userId: ensureUserId() })
+        });
+        if (!resp.ok) throw new Error('Replace failed');
+        const { activity: rawReplacement } = await resp.json();
+        if (!rawReplacement) throw new Error('No activity in response');
+        const replacement = { id: `${rawReplacement.city || a.city}-replacement-${uid()}`, ...normalizeActivityMetadata(rawReplacement), city: canonicalizeActivityCity(rawReplacement.city, a.city) };
+        const idx = state.activities.findIndex((x) => x.id === a.id);
+        if (idx !== -1) state.activities.splice(idx, 1, replacement);
+        delete state.reviewed[a.id];
+        state.reviewed[replacement.id] = { approved: null, notes: '' };
+        postPreferenceSignal(a, 'declined', reason);
+        close();
+        renderActivities();
+      } catch {
+        expandConfirmDecline.textContent = 'Replace Activity';
+        expandConfirmDecline.disabled = false;
+      }
+    });
+
     body.querySelector('.flip-btn')?.addEventListener('click', () => {
       close();
       openActivityMapOverlay(a.id);
