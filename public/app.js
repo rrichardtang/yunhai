@@ -3814,7 +3814,7 @@ function renderArrangeCityNav(cityGroups) {
 
   const activeIndex = cityGroups.findIndex((g) => normalizeCity(g.city) === normalizeCity(state.arrangeCity));
   els.arrangeCityNav.innerHTML = `
-    <button type="button" class="secondary arrange-city-arrow" data-city-prev ${activeIndex <= 0 ? 'disabled' : ''}><i class="ph-bold ph-arrow-left" aria-hidden="true"></i></button>
+    <button type="button" class="icon-btn nav-secondary arrange-city-arrow" data-city-prev ${activeIndex <= 0 ? 'disabled' : ''} aria-label="Previous city"><i class="ph-bold ph-arrow-left" aria-hidden="true"></i></button>
     <div class="arrange-city-tabs">
       ${cityGroups.map((g) => {
         const start = parseYmdAsLocal(g.days[0].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -3822,7 +3822,7 @@ function renderArrangeCityNav(cityGroups) {
         return `<button type="button" class="arrange-city-tab ${normalizeCity(g.city) === normalizeCity(state.arrangeCity) ? 'active' : ''}" data-city-tab="${esc(g.city)}">${esc(g.city)} (${start}–${end})</button>`;
       }).join('')}
     </div>
-    <button type="button" class="secondary arrange-city-arrow" data-city-next ${activeIndex >= cityGroups.length - 1 ? 'disabled' : ''}><i class="ph-bold ph-arrow-right" aria-hidden="true"></i></button>
+    <button type="button" class="icon-btn nav-primary arrange-city-arrow" data-city-next ${activeIndex >= cityGroups.length - 1 ? 'disabled' : ''} aria-label="Next city"><i class="ph-bold ph-arrow-right" aria-hidden="true"></i></button>
   `;
 
   els.arrangeCityNav.querySelectorAll('[data-city-tab]').forEach((btn) => {
