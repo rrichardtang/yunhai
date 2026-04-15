@@ -1293,10 +1293,7 @@ function buildChecklistFromState() {
   // Approved activities that require booking
   (state.activities || []).forEach((a) => {
     if (!state.reviewed[a.id]?.approved) return;
-    const bt = a.booking_type;
-    const requiresBooking = ['tour', 'attraction'].includes(bt) ||
-      (!bt && ['attraction', 'tour', 'museum'].includes(String(a.type || a.category || '').toLowerCase()));
-    if (!requiresBooking) return;
+    if (!['tour', 'attraction'].includes(a.booking_type)) return;
     const placement = state.placements[a.id];
     if (!placement) return;
     const day = state.days.find((d) => d.id === placement.dayId);
@@ -2680,7 +2677,7 @@ function renderPreferencesModal() {
 
   els.profileTravelNotes.value = profile.aboutMe || '';
   els.profileTravelNotes.disabled = false;
-  els.profileEditBtn.textContent = 'Save';
+  els.profileEditBtn.innerHTML = '<i class="ph-bold ph-floppy-disk"></i>';
 
   if (els.aiSummarySection && els.profileAiSummary) {
     const instruction = profile.profileInstruction || '';
@@ -6388,6 +6385,7 @@ document.getElementById('openChecklistBtn')?.addEventListener('click', () => {
   els.confidencePopover?.classList.add('hidden');
   openChecklistModal();
 });
+document.getElementById('checklistModalSave')?.addEventListener('click', saveSnapshot);
 document.getElementById('checklistModalClose')?.addEventListener('click', closeChecklistModal);
 document.getElementById('checklistModal')?.addEventListener('click', (e) => {
   if (e.target === document.getElementById('checklistModal')) closeChecklistModal();

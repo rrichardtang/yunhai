@@ -4,6 +4,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-15] Fix checklist auto-population to rely solely on backend booking_type
+
+- Removed fragile frontend heuristic from `buildChecklistFromState()` that inferred booking requirement from `a.type`/`a.category` when `booking_type` was missing
+- Now uses only `['tour', 'attraction'].includes(a.booking_type)` — the authoritative backend field set by Claude at generation time
+- File: `public/app.js`
+
 ## [2026-04-15] Booking checklist complete overhaul per checklist.md spec
 
 - New typed data model in `normalizeChecklistItem`: transportation (startLocation, endLocation, isRoundTrip, departureDate/Time, returnDate/Time), accommodation (accommodationCity, checkInDate, checkOutDate), activity (activityLocation, activityDate/Time) — each type has its own primary fields

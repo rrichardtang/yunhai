@@ -1,6 +1,6 @@
 # Current State
 
-_Last updated: 2026-04-15_
+_Last updated: 2026-04-15 (session 2)_
 
 ## Objective
 Booking checklist overhaul — complete redesign per checklist.md spec.
@@ -24,3 +24,4 @@ Full overhaul complete and ready to push. This session: rewrote checklist data m
 - Push and test on VPS — verify modal renders, Google Maps autocomplete fires in modal context
 - Check that existing saved itineraries with old checklist schema migrate cleanly on load
 - Test notes feature: save notes, verify they persist in state.reviewed and pre-populate on card re-render; verify notes pass through to Replace/Modify LLM call
+- Verify checklist auto-population: approve a tour/attraction card and confirm it appears under the correct city; approve a restaurant/none card and confirm it is excluded
