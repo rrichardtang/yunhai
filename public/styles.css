@@ -999,25 +999,10 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
   backdrop-filter: blur(6px);
   box-shadow: var(--shadow-sm);
 }
-.nav-primary {
-  background: var(--accent) !important;
-  color: #fff !important;
-  font-size: 1rem;
-  padding: 12px 20px;
-}
-.nav-primary:hover { background: var(--accent-hover) !important; }
-.nav-secondary {
-  border: 1px solid var(--secondary);
-  background: var(--base-light) !important;
-  color: var(--text) !important;
-  font-size: .98rem;
-  padding: 12px 16px;
-}
-.nav-secondary:hover { background: var(--secondary-light) !important; }
-.step-nav .nav-primary,
-.step-nav .nav-secondary { width: 100%; }
-.step-nav-split .nav-secondary { max-width: 180px; }
-.step-nav-split .nav-primary { max-width: 320px; }
+.nav-primary { font-size: 1.4rem; color: var(--accent) !important; background: none !important; border: none !important; }
+.nav-primary:hover:not(:disabled) { color: var(--accent-hover) !important; text-shadow: 0 0 10px rgba(42,125,225,.6); background: rgba(42,125,225,.08) !important; }
+.nav-secondary { font-size: 1.4rem; color: var(--text-muted) !important; background: none !important; border: none !important; }
+.nav-secondary:hover:not(:disabled) { color: var(--text) !important; text-shadow: 0 0 8px rgba(100,116,139,.5); background: rgba(100,116,139,.08) !important; }
 .save-progress-btn { font-size: 1.2rem; }
 
 /* ── Chat widget ── */
@@ -1231,7 +1216,7 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 
   /* Buttons: compact */
   button { min-height: 34px; padding: 5px 10px; font-size: 0.82rem; }
-  .nav-primary, .nav-secondary { padding: 7px 12px; font-size: 0.85rem; }
+  .nav-primary, .nav-secondary { font-size: 1.2rem; }
 
   /* Setup actions: stay inline */
   .setup-actions { flex-direction: row; flex-wrap: wrap; gap: 6px; }
@@ -1274,8 +1259,8 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 
   /* Step nav */
   .step-nav-split { flex-direction: row; gap: 8px; justify-content: space-between; }
-  .step-nav-split .nav-secondary { max-width: none; width: auto; }
-  .step-nav-split .nav-primary { max-width: none; flex: 1; text-align: center; }
+  .step-nav-split .nav-secondary { max-width: none; }
+  .step-nav-split .nav-primary { max-width: none; }
   .sticky-nav { padding: 8px; border-radius: 10px; }
 
   /* Activity cards: compact preview on mobile — tap to expand */
