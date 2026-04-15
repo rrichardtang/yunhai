@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-15] Fix decline button — one-click toggle, mobile ReferenceError, removed Customize section
+
+- Removed `pointer-events: none` from `.btn-decline.inactive` — was blocking all hover and click events (`public/styles.css`)
+- Decline button is now a simple one-click toggle matching approve: click to decline, click again to un-decline (`public/app.js`)
+- Removed hidden feedback reveal step — `decline-feedback` section always visible, no disable/enable of the button
+- Removed the "Customize" section (notes textarea + apply-note button) and all related event wiring — superseded by the feedback section
+- Moved `syncVerdictClasses` from inside `buildActivityCard` closure to module scope — it was inaccessible to `openCardExpand`, causing a silent ReferenceError on mobile when decline/approve was tapped in the expanded overlay (`public/app.js`)
+- Added "Saved" confirmation flash (1.5s) on Save Notes button — both inline card and expand overlay
+
 ## [2026-04-15] Activity card UX — decline flow, mobile map button, mobile card state fix
 
 - Replaced "Cancel" button in decline feedback panel with "Save Notes" — marks card as declined with reason saved, no API call or replacement fetched (`public/app.js`)

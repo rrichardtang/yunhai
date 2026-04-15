@@ -3,10 +3,10 @@
 _Last updated: 2026-04-15_
 
 ## Objective
-Activity card UX polish — decline flow improvements and mobile card interaction fixes.
+Activity card UX polish — decline button fully fixed and working on desktop and mobile.
 
 ## Active Workstream
-All changes complete and pushed. This session: replaced Cancel with Save Notes on decline flow, switched checkmark to Phosphor floppy-disk icon, fixed mobile map button position, added full-screen map overlay close button on mobile, and fixed approve/decline buttons in mobile expanded card overlay not persisting state.
+All changes complete and ready to push. This session: fixed decline button being unclickable (removed `pointer-events: none` from `.btn-decline.inactive`), made decline a simple one-click toggle matching approve behavior, removed the hidden feedback reveal step, removed the Customize section, moved `syncVerdictClasses` to module scope (was inside `buildActivityCard` closure causing ReferenceError in mobile expand overlay), added "Saved" confirmation flash on Save Notes.
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture

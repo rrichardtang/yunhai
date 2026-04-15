@@ -2681,6 +2681,9 @@ function renderActivities() {
       if (!reason) return;
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: false, declineReason: reason };
       postPreferenceSignal(a, 'declined', reason);
+      syncVerdictClasses(card, false);
+      saveDeclineNotes.textContent = 'Saved';
+      setTimeout(() => { saveDeclineNotes.textContent = 'Save Notes'; }, 1500);
     });
 
     declineReason.addEventListener('input', () => {
@@ -2803,6 +2806,8 @@ function renderActivities() {
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: false, declineReason: reason };
       postPreferenceSignal(a, 'declined', reason);
       syncExpand(false);
+      expandSaveNotes.textContent = 'Saved';
+      setTimeout(() => { expandSaveNotes.textContent = 'Save Notes'; }, 1500);
     });
 
     expandConfirmDecline?.addEventListener('click', async () => {
