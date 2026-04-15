@@ -1,3 +1,10 @@
+/* ── Trip Health inline panel (step 4) ── */
+.trip-health-inline-panel {
+  margin-top: 24px;
+  border-top: 1px solid var(--secondary-light, #E2E8F0);
+  padding-top: 20px;
+}
+
 /* ── Confidence badge ── */
 .confidence-badge {
   border: none;

@@ -53,7 +53,9 @@
             <p id="confidencePopoverTopIssue">No issues detected</p>
             <p id="confidencePopoverProgress">0 of 0 items verified</p>
             <button id="openConfidenceReviewBtn" class="primary" type="button">Open Trip Health</button>
+            <button id="openChecklistBtn" class="secondary" type="button">Open Checklist</button>
           </div>
+          <button id="checklistBtn" class="link-btn" type="button" title="Booking Checklist"><i class="ph-bold ph-check-square" aria-hidden="true"></i> Checklist</button>
           <button id="preferencesLink" class="link-btn" type="button">My Profile</button>
         </div>
       </div>
@@ -92,8 +94,7 @@
         <div class="step active">1. Setup</div>
         <div class="step">2. Review</div>
         <div class="step">3. Arrange</div>
-        <div class="step">4. Itinerary</div>
-        <div class="step">5. Trip Health</div>
+        <div class="step">4. Finalize</div>
       </nav>
 
       <section id="step1" class="panel step-panel active">
@@ -176,7 +177,7 @@
 
       <section id="step4" class="panel step-panel">
         <div class="between">
-          <h2>Final Itinerary</h2>
+          <h2>Finalize</h2>
           <div class="calendar-actions">
             <label for="calendarMetadataMode" class="muted-text">Metadata</label>
             <select id="calendarMetadataMode">
@@ -197,38 +198,18 @@
           </div>
           <div id="savedItineraries" class="saved-itineraries-list"></div>
         </section>
+        <section class="trip-health-inline-panel">
+          <div class="between"><h3>Trip Health</h3></div>
+          <div id="confidenceSummary" class="trip-health-summary"></div>
+          <section class="card-panel confidence-issues-panel">
+            <div class="between"><h3>Issue review</h3></div>
+            <p class="muted-text">Review each flagged issue and choose an action: fix, verify, dismiss, or add context.</p>
+            <div id="confidenceIssues" class="confidence-issues-list"></div>
+          </section>
+        </section>
         <div class="step-nav sticky-nav step-nav-split">
           <button id="editBtn" class="secondary nav-secondary" type="button" data-nav-back="4"><i class="ph-bold ph-arrow-left"></i> Back</button>
           <button class="secondary save-progress-btn" type="button"><i class="ph-bold ph-floppy-disk"></i> Save Progress</button>
-          <button class="primary nav-primary" type="button" data-nav-next="4">Next <i class="ph-bold ph-arrow-right"></i></button>
-        </div>
-      </section>
-
-      <section id="step5" class="panel step-panel">
-        <div class="between"><h2>Trip Health</h2></div>
-        <p class="muted-text">Refreshed Confidence Check workspace for live trip verification, issue handling, and budget impact tracking.</p>
-        <div id="confidenceSummary" class="trip-health-summary"></div>
-        <section class="card-panel confidence-issues-panel">
-          <div class="between">
-            <h3>Issue review</h3>
-          </div>
-          <p class="muted-text">Review each flagged issue and choose an action: fix, verify, dismiss, or add context.</p>
-          <div id="confidenceIssues" class="confidence-issues-list"></div>
-        </section>
-        <section class="card-panel confidence-checklist-panel">
-          <div class="between">
-            <h3>Editable checklist</h3>
-            <button id="addChecklistItemBtn" class="secondary" type="button">+ Add item</button>
-          </div>
-          <p class="muted-text">Type directly in each field. Updates are immediate and reflected in summaries above.</p>
-          <div id="confidenceChecklist" class="saved-itineraries-list"></div>
-          <label><input id="confidenceEmailSummary" type="checkbox" /> Email critical summary</label>
-          <button id="sendConfidenceEmailBtn" class="secondary" type="button">Send summary now</button>
-        </section>
-
-        <div class="step-nav sticky-nav step-nav-split">
-          <button class="secondary nav-secondary" type="button" data-nav-back="5"><i class="ph-bold ph-arrow-left"></i> Back</button>
-          <button id="saveConfidenceBtn" class="secondary" type="button"><i class="ph-bold ph-floppy-disk"></i> Save Progress</button>
         </div>
       </section>
     </main>
@@ -282,6 +263,24 @@
         </div>
 
         <button id="deleteProfileBtn" class="secondary profile-delete-bottom" type="button"><i class="ph-bold ph-trash"></i> Delete</button>
+      </div>
+    </div>
+
+    <div id="checklistModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Booking Checklist">
+      <div class="modal-card">
+        <div class="between">
+          <h3>Booking Checklist</h3>
+          <button id="checklistModalClose" class="secondary" type="button">Close</button>
+        </div>
+        <section class="card-panel confidence-checklist-panel">
+          <div class="between">
+            <p class="muted-text">Type directly in each field. Updates are immediate and reflected in summaries above.</p>
+            <button id="addChecklistItemBtn" class="secondary" type="button">+ Add item</button>
+          </div>
+          <div id="confidenceChecklist" class="saved-itineraries-list"></div>
+          <label><input id="confidenceEmailSummary" type="checkbox" /> Email critical summary</label>
+          <button id="sendConfidenceEmailBtn" class="secondary" type="button">Send summary now</button>
+        </section>
       </div>
     </div>
 

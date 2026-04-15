@@ -85,7 +85,7 @@ function pacePrefLabel(value) {
 
 const els = {
   steps: [...document.querySelectorAll('#stepIndicator .step')],
-  panels: [1,2,3,4,5].map((n) => document.getElementById(`step${n}`)),
+  panels: [1,2,3,4].map((n) => document.getElementById(`step${n}`)),
   tripName: document.getElementById('tripName'),
   tripBudget: document.getElementById('tripBudget'),
   numTravelers: document.getElementById('numTravelers'),
@@ -1387,8 +1387,7 @@ function renderConfidence() {
         btn.addEventListener('click', () => {
           const action = btn.getAttribute('data-issue-action');
           if (action === 'fix') {
-            const target = document.querySelector('.confidence-checklist-panel');
-            target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            openChecklistModal();
             return;
           }
           if (action === 'verify') setMeta({ action: 'verified' });
@@ -1626,9 +1625,6 @@ async function goToNextStep(fromStep = state.step) {
     return;
   }
 
-  if (fromStep === 4) {
-    setStep(5);
-  }
 }
 
 function goToPreviousStep(fromStep = state.step) {
@@ -2312,6 +2308,15 @@ async function openPreferencesModal() {
 function closePreferencesModal() {
   renderPreferencesModal();
   els.prefsModal.classList.add('hidden');
+}
+
+function openChecklistModal() {
+  renderConfidence();
+  document.getElementById('checklistModal').classList.remove('hidden');
+}
+
+function closeChecklistModal() {
+  document.getElementById('checklistModal').classList.add('hidden');
 }
 
 async function fetchStatus() {
@@ -5389,7 +5394,7 @@ function hydrateFromSnapshot(snapshot) {
   if (els.numChildren) els.numChildren.value = state.numChildren;
   renderCities();
 
-  const targetStep = snapshot.currentStep || 3;
+  const targetStep = Math.min(snapshot.currentStep || 3, 4);
   if (targetStep >= 2) renderActivities();
   if (targetStep >= 3) renderArrange();
   if (targetStep >= 4) renderItinerary();
@@ -5890,9 +5895,18 @@ els.profileSelector?.addEventListener('change', (e) => {
 els.newProfileBtn?.addEventListener('click', createNewProfile);
 els.deleteProfileBtn?.addEventListener('click', deleteActiveProfile);
 els.confidenceBadge?.addEventListener('click', () => els.confidencePopover?.classList.toggle('hidden'));
+document.getElementById('checklistBtn')?.addEventListener('click', openChecklistModal);
+document.getElementById('openChecklistBtn')?.addEventListener('click', () => {
+  els.confidencePopover?.classList.add('hidden');
+  openChecklistModal();
+});
+document.getElementById('checklistModalClose')?.addEventListener('click', closeChecklistModal);
+document.getElementById('checklistModal')?.addEventListener('click', (e) => {
+  if (e.target === document.getElementById('checklistModal')) closeChecklistModal();
+});
 els.openConfidenceReviewBtn?.addEventListener('click', () => {
   els.confidencePopover?.classList.add('hidden');
-  setStep(5);
+  setStep(4);
 });
 els.addChecklistItemBtn?.addEventListener('click', () => {
   state.confidenceChecklist.push(normalizeChecklistItem({ type: 'other', city: '', name: '', dateTime: '', notes: '', bookingReference: '', budgetUsd: null, verified: false, status: 'open' }));
