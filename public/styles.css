@@ -1186,6 +1186,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
   /* Forms: tighten padding globally */
   input, textarea, select { padding: 6px 10px; font-size: 0.85rem; }
+  .tp-place-autocomplete { max-width: 100%; overflow: hidden; box-sizing: border-box; }
+  .city-autocomplete { max-width: 100%; overflow: hidden; }
   label { margin-bottom: 6px; font-size: 0.85rem; }
 
   /* Buttons: compact */
@@ -1213,8 +1215,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   .city-row-main input[type="date"] { width: 100%; min-width: 0; padding: 4px 2px; font-size: 0.75rem; -webkit-appearance: none; }
 
   /* Drawer sections: tighter */
-  .city-dropdown-section { padding: 8px; border-radius: 10px; }
-  .city-dropdown-grid { gap: 6px; }
+  .city-dropdown-section { padding: 6px; border-radius: 10px; overflow: hidden; max-width: 100%; box-sizing: border-box; }
+  .city-dropdown-grid { gap: 4px; overflow: hidden; }
+  .city-dropdown-label { font-size: 0.75rem; margin-bottom: 3px; }
+  .city-drawer { overflow: hidden; }
   .hotel-row, .travel-row { grid-template-columns: 1fr; }
   .accommodation-row { grid-template-columns: 1fr 1fr; }
   .accommodation-row > :first-child { grid-column: 1 / -1; }
