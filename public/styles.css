@@ -1218,7 +1218,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   .hotel-row, .travel-row { grid-template-columns: 1fr; }
   .accommodation-row { grid-template-columns: 1fr 1fr; }
   .accommodation-row > :first-child { grid-column: 1 / -1; }
+  .accommodation-row input[type="date"] { padding: 4px 2px; font-size: 0.75rem; min-width: 0; width: 100%; }
   .arrival-row, .departure-row { grid-template-columns: 1fr auto; }
+  .arrival-row input[type="date"],
+  .arrival-row input[type="time"],
+  .departure-row input[type="date"],
+  .departure-row input[type="time"] { padding: 4px 2px; font-size: 0.75rem; min-width: 0; }
 
   /* Topbar */
   .topbar { padding: 8px 10px; }

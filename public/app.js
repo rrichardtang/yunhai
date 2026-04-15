@@ -539,9 +539,10 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
   const styleShadowInput = () => {
     const inner = placeAutocomplete.shadowRoot?.querySelector('input');
     if (!inner) return;
-    inner.style.fontSize = 'inherit';
-    inner.style.padding = window.innerWidth < 768 ? '6px 10px' : '10px 14px';
+    inner.style.fontSize = window.innerWidth < 768 ? '0.65rem' : 'inherit';
+    inner.style.padding = window.innerWidth < 768 ? '3px 4px' : '10px 14px';
     inner.style.boxSizing = 'border-box';
+    inner.style.minHeight = '0';
   };
   // Try immediately and after a short delay for shadow DOM readiness
   styleShadowInput();
