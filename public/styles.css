@@ -377,7 +377,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .activity-card { transition: background .2s ease, border-left-color .2s ease; perspective: 1200px; min-height: 520px; }
 .activity-card-inner { position: relative; width: 100%; min-height: 520px; transition: transform .55s ease; transform-style: preserve-3d; }
 .activity-card.is-flipped .activity-card-inner { transform: rotateY(180deg); }
-.activity-card-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--base-light); overflow: auto; }
+.activity-card-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--base-light); overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .activity-card-back { transform: rotateY(180deg); }
 .card img { width: 100%; height: 160px; object-fit: cover; background: var(--secondary-light); }
 .card-content { padding: 14px; }

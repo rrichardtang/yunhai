@@ -2524,7 +2524,7 @@ function renderActivities() {
                 <span class="badge">${esc(a.type)}</span>
                 <span class="badge ${verdictClass}">${esc(a.verdict || 'N/A')}</span>
               </div>
-              <button class="secondary flip-btn" type="button" title="Flip to map" aria-label="Flip card">🗺️</button>
+              <button class="secondary flip-btn" type="button" title="Flip to map" aria-label="Flip card"><i class="ph-bold ph-map-trifold" aria-hidden="true"></i></button>
             </div>
             <h3>${esc(a.name)}</h3>
             <p><strong>City:</strong> ${esc(a.city || '')}</p>
@@ -2582,7 +2582,7 @@ function renderActivities() {
           <div class="card-content map-back-content">
             <div class="activity-card-head-actions">
               <strong>Map view</strong>
-              <button class="secondary flip-btn" type="button" title="Flip back" aria-label="Flip card">↩️</button>
+              <button class="secondary flip-btn" type="button" title="Flip back" aria-label="Flip card"><i class="ph-bold ph-arrow-u-up-left" aria-hidden="true"></i></button>
             </div>
             <p class="muted-text">${esc(a.name)}${a.city ? ` · ${esc(a.city)}` : ''}</p>
             <button type="button" class="mini-map-wrap" title="Open full map">
