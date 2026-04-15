@@ -331,7 +331,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .travel-row input, .travel-row select { margin-top: 0; }
 
 .place-autocomplete-fallback { display: none; }
-.tp-place-autocomplete { display: block; width: 100%; }
+.tp-place-autocomplete { display: block; width: 100%; font-size: inherit; }
+.tp-place-autocomplete::part(input) {
+  font-size: inherit;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+}
 .city-autocomplete { position: relative; }
 .city-suggestions {
   position: absolute;
@@ -1186,6 +1194,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
   /* Forms: tighten padding globally */
   input, textarea, select { padding: 6px 10px; font-size: 0.85rem; }
+  .tp-place-autocomplete { font-size: 0.85rem; }
+  .tp-place-autocomplete::part(input) { padding: 6px 10px; font-size: 0.85rem; }
   label { margin-bottom: 6px; font-size: 0.85rem; }
 
   /* Buttons: compact */
