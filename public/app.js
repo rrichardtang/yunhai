@@ -535,6 +535,19 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
   element.classList.add('place-autocomplete-fallback');
   element.insertAdjacentElement('afterend', placeAutocomplete);
 
+  // Style the shadow DOM input to match our compact UI
+  const styleShadowInput = () => {
+    const inner = placeAutocomplete.shadowRoot?.querySelector('input');
+    if (!inner) return;
+    inner.style.fontSize = 'inherit';
+    inner.style.padding = window.innerWidth < 768 ? '6px 10px' : '10px 14px';
+    inner.style.boxSizing = 'border-box';
+  };
+  // Try immediately and after a short delay for shadow DOM readiness
+  styleShadowInput();
+  requestAnimationFrame(styleShadowInput);
+  setTimeout(styleShadowInput, 200);
+
   const getWidgetValue = () => {
     if (typeof placeAutocomplete.value === 'string') return placeAutocomplete.value;
     const internalInput = placeAutocomplete.shadowRoot?.querySelector('input');
