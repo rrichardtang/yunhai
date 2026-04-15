@@ -2538,6 +2538,21 @@ function renderActivities() {
     observer.observe(placeholder);
   });
 
+  function syncVerdictClasses(cardEl, approved) {
+    const approveBtn = cardEl.querySelector('.approve');
+    const declineBtn = cardEl.querySelector('.decline');
+    if (approveBtn) {
+      approveBtn.classList.toggle('active', approved === true);
+      approveBtn.classList.toggle('inactive', approved === false);
+    }
+    if (declineBtn) {
+      declineBtn.classList.toggle('active', approved === false);
+      declineBtn.classList.toggle('inactive', approved === true);
+    }
+    cardEl.classList.toggle('approved', approved === true);
+    cardEl.classList.toggle('declined', approved === false);
+  }
+
   function buildActivityCard(a) {
     const review = state.reviewed[a.id] || { approved: null, notes: '' };
     const approvedState = review.approved;
@@ -2639,21 +2654,6 @@ function renderActivities() {
 
     if (isFlipped) {
       setTimeout(() => ensureMiniMapForCard(card, a), 0);
-    }
-
-    function syncVerdictClasses(cardEl, approved) {
-      const approveBtn = cardEl.querySelector('.approve');
-      const declineBtn2 = cardEl.querySelector('.decline');
-      if (approveBtn) {
-        approveBtn.classList.toggle('active', approved === true);
-        approveBtn.classList.toggle('inactive', approved === false);
-      }
-      if (declineBtn2) {
-        declineBtn2.classList.toggle('active', approved === false);
-        declineBtn2.classList.toggle('inactive', approved === true);
-      }
-      cardEl.classList.toggle('approved', approved === true);
-      cardEl.classList.toggle('declined', approved === false);
     }
 
     card.querySelector('.approve').addEventListener('click', () => {
