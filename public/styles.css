@@ -777,7 +777,7 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
   padding: 20px;
   background: rgba(11, 37, 69, .55);
   backdrop-filter: blur(6px);
-  z-index: 999;
+  z-index: 1800;
 }
 .planning-overlay-card {
   width: min(600px, 100%);
@@ -813,7 +813,7 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
   display: flex; align-items: center; justify-content: center;
   background: rgba(11, 37, 69, .45);
   backdrop-filter: blur(6px);
-  z-index: 1200;
+  z-index: 1900;
 }
 .modal-card {
   width: min(720px, calc(100% - 24px));
@@ -860,7 +860,7 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 .textarea-expand-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--base-light); }
 
 /* ── Textarea expand modal ── */
-.textarea-expand-modal { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; }
+.textarea-expand-modal { position: fixed; inset: 0; z-index: 2100; display: flex; align-items: center; justify-content: center; }
 .textarea-expand-modal.hidden { display: none; }
 .textarea-expand-backdrop { position: absolute; inset: 0; background: rgba(11,37,69,.4); }
 .textarea-expand-dialog {
@@ -1012,6 +1012,12 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 
 /* ── Chat widget ── */
 #chatWidget { position: fixed; bottom: 24px; right: 24px; z-index: 1000; }
+
+body.overlay-active .sticky-nav,
+body.overlay-active #chatWidget {
+  opacity: 0;
+  pointer-events: none;
+}
 #chatBubble {
   width: 56px; height: 56px;
   border-radius: 50%;
