@@ -23,3 +23,4 @@ Full overhaul complete and ready to push. This session: rewrote checklist data m
 ## Next Actions
 - Push and test on VPS — verify modal renders, Google Maps autocomplete fires in modal context
 - Check that existing saved itineraries with old checklist schema migrate cleanly on load
+- Test notes feature: save notes, verify they persist in state.reviewed and pre-populate on card re-render; verify notes pass through to Replace/Modify LLM call

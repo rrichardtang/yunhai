@@ -22,6 +22,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Old event listeners for `addChecklistItemBtn` (removed from HTML) replaced with modal-level event delegation
 - Files: `public/app.js`, `public/confidence.css`, `public/planner.html`
 
+## [2026-04-15] Fix activity notes — separate from decline flow, passed to Replace/Modify LLM call
+
+- Notes textarea (`activity-notes-text`) moved out of `.decline-feedback` into its own `.activity-notes` section — always visible, saves without declining the activity
+- "Save Notes" now only writes to `state.reviewed[id].notes`; no longer sets `approved: false`
+- Decline flow retains its own `.decline-reason` textarea + "Replace/Modify" button (renamed from "Replace Activity")
+- Notes are included in the `/api/activity/replace` payload and injected into the LLM prompt as additional context
+- Both inline card and mobile expand overlay handlers updated; notes pre-populated from `state.reviewed` on card build
+- Files: `public/app.js`, `public/styles.css`, `src/server.js`
+
 ## [2026-04-15] Fix decline button — one-click toggle, mobile ReferenceError, removed Customize section
 
 - Removed `pointer-events: none` from `.btn-decline.inactive` — was blocking all hover and click events (`public/styles.css`)

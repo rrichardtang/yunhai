@@ -3101,11 +3101,16 @@ function renderActivities() {
               <button class="${approveBtnClass}"><i class="ph-bold ph-check-circle" aria-hidden="true"></i> Approve</button>
               <button class="${declineBtnClass}"><i class="ph-bold ph-x-circle" aria-hidden="true"></i> Decline</button>
             </div>
+            <div class="activity-notes">
+              <textarea class="activity-notes-text" rows="2" maxlength="400" placeholder="Add notes or reminders for this activity…">${esc(review.notes || '')}</textarea>
+              <div class="activity-notes-actions">
+                <button class="secondary save-activity-notes" type="button">Save Notes</button>
+              </div>
+            </div>
             <div class="decline-feedback">
-              <textarea class="decline-reason" rows="2" maxlength="200" placeholder="Why are you declining? What would you prefer instead? (required)"></textarea>
+              <textarea class="decline-reason" rows="2" maxlength="200" placeholder="What would you prefer instead? (required for Replace/Modify)"></textarea>
               <div class="decline-feedback-actions">
-                <button class="secondary save-decline-notes" type="button" disabled>Save Notes</button>
-                <button class="primary confirm-decline" type="button" disabled>Replace Activity</button>
+                <button class="primary confirm-decline" type="button" disabled>Replace/Modify</button>
               </div>
             </div>
           </div>
@@ -3152,7 +3157,8 @@ function renderActivities() {
     });
     const declineReason = card.querySelector('.decline-reason');
     const confirmDecline = card.querySelector('.confirm-decline');
-    const saveDeclineNotes = card.querySelector('.save-decline-notes');
+    const saveActivityNotes = card.querySelector('.save-activity-notes');
+    const activityNotesText = card.querySelector('.activity-notes-text');
     const declineBtn = card.querySelector('.decline');
 
     declineBtn.addEventListener('click', () => {
@@ -3163,20 +3169,15 @@ function renderActivities() {
       syncVerdictClasses(card, nextApproved);
     });
 
-    saveDeclineNotes.addEventListener('click', () => {
-      const reason = declineReason.value.trim();
-      if (!reason) return;
-      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: false, declineReason: reason };
-      postPreferenceSignal(a, 'declined', reason);
-      syncVerdictClasses(card, false);
-      saveDeclineNotes.textContent = 'Saved';
-      setTimeout(() => { saveDeclineNotes.textContent = 'Save Notes'; }, 1500);
+    saveActivityNotes.addEventListener('click', () => {
+      const notes = activityNotesText.value.trim();
+      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), notes };
+      saveActivityNotes.textContent = 'Saved';
+      setTimeout(() => { saveActivityNotes.textContent = 'Save Notes'; }, 1500);
     });
 
     declineReason.addEventListener('input', () => {
-      const hasText = !!declineReason.value.trim();
-      confirmDecline.disabled = !hasText;
-      saveDeclineNotes.disabled = !hasText;
+      confirmDecline.disabled = !declineReason.value.trim();
     });
 
     confirmDecline.addEventListener('click', async () => {
@@ -3185,10 +3186,11 @@ function renderActivities() {
       confirmDecline.disabled = true;
       confirmDecline.textContent = '…';
       try {
+        const notes = state.reviewed[a.id]?.notes || '';
         const resp = await apiFetch('/api/activity/replace', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity: a, reason, userId: ensureUserId() })
+          body: JSON.stringify({ activity: a, reason, notes, userId: ensureUserId() })
         });
         if (!resp.ok) throw new Error('Replace failed');
         const { activity: rawReplacement } = await resp.json();
@@ -3201,7 +3203,7 @@ function renderActivities() {
         postPreferenceSignal(a, 'declined', reason);
         renderActivities();
       } catch {
-        confirmDecline.textContent = 'Replace Activity';
+        confirmDecline.textContent = 'Replace/Modify';
         confirmDecline.disabled = false;
       }
     });
@@ -3271,8 +3273,9 @@ function renderActivities() {
 
     const expandDeclineBtn = body.querySelector('.decline');
     const expandDeclineReason = body.querySelector('.decline-reason');
-    const expandSaveNotes = body.querySelector('.save-decline-notes');
     const expandConfirmDecline = body.querySelector('.confirm-decline');
+    const expandSaveActivityNotes = body.querySelector('.save-activity-notes');
+    const expandActivityNotesText = body.querySelector('.activity-notes-text');
 
     expandDeclineBtn?.addEventListener('click', () => {
       const current = state.reviewed[a.id]?.approved;
@@ -3282,20 +3285,15 @@ function renderActivities() {
       syncExpand(next);
     });
 
-    expandDeclineReason?.addEventListener('input', () => {
-      const hasText = !!expandDeclineReason.value.trim();
-      if (expandSaveNotes) expandSaveNotes.disabled = !hasText;
-      if (expandConfirmDecline) expandConfirmDecline.disabled = !hasText;
+    expandSaveActivityNotes?.addEventListener('click', () => {
+      const notes = expandActivityNotesText.value.trim();
+      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), notes };
+      expandSaveActivityNotes.textContent = 'Saved';
+      setTimeout(() => { expandSaveActivityNotes.textContent = 'Save Notes'; }, 1500);
     });
 
-    expandSaveNotes?.addEventListener('click', () => {
-      const reason = expandDeclineReason.value.trim();
-      if (!reason) return;
-      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: false, declineReason: reason };
-      postPreferenceSignal(a, 'declined', reason);
-      syncExpand(false);
-      expandSaveNotes.textContent = 'Saved';
-      setTimeout(() => { expandSaveNotes.textContent = 'Save Notes'; }, 1500);
+    expandDeclineReason?.addEventListener('input', () => {
+      if (expandConfirmDecline) expandConfirmDecline.disabled = !expandDeclineReason.value.trim();
     });
 
     expandConfirmDecline?.addEventListener('click', async () => {
@@ -3304,10 +3302,11 @@ function renderActivities() {
       expandConfirmDecline.disabled = true;
       expandConfirmDecline.textContent = '…';
       try {
+        const notes = state.reviewed[a.id]?.notes || '';
         const resp = await apiFetch('/api/activity/replace', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity: a, reason, userId: ensureUserId() })
+          body: JSON.stringify({ activity: a, reason, notes, userId: ensureUserId() })
         });
         if (!resp.ok) throw new Error('Replace failed');
         const { activity: rawReplacement } = await resp.json();
@@ -3321,7 +3320,7 @@ function renderActivities() {
         close();
         renderActivities();
       } catch {
-        expandConfirmDecline.textContent = 'Replace Activity';
+        expandConfirmDecline.textContent = 'Replace/Modify';
         expandConfirmDecline.disabled = false;
       }
     });

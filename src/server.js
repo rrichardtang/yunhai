@@ -929,7 +929,7 @@ app.post('/api/activity/replace', async (req, res) => {
     return res.status(503).json({ error: 'Anthropic API key not configured' });
   }
 
-  const { activity, reason, userId } = req.body || {};
+  const { activity, reason, notes, userId } = req.body || {};
   if (!activity?.name || !activity?.city || !reason) {
     return res.status(400).json({ error: 'activity, reason, and userId are required' });
   }
@@ -940,6 +940,7 @@ app.post('/api/activity/replace', async (req, res) => {
 
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const notesClause = notes ? `\nTraveler's saved notes for this activity: "${notes}"` : '';
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 600,
@@ -947,7 +948,7 @@ app.post('/api/activity/replace', async (req, res) => {
       messages: [{
         role: 'user',
         content: `The traveler declined this activity: "${activity.name}" (${activity.type}, ${activity.city}).
-Their reason: "${reason}"
+Their reason: "${reason}"${notesClause}
 
 Generate exactly ONE replacement activity for ${activity.city} that directly addresses their feedback. It must be different from the declined activity.
 
