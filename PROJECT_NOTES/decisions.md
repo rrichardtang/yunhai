@@ -4,6 +4,18 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-04-15] Minimal frontend boundary split with fallback-safe loading
+
+**Decision:** Extract only three boundary concerns from `public/app.js` into helper modules: overlay/modal manager (`public/js/overlayManager.js`), API/service layer (`public/js/apiService.js`), and top-level persistence helpers (`public/js/statePersistence.js`), while keeping orchestration in `app.js`.
+**Reasoning:** Recent mobile regressions showed that touching unrelated logic in one monolithic file increases blast radius. This split isolates high-churn boundaries first, lowers risk, and makes failures easier to localize without pausing feature work.
+**Alternatives rejected:**
+- Full rewrite into a framework/module system now — rejected as too risky and time-expensive for current delivery pace.
+- No split at all — rejected because it preserves the same fragility pattern.
+**Tradeoffs:**
+- `public/app.js` remains large by design for now.
+- Because `planner.html` still only loads `/app.js` directly in this environment, fallbacks remain in `app.js` when helper globals are missing.
+- Chosen approach is intentionally minimal and revertible (easy rollback by inlining boundary helpers if needed).
+
 ## [2026-04-11] Cross-device sync via server-side user data store
 
 **Decision:** Keep localStorage as a fast local cache and dual-write all user data (profiles, snapshots, view mode, chat session map) to a server-side flat JSON store keyed by Clerk userId. On sign-in, pull from server to hydrate localStorage if local is empty or stale.

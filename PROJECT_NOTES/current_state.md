@@ -1,12 +1,27 @@
 # Current State
 
-_Last updated: 2026-04-15 (session 2)_
+_Last updated: 2026-04-15 (session 3)_
 
 ## Objective
-Booking checklist overhaul — complete redesign per checklist.md spec.
+Stabilize frontend boundaries with a minimal split of high-churn logic out of `public/app.js` while keeping behavior unchanged.
 
 ## Active Workstream
-Full overhaul complete and ready to push. This session: rewrote checklist data model (typed schemas per transportation/accommodation/activity), rebuilt modal UI with category containers, collapsed/expanded rows, two-zone progressive disclosure, Google Maps autocomplete on location fields (reusing existing `attachPlaceAutocompleteElement`), pill search bar with autofill dropdown, container collapse/expand with item count badges, checked-off behavior (strikethrough + color shift, no reorder), undo toast on delete, per-container subtotals + grand total, + Add Item ghost buttons, fully responsive layout.
+Frontend boundary split landed with minimal scope:
+- Extracted **overlay/modal manager** into `public/js/overlayManager.js`
+- Extracted **API/service layer** into `public/js/apiService.js`
+- Extracted **top-level state/persistence helpers** into `public/js/statePersistence.js`
+
+Primary motivation:
+- reduce mobile fragility from one giant script
+- lower regression risk by isolating frequently-touched concerns
+- create clearer seams for future refactors without forcing a full rewrite now
+
+Intentional hold line:
+- `public/app.js` still owns core planner orchestration/UI flow (step rendering, activity/review interactions, arrange/finalize flow, chat wiring, map behaviors, and checklist UX orchestration)
+- split is intentionally **minimal and revertible** (small boundary files + fallback paths in `app.js`, no large architectural migration)
+
+Script-loading caveat status:
+- `planner.html` still does **not** load the new helper scripts directly in this environment (`/app.js` is still the only local app script tag), so `app.js` keeps runtime fallbacks and in-file defaults to preserve behavior if helper globals are absent.
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture

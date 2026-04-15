@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-15] Frontend split: isolate boundary helpers while keeping app.js orchestration
+
+- Extracted overlay/modal concerns to `public/js/overlayManager.js`
+- Extracted API/service wrapper concerns to `public/js/apiService.js`
+- Extracted top-level state/persistence helpers to `public/js/statePersistence.js`
+- Kept core planner orchestration intentionally in `public/app.js` (step flow, render pipeline, review/arrange/finalize logic, chat/maps/checklist integration)
+- Scope was intentionally minimal and revertible to reduce risk during active mobile-hardening work
+- In current workspace state, `public/planner.html` still loads `/app.js` directly and does not wire helper scripts yet; `app.js` retains fallback paths/defaults when helper globals are absent
+- Files: `public/js/overlayManager.js`, `public/js/apiService.js`, `public/js/statePersistence.js`, `public/app.js`, `PROJECT_NOTES/current_state.md`, `PROJECT_NOTES/decisions.md`, `PROJECT_NOTES/changelog.md`
+
 ## [2026-04-15] Fix checklist auto-population to rely solely on backend booking_type
 
 - Removed fragile frontend heuristic from `buildChecklistFromState()` that inferred booking requirement from `a.type`/`a.category` when `booking_type` was missing
