@@ -1180,7 +1180,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 767px) {
   .container { padding: 0 16px 32px; margin-top: 16px; }
   .panel { padding: 20px 16px; }
-  .setup-actions { flex-direction: column; }
+  .setup-actions { flex-direction: row; flex-wrap: wrap; }
   .review-toolbar { grid-template-columns: 1fr; }
   .city-row-main {
     grid-template-columns: auto 1fr 1fr auto;
@@ -1199,16 +1199,17 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   /* notes: col 2–4, row 3 */
   .city-row-main > :nth-child(5) { grid-column: 2 / 5; grid-row: 3; }
   .hotel-row,
-  .travel-row,
-  .accommodation-row,
+  .travel-row { grid-template-columns: 1fr; }
+  .accommodation-row { grid-template-columns: 1fr 1fr; }
+  .accommodation-row > :first-child { grid-column: 1 / -1; }
   .arrival-row,
-  .departure-row { grid-template-columns: 1fr; }
+  .departure-row { grid-template-columns: 1fr auto; }
   .topbar { padding: 12px 16px; }
   .topbar-row { flex-direction: column; align-items: flex-start; gap: 8px; }
   .topbar-actions { width: 100%; justify-content: space-between; flex-wrap: wrap; }
-  .step-nav-split { flex-direction: column; gap: 8px; }
-  .step-nav-split .nav-secondary,
-  .step-nav-split .nav-primary { max-width: none; width: 100%; text-align: center; }
+  .step-nav-split { flex-direction: row; gap: 8px; justify-content: space-between; }
+  .step-nav-split .nav-secondary { max-width: none; width: auto; }
+  .step-nav-split .nav-primary { max-width: none; flex: 1; text-align: center; }
   .execution-head { flex-direction: column; align-items: flex-start; }
   .execution-toolbar { width: 100%; }
   .execution-toolbar button { flex: 1; min-height: 40px; }
