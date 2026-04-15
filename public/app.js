@@ -2307,12 +2307,12 @@ function renderCities() {
         </div>
         <input type="date" value="${esc(city.logistics.arrival.date)}" data-field="dateFrom" aria-label="Start date" title="Start date" />
         <input type="date" value="${esc(city.logistics.departure.date)}" data-field="dateTo" aria-label="End date" title="End date" />
-        <button class="secondary" type="button" data-remove-city>Remove</button>
+        <button class="icon-btn red" type="button" data-remove-city title="Remove city"><i class="ph-bold ph-trash" aria-hidden="true"></i></button>
       </div>
       <div class="city-notes-row">
         <div class="textarea-expand-wrap">
           <textarea id="cityNotes-${city.id}" rows="2" class="profile-textarea-fixed city-notes-textarea" placeholder="Notes — any reminders, preferences, or details for this city…" data-field="notes">${esc(city.notes || '')}</textarea>
-          <button class="textarea-expand-btn city-notes-expand-btn" type="button" data-expand="cityNotes-${city.id}" data-title="Notes — ${esc(city.name || 'City')}" aria-label="Expand notes"><i class="ph-bold ph-arrows-out-simple"></i></button>
+          <button class="textarea-expand-btn city-notes-expand-btn" type="button" data-expand="cityNotes-${city.id}" data-title="Notes — ${esc(city.name || 'City')}" aria-label="Expand notes"><i class="ph-bold ph-caret-up"></i></button>
         </div>
       </div>
       ${readyForDetails && city.detailsExpanded ? `
@@ -3240,6 +3240,7 @@ function renderActivities() {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'card-expand-close';
     closeBtn.innerHTML = '<i class="ph-bold ph-x" aria-hidden="true"></i>';
+    closeBtn.classList.add('icon-btn', 'red');
     closeBtn.setAttribute('aria-label', 'Close');
 
     overlay.appendChild(closeBtn);
@@ -3431,7 +3432,7 @@ function mountActivityMapOverlay() {
     <div class="activity-map-shell">
       <div class="activity-map-topbar">
         <strong>Itinerary map</strong>
-        <button class="secondary close-activity-map" type="button">Close <i class="ph-bold ph-x" aria-hidden="true"></i></button>
+        <button class="icon-btn red close-activity-map" type="button" aria-label="Close map"><i class="ph-bold ph-x" aria-hidden="true"></i></button>
       </div>
       <div class="activity-map-canvas" id="activityMapCanvas"></div>
     </div>
@@ -5214,7 +5215,7 @@ function renderSavedItineraries() {
         </div>
         <div class="saved-itinerary-actions">
           <button type="button" class="secondary" data-load-itinerary="${esc(item.id)}">Open</button>
-          <button type="button" class="secondary" data-delete-itinerary="${esc(item.id)}">Delete</button>
+          <button type="button" class="icon-btn red" data-delete-itinerary="${esc(item.id)}" title="Delete itinerary"><i class="ph-bold ph-trash" aria-hidden="true"></i></button>
         </div>
       </article>
     `;

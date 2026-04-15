@@ -121,7 +121,7 @@
         </section>
 
         <div class="step-nav sticky-nav step-nav-split">
-          <button class="secondary save-progress-btn" type="button"><i class="ph-bold ph-floppy-disk"></i> Save Progress</button>
+          <button class="icon-btn grey save-progress-btn" type="button" title="Save Progress"><i class="ph-bold ph-floppy-disk"></i></button>
           <button id="planBtn" class="primary nav-primary" type="button" data-nav-next="1">Next <i class="ph-bold ph-arrow-right"></i></button>
         </div>
       </section>
@@ -146,7 +146,7 @@
         <div id="activitiesGrid" class="cards-grid"></div>
         <div class="step-nav sticky-nav step-nav-split">
           <button id="backToSetupBtn" class="secondary nav-secondary" type="button" data-nav-back="2"><i class="ph-bold ph-arrow-left"></i> Back</button>
-          <button class="secondary save-progress-btn" type="button"><i class="ph-bold ph-floppy-disk"></i> Save Progress</button>
+          <button class="icon-btn grey save-progress-btn" type="button" title="Save Progress"><i class="ph-bold ph-floppy-disk"></i></button>
           <button id="continueArrangeBtn" class="primary nav-primary" type="button" data-nav-next="2" title="Approve at least one activity to continue">Next <i class="ph-bold ph-arrow-right"></i></button>
           <p id="continueArrangeHint" class="nav-hint muted-text">Approve at least one activity to continue</p>
         </div>
@@ -169,7 +169,7 @@
         <div id="dayColumns" class="day-columns"></div>
         <div class="step-nav sticky-nav step-nav-split">
           <button id="backToReviewBtn" class="secondary nav-secondary" type="button" data-nav-back="3"><i class="ph-bold ph-arrow-left"></i> Back</button>
-          <button id="saveProgressBtn" class="secondary save-progress-btn" type="button"><i class="ph-bold ph-floppy-disk"></i> Save Progress</button>
+          <button id="saveProgressBtn" class="icon-btn grey save-progress-btn" type="button" title="Save Progress"><i class="ph-bold ph-floppy-disk"></i></button>
           <button id="generateBtn" class="primary nav-primary" type="button" data-nav-next="3">Next <i class="ph-bold ph-arrow-right"></i></button>
         </div>
       </section>
@@ -208,7 +208,7 @@
         </section>
         <div class="step-nav sticky-nav step-nav-split">
           <button id="editBtn" class="secondary nav-secondary" type="button" data-nav-back="4"><i class="ph-bold ph-arrow-left"></i> Back</button>
-          <button class="secondary save-progress-btn" type="button"><i class="ph-bold ph-floppy-disk"></i> Save Progress</button>
+          <button class="icon-btn grey save-progress-btn" type="button" title="Save Progress"><i class="ph-bold ph-floppy-disk"></i></button>
         </div>
       </section>
     </main>
@@ -219,11 +219,11 @@
           <select id="profileSelector" class="profile-dropdown" aria-label="Select profile"></select>
           <input id="profileNameInput" class="profile-name-input hidden" type="text" maxlength="32" aria-label="Profile name" />
           <button id="newProfileBtn" class="secondary" type="button">+ New Profile</button>
-          <button id="profileEditBtn" class="primary" type="button">Save</button>
+          <button id="profileEditBtn" class="icon-btn grey" type="button" title="Save"><i class="ph-bold ph-floppy-disk"></i></button>
         </div>
         <div class="between">
           <h3>Traveler Profile</h3>
-          <button id="prefsClose" class="secondary" type="button">Close</button>
+          <button id="prefsClose" class="icon-btn red" type="button" aria-label="Close"><i class="ph-bold ph-x"></i></button>
         </div>
 
         <section class="prefs-section profile-section">
@@ -233,7 +233,7 @@
           <p class="ai-summary-hint">Tell the planner your preferences as a traveler</p>
           <div class="textarea-expand-wrap">
             <textarea id="profileTravelNotes" rows="5" class="profile-textarea-fixed" placeholder="e.g. I'm not a morning person, I have a smaller budget, avoid things with lots of walking..."></textarea>
-            <button class="textarea-expand-btn" type="button" data-expand="profileTravelNotes" data-title="About me" aria-label="Expand About me"><i class="ph-bold ph-arrows-out-simple"></i></button>
+            <button class="textarea-expand-btn" type="button" data-expand="profileTravelNotes" data-title="About me" aria-label="Expand About me"><i class="ph-bold ph-caret-up"></i></button>
           </div>
         </section>
 
@@ -242,7 +242,7 @@
           <p class="ai-summary-hint">This is how the planner sees you. Edit if it doesn't feel right.</p>
           <div class="textarea-expand-wrap">
             <textarea id="profileAiSummary" rows="5" class="profile-textarea-fixed" placeholder="Save your profile to generate a summary..."></textarea>
-            <button class="textarea-expand-btn" type="button" data-expand="profileAiSummary" data-title="AI-generated summary" aria-label="Expand AI-generated summary"><i class="ph-bold ph-arrows-out-simple"></i></button>
+            <button class="textarea-expand-btn" type="button" data-expand="profileAiSummary" data-title="AI-generated summary" aria-label="Expand AI-generated summary"><i class="ph-bold ph-caret-up"></i></button>
           </div>
         </section>
 
@@ -252,7 +252,7 @@
           <div class="textarea-expand-dialog">
             <div class="textarea-expand-dialog-header">
               <span id="textareaExpandTitle" class="textarea-expand-dialog-title"></span>
-              <button id="textareaExpandClose" class="textarea-expand-close" type="button" aria-label="Close"><i class="ph-bold ph-x"></i></button>
+              <button id="textareaExpandClose" class="textarea-expand-close icon-btn red" type="button" aria-label="Close"><i class="ph-bold ph-x"></i></button>
             </div>
             <textarea id="textareaExpandEditor" class="textarea-expand-editor"></textarea>
             <div class="textarea-expand-actions">
@@ -261,7 +261,7 @@
           </div>
         </div>
 
-        <button id="deleteProfileBtn" class="secondary profile-delete-bottom" type="button"><i class="ph-bold ph-trash"></i> Delete</button>
+        <button id="deleteProfileBtn" class="icon-btn red profile-delete-bottom" type="button" title="Delete profile"><i class="ph-bold ph-trash"></i></button>
       </div>
     </div>
 
@@ -269,7 +269,7 @@
       <div class="modal-card checklist-modal-card">
         <div class="between checklist-modal-header">
           <h3>Booking Checklist</h3>
-          <button id="checklistModalClose" class="secondary" type="button">Close</button>
+          <button id="checklistModalClose" class="icon-btn red" type="button" aria-label="Close"><i class="ph-bold ph-x"></i></button>
         </div>
         <div id="confidenceChecklist"></div>
         <div class="checklist-modal-footer">
@@ -284,7 +284,7 @@
       <div id="chatPanel" class="hidden">
         <div id="chatHeader">
           <span>Travel Assistant</span>
-          <button id="chatClose" type="button"><i class="ph-bold ph-x"></i></button>
+          <button id="chatClose" class="icon-btn red" type="button" aria-label="Close chat"><i class="ph-bold ph-x"></i></button>
         </div>
         <div id="chatMessages"></div>
         <div id="chatInputArea">

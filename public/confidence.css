@@ -306,13 +306,16 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-muted, #475569);
-  padding: 4px 6px;
-  border-radius: 8px;
-  font-size: 15px;
-  transition: background .12s ease, color .12s ease;
+  color: #dc2626;
+  padding: 6px;
+  border-radius: 6px;
+  font-size: 1.05rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  transition: color .12s ease, text-shadow .12s ease, background .12s ease;
 }
-.cl-delete-btn:hover { background: #fee2e2; color: #991b1b; }
+.cl-delete-btn:hover { color: #ef4444; text-shadow: 0 0 8px rgba(239,68,68,.7); background: rgba(239,68,68,.08); }
 
 /* ── Form fields ── */
 .cl-field {
