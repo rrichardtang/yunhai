@@ -3113,7 +3113,7 @@ function renderActivities() {
                 <textarea id="actDecline-${a.id}" class="profile-textarea-fixed decline-reason" rows="2" maxlength="200" placeholder="What would you prefer instead?"></textarea>
                 <button class="textarea-expand-btn" type="button" data-expand="actDecline-${a.id}" data-title="Replace/Modify — ${esc(a.name)}" aria-label="Expand reason"><i class="ph-bold ph-arrows-out-simple"></i></button>
               </div>
-              <button class="icon-btn confirm-decline" type="button" title="Replace/Modify" aria-label="Replace/Modify" disabled><i class="ph-bold ph-recycle"></i></button>
+              <button class="icon-btn confirm-decline" type="button" title="Replace/Modify" aria-label="Replace/Modify" disabled><i class="ph-bold ph-arrows-clockwise"></i></button>
             </div>
           </div>
         </div>

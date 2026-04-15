@@ -476,7 +476,7 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 .notes-row .apply-note:not(:disabled):hover { background: #dcfce7; border-color: var(--ok); }
 
 /* ── Activity inline rows (notes + decline) ── */
-.activity-inline-row { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; }
+.activity-inline-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .activity-inline-row + .activity-inline-row { margin-top: 8px; }
 .activity-notes-wrap { flex: 1; min-width: 0; }
 .activity-notes-wrap .profile-textarea-fixed { font-size: 13px; border-radius: 10px; padding: 6px 28px 6px 8px; }
