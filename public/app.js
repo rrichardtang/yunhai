@@ -2501,7 +2501,34 @@ function renderActivities() {
 
   renderBudgetTracker();
   els.activitiesGrid.innerHTML = '';
-  filteredActivities.forEach((a) => {
+
+  // Clean up previous observer
+  if (window._cardRevealObserver) { window._cardRevealObserver.disconnect(); window._cardRevealObserver = null; }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      const placeholder = entry.target;
+      observer.unobserve(placeholder);
+      const idx = Number(placeholder.dataset.cardIndex);
+      const a = filteredActivities[idx];
+      if (!a) return;
+      const card = buildActivityCard(a);
+      placeholder.replaceWith(card);
+      requestAnimationFrame(() => card.classList.add('card-revealed'));
+    });
+  }, { rootMargin: '200px' });
+  window._cardRevealObserver = observer;
+
+  filteredActivities.forEach((a, i) => {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'activity-card-placeholder';
+    placeholder.dataset.cardIndex = i;
+    els.activitiesGrid.appendChild(placeholder);
+    observer.observe(placeholder);
+  });
+
+  function buildActivityCard(a) {
     const review = state.reviewed[a.id] || { approved: null, notes: '' };
     const approvedState = review.approved;
     const isApproved = approvedState === true;
@@ -2512,12 +2539,12 @@ function renderActivities() {
     const verdictClass = `verdict-${(a.verdict || '').replace(/\s+/g, '-')}`;
     const isFlipped = Boolean(state.reviewCardFlips[a.id]);
     const card = document.createElement('article');
-    card.className = `card activity-card ${cardStateClass} ${isFlipped ? 'is-flipped' : ''}`.trim();
+    card.className = `card activity-card card-reveal ${cardStateClass} ${isFlipped ? 'is-flipped' : ''}`.trim();
     card.dataset.activityId = a.id;
     card.innerHTML = `
       <div class="activity-card-inner">
         <div class="activity-card-face activity-card-front">
-          <img src="${esc(a.imageUrl || '')}" alt="${esc(a.name)}" />
+          <img src="${esc(a.imageUrl || '')}" alt="${esc(a.name)}" loading="lazy" />
           <div class="card-content">
             <div class="activity-card-head-actions">
               <div>
@@ -2622,7 +2649,6 @@ function renderActivities() {
 
     declineBtn.addEventListener('click', () => {
       if (state.reviewed[a.id]?.approved === false) {
-        // Already declined — toggle back to unreviewed
         state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: null };
         renderActivities();
         return;
@@ -2704,8 +2730,8 @@ function renderActivities() {
       openActivityMapOverlay(a.id);
     });
 
-    els.activitiesGrid.appendChild(card);
-  });
+    return card;
+  }
 }
 
 function destroyMiniMaps() {

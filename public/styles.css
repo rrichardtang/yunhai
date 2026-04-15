@@ -374,7 +374,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   box-shadow: var(--shadow-sm);
   color: var(--text);
 }
-.activity-card { transition: background .2s ease, border-left-color .2s ease; perspective: 1200px; min-height: 520px; }
+.activity-card-placeholder { min-height: 520px; border-radius: 20px; background: var(--secondary-light); }
+.card-reveal { opacity: 0; transform: translateY(24px); }
+.card-revealed { opacity: 1; transform: translateY(0); transition: opacity .4s ease, transform .4s ease; }
+.activity-card { transition: background .2s ease, border-left-color .2s ease, opacity .4s ease, transform .4s ease; perspective: 1200px; min-height: 520px; }
 .activity-card-inner { position: relative; width: 100%; min-height: 520px; transition: transform .55s ease; transform-style: preserve-3d; }
 .activity-card.is-flipped .activity-card-inner { transform: rotateY(180deg); }
 .activity-card-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--base-light); overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
@@ -1239,6 +1242,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   .step-nav-split .nav-secondary { max-width: none; width: auto; }
   .step-nav-split .nav-primary { max-width: none; flex: 1; text-align: center; }
   .sticky-nav { padding: 8px; border-radius: 10px; }
+
+  /* Activity cards: reduce GPU pressure */
+  .activity-card { perspective: none; min-height: 420px; }
+  .activity-card.is-flipped { perspective: 1200px; }
+  .activity-card-inner { min-height: 420px; }
+  .cards-grid { grid-template-columns: 1fr; }
 
   /* Misc */
   .execution-head { flex-direction: column; align-items: flex-start; }
