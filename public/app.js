@@ -2599,20 +2599,13 @@ function renderActivities() {
               <button class="${approveBtnClass}"><i class="ph-bold ph-check-circle" aria-hidden="true"></i> Approve</button>
               <button class="${declineBtnClass}"><i class="ph-bold ph-x-circle" aria-hidden="true"></i> Decline</button>
             </div>
-            <div class="decline-feedback hidden">
+            <div class="decline-feedback">
               <textarea class="decline-reason" rows="2" maxlength="200" placeholder="Why are you declining? What would you prefer instead? (required)"></textarea>
               <div class="decline-feedback-actions">
                 <button class="secondary save-decline-notes" type="button" disabled>Save Notes</button>
                 <button class="primary confirm-decline" type="button" disabled>Replace Activity</button>
               </div>
             </div>
-            <label class="${review.approved ? '' : 'hidden'}">
-              Customize
-              <div class="notes-row">
-                <textarea rows="2" class="notes" placeholder="What would you like to change?">${esc(review.notes || '')}</textarea>
-                <button class="apply-note" title="Apply note to activity" ${(review.notes || '').trim() ? '' : 'disabled'}><i class="ph-bold ph-floppy-disk" aria-hidden="true"></i></button>
-              </div>
-            </label>
           </div>
         </div>
         <div class="activity-card-face activity-card-back">
@@ -2670,20 +2663,17 @@ function renderActivities() {
       if (nextApproved === true) postPreferenceSignal(a, 'approved');
       syncVerdictClasses(card, nextApproved);
     });
-    const declineFeedback = card.querySelector('.decline-feedback');
     const declineReason = card.querySelector('.decline-reason');
     const confirmDecline = card.querySelector('.confirm-decline');
     const saveDeclineNotes = card.querySelector('.save-decline-notes');
     const declineBtn = card.querySelector('.decline');
 
     declineBtn.addEventListener('click', () => {
-      if (state.reviewed[a.id]?.approved === false) {
-        state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: null };
-        syncVerdictClasses(card, null);
-        return;
-      }
-      declineFeedback.classList.remove('hidden');
-      declineBtn.disabled = true;
+      const current = state.reviewed[a.id]?.approved;
+      const nextApproved = current === false ? null : false;
+      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: nextApproved };
+      if (nextApproved === false) postPreferenceSignal(a, 'declined');
+      syncVerdictClasses(card, nextApproved);
     });
 
     saveDeclineNotes.addEventListener('click', () => {
@@ -2691,7 +2681,6 @@ function renderActivities() {
       if (!reason) return;
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: false, declineReason: reason };
       postPreferenceSignal(a, 'declined', reason);
-      renderActivities();
     });
 
     declineReason.addEventListener('input', () => {
@@ -2726,38 +2715,6 @@ function renderActivities() {
         confirmDecline.disabled = false;
       }
     });
-    const notes = card.querySelector('.notes');
-    const applyBtn = card.querySelector('.apply-note');
-    if (notes) {
-      notes.addEventListener('input', () => {
-        state.reviewed[a.id].notes = notes.value;
-        if (applyBtn) applyBtn.disabled = !notes.value.trim();
-      });
-    }
-    if (applyBtn) {
-      applyBtn.addEventListener('click', async () => {
-        const note = (state.reviewed[a.id]?.notes || '').trim();
-        if (!note) return;
-        applyBtn.disabled = true;
-        applyBtn.textContent = '…';
-        try {
-          const resp = await apiFetch('/api/activity/refine', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ activity: a, note })
-          });
-          if (!resp.ok) throw new Error('Refine failed');
-          const { updates } = await resp.json();
-          Object.assign(a, updates);
-          state.reviewed[a.id].notes = '';
-          renderActivities();
-        } catch {
-          applyBtn.innerHTML = '<i class="ph-bold ph-floppy-disk" aria-hidden="true"></i>';
-          applyBtn.disabled = false;
-        }
-      });
-    }
-
     card.querySelector('.mini-map-wrap')?.addEventListener('click', () => {
       openActivityMapOverlay(a.id);
     });
@@ -2822,21 +2779,16 @@ function renderActivities() {
     });
 
     const expandDeclineBtn = body.querySelector('.decline');
-    const expandDeclineFeedback = body.querySelector('.decline-feedback');
     const expandDeclineReason = body.querySelector('.decline-reason');
     const expandSaveNotes = body.querySelector('.save-decline-notes');
     const expandConfirmDecline = body.querySelector('.confirm-decline');
 
     expandDeclineBtn?.addEventListener('click', () => {
-      if (state.reviewed[a.id]?.approved === false) {
-        state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: null };
-        syncExpand(null);
-        expandDeclineFeedback?.classList.add('hidden');
-        expandDeclineBtn.disabled = false;
-        return;
-      }
-      expandDeclineFeedback?.classList.remove('hidden');
-      expandDeclineBtn.disabled = true;
+      const current = state.reviewed[a.id]?.approved;
+      const next = current === false ? null : false;
+      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: next };
+      if (next === false) postPreferenceSignal(a, 'declined');
+      syncExpand(next);
     });
 
     expandDeclineReason?.addEventListener('input', () => {
@@ -2851,8 +2803,6 @@ function renderActivities() {
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: false, declineReason: reason };
       postPreferenceSignal(a, 'declined', reason);
       syncExpand(false);
-      expandDeclineFeedback?.classList.add('hidden');
-      expandDeclineBtn.disabled = false;
     });
 
     expandConfirmDecline?.addEventListener('click', async () => {
