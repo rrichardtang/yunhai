@@ -340,7 +340,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   width: 100%;
   font-size: .9rem;
 }
-.city-row-toggle { min-width: 32px; padding: 4px 8px; }
+.city-row-toggle { font-size: 1rem; }
 .city-drawer { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--secondary-light); }
 .city-dropdown-grid { display: grid; gap: 10px; }
 .city-dropdown-section { border: 1px solid var(--secondary-light); border-radius: 14px; padding: 14px; background: var(--secondary-light); }

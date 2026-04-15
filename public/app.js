@@ -2301,7 +2301,7 @@ function renderCities() {
     row.dataset.cityId = city.id;
     row.innerHTML = `
       <div class="city-row-main">
-        <button class="secondary city-row-toggle" type="button" data-toggle-details ${readyForDetails ? '' : 'disabled'}>${city.detailsExpanded ? '−' : '+'}</button>
+        <button class="icon-btn grey city-row-toggle" type="button" data-toggle-details ${readyForDetails ? '' : 'disabled'}><i class="ph-bold ${city.detailsExpanded ? 'ph-caret-up' : 'ph-caret-down'}" aria-hidden="true"></i></button>
         <div class="city-autocomplete">
           <input type="text" placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off" />
         </div>
@@ -2312,7 +2312,7 @@ function renderCities() {
       <div class="city-notes-row">
         <div class="textarea-expand-wrap">
           <textarea id="cityNotes-${city.id}" rows="2" class="profile-textarea-fixed city-notes-textarea" placeholder="Notes — any reminders, preferences, or details for this city…" data-field="notes">${esc(city.notes || '')}</textarea>
-          <button class="textarea-expand-btn city-notes-expand-btn" type="button" data-expand="cityNotes-${city.id}" data-title="Notes — ${esc(city.name || 'City')}" aria-label="Expand notes"><i class="ph-bold ph-caret-up"></i></button>
+          <button class="textarea-expand-btn city-notes-expand-btn" type="button" data-expand="cityNotes-${city.id}" data-title="Notes — ${esc(city.name || 'City')}" aria-label="Expand notes"><i class="ph-bold ph-arrows-out-simple"></i></button>
         </div>
       </div>
       ${readyForDetails && city.detailsExpanded ? `
