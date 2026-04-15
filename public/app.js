@@ -536,18 +536,37 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
   element.insertAdjacentElement('afterend', placeAutocomplete);
 
   // Style the shadow DOM input to match our compact UI
+  const isMobile = window.innerWidth < 768;
+  if (isMobile) {
+    placeAutocomplete.style.height = '32px';
+    placeAutocomplete.style.maxHeight = '32px';
+    placeAutocomplete.style.overflow = 'hidden';
+  }
   const styleShadowInput = () => {
-    const inner = placeAutocomplete.shadowRoot?.querySelector('input');
-    if (!inner) return;
-    inner.style.fontSize = window.innerWidth < 768 ? '0.65rem' : 'inherit';
-    inner.style.padding = window.innerWidth < 768 ? '3px 4px' : '10px 14px';
-    inner.style.boxSizing = 'border-box';
-    inner.style.minHeight = '0';
+    const sr = placeAutocomplete.shadowRoot;
+    if (!sr) return;
+    // Inject a style tag to override all internal styles
+    if (!sr.querySelector('.tp-override')) {
+      const s = document.createElement('style');
+      s.className = 'tp-override';
+      s.textContent = `
+        @media (max-width: 767px) {
+          :host { height: 32px !important; max-height: 32px !important; }
+          * { font-size: 0.8rem !important; box-sizing: border-box !important; }
+          input { padding: 4px 8px !important; height: 32px !important; min-height: 0 !important; }
+          div, span { padding: 0 !important; margin: 0 !important; min-height: 0 !important; }
+        }
+      `;
+      sr.prepend(s);
+    }
+    const inner = sr.querySelector('input');
+    if (!inner || !isMobile) return;
+    inner.style.cssText = 'font-size:0.8rem;padding:4px 8px;height:32px;min-height:0;box-sizing:border-box';
   };
-  // Try immediately and after a short delay for shadow DOM readiness
   styleShadowInput();
   requestAnimationFrame(styleShadowInput);
   setTimeout(styleShadowInput, 200);
+  setTimeout(styleShadowInput, 500);
 
   const getWidgetValue = () => {
     if (typeof placeAutocomplete.value === 'string') return placeAutocomplete.value;
