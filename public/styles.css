@@ -986,18 +986,21 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 }
 
 /* ── Step nav (sticky bottom bar) ── */
-.step-nav { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
-.step-nav-split { flex-direction: row; justify-content: flex-end; align-items: center; }
+.step-nav { margin-top: 16px; display: flex; justify-content: center; }
+.step-nav-split { flex-direction: row; justify-content: center; align-items: center; gap: 4px; }
 .sticky-nav {
   position: sticky;
   bottom: 10px;
   z-index: 10;
-  padding: 14px;
+  padding: 8px 16px;
   border: 1px solid var(--secondary-light);
   border-radius: 16px;
   background: rgba(250, 248, 245, 0.96);
   backdrop-filter: blur(6px);
   box-shadow: var(--shadow-sm);
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
 }
 .nav-primary { font-size: 1.4rem; color: var(--accent) !important; background: none !important; border: none !important; }
 .nav-primary:hover:not(:disabled) { color: var(--accent-hover) !important; text-shadow: 0 0 10px rgba(42,125,225,.6); background: rgba(42,125,225,.08) !important; }
@@ -1258,9 +1261,7 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
   .topbar-actions { width: 100%; justify-content: space-between; flex-wrap: wrap; }
 
   /* Step nav */
-  .step-nav-split { flex-direction: row; gap: 8px; justify-content: space-between; }
-  .step-nav-split .nav-secondary { max-width: none; }
-  .step-nav-split .nav-primary { max-width: none; }
+  .step-nav-split { gap: 4px; }
   .sticky-nav { padding: 8px; border-radius: 10px; }
 
   /* Activity cards: compact preview on mobile — tap to expand */
