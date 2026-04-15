@@ -992,6 +992,39 @@ let loadingInterval = null;
 let loadingMessageIndex = 0;
 let activeSavingToastId = null;
 
+function refreshOverlayInterlocks() {
+  const hasBlockingOverlay = [
+    document.getElementById('planningOverlay'),
+    document.getElementById('prefsModal'),
+    document.getElementById('checklistModal'),
+    document.getElementById('textareaExpandModal'),
+    document.querySelector('.activity-map-overlay'),
+    document.getElementById('confirmDialog')
+  ].some((node) => node && !node.classList.contains('hidden'));
+
+  document.body.classList.toggle('overlay-active', hasBlockingOverlay);
+}
+
+function refreshCityTimelineUI(row, city) {
+  if (!row || !city) return;
+  const error = validateCityTimeline(city);
+  const errorEl = row.querySelector('.city-dropdown-error');
+  if (errorEl) {
+    errorEl.textContent = error || '';
+    errorEl.classList.toggle('hidden', !error);
+  }
+
+  const checkIn = row.querySelector('[data-logistics="accommodationCheckIn"]');
+  if (checkIn && checkIn.value !== (city.logistics?.accommodation?.checkIn || '')) {
+    checkIn.value = city.logistics.accommodation.checkIn || '';
+  }
+
+  const checkOut = row.querySelector('[data-logistics="accommodationCheckOut"]');
+  if (checkOut && checkOut.value !== (city.logistics?.accommodation?.checkOut || '')) {
+    checkOut.value = city.logistics.accommodation.checkOut || '';
+  }
+}
+
 function showToast(message, type = 'info') {
   const safeType = ['success', 'error', 'info'].includes(type) ? type : 'info';
   const host = document.getElementById('toastHost');
@@ -1402,6 +1435,7 @@ function computeConfidenceLocal() {
 
 // Checklist search state (module-level, reset on each modal open)
 const checklistSearch = { query: '', containerCollapsed: {} };
+let checklistSearchRenderTimer = null;
 
 function renderChecklistItemExpanded(item) {
   const hasSecondary = item.referenceNum || item.notes || item.budgetUsd != null;
@@ -1658,9 +1692,16 @@ function bindChecklistEvents(el) {
   const searchInput = el.querySelector('#clSearchInput');
   searchInput?.addEventListener('input', (e) => {
     checklistSearch.query = e.target.value;
-    renderChecklistModal();
-    const newInput = el.querySelector('#clSearchInput');
-    if (newInput) { newInput.focus(); newInput.setSelectionRange(newInput.value.length, newInput.value.length); }
+    if (checklistSearchRenderTimer) clearTimeout(checklistSearchRenderTimer);
+    checklistSearchRenderTimer = setTimeout(() => {
+      renderChecklistModal();
+      const newInput = el.querySelector('#clSearchInput');
+      if (newInput) {
+        newInput.focus();
+        newInput.setSelectionRange(newInput.value.length, newInput.value.length);
+      }
+      checklistSearchRenderTimer = null;
+    }, 90);
   });
 
   // Search result selection
@@ -1873,20 +1914,41 @@ function syncItemFromExpanded(el, id) {
   item.updatedAt = new Date().toISOString();
 
   if (item.type === 'transportation') {
-    item.startLocation = get('[data-cl="startLocation"]') || item.startLocation;
-    item.endLocation = get('[data-cl="endLocation"]') || item.endLocation;
+    item.startLocation = get('[data-cl="startLocation"]');
+    item.endLocation = get('[data-cl="endLocation"]');
     item.departureDate = get('[data-cl="departureDate"]');
     item.departureTime = get('[data-cl="departureTime"]');
     item.returnDate = get('[data-cl="returnDate"]');
     item.returnTime = get('[data-cl="returnTime"]');
+
+    if (!item.startLocation) {
+      item.startPlaceId = '';
+      item.startLat = null;
+      item.startLng = null;
+    }
+    if (!item.endLocation) {
+      item.endPlaceId = '';
+      item.endLat = null;
+      item.endLng = null;
+    }
   } else if (item.type === 'accommodation') {
-    item.accommodationCity = get('[data-cl="accommodationCity"]') || item.accommodationCity;
+    item.accommodationCity = get('[data-cl="accommodationCity"]');
     item.checkInDate = get('[data-cl="checkInDate"]');
     item.checkOutDate = get('[data-cl="checkOutDate"]');
+    if (!item.accommodationCity) {
+      item.accommodationCityPlaceId = '';
+      item.accommodationCityLat = null;
+      item.accommodationCityLng = null;
+    }
   } else {
-    item.activityLocation = get('[data-cl="activityLocation"]') || item.activityLocation;
+    item.activityLocation = get('[data-cl="activityLocation"]');
     item.activityDate = get('[data-cl="activityDate"]');
     item.activityTime = get('[data-cl="activityTime"]');
+    if (!item.activityLocation) {
+      item.activityLocationPlaceId = '';
+      item.activityLocationLat = null;
+      item.activityLocationLng = null;
+    }
   }
 
   // Keep legacy fields in sync for confidence score
@@ -2027,6 +2089,7 @@ function setPlanningLoading(isLoading) {
 
   if (!isLoading) {
     overlay.classList.add('hidden');
+    refreshOverlayInterlocks();
     if (loadingInterval) clearInterval(loadingInterval);
     loadingInterval = null;
     loadingMessageIndex = 0;
@@ -2038,6 +2101,7 @@ function setPlanningLoading(isLoading) {
   overlay.querySelector('[data-loading-message]').textContent = LOADING_MESSAGES[0];
   updatePlanningStatus('Starting planning...', '');
   overlay.classList.remove('hidden');
+  refreshOverlayInterlocks();
 
   if (loadingInterval) clearInterval(loadingInterval);
   loadingInterval = setInterval(() => {
@@ -2360,7 +2424,8 @@ function renderCities() {
     `;
 
     row.querySelectorAll('[data-field]').forEach((input) => {
-      input.addEventListener('input', () => {
+      const eventType = (input.type === 'date' || input.type === 'time') ? 'change' : 'input';
+      input.addEventListener(eventType, () => {
         const field = input.dataset.field;
 
         if (field === 'name') {
@@ -2384,8 +2449,8 @@ function renderCities() {
           if (city.accommodation) city.accommodation.checkIn = input.value || '';
           syncCityLegacyDates(city);
           syncTravelDateTimes();
+          refreshCityTimelineUI(row, city);
           renderSetupInsights();
-          renderCities();
           return;
         }
 
@@ -2395,8 +2460,8 @@ function renderCities() {
           if (city.accommodation) city.accommodation.checkOut = input.value || '';
           syncCityLegacyDates(city);
           syncTravelDateTimes();
+          refreshCityTimelineUI(row, city);
           renderSetupInsights();
-          renderCities();
           return;
         }
 
@@ -2526,7 +2591,8 @@ function renderCities() {
     });
 
     row.querySelectorAll('[data-logistics]').forEach((input) => {
-      input.addEventListener('input', () => {
+      const eventType = (input.type === 'date' || input.type === 'time') ? 'change' : 'input';
+      input.addEventListener(eventType, () => {
         const field = input.dataset.logistics;
 
         // Don't re-render on text input for location fields — it destroys the autocomplete widget
@@ -2549,8 +2615,8 @@ function renderCities() {
 
         syncCityLegacyDates(city);
         syncTravelDateTimes();
+        refreshCityTimelineUI(row, city);
         renderSetupInsights();
-        renderCities();
       });
     });
 
@@ -2788,21 +2854,29 @@ async function openPreferencesModal() {
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   renderPreferencesModal();
   els.prefsModal.classList.remove('hidden');
+  refreshOverlayInterlocks();
 }
 
 function closePreferencesModal() {
   renderPreferencesModal();
   els.prefsModal.classList.add('hidden');
+  refreshOverlayInterlocks();
 }
 
 function openChecklistModal() {
   buildChecklistFromState();
   document.getElementById('checklistModal').classList.remove('hidden');
   renderChecklistModal();
+  refreshOverlayInterlocks();
 }
 
 function closeChecklistModal() {
+  if (checklistSearchRenderTimer) {
+    clearTimeout(checklistSearchRenderTimer);
+    checklistSearchRenderTimer = null;
+  }
   document.getElementById('checklistModal').classList.add('hidden');
+  refreshOverlayInterlocks();
 }
 
 async function fetchStatus() {
@@ -3458,6 +3532,7 @@ function mountActivityMapOverlay() {
 function closeActivityMapOverlay() {
   if (!activityMapOverlay) return;
   activityMapOverlay.classList.add('hidden');
+  refreshOverlayInterlocks();
 }
 
 function focusActivityCard(activityId) {
@@ -3474,6 +3549,7 @@ async function openActivityMapOverlay(selectedActivityId = null) {
   mountActivityMapOverlay();
   state.mapOverlaySelectedActivityId = selectedActivityId;
   activityMapOverlay.classList.remove('hidden');
+  refreshOverlayInterlocks();
 
   const mapCanvas = activityMapOverlay.querySelector('#activityMapCanvas');
   const activities = [...state.activities];
@@ -5750,7 +5826,9 @@ function showRegenerateConfirmDialog() {
         </div>
       </div>`;
     document.body.appendChild(dialog);
+    refreshOverlayInterlocks();
 
+<<<<<<< HEAD
     const cleanup = (result) => { dialog.remove(); resolve(result); };
 
     dialog.querySelector('#regenYes').addEventListener('click', () => {
@@ -5759,6 +5837,16 @@ function showRegenerateConfirmDialog() {
     });
     dialog.querySelector('#regenNo').addEventListener('click', () => cleanup(null));
     dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(null); });
+=======
+    const cleanup = (result) => {
+      dialog.remove();
+      refreshOverlayInterlocks();
+      resolve(result);
+    };
+    dialog.querySelector('#regenYes').addEventListener('click', () => cleanup(true));
+    dialog.querySelector('#regenNo').addEventListener('click', () => cleanup(false));
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(false); });
+>>>>>>> 922fc86879c16ff76b92ee635eb143853142c26c
   });
 }
 
@@ -5780,8 +5868,13 @@ function showConfirmDialog(title, message, confirmLabel = 'Confirm') {
         </div>
       </div>`;
     document.body.appendChild(dialog);
+    refreshOverlayInterlocks();
 
-    const cleanup = (result) => { dialog.remove(); resolve(result); };
+    const cleanup = (result) => {
+      dialog.remove();
+      refreshOverlayInterlocks();
+      resolve(result);
+    };
     dialog.querySelector('#confirmYes').addEventListener('click', () => cleanup(true));
     dialog.querySelector('#confirmNo').addEventListener('click', () => cleanup(false));
     dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(false); });
@@ -6340,6 +6433,7 @@ function openExpandModal(targetId, title) {
   expandTitle.textContent = title;
   expandEditor.value = document.getElementById(targetId)?.value || '';
   expandModal.classList.remove('hidden');
+  refreshOverlayInterlocks();
   expandEditor.focus();
 }
 
@@ -6352,6 +6446,7 @@ function closeExpandModal(save) {
     }
   }
   expandModal.classList.add('hidden');
+  refreshOverlayInterlocks();
   expandTargetId = null;
 }
 
