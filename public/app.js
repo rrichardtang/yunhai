@@ -1830,8 +1830,13 @@ function renderCities() {
         </div>
         <input type="date" value="${esc(city.logistics.arrival.date)}" data-field="dateFrom" aria-label="Start date" title="Start date" />
         <input type="date" value="${esc(city.logistics.departure.date)}" data-field="dateTo" aria-label="End date" title="End date" />
-        <input type="text" placeholder="Notes" value="${esc(city.notes || '')}" data-field="notes" />
         <button class="secondary" type="button" data-remove-city>Remove</button>
+      </div>
+      <div class="city-notes-row">
+        <div class="textarea-expand-wrap">
+          <textarea id="cityNotes-${city.id}" rows="2" class="profile-textarea-fixed city-notes-textarea" placeholder="Notes — any reminders, preferences, or details for this city…" data-field="notes">${esc(city.notes || '')}</textarea>
+          <button class="textarea-expand-btn city-notes-expand-btn" type="button" data-expand="cityNotes-${city.id}" data-title="Notes — ${esc(city.name || 'City')}" aria-label="Expand notes"><i class="ph-bold ph-arrows-out-simple"></i></button>
+        </div>
       </div>
       ${readyForDetails && city.detailsExpanded ? `
         <div class="city-drawer">
@@ -1873,7 +1878,7 @@ function renderCities() {
       ` : ''}
     `;
 
-    row.querySelectorAll('input[data-field]').forEach((input) => {
+    row.querySelectorAll('[data-field]').forEach((input) => {
       input.addEventListener('input', () => {
         const field = input.dataset.field;
 
@@ -1950,6 +1955,11 @@ function renderCities() {
         }
       });
     }
+
+    row.querySelector('.city-notes-expand-btn')?.addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      openExpandModal(btn.dataset.expand, btn.dataset.title);
+    });
 
     const accommodationInput = row.querySelector('[data-accommodation-field="address"]');
     if (accommodationInput && isGooglePlacesReady()) {
@@ -5769,7 +5779,10 @@ function openExpandModal(targetId, title) {
 function closeExpandModal(save) {
   if (save && expandTargetId) {
     const target = document.getElementById(expandTargetId);
-    if (target) target.value = expandEditor.value;
+    if (target) {
+      target.value = expandEditor.value;
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   }
   expandModal.classList.add('hidden');
   expandTargetId = null;
