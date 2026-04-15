@@ -1659,8 +1659,8 @@ function bindChecklistEvents(el) {
   searchInput?.addEventListener('input', (e) => {
     checklistSearch.query = e.target.value;
     renderChecklistModal();
-    // Re-focus
-    el.querySelector('#clSearchInput')?.focus();
+    const newInput = el.querySelector('#clSearchInput');
+    if (newInput) { newInput.focus(); newInput.setSelectionRange(newInput.value.length, newInput.value.length); }
   });
 
   // Search result selection

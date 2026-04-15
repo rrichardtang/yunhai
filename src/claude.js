@@ -211,7 +211,15 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
     opening_hours: String(raw.opening_hours || defaults.openingHours || '').trim(),
     estimated_cost_usd: (Number.isFinite(Number(raw.estimated_cost_usd)) && Number(raw.estimated_cost_usd) >= 0) ? Number(raw.estimated_cost_usd) : null,
     cost_type: raw.cost_type === 'per_group' ? 'per_group' : 'per_person',
-    booking_type: ['tour', 'attraction', 'restaurant', 'none'].includes(raw.booking_type) ? raw.booking_type : 'none',
+    booking_type: (() => {
+      if (['tour', 'attraction', 'restaurant', 'none'].includes(raw.booking_type)) return raw.booking_type;
+      // Claude omitted or gave invalid booking_type — infer from type field
+      const t = String(raw.type || '').toLowerCase();
+      if (t === 'tour' || t === 'show') return 'tour';
+      if (['cultural', 'sports'].includes(t)) return 'attraction';
+      if (['food', 'breakfast', 'lunch', 'dinner'].includes(t)) return 'restaurant';
+      return 'none';
+    })(),
     booking_links: []
   };
 }
