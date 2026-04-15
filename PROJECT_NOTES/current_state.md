@@ -1,17 +1,15 @@
 # Current State
 
-_Last updated: 2026-04-14 (session 10)_
+_Last updated: 2026-04-14 (session 11)_
 
 ## Objective
 Mobile experience polish — fix navigation bugs and responsive layout issues on iOS WebKit (Brave on iPhone).
 
 ## Active Workstream
-All mobile fixes complete and pushed:
-- Back button / browser nav causing full page reload on iOS WebKit — fixed via `history.replaceState` seed + `pushState` with null URL + `spa` flag guard on `popstate`
-- Header buttons unclickable on mobile — fixed with `position: relative; z-index: 100` on `.topbar`
-- Chat concierge panel offset off-screen on mobile — fixed `right: -24px` → `right: 0; left: 0`
-- City card row layout broken on mobile — replaced 1fr collapse with explicit `nth-child` grid placement
-- Structural navigation bug fixed: 3 independent nav systems (Next/Back, step tabs, browser back) had inconsistent per-step render logic; `setStep()` now owns all step-entry rendering so every nav path gets the same behavior
+All mobile fixes complete and pushed. Latest fix addresses mobile crash when rapidly tapping step headers:
+- `setStep()` transition lock (RAF-based) prevents concurrent render calls from rapid taps
+- Sortable instances now tracked and destroyed before each `renderArrange()` re-render
+- Step indicator CSS hardened for mobile: `touch-action: manipulation`, `user-select: none`, tap highlight suppressed
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
@@ -25,6 +23,6 @@ All mobile fixes complete and pushed:
 - Mobile city card layout uses `nth-child` selectors — fragile if HTML child order changes
 
 ## Next Actions
-- Verify mobile fixes on device (back button, header buttons, chat, city card layout, step navigation)
+- Verify rapid-tap crash fix on device
 - Add visual issue deep-links from confidence step to specific itinerary items/cards
 - Add “reminder before departure” scheduling behavior behind a simple server-side cron/passive worker

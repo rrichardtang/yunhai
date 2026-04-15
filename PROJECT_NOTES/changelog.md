@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-14] Fix mobile crash when rapidly tapping step header navigation
+
+- Root cause 1: no transition lock on `setStep()` — rapid mobile taps fired multiple concurrent render calls (renderArrange, renderItinerary, renderConfidence) in the same frame, causing DOM thrashing and crash
+- Root cause 2: `renderArrange()` created new Sortable instances on every call without destroying previous ones — accumulated orphaned drag handlers corrupted the DOM under rapid navigation
+- Root cause 3: step indicator lacked mobile touch CSS — missing `touch-action: manipulation` caused 300ms delay + double-tap zoom; missing `user-select: none` caused text selection flicker
+- Fix 1: added `requestAnimationFrame`-based transition lock in `setStep()` — drops any `setStep` call that arrives before the previous frame completes
+- Fix 2: introduced `_arrangeSortables` array; all Sortable instances are tracked and `.destroy()`-ed at the start of each `renderArrange()` call
+- Fix 3: added `touch-action: manipulation`, `user-select: none`, `-webkit-tap-highlight-color: transparent` to `.step` in `styles.css`
+- Files: `public/app.js`, `public/styles.css`
+
 ## [2026-04-14] Fix structural navigation bug — setStep() as single source of truth for step rendering
 
 - Root cause: 3 independent navigation systems (Next/Back buttons, step tab clicks, browser back/popstate) each had their own ad-hoc render logic; step tabs and browser back only handled steps 3/4, never step 2 — navigating to Review via tab or browser back showed a blank/stale panel

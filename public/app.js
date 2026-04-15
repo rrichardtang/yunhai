@@ -1008,7 +1008,12 @@ function updatePlanningStatus(status = '', progress = '') {
   overlay.querySelector('[data-progress]').textContent = progress;
 }
 
+let _stepTransitionLock = false;
 function setStep(n, { pushHistory = true } = {}) {
+  if (_stepTransitionLock) return;
+  _stepTransitionLock = true;
+  requestAnimationFrame(() => { _stepTransitionLock = false; });
+
   const prev = state.step;
   state.step = n;
   if (n > state.maxStep) state.maxStep = n;
@@ -3515,7 +3520,11 @@ function bindCommuteInteractions() {
   document.addEventListener('click', closeAllCommuteMenus, { once: true });
 }
 
+let _arrangeSortables = [];
 function renderArrange() {
+  _arrangeSortables.forEach((s) => { try { s.destroy(); } catch {} });
+  _arrangeSortables = [];
+
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
   const cityGroups = getArrangeCities();
   renderArrangeCityNav(cityGroups);
@@ -3620,7 +3629,7 @@ function renderArrange() {
 
   bindCommuteInteractions();
 
-  new Sortable(els.stagingArea, {
+  _arrangeSortables.push(new Sortable(els.stagingArea, {
     group: 'itinerary',
     sort: false,
     animation: 120,
@@ -3630,10 +3639,10 @@ function renderArrange() {
       evt.item.dataset.dragActivityId = id;
       evt.item.dataset.prevPlacement = JSON.stringify(state.placements[id] || { dayId: null, time: null });
     }
-  });
+  }));
 
   document.querySelectorAll('.day-schedule').forEach((zone) => {
-    new Sortable(zone, {
+    _arrangeSortables.push(new Sortable(zone, {
       group: 'itinerary',
       sort: false,
       animation: 120,
@@ -3707,7 +3716,7 @@ function renderArrange() {
 
         renderArrange();
       }
-    });
+    }));
   });
 
   bindPlacedCardInteractions();

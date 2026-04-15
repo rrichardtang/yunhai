@@ -109,6 +109,10 @@ h1, h2, h3, h4, h5, h6 {
   font-size: .85rem;
   letter-spacing: .01em;
   transition: background .2s ease, color .2s ease, border-color .2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .step.active {
   background: var(--accent);
