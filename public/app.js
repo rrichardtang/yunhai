@@ -176,14 +176,55 @@ const VIEW_MODE_KEY = 'travelplanner_view_mode_v1';
 const MINIMAL_OFFLINE_KEY = 'travelplanner_minimal_offline_v1';
 const GEO_CACHE_KEY = 'travelplanner_geo_cache_v1';
 
+function createInlineOverlayManager() {
+  const entries = new Map();
+
+  const isVisible = (entry) => {
+    const node = entry?.getNode?.();
+    if (!node) return false;
+    return entry.isVisible ? entry.isVisible(node) : !node.classList.contains('hidden');
+  };
+
+  const refresh = () => {
+    const hasBlockingOverlay = Array.from(entries.values()).some((entry) => isVisible(entry));
+    document.body.classList.toggle('overlay-active', hasBlockingOverlay);
+    return hasBlockingOverlay;
+  };
+
+  const register = (name, getNode, isVisibleFn) => {
+    if (!name || typeof getNode !== 'function') return;
+    entries.set(String(name), {
+      getNode,
+      isVisible: typeof isVisibleFn === 'function' ? isVisibleFn : null
+    });
+    refresh();
+  };
+
+  const open = (name) => {
+    const node = entries.get(String(name))?.getNode?.();
+    if (node) node.classList.remove('hidden');
+    refresh();
+    return node;
+  };
+
+  const close = (name) => {
+    const node = entries.get(String(name))?.getNode?.();
+    if (node) node.classList.add('hidden');
+    refresh();
+    return node;
+  };
+
+  return {
+    register,
+    open,
+    close,
+    refresh
+  };
+}
+
 const overlayManager = window.TravelPlannerOverlayManager?.createOverlayManager
   ? window.TravelPlannerOverlayManager.createOverlayManager()
-  : {
-      register: () => {},
-      open: () => {},
-      close: () => {},
-      refresh: () => false
-    };
+  : createInlineOverlayManager();
 
 const persistence = window.TravelPlannerStatePersistence?.createStatePersistence
   ? window.TravelPlannerStatePersistence.createStatePersistence(localStorage)
