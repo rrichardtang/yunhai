@@ -1206,17 +1206,20 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   .topbar { padding: 12px 16px; }
   .topbar-row { flex-direction: column; align-items: flex-start; gap: 8px; }
   .topbar-actions { width: 100%; justify-content: space-between; flex-wrap: wrap; }
-  .step-nav-split { flex-direction: column; }
+  .step-nav-split { flex-direction: column; gap: 8px; }
   .step-nav-split .nav-secondary,
-  .step-nav-split .nav-primary { max-width: none; }
+  .step-nav-split .nav-primary { max-width: none; width: 100%; text-align: center; }
   .execution-head { flex-direction: column; align-items: flex-start; }
   .execution-toolbar { width: 100%; }
-  .execution-toolbar button { flex: 1; min-height: 44px; }
+  .execution-toolbar button { flex: 1; min-height: 40px; }
   .toast-host { left: 12px; right: 12px; bottom: 12px; max-width: none; }
   .steps { flex-wrap: wrap; }
-  button { min-height: 44px; }
+  button { min-height: 40px; padding: 7px 12px; font-size: 0.88rem; }
+  .nav-primary, .nav-secondary { padding: 8px 14px; font-size: 0.88rem; }
+  .setup-actions { gap: 6px; }
+  .city-row-main input[type="date"] { width: 100%; min-width: 0; }
   .modal-card { border-radius: 20px 20px 0 0; max-height: 92vh; position: fixed; bottom: 0; }
-  #chatPanel { width: 100vw; height: 70vh; right: 0; bottom: 70px; border-radius: 20px 20px 0 0; left: 0; }
+  #chatPanel { position: fixed; width: 100vw; height: 70vh; left: 0; right: 0; bottom: 0; border-radius: 20px 20px 0 0; }
 }
 
 /* ── Responsive: Medium (768–1024px) ── */

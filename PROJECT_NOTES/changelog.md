@@ -4,6 +4,14 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-14] Fix mobile UI scaling — buttons oversized, fields clipped, chat panel cut off
+
+- Root cause: the `@media (max-width: 767px)` block in `styles.css` applied `min-height: 44px` globally to all buttons with no padding reduction, causing them to stack large; drawer grid sections (`accommodation-row`, `arrival-row`, `departure-row`) used `minmax` columns that overflowed on narrow screens; chat panel used `position: absolute` relative to its `position: fixed; right: 24px` parent, causing `left: 0; right: 0` to be offset and clip the panel
+- Fix 1: reduced button `min-height` to 40px, `padding` to `7px 12px`, `font-size` to `0.88rem` on mobile; tightened `.setup-actions` gap; gave `.step-nav-split` buttons `width: 100%`
+- Fix 2: added `width: 100%; min-width: 0` to `input[type="date"]` inside city rows to prevent grid cell overflow
+- Fix 3: changed `#chatPanel` mobile override to `position: fixed; left: 0; right: 0; bottom: 0` — decouples it from the offset parent so it anchors to the full viewport edge
+- File: `public/styles.css`
+
 ## [2026-04-14] Fix mobile crash when rapidly tapping step header navigation
 
 - Root cause 1: no transition lock on `setStep()` — rapid mobile taps fired multiple concurrent render calls (renderArrange, renderItinerary, renderConfidence) in the same frame, causing DOM thrashing and crash

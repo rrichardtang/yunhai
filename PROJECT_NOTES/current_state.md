@@ -1,15 +1,12 @@
 # Current State
 
-_Last updated: 2026-04-14 (session 11)_
+_Last updated: 2026-04-14 (session 12)_
 
 ## Objective
 Mobile experience polish — fix navigation bugs and responsive layout issues on iOS WebKit (Brave on iPhone).
 
 ## Active Workstream
-All mobile fixes complete and pushed. Latest fix addresses mobile crash when rapidly tapping step headers:
-- `setStep()` transition lock (RAF-based) prevents concurrent render calls from rapid taps
-- Sortable instances now tracked and destroyed before each `renderArrange()` re-render
-- Step indicator CSS hardened for mobile: `touch-action: manipulation`, `user-select: none`, tap highlight suppressed
+All mobile fixes complete and pushed. Latest fix addresses mobile UI scaling: buttons too large, fields clipped, and chat panel cut off — all caused by missing or incorrect mobile CSS overrides in `styles.css`.
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
