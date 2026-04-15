@@ -1619,9 +1619,12 @@ function renderChecklistModal() {
 
   el.innerHTML = `
     <div class="cl-search-wrap">
-      <div class="cl-search-pill">
-        <i class="ph-bold ph-magnifying-glass cl-search-icon" aria-hidden="true"></i>
-        <input type="search" class="cl-search-input" id="clSearchInput" placeholder="Search bookings…" value="${esc(checklistSearch.query)}" autocomplete="off" />
+      <div class="cl-search-row">
+        <div class="cl-search-pill">
+          <i class="ph-bold ph-magnifying-glass cl-search-icon" aria-hidden="true"></i>
+          <input type="search" class="cl-search-input" id="clSearchInput" placeholder="Search bookings…" value="${esc(checklistSearch.query)}" autocomplete="off" />
+        </div>
+        <button id="checklistModalSave" class="icon-btn grey" type="button" title="Save Progress"><i class="ph-bold ph-floppy-disk"></i></button>
       </div>
       ${searchMatches.length > 0 ? `
         <ul class="cl-search-dropdown" id="clSearchDropdown" role="listbox">
@@ -1649,6 +1652,8 @@ function renderChecklistModal() {
 }
 
 function bindChecklistEvents(el) {
+  el.querySelector('#checklistModalSave')?.addEventListener('click', saveSnapshot);
+
   // Search input
   const searchInput = el.querySelector('#clSearchInput');
   searchInput?.addEventListener('input', (e) => {
@@ -2298,7 +2303,7 @@ function renderCities() {
     row.dataset.cityId = city.id;
     row.innerHTML = `
       <div class="city-row-main">
-        <button class="icon-btn grey city-row-toggle" type="button" data-toggle-details ${readyForDetails ? '' : 'disabled'}><i class="ph-bold ${city.detailsExpanded ? 'ph-caret-up' : 'ph-caret-down'}" aria-hidden="true"></i></button>
+        <button class="icon-btn grey city-row-toggle" type="button" data-toggle-details title="${city.detailsExpanded ? 'Collapse' : 'Expand'}" ${readyForDetails ? '' : 'disabled'}><i class="ph-bold ${city.detailsExpanded ? 'ph-caret-up' : 'ph-caret-down'}" aria-hidden="true"></i></button>
         <div class="city-autocomplete">
           <input type="text" placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off" />
         </div>
@@ -3175,8 +3180,8 @@ function renderActivities() {
     saveActivityNotes.addEventListener('click', () => {
       const notes = activityNotesText.value.trim();
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), notes };
-      saveActivityNotes.textContent = 'Saved';
-      setTimeout(() => { saveActivityNotes.textContent = 'Save Notes'; }, 1500);
+      saveActivityNotes.innerHTML = '<i class="ph-bold ph-check"></i>';
+      setTimeout(() => { saveActivityNotes.innerHTML = '<i class="ph-bold ph-floppy-disk"></i>'; }, 1500);
     });
 
     declineReason.addEventListener('input', () => {
@@ -3247,6 +3252,7 @@ function renderActivities() {
     closeBtn.innerHTML = '<i class="ph-bold ph-x" aria-hidden="true"></i>';
     closeBtn.classList.add('icon-btn', 'red');
     closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.setAttribute('title', 'Close');
 
     overlay.appendChild(closeBtn);
     overlay.appendChild(body);
@@ -3291,8 +3297,8 @@ function renderActivities() {
     expandSaveActivityNotes?.addEventListener('click', () => {
       const notes = expandActivityNotesText.value.trim();
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), notes };
-      expandSaveActivityNotes.textContent = 'Saved';
-      setTimeout(() => { expandSaveActivityNotes.textContent = 'Save Notes'; }, 1500);
+      expandSaveActivityNotes.innerHTML = '<i class="ph-bold ph-check"></i>';
+      setTimeout(() => { expandSaveActivityNotes.innerHTML = '<i class="ph-bold ph-floppy-disk"></i>'; }, 1500);
     });
 
     expandDeclineReason?.addEventListener('input', () => {
@@ -3434,7 +3440,7 @@ function mountActivityMapOverlay() {
     <div class="activity-map-shell">
       <div class="activity-map-topbar">
         <strong>Itinerary map</strong>
-        <button class="icon-btn red close-activity-map" type="button" aria-label="Close map"><i class="ph-bold ph-x" aria-hidden="true"></i></button>
+        <button class="icon-btn red close-activity-map" type="button" title="Close map" aria-label="Close map"><i class="ph-bold ph-x" aria-hidden="true"></i></button>
       </div>
       <div class="activity-map-canvas" id="activityMapCanvas"></div>
     </div>
@@ -3811,7 +3817,7 @@ function renderArrangeCityNav(cityGroups) {
 
   const activeIndex = cityGroups.findIndex((g) => normalizeCity(g.city) === normalizeCity(state.arrangeCity));
   els.arrangeCityNav.innerHTML = `
-    <button type="button" class="icon-btn nav-secondary arrange-city-arrow" data-city-prev ${activeIndex <= 0 ? 'disabled' : ''} aria-label="Previous city"><i class="ph-bold ph-arrow-left" aria-hidden="true"></i></button>
+    <button type="button" class="icon-btn nav-secondary arrange-city-arrow" data-city-prev title="Previous city" ${activeIndex <= 0 ? 'disabled' : ''} aria-label="Previous city"><i class="ph-bold ph-arrow-left" aria-hidden="true"></i></button>
     <div class="arrange-city-tabs">
       ${cityGroups.map((g) => {
         const start = parseYmdAsLocal(g.days[0].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -3819,7 +3825,7 @@ function renderArrangeCityNav(cityGroups) {
         return `<button type="button" class="arrange-city-tab ${normalizeCity(g.city) === normalizeCity(state.arrangeCity) ? 'active' : ''}" data-city-tab="${esc(g.city)}">${esc(g.city)} (${start}–${end})</button>`;
       }).join('')}
     </div>
-    <button type="button" class="icon-btn nav-primary arrange-city-arrow" data-city-next ${activeIndex >= cityGroups.length - 1 ? 'disabled' : ''} aria-label="Next city"><i class="ph-bold ph-arrow-right" aria-hidden="true"></i></button>
+    <button type="button" class="icon-btn nav-primary arrange-city-arrow" data-city-next title="Next city" ${activeIndex >= cityGroups.length - 1 ? 'disabled' : ''} aria-label="Next city"><i class="ph-bold ph-arrow-right" aria-hidden="true"></i></button>
   `;
 
   els.arrangeCityNav.querySelectorAll('[data-city-tab]').forEach((btn) => {
@@ -6385,7 +6391,6 @@ document.getElementById('openChecklistBtn')?.addEventListener('click', () => {
   els.confidencePopover?.classList.add('hidden');
   openChecklistModal();
 });
-document.getElementById('checklistModalSave')?.addEventListener('click', saveSnapshot);
 document.getElementById('checklistModalClose')?.addEventListener('click', closeChecklistModal);
 document.getElementById('checklistModal')?.addEventListener('click', (e) => {
   if (e.target === document.getElementById('checklistModal')) closeChecklistModal();
