@@ -175,6 +175,35 @@ const SNAPSHOT_KEY = 'travelplanner_snapshot';
 const VIEW_MODE_KEY = 'travelplanner_view_mode_v1';
 const MINIMAL_OFFLINE_KEY = 'travelplanner_minimal_offline_v1';
 const GEO_CACHE_KEY = 'travelplanner_geo_cache_v1';
+
+const overlayManager = window.TravelPlannerOverlayManager?.createOverlayManager
+  ? window.TravelPlannerOverlayManager.createOverlayManager()
+  : {
+      register: () => {},
+      open: () => {},
+      close: () => {},
+      refresh: () => false
+    };
+
+const persistence = window.TravelPlannerStatePersistence?.createStatePersistence
+  ? window.TravelPlannerStatePersistence.createStatePersistence(localStorage)
+  : {
+      loadJson(key, fallback = null) {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : fallback;
+        } catch {
+          return fallback;
+        }
+      },
+      saveJson(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
+        return value;
+      },
+      remove(key) {
+        localStorage.removeItem(key);
+      }
+    };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s='') => s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalizeCity = (str = '') => String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -187,18 +216,12 @@ let activityMapOverlayMarkers = [];
 const miniMapInstances = new Map();
 
 function loadGeocodeCache() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || '{}');
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
+  const parsed = persistence.loadJson(GEO_CACHE_KEY, {});
+  return parsed && typeof parsed === 'object' ? parsed : {};
 }
 
 function persistGeocodeCache() {
-  try {
-    localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geocodeCache));
-  } catch {}
+  persistence.saveJson(GEO_CACHE_KEY, geocodeCache);
 }
 
 function geocodeKey(value = '') {
@@ -888,7 +911,7 @@ async function syncFromServer() {
     }
 
     if (data.viewMode) {
-      localStorage.setItem(VIEW_MODE_KEY, data.viewMode);
+      persistence.saveJson(VIEW_MODE_KEY, data.viewMode);
     }
 
     if (data.chatSessions) {
@@ -993,16 +1016,7 @@ let loadingMessageIndex = 0;
 let activeSavingToastId = null;
 
 function refreshOverlayInterlocks() {
-  const hasBlockingOverlay = [
-    document.getElementById('planningOverlay'),
-    document.getElementById('prefsModal'),
-    document.getElementById('checklistModal'),
-    document.getElementById('textareaExpandModal'),
-    document.querySelector('.activity-map-overlay'),
-    document.getElementById('confirmDialog')
-  ].some((node) => node && !node.classList.contains('hidden'));
-
-  document.body.classList.toggle('overlay-active', hasBlockingOverlay);
+  overlayManager.refresh();
 }
 
 function refreshCityTimelineUI(row, city) {
@@ -2088,8 +2102,7 @@ function setPlanningLoading(isLoading) {
   els.planBtn.innerHTML = isLoading ? 'Planning…' : 'Next <i class="ph-bold ph-arrow-right" aria-hidden="true"></i>';
 
   if (!isLoading) {
-    overlay.classList.add('hidden');
-    refreshOverlayInterlocks();
+    overlayManager.close('planningOverlay');
     if (loadingInterval) clearInterval(loadingInterval);
     loadingInterval = null;
     loadingMessageIndex = 0;
@@ -2100,8 +2113,7 @@ function setPlanningLoading(isLoading) {
   overlay.querySelector('[data-trip-name]').textContent = `Planning your trip to ${tripName}`;
   overlay.querySelector('[data-loading-message]').textContent = LOADING_MESSAGES[0];
   updatePlanningStatus('Starting planning...', '');
-  overlay.classList.remove('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.open('planningOverlay');
 
   if (loadingInterval) clearInterval(loadingInterval);
   loadingInterval = setInterval(() => {
@@ -2661,12 +2673,26 @@ async function getAuthToken() {
   }
 }
 
+let _apiService = null;
+function getApiService() {
+  if (_apiService) return _apiService;
+  if (window.TravelPlannerApiService?.createApiService) {
+    _apiService = window.TravelPlannerApiService.createApiService({ tokenProvider: getAuthToken });
+  } else {
+    _apiService = {
+      request: async (url, options = {}) => {
+        const token = await getAuthToken();
+        const headers = new Headers(options.headers || {});
+        if (token) headers.set('Authorization', `Bearer ${token}`);
+        return fetch(url, { ...options, headers });
+      }
+    };
+  }
+  return _apiService;
+}
+
 async function apiFetch(url, options = {}) {
-  const token = await getAuthToken();
-  const headers = new Headers(options.headers || {});
-  if (token) headers.set('Authorization', `Bearer ${token}`);
-  const next = { ...options, headers };
-  return fetch(url, next);
+  return getApiService().request(url, options);
 }
 
 function postPreferenceSignal(activity, verdict, reason) {
@@ -2851,21 +2877,18 @@ async function openPreferencesModal() {
   state.profilesStore = loadProfiles();
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   renderPreferencesModal();
-  els.prefsModal.classList.remove('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.open('prefsModal');
 }
 
 function closePreferencesModal() {
   renderPreferencesModal();
-  els.prefsModal.classList.add('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.close('prefsModal');
 }
 
 function openChecklistModal() {
   buildChecklistFromState();
-  document.getElementById('checklistModal').classList.remove('hidden');
+  overlayManager.open('checklistModal');
   renderChecklistModal();
-  refreshOverlayInterlocks();
 }
 
 function closeChecklistModal() {
@@ -2873,8 +2896,7 @@ function closeChecklistModal() {
     clearTimeout(checklistSearchRenderTimer);
     checklistSearchRenderTimer = null;
   }
-  document.getElementById('checklistModal').classList.add('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.close('checklistModal');
 }
 
 async function fetchStatus() {
@@ -3529,8 +3551,7 @@ function mountActivityMapOverlay() {
 
 function closeActivityMapOverlay() {
   if (!activityMapOverlay) return;
-  activityMapOverlay.classList.add('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.close('activityMapOverlay');
 }
 
 function focusActivityCard(activityId) {
@@ -3546,8 +3567,7 @@ async function openActivityMapOverlay(selectedActivityId = null) {
   if (!isGoogleMapsReady()) return;
   mountActivityMapOverlay();
   state.mapOverlaySelectedActivityId = selectedActivityId;
-  activityMapOverlay.classList.remove('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.open('activityMapOverlay');
 
   const mapCanvas = activityMapOverlay.querySelector('#activityMapCanvas');
   const activities = [...state.activities];
@@ -5111,11 +5131,7 @@ function getMinimalPayload() {
 }
 
 function getMinimalOfflineStore() {
-  try {
-    return JSON.parse(localStorage.getItem(MINIMAL_OFFLINE_KEY) || '{}');
-  } catch {
-    return {};
-  }
+  return persistence.loadJson(MINIMAL_OFFLINE_KEY, {}) || {};
 }
 
 function saveMinimalOfflinePayload(payload) {
@@ -5127,7 +5143,7 @@ function saveMinimalOfflinePayload(payload) {
 
   const store = getMinimalOfflineStore();
   store[id] = payload;
-  localStorage.setItem(MINIMAL_OFFLINE_KEY, JSON.stringify(store));
+  persistence.saveJson(MINIMAL_OFFLINE_KEY, store);
   showToast('Minimal itinerary saved for offline use.', 'success');
 }
 
@@ -5260,7 +5276,7 @@ function renderExecutionMode() {
 function setViewMode(mode = 'planning') {
   const resolved = mode === 'execution' ? 'execution' : 'planning';
   state.viewMode = resolved;
-  localStorage.setItem(VIEW_MODE_KEY, resolved);
+  persistence.saveJson(VIEW_MODE_KEY, resolved);
   syncToServer('viewMode', resolved);
   document.body.classList.toggle('execution-mode', resolved === 'execution');
   if (els.planningModeBtn) els.planningModeBtn.classList.toggle('active', resolved === 'planning');
@@ -5753,6 +5769,16 @@ function bindChatEvents() {
   });
 }
 
+function registerOverlayNodes() {
+  overlayManager.register('planningOverlay', () => document.getElementById('planningOverlay'));
+  overlayManager.register('prefsModal', () => document.getElementById('prefsModal'));
+  overlayManager.register('checklistModal', () => document.getElementById('checklistModal'));
+  overlayManager.register('textareaExpandModal', () => document.getElementById('textareaExpandModal'));
+  overlayManager.register('activityMapOverlay', () => document.querySelector('.activity-map-overlay'));
+  overlayManager.register('confirmDialog', () => document.getElementById('confirmDialog'));
+  overlayManager.register('regenerateConfirmDialog', () => document.getElementById('regenerateConfirmDialog'));
+}
+
 function mountPlanningOverlay() {
   const overlay = document.createElement('div');
   overlay.id = 'planningOverlay';
@@ -5776,13 +5802,7 @@ function mountToastHost() {
 }
 
 function getSnapshot() {
-  try {
-    const raw = localStorage.getItem(SNAPSHOT_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  return persistence.loadJson(SNAPSHOT_KEY, null);
 }
 
 function showRegenerateConfirmDialog() {
@@ -5856,7 +5876,7 @@ function step1Fingerprint() {
 }
 
 function clearSnapshot() {
-  localStorage.removeItem(SNAPSHOT_KEY);
+  persistence.remove(SNAPSHOT_KEY);
   syncToServer('snapshot', null);
 }
 
@@ -5882,7 +5902,7 @@ function saveSnapshot() {
     confidenceIssueMeta: state.confidenceIssueMeta,
     currentItineraryId: state.currentItineraryId || null
   };
-  localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(payload));
+  persistence.saveJson(SNAPSHOT_KEY, payload);
   syncToServer('snapshot', payload);
 
   if (state.currentItineraryId) {
@@ -6398,8 +6418,7 @@ function openExpandModal(targetId, title) {
   expandTargetId = targetId;
   expandTitle.textContent = title;
   expandEditor.value = document.getElementById(targetId)?.value || '';
-  expandModal.classList.remove('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.open('textareaExpandModal');
   expandEditor.focus();
 }
 
@@ -6411,8 +6430,7 @@ function closeExpandModal(save) {
       target.dispatchEvent(new Event('input', { bubbles: true }));
     }
   }
-  expandModal.classList.add('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.close('textareaExpandModal');
   expandTargetId = null;
 }
 
@@ -6564,6 +6582,7 @@ history.replaceState({ spa: true, step: 1 }, '');
   mountPlanningOverlay();
   mountActivityMapOverlay();
   mountToastHost();
+  registerOverlayNodes();
   bindChatEvents();
   ensureUserId();
   ensureChatSessionId();
@@ -6577,7 +6596,7 @@ history.replaceState({ spa: true, step: 1 }, '');
     els.calendarMetadataMode.value = state.calendarMetadataMode;
   }
   updateCalendarControls();
-  setViewMode(localStorage.getItem(VIEW_MODE_KEY) === 'execution' ? 'execution' : 'planning');
+  setViewMode(persistence.loadJson(VIEW_MODE_KEY, 'planning') === 'execution' ? 'execution' : 'planning');
   const loadedFromShare = await maybeLoadSharedItineraryFromUrl();
   if (!loadedFromShare) renderMyTrips();
 })();
