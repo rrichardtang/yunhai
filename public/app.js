@@ -2633,6 +2633,10 @@ function renderActivities() {
 
     card.querySelectorAll('.flip-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
+        if (window.matchMedia('(max-width: 767px)').matches) {
+          openActivityMapOverlay(a.id);
+          return;
+        }
         const next = !card.classList.contains('is-flipped');
         state.reviewCardFlips[a.id] = next;
         card.classList.toggle('is-flipped', next);
@@ -2644,12 +2648,27 @@ function renderActivities() {
       setTimeout(() => ensureMiniMapForCard(card, a), 0);
     }
 
+    function syncVerdictClasses(cardEl, approved) {
+      const approveBtn = cardEl.querySelector('.approve');
+      const declineBtn2 = cardEl.querySelector('.decline');
+      if (approveBtn) {
+        approveBtn.classList.toggle('active', approved === true);
+        approveBtn.classList.toggle('inactive', approved === false);
+      }
+      if (declineBtn2) {
+        declineBtn2.classList.toggle('active', approved === false);
+        declineBtn2.classList.toggle('inactive', approved === true);
+      }
+      cardEl.classList.toggle('approved', approved === true);
+      cardEl.classList.toggle('declined', approved === false);
+    }
+
     card.querySelector('.approve').addEventListener('click', () => {
       const current = state.reviewed[a.id]?.approved;
       const nextApproved = current === true ? null : true;
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: nextApproved };
       if (nextApproved === true) postPreferenceSignal(a, 'approved');
-      renderActivities();
+      syncVerdictClasses(card, nextApproved);
     });
     const declineFeedback = card.querySelector('.decline-feedback');
     const declineReason = card.querySelector('.decline-reason');
@@ -2660,7 +2679,7 @@ function renderActivities() {
     declineBtn.addEventListener('click', () => {
       if (state.reviewed[a.id]?.approved === false) {
         state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: null };
-        renderActivities();
+        syncVerdictClasses(card, null);
         return;
       }
       declineFeedback.classList.remove('hidden');
@@ -2788,13 +2807,18 @@ function renderActivities() {
     }
     closeBtn.addEventListener('click', close);
 
+    function syncExpand(approved) {
+      syncVerdictClasses(body, approved);
+      syncVerdictClasses(sourceCard, approved);
+    }
+
     // Wire up actions directly against state (source card may be re-rendered)
     body.querySelector('.approve')?.addEventListener('click', () => {
       const current = state.reviewed[a.id]?.approved;
-      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: current === true ? null : true };
-      if (state.reviewed[a.id].approved === true) postPreferenceSignal(a, 'approved');
-      close();
-      renderActivities();
+      const next = current === true ? null : true;
+      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: next };
+      if (next === true) postPreferenceSignal(a, 'approved');
+      syncExpand(next);
     });
 
     const expandDeclineBtn = body.querySelector('.decline');
@@ -2806,8 +2830,9 @@ function renderActivities() {
     expandDeclineBtn?.addEventListener('click', () => {
       if (state.reviewed[a.id]?.approved === false) {
         state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: null };
-        close();
-        renderActivities();
+        syncExpand(null);
+        expandDeclineFeedback?.classList.add('hidden');
+        expandDeclineBtn.disabled = false;
         return;
       }
       expandDeclineFeedback?.classList.remove('hidden');
@@ -2825,8 +2850,9 @@ function renderActivities() {
       if (!reason) return;
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: false, declineReason: reason };
       postPreferenceSignal(a, 'declined', reason);
-      close();
-      renderActivities();
+      syncExpand(false);
+      expandDeclineFeedback?.classList.add('hidden');
+      expandDeclineBtn.disabled = false;
     });
 
     expandConfirmDecline?.addEventListener('click', async () => {
