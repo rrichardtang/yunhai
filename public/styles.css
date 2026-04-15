@@ -475,14 +475,11 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 .notes-row .apply-note:disabled { opacity: 0.3; cursor: default; }
 .notes-row .apply-note:not(:disabled):hover { background: #dcfce7; border-color: var(--ok); }
 
-/* ── Activity notes ── */
-.activity-notes { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
-.activity-notes .activity-notes-text { width: 100%; box-sizing: border-box; resize: vertical; border: 1px solid var(--secondary); border-radius: 10px; padding: 6px 8px; font-size: 14px; }
-.activity-notes-actions { display: flex; gap: 8px; justify-content: flex-end; }
-/* ── Decline feedback ── */
-.decline-feedback { margin-top: 6px; display: flex; flex-direction: column; gap: 8px; }
-.decline-feedback .decline-reason { width: 100%; box-sizing: border-box; resize: vertical; border: 1px solid var(--secondary); border-radius: 10px; padding: 6px 8px; font-size: 14px; }
-.decline-feedback-actions { display: flex; gap: 8px; justify-content: flex-end; }
+/* ── Activity inline rows (notes + decline) ── */
+.activity-inline-row { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; }
+.activity-inline-row + .activity-inline-row { margin-top: 8px; }
+.activity-notes-wrap { flex: 1; min-width: 0; }
+.activity-notes-wrap .profile-textarea-fixed { font-size: 13px; border-radius: 10px; padding: 6px 28px 6px 8px; }
 
 .hidden { display: none !important; }
 

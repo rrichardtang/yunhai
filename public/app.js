@@ -3101,17 +3101,19 @@ function renderActivities() {
               <button class="${approveBtnClass}"><i class="ph-bold ph-check-circle" aria-hidden="true"></i> Approve</button>
               <button class="${declineBtnClass}"><i class="ph-bold ph-x-circle" aria-hidden="true"></i> Decline</button>
             </div>
-            <div class="activity-notes">
-              <textarea class="activity-notes-text" rows="2" maxlength="400" placeholder="Add notes or reminders for this activity…">${esc(review.notes || '')}</textarea>
-              <div class="activity-notes-actions">
-                <button class="secondary save-activity-notes" type="button">Save Notes</button>
+            <div class="activity-inline-row">
+              <div class="textarea-expand-wrap activity-notes-wrap">
+                <textarea id="actNotes-${a.id}" class="profile-textarea-fixed activity-notes-text" rows="2" maxlength="400" placeholder="Add notes or reminders…">${esc(review.notes || '')}</textarea>
+                <button class="textarea-expand-btn" type="button" data-expand="actNotes-${a.id}" data-title="Notes — ${esc(a.name)}" aria-label="Expand notes"><i class="ph-bold ph-arrows-out-simple"></i></button>
               </div>
+              <button class="icon-btn save-activity-notes" type="button" title="Save Notes" aria-label="Save Notes"><i class="ph-bold ph-floppy-disk"></i></button>
             </div>
-            <div class="decline-feedback">
-              <textarea class="decline-reason" rows="2" maxlength="200" placeholder="What would you prefer instead? (required for Replace/Modify)"></textarea>
-              <div class="decline-feedback-actions">
-                <button class="primary confirm-decline" type="button" disabled>Replace/Modify</button>
+            <div class="activity-inline-row">
+              <div class="textarea-expand-wrap activity-notes-wrap">
+                <textarea id="actDecline-${a.id}" class="profile-textarea-fixed decline-reason" rows="2" maxlength="200" placeholder="What would you prefer instead?"></textarea>
+                <button class="textarea-expand-btn" type="button" data-expand="actDecline-${a.id}" data-title="Replace/Modify — ${esc(a.name)}" aria-label="Expand reason"><i class="ph-bold ph-arrows-out-simple"></i></button>
               </div>
+              <button class="icon-btn confirm-decline" type="button" title="Replace/Modify" aria-label="Replace/Modify" disabled><i class="ph-bold ph-recycle"></i></button>
             </div>
           </div>
         </div>
@@ -3160,6 +3162,10 @@ function renderActivities() {
     const saveActivityNotes = card.querySelector('.save-activity-notes');
     const activityNotesText = card.querySelector('.activity-notes-text');
     const declineBtn = card.querySelector('.decline');
+
+    card.querySelectorAll('.textarea-expand-btn').forEach((btn) => {
+      btn.addEventListener('click', () => openExpandModal(btn.dataset.expand, btn.dataset.title));
+    });
 
     declineBtn.addEventListener('click', () => {
       const current = state.reviewed[a.id]?.approved;
