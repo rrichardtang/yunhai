@@ -4,6 +4,24 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-15] Booking checklist complete overhaul per checklist.md spec
+
+- New typed data model in `normalizeChecklistItem`: transportation (startLocation, endLocation, isRoundTrip, departureDate/Time, returnDate/Time), accommodation (accommodationCity, checkInDate, checkOutDate), activity (activityLocation, activityDate/Time) — each type has its own primary fields
+- `buildChecklistFromState`: updated to populate new typed fields from state; uses stable type-aware keys to avoid duplicates
+- Replaced old `renderConfidence` checklist section with `renderChecklistModal()` — fully self-contained, called only when modal opens
+- Category containers (Transportation, Accommodation, City Activities) — always rendered even when empty, with Phosphor empty state icons
+- Collapsed rows: single scannable line per item type; location truncation to 28 chars; checked-off items get strikethrough + muted color (no opacity, WCAG AA safe); 200-350ms transition
+- Expanded form: click row to expand; primary zone always visible; secondary zone (Reference #, Price, Notes) behind "More details" ghost button; auto-expands if any secondary field has data
+- Google Maps autocomplete: reuses existing `attachPlaceAutocompleteElement` for startLocation, endLocation, accommodationCity, activityLocation
+- Search bar: pill-shaped, Phosphor magnifying-glass icon, searches item names only, autofill dropdown with category badge, scroll + accent flash on select
+- Container collapse/expand: click header collapses to title + item count badge
+- Delete: ghost Phosphor trash icon, undo toast (4s) with Undo button
+- + Add Item: ghost button, minimum 44px touch target; new item opens expanded in sorted position
+- Per-container subtotals + grand total: only visible when prices exist
+- CSS: full rewrite of `confidence.css`; modal is now a flex column with fixed header/footer and scrollable body; responsive: compact (<768) stacks all form rows, wide uses 2-col grid
+- Old event listeners for `addChecklistItemBtn` (removed from HTML) replaced with modal-level event delegation
+- Files: `public/app.js`, `public/confidence.css`, `public/planner.html`
+
 ## [2026-04-15] Fix decline button — one-click toggle, mobile ReferenceError, removed Customize section
 
 - Removed `pointer-events: none` from `.btn-decline.inactive` — was blocking all hover and click events (`public/styles.css`)

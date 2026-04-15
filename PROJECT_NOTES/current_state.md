@@ -3,10 +3,10 @@
 _Last updated: 2026-04-15_
 
 ## Objective
-Activity card UX polish — decline button fully fixed and working on desktop and mobile.
+Booking checklist overhaul — complete redesign per checklist.md spec.
 
 ## Active Workstream
-All changes complete and ready to push. This session: fixed decline button being unclickable (removed `pointer-events: none` from `.btn-decline.inactive`), made decline a simple one-click toggle matching approve behavior, removed the hidden feedback reveal step, removed the Customize section, moved `syncVerdictClasses` to module scope (was inside `buildActivityCard` closure causing ReferenceError in mobile expand overlay), added "Saved" confirmation flash on Save Notes.
+Full overhaul complete and ready to push. This session: rewrote checklist data model (typed schemas per transportation/accommodation/activity), rebuilt modal UI with category containers, collapsed/expanded rows, two-zone progressive disclosure, Google Maps autocomplete on location fields (reusing existing `attachPlaceAutocompleteElement`), pill search bar with autofill dropdown, container collapse/expand with item count badges, checked-off behavior (strikethrough + color shift, no reorder), undo toast on delete, per-container subtotals + grand total, + Add Item ghost buttons, fully responsive layout.
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
@@ -18,8 +18,8 @@ All changes complete and ready to push. This session: fixed decline button being
 - Email summary depends on Resend env configuration and authenticated user email claim
 - Concurrent writes from two devices remain last-write-wins
 - Mobile city card layout uses `nth-child` selectors — fragile if HTML child order changes
+- Checklist items created before this overhaul will be migrated via `normalizeChecklistItem`; old `bookingReference`/`city` fields map to new typed fields
 
 ## Next Actions
-- Verify rapid-tap crash fix on device
-- Add visual issue deep-links from confidence step to specific itinerary items/cards
-- Add “reminder before departure” scheduling behavior behind a simple server-side cron/passive worker
+- Push and test on VPS — verify modal renders, Google Maps autocomplete fires in modal context
+- Check that existing saved itineraries with old checklist schema migrate cleanly on load
