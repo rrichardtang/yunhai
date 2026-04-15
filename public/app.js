@@ -5889,8 +5889,11 @@ function showRegenerateConfirmDialog() {
     document.body.appendChild(dialog);
     refreshOverlayInterlocks();
 
-<<<<<<< HEAD
-    const cleanup = (result) => { dialog.remove(); resolve(result); };
+    const cleanup = (result) => {
+      dialog.remove();
+      refreshOverlayInterlocks();
+      resolve(result);
+    };
 
     dialog.querySelector('#regenYes').addEventListener('click', () => {
       const checked = [...dialog.querySelectorAll('.regen-city-cb:checked')].map((cb) => cities[parseInt(cb.dataset.index, 10)]);
@@ -5898,16 +5901,6 @@ function showRegenerateConfirmDialog() {
     });
     dialog.querySelector('#regenNo').addEventListener('click', () => cleanup(null));
     dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(null); });
-=======
-    const cleanup = (result) => {
-      dialog.remove();
-      refreshOverlayInterlocks();
-      resolve(result);
-    };
-    dialog.querySelector('#regenYes').addEventListener('click', () => cleanup(true));
-    dialog.querySelector('#regenNo').addEventListener('click', () => cleanup(false));
-    dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(false); });
->>>>>>> 922fc86879c16ff76b92ee635eb143853142c26c
   });
 }
 
