@@ -991,7 +991,8 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 .sticky-nav {
   position: fixed;
   bottom: 24px;
-  right: 96px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 10;
   height: 56px;
   padding: 0 16px;
@@ -1263,7 +1264,7 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 
   /* Step nav */
   .step-nav-split { gap: 4px; }
-  .sticky-nav { right: 80px; height: 48px; border-radius: 24px; padding: 0 12px; }
+  .sticky-nav { left: 50%; transform: translateX(-50%); height: 48px; border-radius: 24px; padding: 0 12px; max-width: calc(100vw - 20px); }
 
   /* Activity cards: compact preview on mobile — tap to expand */
   .activity-card { perspective: none; min-height: unset; cursor: pointer; }
