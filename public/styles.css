@@ -1178,49 +1178,67 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ── Responsive: Compact (<768px) ── */
 @media (max-width: 767px) {
-  .container { padding: 0 16px 32px; margin-top: 16px; }
-  .panel { padding: 20px 16px; }
-  .setup-actions { flex-direction: row; flex-wrap: wrap; }
+  /* Scale the entire UI down — everything using rem/inherit cascades from this */
+  html { font-size: 13px; }
+
+  .container { padding: 0 10px 24px; margin-top: 10px; }
+  .panel { padding: 14px 10px; }
+
+  /* Forms: tighten padding globally */
+  input, textarea, select { padding: 6px 10px; font-size: 0.85rem; }
+  label { margin-bottom: 6px; font-size: 0.85rem; }
+
+  /* Buttons: compact */
+  button { min-height: 34px; padding: 5px 10px; font-size: 0.82rem; }
+  .nav-primary, .nav-secondary { padding: 7px 12px; font-size: 0.85rem; }
+
+  /* Setup actions: stay inline */
+  .setup-actions { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+
   .review-toolbar { grid-template-columns: 1fr; }
+
+  /* City row: 3-row compact grid */
+  .city-row { padding: 8px; margin-bottom: 6px; border-radius: 10px; }
   .city-row-main {
     grid-template-columns: auto 1fr 1fr auto;
     grid-template-rows: auto auto auto;
+    gap: 4px;
   }
-  /* toggle: col 1, row 1 */
   .city-row-main > :nth-child(1) { grid-column: 1; grid-row: 1; min-height: unset; align-self: center; }
-  /* city autocomplete: col 2–3, row 1 */
   .city-row-main > :nth-child(2) { grid-column: 2 / 4; grid-row: 1; }
-  /* remove btn: col 4, row 1 */
-  .city-row-main > :nth-child(6) { grid-column: 4; grid-row: 1; min-height: unset; padding: 6px 10px; font-size: .8rem; align-self: center; }
-  /* dateFrom: col 2, row 2 */
+  .city-row-main > :nth-child(6) { grid-column: 4; grid-row: 1; min-height: unset; padding: 4px 8px; font-size: .75rem; align-self: center; }
   .city-row-main > :nth-child(3) { grid-column: 2; grid-row: 2; }
-  /* dateTo: col 3, row 2 */
   .city-row-main > :nth-child(4) { grid-column: 3; grid-row: 2; }
-  /* notes: col 2–4, row 3 */
   .city-row-main > :nth-child(5) { grid-column: 2 / 5; grid-row: 3; }
-  .hotel-row,
-  .travel-row { grid-template-columns: 1fr; }
+  .city-row-main input[type="date"] { width: 100%; min-width: 0; }
+
+  /* Drawer sections: tighter */
+  .city-dropdown-section { padding: 8px; border-radius: 10px; }
+  .city-dropdown-grid { gap: 6px; }
+  .hotel-row, .travel-row { grid-template-columns: 1fr; }
   .accommodation-row { grid-template-columns: 1fr 1fr; }
   .accommodation-row > :first-child { grid-column: 1 / -1; }
-  .arrival-row,
-  .departure-row { grid-template-columns: 1fr auto; }
-  .topbar { padding: 12px 16px; }
-  .topbar-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .arrival-row, .departure-row { grid-template-columns: 1fr auto; }
+
+  /* Topbar */
+  .topbar { padding: 8px 10px; }
+  .topbar-row { flex-direction: column; align-items: flex-start; gap: 6px; }
   .topbar-actions { width: 100%; justify-content: space-between; flex-wrap: wrap; }
+
+  /* Step nav */
   .step-nav-split { flex-direction: row; gap: 8px; justify-content: space-between; }
   .step-nav-split .nav-secondary { max-width: none; width: auto; }
   .step-nav-split .nav-primary { max-width: none; flex: 1; text-align: center; }
+  .sticky-nav { padding: 8px; border-radius: 10px; }
+
+  /* Misc */
   .execution-head { flex-direction: column; align-items: flex-start; }
   .execution-toolbar { width: 100%; }
-  .execution-toolbar button { flex: 1; min-height: 40px; }
-  .toast-host { left: 12px; right: 12px; bottom: 12px; max-width: none; }
+  .execution-toolbar button { flex: 1; min-height: 34px; }
+  .toast-host { left: 8px; right: 8px; bottom: 8px; max-width: none; }
   .steps { flex-wrap: wrap; }
-  button { min-height: 40px; padding: 7px 12px; font-size: 0.88rem; }
-  .nav-primary, .nav-secondary { padding: 8px 14px; font-size: 0.88rem; }
-  .setup-actions { gap: 6px; }
-  .city-row-main input[type="date"] { width: 100%; min-width: 0; }
-  .modal-card { border-radius: 20px 20px 0 0; max-height: 92vh; position: fixed; bottom: 0; }
-  #chatPanel { position: fixed; width: 100vw; height: 70vh; left: 0; right: 0; bottom: 0; border-radius: 20px 20px 0 0; }
+  .modal-card { border-radius: 16px 16px 0 0; max-height: 92vh; position: fixed; bottom: 0; }
+  #chatPanel { position: fixed; width: 100vw; height: 70vh; left: 0; right: 0; bottom: 0; border-radius: 16px 16px 0 0; }
 }
 
 /* ── Responsive: Medium (768–1024px) ── */
