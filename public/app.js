@@ -3629,23 +3629,26 @@ function submitAddActivity() {
   renderActivities();
   showToast(`Finding the best match for "${name}"…`, 'info');
 
-  const userId = state.userId || null;
   apiFetch('/api/activity/replace', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ activity: stub, reason: why || null, userId, userAdded: true }),
+    body: JSON.stringify({ activity: stub, reason: why || null, userId: ensureUserId(), userAdded: true }),
   })
-    .then((res) => res.json())
+    .then((res) => {
+      if (!res.ok) throw new Error(`server ${res.status}`);
+      return res.json();
+    })
     .then((data) => {
       if (!data?.activity) throw new Error('no activity returned');
-      const enriched = { ...data.activity, id: stubId, userAdded: true };
+      // Preserve the stub's city exactly so filters match; keep userAdded flag; drop enriching
+      const enriched = { ...data.activity, id: stubId, city: stub.city, userAdded: true };
       const idx = state.activities.findIndex((a) => a.id === stubId);
       if (idx !== -1) state.activities[idx] = enriched;
       renderActivities();
       showToast(`"${enriched.name}" added to your itinerary.`, 'success');
     })
-    .catch(() => {
-      // Enrichment failed — keep stub, remove enriching flag so card renders normally
+    .catch((err) => {
+      console.error('[addActivity] enrichment failed:', err);
       const idx = state.activities.findIndex((a) => a.id === stubId);
       if (idx !== -1) delete state.activities[idx].enriching;
       renderActivities();
