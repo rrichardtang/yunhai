@@ -25,6 +25,7 @@ const state = {
   isPlanning: false,
   profilesStore: null,
   profile: null,
+  learnedPrefs: null,
   reviewFilters: {
     search: '',
     city: '',
@@ -146,6 +147,8 @@ const els = {
   profileTravelNotes: document.getElementById('profileTravelNotes'),
   profileAiSummary: document.getElementById('profileAiSummary'),
   aiSummarySection: document.getElementById('aiSummarySection'),
+  learnedPrefsSection: document.getElementById('learnedPrefsSection'),
+  learnedPrefsTags: document.getElementById('learnedPrefsTags'),
   profileEditBtn: document.getElementById('profileEditBtn'),
 
   autoArrangeBtn: document.getElementById('autoArrangeBtn'),
@@ -2768,6 +2771,24 @@ function renderPreferencesModal() {
     }
   }
 
+  if (els.learnedPrefsSection && els.learnedPrefsTags) {
+    const lp = state.learnedPrefs;
+    const constraints = lp?.constraints || [];
+    const preferences = lp?.preferences || [];
+    const all = [
+      ...constraints.map((c) => ({ text: c.text, kind: 'constraint' })),
+      ...preferences.map((p) => ({ text: p.text, kind: 'preference' }))
+    ];
+    if (all.length) {
+      els.learnedPrefsTags.innerHTML = all.map((item) =>
+        `<span class="learned-pref-tag" data-kind="${item.kind}" data-text="${esc(item.text)}">${esc(item.text)}<button class="learned-pref-remove" aria-label="Remove"><i class="ph-bold ph-x"></i></button></span>`
+      ).join('');
+      els.learnedPrefsSection.classList.remove('hidden');
+    } else {
+      els.learnedPrefsSection.classList.add('hidden');
+    }
+  }
+
   els.profileQuestions.querySelectorAll('[data-rating]').forEach((scaleEl) => {
     scaleEl.addEventListener('click', (e) => {
       const dot = e.target.closest('.dot-scale-dot');
@@ -2858,6 +2879,12 @@ async function deleteActiveProfile() {
 async function openPreferencesModal() {
   state.profilesStore = loadProfiles();
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
+  apiFetch('/api/preferences').then((r) => r.ok ? r.json() : null).then((data) => {
+    if (data?.preferences) {
+      state.learnedPrefs = data.preferences;
+      renderPreferencesModal();
+    }
+  }).catch(() => {});
   renderPreferencesModal();
   els.prefsModal.classList.remove('hidden');
   refreshOverlayInterlocks();
@@ -6540,6 +6567,24 @@ els.preferencesLink.addEventListener('click', openPreferencesModal);
 els.prefsClose.addEventListener('click', closePreferencesModal);
 els.prefsModal.addEventListener('click', (e) => {
   if (e.target === els.prefsModal) closePreferencesModal();
+});
+els.learnedPrefsTags?.addEventListener('click', (e) => {
+  const btn = e.target.closest('.learned-pref-remove');
+  if (!btn) return;
+  const tag = btn.closest('.learned-pref-tag');
+  if (!tag) return;
+  const kind = tag.dataset.kind;
+  const text = tag.dataset.text;
+  const lp = state.learnedPrefs;
+  if (!lp) return;
+  if (kind === 'constraint') lp.constraints = lp.constraints.filter((c) => c.text !== text);
+  if (kind === 'preference') lp.preferences = lp.preferences.filter((p) => p.text !== text);
+  apiFetch('/api/preferences', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ constraints: lp.constraints, preferences: lp.preferences })
+  }).catch(() => {});
+  renderPreferencesModal();
 });
 
 // Textarea expand modal

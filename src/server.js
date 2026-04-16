@@ -46,6 +46,7 @@ const {
   needsDistillation,
   distill: distillProfile,
   load: loadPreferences,
+  save: savePreferences,
   getSummary: getPreferenceSummary,
   reset: resetPreferences,
   resolveUserId
@@ -1222,6 +1223,21 @@ app.get('/api/preferences', (req, res) => {
     return res.json({ preferences: loadPreferences(userId) });
   } catch (error) {
     return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid userId' });
+  }
+});
+
+app.put('/api/preferences', (req, res) => {
+  try {
+    const userId = parseUserId(getAuthedUserId(req));
+    const prefs = loadPreferences(userId);
+    const { constraints, preferences, distilledProfile } = req.body || {};
+    if (Array.isArray(constraints)) prefs.constraints = constraints;
+    if (Array.isArray(preferences)) prefs.preferences = preferences;
+    if (typeof distilledProfile === 'string') prefs.distilledProfile = distilledProfile;
+    savePreferences(prefs, userId);
+    return res.json({ ok: true, preferences: prefs });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || 'Failed to update preferences' });
   }
 });
 
