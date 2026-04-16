@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-16] Fix Budget Lens and Booking Checklist population
+
+- `buildChecklistFromState`: removed `booking_type` filter (was `tour`/`attraction` only) and placement gate — all approved activities now enter the checklist regardless of type or whether they've been arranged
+- `buildChecklistFromState`: placement is now optional — falls back to `a.city` for location and empty string for date when no placement exists yet
+- `buildChecklistFromState`: merge now always overwrites `budgetUsd` from live `activityEstimatedCost` (was `??` which kept stale prices after activity refinement)
+- Activity cards: per-person cost rendered as inline editable `<input>` — blur/Enter commits new value to `state.activities`, updates `= $total` display, and refreshes Budget Lens
+- Approve/decline card handlers now call `renderBudgetTracker()` so Budget Lens updates on single-card toggles
+- Files: `public/app.js`, `public/styles.css`
+
 ## [2026-04-16] Modify vs Replace split on activity cards
 
 - `/api/activity/refine` upgraded: switched from `claude-haiku-4-5` to `gpt-5.4-mini` (via OpenAI SDK); terse reasoning-reliant prompt; unconditional `search()` grounding when Brave is configured; accepts optional `budget_target` for budget-optimization path; `ACTIVITY_REFINE_MODEL` constant added

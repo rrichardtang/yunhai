@@ -1335,15 +1335,12 @@ function buildChecklistFromState() {
   const existingKeys = new Set(existing.map(keyOf));
   const items = [...existing];
 
-  // Approved activities that require booking
+  // All approved activities
   (state.activities || []).forEach((a) => {
     if (!state.reviewed[a.id]?.approved) return;
-    if (!['tour', 'attraction'].includes(a.booking_type)) return;
     const placement = state.placements[a.id];
-    if (!placement) return;
-    const day = state.days.find((d) => d.id === placement.dayId);
-    if (!day) return;
-    const time = parseTimeTo24(placement.time || a.suggested_time || typeToTime(a.type));
+    const day = placement ? state.days.find((d) => d.id === placement.dayId) : null;
+    const time = day ? parseTimeTo24(placement.time || a.suggested_time || typeToTime(a.type)) : '';
     const notes = String(state.reviewed[a.id]?.notes || '').trim();
     const activityEstimatedCost = (() => {
       if (a.estimated_cost_usd === null || a.estimated_cost_usd === undefined) return null;
@@ -1357,8 +1354,8 @@ function buildChecklistFromState() {
       activityId: a.id,
       bookingNotRequired: Boolean(state.reviewed[a.id]?.bookingNotRequired),
       name: a.name || '',
-      activityLocation: day.city || '',
-      activityDate: day.date || '',
+      activityLocation: day ? (day.city || '') : (a.city || ''),
+      activityDate: day ? (day.date || '') : '',
       activityTime: time || '',
       budgetUsd: activityEstimatedCost,
       notes
@@ -1377,7 +1374,7 @@ function buildChecklistFromState() {
         activityLocation: item.activityLocation,
         activityDate: item.activityDate,
         activityTime: item.activityTime,
-        budgetUsd: items[idx].budgetUsd ?? activityEstimatedCost,
+        budgetUsd: activityEstimatedCost,
         notes
       });
       existingKeys.add(keyOf(items[idx]));
@@ -3433,25 +3430,30 @@ function renderActivities() {
               const isPerGroup = a.cost_type === 'per_group';
               const cost = a.estimated_cost_usd;
               let costHtml = '';
-              if (cost !== null && cost !== undefined) {
-                if (isPerGroup) {
-                  costHtml = `$${cost} (group)`;
-                } else if (adults + children > 1) {
-                  const adultTotal = cost * adults;
-                  const childTotal = Math.round(cost * 0.6 * children);
-                  const total = adultTotal + childTotal;
-                  const parts = [`$${cost} × ${adults} adult${adults > 1 ? 's' : ''}`];
-                  if (children > 0) parts.push(`$${Math.round(cost * 0.6)} × ${children} child${children > 1 ? 'ren' : ''}`);
-                  costHtml = `${parts.join(' + ')} = $${total}`;
-                } else {
-                  costHtml = `$${cost} per person`;
-                }
-              } else {
-                costHtml = 'N/A';
-              }
               const links = Array.isArray(a.booking_links) && a.booking_links.length
                 ? a.booking_links.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="booking-link">${esc(l.site)}</a>`).join('')
                 : '';
+              if (cost !== null && cost !== undefined) {
+                if (isPerGroup) {
+                  costHtml = `$${cost} (group)`;
+                  return `<p class="activity-cost"><strong>Est. cost:</strong> ${costHtml}${links ? `<span class="booking-links">${links}</span>` : ''}</p>`;
+                }
+                const totalFn = (pp) => {
+                  const adultTotal = pp * adults;
+                  const childTotal = Math.round(pp * 0.6 * children);
+                  return adultTotal + childTotal;
+                };
+                const totalDisplay = adults + children > 1
+                  ? (() => {
+                    const parts = [`× ${adults} adult${adults > 1 ? 's' : ''}`];
+                    if (children > 0) parts.push(`$${Math.round(cost * 0.6)} × ${children} child${children > 1 ? 'ren' : ''}`);
+                    return ` ${parts.join(' + ')} = <span class="cost-total">$${totalFn(cost)}</span>`;
+                  })()
+                  : ' per person';
+                costHtml = `$<input type="number" min="0" step="1" class="cost-per-person-input" data-activity-id="${esc(a.id)}" value="${cost}" aria-label="Cost per person">${totalDisplay}`;
+              } else {
+                costHtml = `$<input type="number" min="0" step="1" class="cost-per-person-input" data-activity-id="${esc(a.id)}" value="" placeholder="0" aria-label="Cost per person"> per person`;
+              }
               return `<p class="activity-cost"><strong>Est. cost:</strong> ${costHtml}${links ? `<span class="booking-links">${links}</span>` : ''}</p>`;
             })()}
             <p><strong>Why it fits:</strong> ${esc(a.why_it_fits || '')}</p>
@@ -3511,11 +3513,33 @@ function renderActivities() {
       setTimeout(() => ensureMiniMapForCard(card, a), 0);
     }
 
+    const costInput = card.querySelector('.cost-per-person-input');
+    if (costInput) {
+      const commitCost = () => {
+        const val = parseFloat(costInput.value);
+        const activity = state.activities.find((x) => x.id === a.id);
+        if (!activity) return;
+        activity.estimated_cost_usd = Number.isFinite(val) && val >= 0 ? val : null;
+        renderBudgetTracker();
+        // Update total display inline without re-rendering the whole card
+        const adults = state.numTravelers || 1;
+        const children = state.numChildren || 0;
+        const totalEl = costInput.closest('.activity-cost')?.querySelector('.cost-total');
+        if (totalEl && Number.isFinite(val)) {
+          const total = val * adults + Math.round(val * 0.6 * children);
+          totalEl.textContent = `$${total}`;
+        }
+      };
+      costInput.addEventListener('change', commitCost);
+      costInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { costInput.blur(); } });
+    }
+
     card.querySelector('.approve').addEventListener('click', () => {
       const current = state.reviewed[a.id]?.approved;
       const nextApproved = current === true ? null : true;
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: nextApproved };
       syncVerdictClasses(card, nextApproved);
+      renderBudgetTracker();
     });
     const declineReason = card.querySelector('.decline-reason');
     const confirmModify = card.querySelector('.confirm-modify');
@@ -3530,6 +3554,7 @@ function renderActivities() {
       const nextApproved = current === false ? null : false;
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: nextApproved };
       syncVerdictClasses(card, nextApproved);
+      renderBudgetTracker();
     });
 
     saveActivityNotes.addEventListener('click', () => {

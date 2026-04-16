@@ -1442,7 +1442,11 @@ body.overlay-active #chatWidget {
 .budget-caveat { font-size: 0.8rem; opacity: 0.8; }
 
 /* ── Activity cost + booking links ── */
-.activity-cost { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0; }
+.activity-cost { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: 4px 0; }
+.cost-per-person-input { width: 5ch; border: none; border-bottom: 1px dashed var(--muted); background: transparent; font: inherit; color: inherit; text-align: right; padding: 0 2px; -moz-appearance: textfield; }
+.cost-per-person-input::-webkit-outer-spin-button,
+.cost-per-person-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.cost-per-person-input:focus { outline: none; border-bottom-color: var(--accent); }
 .booking-links { display: flex; gap: 6px; flex-wrap: wrap; }
 .booking-link {
   display: inline-block;

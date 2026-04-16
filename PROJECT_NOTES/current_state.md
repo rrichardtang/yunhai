@@ -1,15 +1,15 @@
 # Current State
 
-_Last updated: 2026-04-16 (session 8)_
+_Last updated: 2026-04-16 (session 9)_
 
 ## Objective
-Modify vs Replace split complete. Ready to push to VPS.
+Budget Lens + Booking Checklist bugs fixed. Pushed to VPS, ready for smoke test.
 
 ## Active Workstream
-Implemented Modify / Replace split on activity cards:
-- `/api/activity/refine` upgraded: now uses `gpt-5.4-mini`, unconditional Brave `search()` grounding when configured, optional `budget_target` field, terse reasoning-reliant prompt
-- Frontend: single textarea + two buttons (pencil = Modify → `/refine`, arrows = Replace → `/replace`); both inline card and expanded modal wired; `id` preserved on modify
-- All 11 tests pass
+Fixed three bugs in the Budget Lens / Booking Checklist feature area:
+- Bug A/B: `buildChecklistFromState` now includes ALL approved activities (removed `booking_type` gate and placement requirement); budget lens and checklist populate immediately after Step 2 approval
+- Bug C: checklist price always recomputed from live `estimated_cost_usd` — no more stale prices after activity refinement
+- Per-person cost on activity cards is now user-editable inline
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
@@ -23,5 +23,5 @@ Implemented Modify / Replace split on activity cards:
 - Planner still generates generic venue names — users rely on Modify to pin specifics
 
 ## Next Actions
-- Push to VPS
-- Smoke test: Modify (pin to named venue) + Replace (swap activity type) + existing replace flows
+- Smoke test: approve all visible → verify Budget Lens fills and checklist populates
+- Smoke test: edit per-person cost on a card → verify checklist price updates
