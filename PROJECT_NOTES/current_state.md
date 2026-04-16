@@ -1,15 +1,15 @@
 # Current State
 
-_Last updated: 2026-04-16 (session 9)_
+_Last updated: 2026-04-16 (session 10)_
 
 ## Objective
-Budget Lens + Booking Checklist bugs fixed. Pushed to VPS, ready for smoke test.
+Restaurant specificity: planner now names specific venues with must-order dishes for all meal activities.
 
 ## Active Workstream
-Fixed three bugs in the Budget Lens / Booking Checklist feature area:
-- Bug A/B: `buildChecklistFromState` now includes ALL approved activities (removed `booking_type` gate and placement requirement); budget lens and checklist populate immediately after Step 2 approval
-- Bug C: checklist price always recomputed from live `estimated_cost_usd` — no more stale prices after activity refinement
-- Per-person cost on activity cards is now user-editable inline
+Added targeted restaurant search to planning pipeline:
+- `searchTopRestaurants()` in `braveSearch.js` fires a focused Brave query per city
+- Results injected as a dedicated prompt block instructing geographic venue selection
+- System prompt now has a MANDATORY RULE: all food/breakfast/lunch/dinner activities must name a specific restaurant and mention 1–2 must-order dishes in `why_it_fits`
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
@@ -20,8 +20,8 @@ Fixed three bugs in the Budget Lens / Booking Checklist feature area:
 ## Risks
 - `/refine` model is `gpt-5.4-mini` — unknown if this model ID is stable/correct (was used for chat concierge already; low risk)
 - Budget optimization batch UI (flip cards, progress bar) not yet wired — `/refine` is ready to serve it as backbone
-- Planner still generates generic venue names — users rely on Modify to pin specifics
+- Restaurant Brave results may not always include local neighborhood context — model falls back to general knowledge if block is empty
 
 ## Next Actions
-- Smoke test: approve all visible → verify Budget Lens fills and checklist populates
-- Smoke test: edit per-person cost on a card → verify checklist price updates
+- Smoke test a city plan and verify meal activities name specific restaurants with dishes
+- If Brave results are thin, consider adding a second query variant (e.g. "top rated local restaurants {city} neighborhood")

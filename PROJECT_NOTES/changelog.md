@@ -4,6 +4,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-16] Named restaurant recommendations with must-order dishes
+
+- `braveSearch.js`: added `searchTopRestaurants(cityName)` — focused Brave query for top restaurants + must-order dishes, 7 results per city
+- `claude.js`: fires `searchTopRestaurants` in parallel with `searchCityActivities`; injects results as dedicated `restaurantBlock` in the planning prompt
+- `claude.js` system prompt: added MANDATORY RULE — all food/breakfast/lunch/dinner activities must name a specific restaurant; `why_it_fits` must mention 1–2 must-order dishes; `booking_type: "none"` banned for meal types
+
 ## [2026-04-16] Fix Budget Lens and Booking Checklist population
 
 - `buildChecklistFromState`: removed `booking_type` filter (was `tour`/`attraction` only) and placement gate — all approved activities now enter the checklist regardless of type or whether they've been arranged

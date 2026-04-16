@@ -51,6 +51,16 @@ async function searchActivityPrice(activityName, cityName) {
   return null;
 }
 
+async function searchTopRestaurants(cityName, { count = 7 } = {}) {
+  const retrieval = await retrieve(`best restaurants in ${cityName} 2026 must order dishes`, {
+    count,
+    task: 'planning',
+    freshness: 'year'
+  });
+  if (!retrieval.results?.length) return '';
+  return buildPromptFragment(retrieval, { title: 'Top restaurant research', maxItems: count });
+}
+
 async function searchActivityPricesBatch(activities, cityName) {
   const bookable = activities.filter((a) => a.booking_type && a.booking_type !== 'none');
   const results = await Promise.all(bookable.map((a) => searchActivityPrice(a.name, cityName)));
@@ -62,6 +72,7 @@ async function searchActivityPricesBatch(activities, cityName) {
 module.exports = {
   search,
   searchCityActivities,
+  searchTopRestaurants,
   searchForChat,
   isConfigured,
   shouldUseBrave,
