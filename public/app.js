@@ -1219,9 +1219,10 @@ function normalizeChecklistItem(item = {}) {
 }
 
 function checklistItemSortKey(item) {
-  if (item.type === 'transportation') return item.departureDate || item.dateTime || '';
-  if (item.type === 'accommodation') return item.checkInDate || item.dateTime || '';
-  return (item.activityDate ? item.activityDate + 'T' + (item.activityTime || '') : item.dateTime) || '';
+  if (item.type === 'transportation') return item.departureDate || item.dateTime || '9999';
+  if (item.type === 'accommodation') return item.checkInDate || item.dateTime || '9999';
+  const date = item.activityDate || (item.dateTime ? item.dateTime.slice(0, 10) : '');
+  return date ? date + 'T' + (item.activityTime || '') : '9999';
 }
 
 function sortChecklistByDateAsc(a, b) {
@@ -1335,6 +1336,7 @@ function buildChecklistFromState() {
   const keyOf = (item) => {
     if (item.type === 'transportation') return `transport|${item.startLocation}|${item.departureDate}`;
     if (item.type === 'accommodation') return `accom|${item.accommodationCity}|${item.checkInDate}`;
+    if (item.activityId) return `activity|id|${item.activityId}`;
     return `activity|${item.activityLocation}|${item.activityDate}`;
   };
   const existingKeys = new Set(existing.map(keyOf));
