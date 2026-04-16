@@ -3638,7 +3638,7 @@ function submitAddActivity() {
   apiFetch('/api/activity/replace', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ activity: stub, reason: why || null, userId: ensureUserId(), userAdded: true }),
+    body: JSON.stringify({ activity: stub, reason: why || null, userId: ensureUserId() }),
   })
     .then((res) => {
       if (!res.ok) throw new Error(`server ${res.status}`);

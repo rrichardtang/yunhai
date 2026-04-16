@@ -929,9 +929,9 @@ app.post('/api/activity/replace', async (req, res) => {
     return res.status(503).json({ error: 'Anthropic API key not configured' });
   }
 
-  const { activity, reason, notes, userId, userAdded = false } = req.body || {};
-  if (!activity?.name || !activity?.city || (!userAdded && !reason)) {
-    return res.status(400).json({ error: 'activity and reason are required (reason optional for userAdded)' });
+  const { activity, reason, notes, userId } = req.body || {};
+  if (!activity?.name || !activity?.city) {
+    return res.status(400).json({ error: 'activity.name and activity.city are required' });
   }
 
   const resolvedUserId = parseUserId(userId);
@@ -947,41 +947,23 @@ app.post('/api/activity/replace', async (req, res) => {
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-    let userContent;
-    if (userAdded) {
-      const whyClause = reason ? `\nThe traveler described it as: "${reason}"` : '';
-      userContent = `The traveler wants to add "${activity.name}" in ${activity.city} to their itinerary.${whyClause}${braveBlock}
+    const contextClause = reason ? `\nTraveler's note: "${reason}"` : '';
+    const notesClause = notes ? `\nSaved notes: "${notes}"` : '';
+    const userContent = `The traveler wants "${activity.name}" in ${activity.city}.${contextClause}${notesClause}${braveBlock}
 
-Enrich this with real-world details — find the actual operator or venue, fill in pricing, booking info, duration, and other fields. Keep the activity true to what the traveler requested; only refine the name if you find the real-world name for it.
+Find the best real-world match — use the web research to ground it in an actual venue or operator, and fill in pricing, booking info, duration, and other details. If the traveler's note asks for something different, find that instead.
 
-Return ONLY valid JSON in this exact shape (no markdown fences):
-{
-  "activity": { ...single activity object matching the standard activity schema... }
-}`;
-    } else {
-      const notesClause = notes ? `\nTraveler's saved notes for this activity: "${notes}"` : '';
-      userContent = `The traveler declined this activity: "${activity.name}" (${activity.type}, ${activity.city}).
-Their reason: "${reason}"${notesClause}${braveBlock}
+Also extract any learnable preference signals from the traveler's note (omit if one-off or situational, e.g. "already did this", "too expensive this trip").
 
-Generate exactly ONE replacement activity for ${activity.city} that directly addresses their feedback. It must be different from the declined activity. Use the web research above to ground the replacement in a real venue or operator.
-
-Also extract any learnable preference signals from the reason (omit signals if the reason is one-off or situational, e.g. "already did this", "too expensive this trip").
-
-Return ONLY valid JSON in this exact shape (no markdown fences):
+Return ONLY valid JSON (no markdown fences):
 {
   "activity": { ...single activity object matching the standard activity schema... },
-  "signals": [
-    // zero or more of:
-    // {"type":"<activity_type>","verdict":"declined"}
-    // {"preference":"<nuanced preference string>"}
-    // {"constraint":"<hard constraint string>"}
-  ]
+  "signals": []
 }`;
-    }
 
     const response = await anthropic.messages.create({
-      model: userAdded ? 'claude-sonnet-4-6' : 'claude-haiku-4-5',
-      max_tokens: userAdded ? 1024 : 600,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
       system: systemPrompt,
       messages: [{ role: 'user', content: userContent }]
     });
@@ -995,10 +977,8 @@ Return ONLY valid JSON in this exact shape (no markdown fences):
 
     const normalized = normalizeActivity(parsed.activity, activity.city);
 
-    if (!userAdded) {
-      const signals = Array.isArray(parsed.signals) ? parsed.signals : [];
-      processChatSignals(signals, resolvedUserId);
-    }
+    const signals = Array.isArray(parsed.signals) ? parsed.signals : [];
+    processChatSignals(signals, resolvedUserId);
 
     return res.json({ activity: normalized });
   } catch (error) {
