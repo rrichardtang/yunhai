@@ -994,6 +994,7 @@ const LOADING_MESSAGES = [
 let loadingInterval = null;
 let loadingMessageIndex = 0;
 let activeSavingToastId = null;
+let profileSnapshot = null;
 
 function refreshOverlayInterlocks() {
   const hasBlockingOverlay = [
@@ -2856,6 +2857,7 @@ async function deleteActiveProfile() {
 async function openPreferencesModal() {
   state.profilesStore = loadProfiles();
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
+  profileSnapshot = JSON.stringify(state.profile);
   apiFetch('/api/preferences').then((r) => r.ok ? r.json() : null).then((data) => {
     if (data?.preferences) {
       state.learnedPrefs = data.preferences;
@@ -6603,12 +6605,13 @@ els.profileEditBtn.addEventListener('click', async () => {
   }
   activeSavingToastId = showToast('Saving...', 'info');
 
-  const prev = state.profile;
+  const prev = profileSnapshot ? JSON.parse(profileSnapshot) : null;
   const profileChanged = !prev ||
     JSON.stringify(next.answers) !== JSON.stringify(prev.answers) ||
     next.aboutMe !== prev.aboutMe;
 
   saveProfile(next);
+  profileSnapshot = JSON.stringify(next);
 
   if (!profileChanged) {
     showToast('Profile saved!', 'success');
