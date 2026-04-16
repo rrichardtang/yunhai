@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-15] Fix add-activity enrichment returning wrong activity
+
+- Root cause: `userAdded` path on `/api/activity/replace` used `claude-haiku-4-5` + `max_tokens: 600` — insufficient for precise instruction-following on enrichment task; returned unrelated city activities
+- Fix: `userAdded` path now uses `claude-sonnet-4-6` + `max_tokens: 1024`; decline/replace path unchanged (Haiku)
+- Simplified `userAdded` prompt to positive framing — removed brittle negative constraints that compensated for Haiku's weaker instruction-following
+- File: `src/server.js`
+
 ## [2026-04-15] Enrich user-added activities and ground Replace/Modify via Brave search
 
 - `/api/activity/replace` now runs `search("${name} ${city}")` (3 results) before every LLM call, injecting results as grounding context — applies to both replace/modify and user-added flows

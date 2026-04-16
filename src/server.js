@@ -950,9 +950,9 @@ app.post('/api/activity/replace', async (req, res) => {
     let userContent;
     if (userAdded) {
       const whyClause = reason ? `\nThe traveler described it as: "${reason}"` : '';
-      userContent = `The traveler wants to add this activity to their itinerary: "${activity.name}" in ${activity.city}.${whyClause}${braveBlock}
+      userContent = `The traveler wants to add "${activity.name}" in ${activity.city} to their itinerary.${whyClause}${braveBlock}
 
-Find the closest real-world match to what the traveler described. If the exact activity doesn't exist in ${activity.city}, find the most similar real option (e.g. if they asked for a boat tour on a river city, find an actual river cruise or kayak tour operator). Ground it in a real venue or operator from the web research — do not invent details.
+Enrich this with real-world details — find the actual operator or venue, fill in pricing, booking info, duration, and other fields. Keep the activity true to what the traveler requested; only refine the name if you find the real-world name for it.
 
 Return ONLY valid JSON in this exact shape (no markdown fences):
 {
@@ -980,8 +980,8 @@ Return ONLY valid JSON in this exact shape (no markdown fences):
     }
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 600,
+      model: userAdded ? 'claude-sonnet-4-6' : 'claude-haiku-4-5',
+      max_tokens: userAdded ? 1024 : 600,
       system: systemPrompt,
       messages: [{ role: 'user', content: userContent }]
     });

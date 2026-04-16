@@ -1,17 +1,16 @@
 # Current State
 
-_Last updated: 2026-04-15 (session 4)_
+_Last updated: 2026-04-15 (session 5)_
 
 ## Objective
-Add user-initiated activity cards to the review step so users can manually add missing activities.
+Fix add-activity enrichment returning wrong activity (e.g. "Sunset Boat Tour" → unrelated city activity).
 
 ## Active Workstream
-Add Activity + Replace/Modify Brave grounding shipped:
-- Blank "Add activity" card appended at end of the review grid on every `renderActivities()` call
-- Clicking the card opens a modal with 4 fields: name (text), city (dropdown from existing cities), est. cost ($ input + per person/group toggle), why it fits (textarea)
-- On submit, stub pushed with `enriching: true`, card shows spinner; `/api/activity/replace` called with `userAdded: true`; enriched result swaps in-place on success
-- `/api/activity/replace` now runs Brave search on `name + city` before every LLM call for both replace/modify and user-added flows — grounds responses in real venues
-- `userAdded` flag on endpoint controls prompt framing and skips preference signal extraction
+Bug fix shipped for `/api/activity/replace` userAdded path:
+- Root cause: `claude-haiku-4-5` with `max_tokens: 600` lacked instruction-following precision for enrichment; prompt used negative guardrails that were brittle against weaker model
+- Fix: `userAdded` path now uses `claude-sonnet-4-6` + `max_tokens: 1024`; decline/replace path keeps Haiku
+- Prompt simplified to positive framing — tell the model what to do, not what not to do
+- Awaiting VPS push and live test
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
@@ -27,6 +26,4 @@ Add Activity + Replace/Modify Brave grounding shipped:
 - User-added activities have no image — card image area will be blank until enrichment fetches one
 
 ## Next Actions
-- Push and test on VPS
-- Verify add card appears at end of grid and modal opens/closes cleanly
-- Verify user-added activity appears as a real card after submit and can be approved/declined
+- Push to VPS and test add-activity with "Sunset Boat Tour" to verify correct enrichment
