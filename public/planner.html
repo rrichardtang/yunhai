@@ -279,6 +279,45 @@
       </div>
     </div>
 
+    <div id="addActivityModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Add Activity">
+      <div class="modal-card add-activity-modal-card">
+        <div class="between">
+          <h3>Add Activity</h3>
+          <button id="addActivityModalClose" class="icon-btn red" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
+        </div>
+        <div class="add-activity-fields">
+          <div class="add-activity-field">
+            <label for="addActivityName">Activity name</label>
+            <input id="addActivityName" type="text" class="add-activity-input" placeholder="e.g. Sunset boat tour" maxlength="120" autocomplete="off" />
+          </div>
+          <div class="add-activity-field">
+            <label for="addActivityCity">City</label>
+            <select id="addActivityCity" class="add-activity-select">
+            </select>
+          </div>
+          <div class="add-activity-field">
+            <label for="addActivityCost">Estimated cost (USD)</label>
+            <div class="add-activity-cost-row">
+              <span class="add-activity-cost-prefix">$</span>
+              <input id="addActivityCost" type="number" class="add-activity-input add-activity-cost-input" placeholder="0" min="0" step="1" />
+              <select id="addActivityCostType" class="add-activity-select add-activity-cost-type">
+                <option value="per_person">per person</option>
+                <option value="per_group">for group</option>
+              </select>
+            </div>
+          </div>
+          <div class="add-activity-field">
+            <label for="addActivityWhy">Why it fits</label>
+            <textarea id="addActivityWhy" class="add-activity-textarea" rows="3" maxlength="400" placeholder="What makes this a good addition to the trip?"></textarea>
+          </div>
+        </div>
+        <div class="add-activity-footer">
+          <button id="addActivityCancel" class="secondary" type="button">Cancel</button>
+          <button id="addActivitySubmit" class="primary" type="button"><i class="ph-bold ph-plus-circle" aria-hidden="true"></i> Add to itinerary</button>
+        </div>
+      </div>
+    </div>
+
     <div id="chatWidget">
       <div id="chatBubble"><i class="ph-bold ph-chats"></i></div>
       <div id="chatPanel" class="hidden">

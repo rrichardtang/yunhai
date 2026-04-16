@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-15] Add user-initiated "Add Activity" card to review step
+
+- Added blank add-activity card at end of review grid (dashed border, centered `ph-plus-circle` icon, hover accent)
+- Added `#addActivityModal` to `public/planner.html` with 4 fields: name, city dropdown, est. cost ($ + per person/group), why it fits
+- Added `buildAddActivityCard()`, `openAddActivityModal()`, `closeAddActivityModal()`, `submitAddActivity()` to `public/app.js`
+- User-added activities pushed to `state.activities` with `userAdded: true`; grid re-renders on submit; success toast shown
+- Added CSS for `.add-activity-card` and all modal field styles to `public/styles.css`
+- Files: `public/app.js`, `public/planner.html`, `public/styles.css`
+
 ## [2026-04-15] Frontend split: isolate boundary helpers while keeping app.js orchestration
 
 - Extracted overlay/modal concerns to `public/js/overlayManager.js`
