@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-16] Modify vs Replace split on activity cards
+
+- `/api/activity/refine` upgraded: switched from `claude-haiku-4-5` to `gpt-5.4-mini` (via OpenAI SDK); terse reasoning-reliant prompt; unconditional `search()` grounding when Brave is configured; accepts optional `budget_target` for budget-optimization path; `ACTIVITY_REFINE_MODEL` constant added
+- Frontend card markup: single shared textarea placeholder updated to "Tweak or replace this activity…"; single `confirm-decline` button replaced with `confirm-modify` (pencil icon, Modify) + `confirm-replace` (arrows icon, Replace)
+- `confirmModify` handler: POSTs to `/api/activity/refine`, merges `{ updates }` into existing activity preserving `id`, calls `renderActivities()`
+- `confirmReplace` handler: renamed from `confirmDecline`, unchanged behavior → `/api/activity/replace`
+- Expanded modal (`openCardExpand`) updated identically — picks up new markup via innerHTML clone, handlers re-wired
+- All 11 existing tests pass
+- Files: `src/server.js`, `public/app.js`
+
 ## [2026-04-16] Fix AI-generated summary disappearing in My Profile
 
 - Bug 1: `profileChanged` always false — slider dot-click handler mutates `state.profile` live, so by save time `prev === state.profile` already had new values, skipping enrich. Fix: capture `profileSnapshot = JSON.stringify(state.profile)` when modal opens; compare `next` against parsed snapshot in save handler; update snapshot after each save.

@@ -84,6 +84,7 @@ const {
 } = require('./calendarSync');
 
 const CHAT_CONCIERGE_MODEL = 'gpt-5.4-mini';
+const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
 
 const app = express();
 const PORT = Number(process.env.PORT || 3457);
@@ -835,51 +836,42 @@ app.get('/api/geocode', async (req, res) => {
 app.use('/api', requireConfiguredAuth);
 
 app.post('/api/activity/refine', async (req, res) => {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(503).json({ error: 'Anthropic API key not configured' });
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(503).json({ error: 'OpenAI API key not configured' });
   }
 
-  const { activity, note } = req.body || {};
+  const { activity, note, budget_target } = req.body || {};
   if (!activity?.name || !note) {
     return res.status(400).json({ error: 'activity and note are required' });
   }
 
   try {
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
+    const braveResults = isBraveConfigured()
+      ? await search(`${activity.name} ${activity.city} ${note}`, { task: 'entity_enrichment', count: 3 })
+      : [];
+    const braveBlock = braveResults.length
+      ? `\nWeb research (use to anchor the refined activity in a real venue — do not invent place names):\n${braveResults.map(r => `- ${r.title}: ${r.description}`).join('\n')}`
+      : '';
+    const budgetClause = budget_target != null
+      ? `\nThe refined activity's estimated_cost_usd must be at or below ${budget_target}. Downscale the venue or choose a cheaper equivalent within the same activity type and city.`
+      : '';
+
+    const userContent = `You are refining an existing travel activity. The traveler wants a tweak, not a replacement.
+
+Current activity: ${JSON.stringify(activity)}
+Traveler's note: "${note}"${braveBlock}${budgetClause}
+
+Return ONLY a JSON object containing the fields that should change. Preserve all field names from the current activity. If the traveler names a specific place, the "name" field must include it verbatim.`;
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const response = await openai.chat.completions.create({
+      model: ACTIVITY_REFINE_MODEL,
       max_tokens: 500,
-      messages: [{ role: 'user', content: `You are refining a travel activity based on the traveler's customization request.
-
-Current activity:
-- Name: ${activity.name}
-- Type: ${activity.type}
-- City: ${activity.city}
-- Why it fits: ${activity.why_it_fits}
-- Pitfall: ${activity.pitfall}
-- Booking advice: ${activity.booking_advice}
-- Duration: ${activity.duration_hours}h
-- Opening hours: ${activity.opening_hours || 'unknown'}
-- Start location: ${activity.start_location || ''}
-- End location: ${activity.end_location || ''}
-- Estimated cost (USD): ${activity.estimated_cost_usd ?? 'unknown'}
-- Cost type: ${activity.cost_type || 'per_person'}
-- Booking type: ${activity.booking_type || 'none'}
-
-Traveler's customization: "${note}"
-
-CRITICAL RULES:
-1. If the traveler names a SPECIFIC place (restaurant, venue, shop, hotel), the updated "name" field MUST include that exact place name. Do NOT generalize it back to a broad category.
-2. Update start_location and end_location to the specific place if one is named.
-3. Tailor why_it_fits, pitfall, and booking_advice to the SPECIFIC place, not the general category.
-4. Return ONLY the fields that should change. Preserve the same JSON field names.
-5. Return ONLY valid JSON, no markdown fences or explanation.
-6. If the activity changes meaningfully, also return updated estimated_cost_usd (number, overestimate), cost_type ("per_person" or "per_group"), and booking_type ("tour" for guided/operator-led experiences, "attraction" for venues with own ticketing, "restaurant" for named restaurants, "none" for generic/free activities).
-Example: {"name":"teamLab Borderless","estimated_cost_usd":35,"cost_type":"per_person","booking_type":"attraction"}` }]
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: userContent }]
     });
 
-    const raw = extractText(response.content).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-    const updates = JSON.parse(raw);
+    const updates = JSON.parse(response.choices?.[0]?.message?.content?.trim() || '{}');
 
     // Re-enrich cost and booking links
     const updatedName = updates.name || activity.name;

@@ -1,14 +1,15 @@
 # Current State
 
-_Last updated: 2026-04-16 (session 7)_
+_Last updated: 2026-04-16 (session 8)_
 
 ## Objective
-Two My Profile bugs fixed. Ready to push to VPS.
+Modify vs Replace split complete. Ready to push to VPS.
 
 ## Active Workstream
-Bug fixes to AI-generated summary visibility in My Profile modal:
-1. `profileChanged` check was always false — slider dot-click handler mutates `state.profile` live, so `prev === state.profile` already had new values by save time. Fixed by capturing a `profileSnapshot` JSON string on modal open and comparing against that.
-2. `GET /api/preferences` on every modal open could overwrite in-memory `profileInstruction` with an empty string from the server (race/stale write). Fixed by merging: incoming `profileInstruction` only wins if non-empty, otherwise fall back to existing `state.learnedPrefs?.profileInstruction`.
+Implemented Modify / Replace split on activity cards:
+- `/api/activity/refine` upgraded: now uses `gpt-5.4-mini`, unconditional Brave `search()` grounding when configured, optional `budget_target` field, terse reasoning-reliant prompt
+- Frontend: single textarea + two buttons (pencil = Modify → `/refine`, arrows = Replace → `/replace`); both inline card and expanded modal wired; `id` preserved on modify
+- All 11 tests pass
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
@@ -17,11 +18,10 @@ Bug fixes to AI-generated summary visibility in My Profile modal:
 - `planner.html` still does not load helper scripts directly; `app.js` retains runtime fallbacks
 
 ## Risks
-- Root cause of #2 (server returning empty profileInstruction) not fully confirmed — the fix is defensive but underlying cause (race condition vs userId mismatch) may resurface
-- Confidence validation is heuristic-based and intentionally lightweight for MVP
-- Email summary depends on Resend env configuration and authenticated user email claim
-- Concurrent writes from two devices remain last-write-wins
+- `/refine` model is `gpt-5.4-mini` — unknown if this model ID is stable/correct (was used for chat concierge already; low risk)
+- Budget optimization batch UI (flip cards, progress bar) not yet wired — `/refine` is ready to serve it as backbone
+- Planner still generates generic venue names — users rely on Modify to pin specifics
 
 ## Next Actions
 - Push to VPS
-- Verify: AI summary persists across modal open/close cycles without needing to re-save
+- Smoke test: Modify (pin to named venue) + Replace (swap activity type) + existing replace flows
