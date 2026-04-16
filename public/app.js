@@ -243,12 +243,18 @@ function geocodeQueryQueued(query) {
 }
 
 async function geocodeActivity(activity = {}) {
-  const candidates = getActivityLocationCandidates(activity);
-  for (const candidate of candidates) {
+  const name = String(activity.name || '').trim();
+  const city = String(activity.city || '').trim();
+  const specific = [activity.start_location, activity.end_location, activity.location]
+    .map((x) => String(x || '').trim()).filter(Boolean);
+  const fallbacks = [[name, city].filter(Boolean).join(', '), city].filter(Boolean);
+
+  // Cache-hit only on specific fields — fallbacks are shared across activities and cause stale hits
+  for (const candidate of specific) {
     const cached = geocodeCache[geocodeKey(candidate)];
     if (cached?.lat != null && cached?.lng != null) return cached;
   }
-  for (const candidate of candidates) {
+  for (const candidate of [...specific, ...fallbacks]) {
     const result = await geocodeQueryQueued(candidate);
     if (result?.lat != null && result?.lng != null) return result;
   }
