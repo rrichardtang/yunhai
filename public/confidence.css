@@ -221,13 +221,16 @@
   overflow: hidden;
 }
 
-.cl-item--checked .cl-item-name {
-  text-decoration: line-through;
-  color: var(--text-muted, #475569);
+.cl-item--checked {
+  box-shadow: none !important;
+  border-color: #86efac;
+  background: #f0fdf4;
+  transform: translateY(1px);
+  transition: transform .2s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease;
 }
-.cl-item--checked .cl-item-meta { color: var(--text-muted, #475569); }
-.cl-item--checked { box-shadow: none !important; }
 .cl-item--checked .cl-item-collapsed { background: transparent; }
+.cl-item--checked .cl-item-name { color: #166534; }
+.cl-item--checked .cl-item-meta { color: #4ade80; }
 
 .cl-item--flash { animation: cl-flash .9s ease; }
 @keyframes cl-flash {
@@ -263,8 +266,8 @@
   font-size: 12px;
 }
 .cl-checkbox.checked {
-  background: var(--accent, #2A7DE1);
-  border-color: var(--accent, #2A7DE1);
+  background: #22c55e;
+  border-color: #22c55e;
 }
 .cl-checkbox:focus-visible {
   outline: 2px solid var(--accent, #2A7DE1);
@@ -492,14 +495,51 @@
 }
 .cl-add-btn:hover { background: var(--accent-soft, #EDF2FB); color: var(--accent, #2A7DE1); }
 
-/* ── Subtotals ── */
+/* ── Item price ── */
+.cl-item-price {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--text-muted, #475569);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+.cl-item--checked .cl-item-price { color: #4ade80; }
+
+/* ── Section header price ── */
+.cl-container-price {
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--text-muted, #475569);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Totals block ── */
+.cl-totals-block {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--secondary-light, #E2E8F0);
+  text-align: right;
+}
+.cl-total-trip {
+  margin: 0 0 2px;
+  font-size: .92rem;
+  color: var(--text, #1E293B);
+}
+.cl-total-activities {
+  margin: 0;
+  font-size: .84rem;
+  color: var(--text-muted, #475569);
+}
+
+/* kept for any legacy references */
 .cl-subtotal {
   font-size: .82rem;
   color: var(--text-muted, #475569);
   margin: 6px 0 2px;
   padding: 0 4px;
 }
-
 .cl-grand-total {
   font-size: .88rem;
   font-weight: 600;

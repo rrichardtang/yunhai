@@ -1697,6 +1697,7 @@ function renderChecklistContainer(group, collapsedState) {
             <span class="cl-item-name">${esc(item.name || '(unnamed)')}</span>
             ${meta ? `<span class="cl-item-meta">${esc(meta)}</span>` : ''}
           </div>
+          ${item.budgetUsd != null ? `<span class="cl-item-price">$${Math.round(item.budgetUsd).toLocaleString()}</span>` : ''}
           <i class="ph-bold ${item.expanded ? 'ph-caret-up' : 'ph-caret-down'} cl-item-chevron" aria-hidden="true"></i>
         </div>
         ${item.expanded ? `
@@ -1740,6 +1741,7 @@ function renderChecklistContainer(group, collapsedState) {
               <span class="cl-item-name">${esc(item.name || '(unnamed)')}</span>
               ${meta ? `<span class="cl-item-meta">${esc(meta)}</span>` : ''}
             </div>
+            ${item.budgetUsd != null ? `<span class="cl-item-price">$${Math.round(item.budgetUsd).toLocaleString()}</span>` : ''}
             <i class="ph-bold ${item.expanded ? 'ph-caret-up' : 'ph-caret-down'} cl-item-chevron" aria-hidden="true"></i>
           </div>
           ${item.expanded ? `
@@ -1769,7 +1771,7 @@ function renderChecklistContainer(group, collapsedState) {
       <section class="cl-container" data-cl-group="${esc(group.label)}">
         <button type="button" class="cl-container-header" data-cl-toggle-container="${esc(group.label)}">
           <span class="cl-container-title">${esc(group.label)}</span>
-          ${isCollapsed ? `<span class="cl-container-badge">${count}</span>` : ''}
+          ${hasPrices ? `<span class="cl-container-price">$${Math.round(containerSubtotal).toLocaleString()}</span>` : (isCollapsed ? `<span class="cl-container-badge">${count}</span>` : '')}
           <i class="ph-bold ${isCollapsed ? 'ph-caret-down' : 'ph-caret-up'} cl-container-chevron" aria-hidden="true"></i>
         </button>
         ${isCollapsed ? '' : `
@@ -1799,7 +1801,7 @@ function renderChecklistContainer(group, collapsedState) {
     <section class="cl-container" data-cl-group="${esc(group.label)}">
       <button type="button" class="cl-container-header" data-cl-toggle-container="${esc(group.label)}">
         <span class="cl-container-title">${esc(group.label)}</span>
-        ${isCollapsed ? `<span class="cl-container-badge">${count}</span>` : ''}
+        ${hasPrices ? `<span class="cl-container-price">$${Math.round(containerSubtotal).toLocaleString()}</span>` : (isCollapsed ? `<span class="cl-container-badge">${count}</span>` : '')}
         <i class="ph-bold ${isCollapsed ? 'ph-caret-down' : 'ph-caret-up'} cl-container-chevron" aria-hidden="true"></i>
       </button>
       ${isCollapsed ? '' : `
@@ -1864,8 +1866,11 @@ function renderChecklistModal() {
     <div class="cl-containers">
       ${groups.map((g) => renderChecklistContainer(g, checklistSearch.containerCollapsed)).join('')}
     </div>
-    ${anyPrices ? `<p class="cl-grand-total">Absolute trip total: $${totals.absoluteTripTotal.toFixed(2)}</p>
-      <p class="cl-subtotal">Budget Lens total: $${totals.budgetLensTotal.toFixed(2)} <span class="muted-text">(itinerary costs only)</span></p>` : ''}
+    ${anyPrices ? `
+      <div class="cl-totals-block">
+        <p class="cl-total-trip"><strong>Total Trip Cost: $${Math.round(totals.absoluteTripTotal).toLocaleString()}</strong></p>
+        <p class="cl-total-activities">Activities Cost: $${Math.round(totals.itineraryActivityTotal).toLocaleString()}</p>
+      </div>` : ''}
   `;
 
   bindChecklistEvents(el);
