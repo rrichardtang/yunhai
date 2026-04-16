@@ -1233,9 +1233,13 @@ function groupChecklist(items = []) {
   const accommodation = [];
   const cityMap = new Map();
 
+  const cityCanonical = new Map(); // normalized → canonical name
   (state.cities || []).forEach((c) => {
     const name = String(c.name || '').trim();
-    if (name) cityMap.set(name, []);
+    if (name) {
+      cityMap.set(name, []);
+      cityCanonical.set(normalizeCity(name), name);
+    }
   });
 
   (Array.isArray(items) ? items : []).forEach((item) => {
@@ -1244,8 +1248,9 @@ function groupChecklist(items = []) {
     } else if (item.type === 'accommodation') {
       accommodation.push(item);
     } else {
-      const city = String(item.city || item.activityLocation || '').trim();
-      const key = cityMap.has(city) ? city : '';
+      const raw = String(item.city || item.activityLocation || '').trim();
+      const canonical = cityCanonical.get(normalizeCity(raw)) || raw;
+      const key = cityMap.has(canonical) ? canonical : '';
       if (!cityMap.has(key)) cityMap.set(key, []);
       cityMap.get(key).push(item);
     }
