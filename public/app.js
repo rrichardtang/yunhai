@@ -1204,6 +1204,7 @@ function normalizeChecklistItem(item = {}) {
   // activity
   return {
     ...base,
+    activityId: String(item.activityId || '').trim(),
     activityLocation: String(item.activityLocation || item.city || '').trim(),
     activityLocationPlaceId: String(item.activityLocationPlaceId || '').trim(),
     activityLocationLat: item.activityLocationLat ?? null,
@@ -1336,8 +1337,33 @@ function buildChecklistFromState() {
     const day = state.days.find((d) => d.id === placement.dayId);
     if (!day) return;
     const time = parseTimeTo24(placement.time || a.suggested_time || typeToTime(a.type));
-    const item = normalizeChecklistItem({ type: 'activity', name: a.name || '', activityLocation: day.city || '', activityDate: day.date || '', activityTime: time || '' });
-    if (!existingKeys.has(keyOf(item))) {
+    const notes = String(state.reviewed[a.id]?.notes || '').trim();
+    const item = normalizeChecklistItem({
+      type: 'activity',
+      activityId: a.id,
+      name: a.name || '',
+      activityLocation: day.city || '',
+      activityDate: day.date || '',
+      activityTime: time || '',
+      notes
+    });
+
+    const existingIdx = items.findIndex((x) => x.type === 'activity' && x.activityId && x.activityId === a.id);
+    const fallbackIdx = existingIdx === -1 ? items.findIndex((x) => x.type === 'activity' && keyOf(x) === keyOf(item)) : -1;
+    const idx = existingIdx !== -1 ? existingIdx : fallbackIdx;
+
+    if (idx !== -1) {
+      items[idx] = normalizeChecklistItem({
+        ...items[idx],
+        activityId: a.id,
+        name: item.name,
+        activityLocation: item.activityLocation,
+        activityDate: item.activityDate,
+        activityTime: item.activityTime,
+        notes
+      });
+      existingKeys.add(keyOf(items[idx]));
+    } else if (!existingKeys.has(keyOf(item))) {
       items.push(item);
       existingKeys.add(keyOf(item));
     }
@@ -1370,6 +1396,26 @@ function buildChecklistFromState() {
 
   state.confidenceChecklist = items;
   return items;
+}
+
+function syncActivityNotesToChecklist(activityId, notes) {
+  if (!activityId) return;
+  const normalizedNotes = String(notes || '').trim();
+  buildChecklistFromState();
+  const item = state.confidenceChecklist.find((x) => x.type === 'activity' && x.activityId === activityId);
+  if (!item) return;
+  item.notes = normalizedNotes;
+  item.updatedAt = new Date().toISOString();
+}
+
+function syncChecklistNotesToActivity(item = {}) {
+  if (item.type !== 'activity' || !item.activityId) return;
+  const activityId = String(item.activityId || '').trim();
+  if (!activityId || !state.reviewed[activityId]) return;
+  state.reviewed[activityId] = {
+    ...(state.reviewed[activityId] || {}),
+    notes: String(item.notes || '').trim()
+  };
 }
 
 function computeConfidenceLocal() {
@@ -1690,7 +1736,11 @@ function renderChecklistModal() {
 }
 
 function bindChecklistEvents(el) {
-  el.querySelector('#checklistModalSave')?.addEventListener('click', saveSnapshot);
+  el.querySelector('#checklistModalSave')?.addEventListener('click', () => {
+    buildChecklistFromState();
+    saveSnapshot();
+    renderActivities();
+  });
 
   // Search input
   const searchInput = el.querySelector('#clSearchInput');
@@ -1962,6 +2012,8 @@ function syncItemFromExpanded(el, id) {
   item.city = item.type === 'transportation' ? item.startLocation
     : item.type === 'accommodation' ? item.accommodationCity
     : item.activityLocation;
+
+  syncChecklistNotesToActivity(item);
 }
 
 // ── renderConfidence (badge + trip health panels) ─────────────────────────
@@ -3279,6 +3331,8 @@ function renderActivities() {
     saveActivityNotes.addEventListener('click', () => {
       const notes = activityNotesText.value.trim();
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), notes };
+      syncActivityNotesToChecklist(a.id, notes);
+      saveSnapshot();
       saveActivityNotes.innerHTML = '<i class="ph-bold ph-check"></i>';
       setTimeout(() => { saveActivityNotes.innerHTML = '<i class="ph-bold ph-floppy-disk"></i>'; }, 1500);
     });
@@ -3393,6 +3447,8 @@ function renderActivities() {
     expandSaveActivityNotes?.addEventListener('click', () => {
       const notes = expandActivityNotesText.value.trim();
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), notes };
+      syncActivityNotesToChecklist(a.id, notes);
+      saveSnapshot();
       expandSaveActivityNotes.innerHTML = '<i class="ph-bold ph-check"></i>';
       setTimeout(() => { expandSaveActivityNotes.innerHTML = '<i class="ph-bold ph-floppy-disk"></i>'; }, 1500);
     });
