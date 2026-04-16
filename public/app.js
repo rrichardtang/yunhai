@@ -2505,11 +2505,7 @@ function renderCities() {
         }
       });
     }
-
-    row.querySelector('.city-notes-expand-btn')?.addEventListener('click', (e) => {
-      const btn = e.currentTarget;
-      openExpandModal(btn.dataset.expand, btn.dataset.title);
-    });
+    bindTextareaExpandButtons(row);
 
     const accommodationInput = row.querySelector('[data-accommodation-field="address"]');
     if (accommodationInput && isGooglePlacesReady()) {
@@ -3271,10 +3267,7 @@ function renderActivities() {
     const saveActivityNotes = card.querySelector('.save-activity-notes');
     const activityNotesText = card.querySelector('.activity-notes-text');
     const declineBtn = card.querySelector('.decline');
-
-    card.querySelectorAll('.textarea-expand-btn').forEach((btn) => {
-      btn.addEventListener('click', () => openExpandModal(btn.dataset.expand, btn.dataset.title));
-    });
+    bindTextareaExpandButtons(card);
 
     declineBtn.addEventListener('click', () => {
       const current = state.reviewed[a.id]?.approved;
@@ -6572,6 +6565,18 @@ const expandTitle = document.getElementById('textareaExpandTitle');
 const expandEditor = document.getElementById('textareaExpandEditor');
 let expandTargetId = null;
 
+if (expandModal && expandModal.parentElement !== document.body) {
+  document.body.appendChild(expandModal);
+}
+
+function bindTextareaExpandButtons(root = document) {
+  root.querySelectorAll('.textarea-expand-btn').forEach((btn) => {
+    if (btn.dataset.expandBound === '1') return;
+    btn.dataset.expandBound = '1';
+    btn.addEventListener('click', () => openExpandModal(btn.dataset.expand, btn.dataset.title));
+  });
+}
+
 function openExpandModal(targetId, title) {
   expandTargetId = targetId;
   expandTitle.textContent = title;
@@ -6599,9 +6604,7 @@ document.getElementById('textareaExpandSave').addEventListener('click', () => cl
 expandModal.querySelector('.textarea-expand-backdrop').addEventListener('click', () => closeExpandModal(false));
 expandModal.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeExpandModal(false); });
 
-document.querySelectorAll('.textarea-expand-btn').forEach((btn) => {
-  btn.addEventListener('click', () => openExpandModal(btn.dataset.expand, btn.dataset.title));
-});
+bindTextareaExpandButtons(document);
 els.profileEditBtn.addEventListener('click', async () => {
   const next = getProfilePayload();
   if (activeSavingToastId) {
