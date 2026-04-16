@@ -1171,9 +1171,12 @@ function normalizeChecklistItem(item = {}) {
   };
 
   if (type === 'transportation') {
+    const rawScope = String(item.transportScope || item.transport_scope || item.transportType || '').toLowerCase();
+    const transportScope = rawScope === 'entry_exit' ? 'entry_exit' : 'experience';
     return {
       ...base,
       isRoundTrip: Boolean(item.isRoundTrip),
+      transportScope,
       startLocation: String(item.startLocation || item.city || '').trim(),
       startPlaceId: String(item.startPlaceId || '').trim(),
       startLat: item.startLat ?? null,
@@ -1205,6 +1208,7 @@ function normalizeChecklistItem(item = {}) {
   return {
     ...base,
     activityId: String(item.activityId || '').trim(),
+    bookingNotRequired: Boolean(item.bookingNotRequired || item.booking_not_required),
     activityLocation: String(item.activityLocation || item.city || '').trim(),
     activityLocationPlaceId: String(item.activityLocationPlaceId || '').trim(),
     activityLocationLat: item.activityLocationLat ?? null,
@@ -1212,6 +1216,16 @@ function normalizeChecklistItem(item = {}) {
     activityDate: String(item.activityDate || (base.dateTime ? base.dateTime.slice(0, 10) : '')).trim(),
     activityTime: String(item.activityTime || (base.dateTime && base.dateTime.length > 10 ? base.dateTime.slice(11, 16) : '')).trim()
   };
+}
+
+function checklistItemSortKey(item) {
+  if (item.type === 'transportation') return item.departureDate || item.dateTime || '';
+  if (item.type === 'accommodation') return item.checkInDate || item.dateTime || '';
+  return (item.activityDate ? item.activityDate + 'T' + (item.activityTime || '') : item.dateTime) || '';
+}
+
+function sortChecklistByDateAsc(a, b) {
+  return checklistItemSortKey(a).localeCompare(checklistItemSortKey(b));
 }
 
 function groupChecklist(items = []) {
@@ -1237,33 +1251,26 @@ function groupChecklist(items = []) {
     }
   });
 
-  const sortKeyForItem = (item) => {
-    if (item.type === 'transportation') return item.departureDate || item.dateTime || '';
-    if (item.type === 'accommodation') return item.checkInDate || item.dateTime || '';
-    return (item.activityDate ? item.activityDate + 'T' + (item.activityTime || '') : item.dateTime) || '';
-  };
-  const sortByDT = (a, b) => sortKeyForItem(a).localeCompare(sortKeyForItem(b));
-
   const plannedNames = new Set((state.cities || []).map((c) => String(c.name || '').trim()).filter(Boolean));
   const cityGroups = [];
   cityMap.forEach((cityItems, city) => {
     if (!city) return;
-    cityGroups.push({ label: city, items: [...cityItems].sort(sortByDT), planned: plannedNames.has(city) });
+    cityGroups.push({ label: city, items: [...cityItems].sort(sortChecklistByDateAsc), planned: plannedNames.has(city) });
   });
   cityGroups.sort((a, b) => {
     if (a.planned !== b.planned) return a.planned ? -1 : 1;
     return a.label.localeCompare(b.label);
   });
 
-  transportation.sort(sortByDT);
-  accommodation.sort(sortByDT);
+  transportation.sort(sortChecklistByDateAsc);
+  accommodation.sort(sortChecklistByDateAsc);
 
   const groups = [];
-  groups.push({ label: 'Transportation', type: 'transportation', items: transportation });
   groups.push({ label: 'Accommodation', type: 'accommodation', items: accommodation });
+  groups.push({ label: 'Transportation', type: 'transportation', items: transportation });
   groups.push(...cityGroups.map(({ label, items }) => ({ label, type: 'activity', items })));
   const unnamed = cityMap.get('') || [];
-  if (unnamed.length) groups.push({ label: 'Other Activities', type: 'activity', items: [...unnamed].sort(sortByDT) });
+  if (unnamed.length) groups.push({ label: 'Other Activities', type: 'activity', items: [...unnamed].sort(sortChecklistByDateAsc) });
   return groups;
 }
 
@@ -1338,13 +1345,22 @@ function buildChecklistFromState() {
     if (!day) return;
     const time = parseTimeTo24(placement.time || a.suggested_time || typeToTime(a.type));
     const notes = String(state.reviewed[a.id]?.notes || '').trim();
+    const activityEstimatedCost = (() => {
+      if (a.estimated_cost_usd === null || a.estimated_cost_usd === undefined) return null;
+      if (a.cost_type === 'per_group') return Number(a.estimated_cost_usd);
+      const adults = state.numTravelers || 1;
+      const children = state.numChildren || 0;
+      return Number(a.estimated_cost_usd) * adults + Number(a.estimated_cost_usd) * 0.6 * children;
+    })();
     const item = normalizeChecklistItem({
       type: 'activity',
       activityId: a.id,
+      bookingNotRequired: Boolean(state.reviewed[a.id]?.bookingNotRequired),
       name: a.name || '',
       activityLocation: day.city || '',
       activityDate: day.date || '',
       activityTime: time || '',
+      budgetUsd: activityEstimatedCost,
       notes
     });
 
@@ -1356,10 +1372,12 @@ function buildChecklistFromState() {
       items[idx] = normalizeChecklistItem({
         ...items[idx],
         activityId: a.id,
+        bookingNotRequired: items[idx].bookingNotRequired ?? Boolean(state.reviewed[a.id]?.bookingNotRequired),
         name: item.name,
         activityLocation: item.activityLocation,
         activityDate: item.activityDate,
         activityTime: item.activityTime,
+        budgetUsd: items[idx].budgetUsd ?? activityEstimatedCost,
         notes
       });
       existingKeys.add(keyOf(items[idx]));
@@ -1387,7 +1405,14 @@ function buildChecklistFromState() {
     const te = city.travelEntry;
     if (!te) return;
     const dt = te.dateTime || '';
-    const item = normalizeChecklistItem({ type: 'transportation', name: '', startLocation: te.entryPoint || '', departureDate: dt ? dt.slice(0, 10) : '', departureTime: dt && dt.length > 10 ? dt.slice(11, 16) : '' });
+    const item = normalizeChecklistItem({
+      type: 'transportation',
+      name: '',
+      transportScope: 'entry_exit',
+      startLocation: te.entryPoint || '',
+      departureDate: dt ? dt.slice(0, 10) : '',
+      departureTime: dt && dt.length > 10 ? dt.slice(11, 16) : ''
+    });
     if (!existingKeys.has(keyOf(item))) {
       items.push(item);
       existingKeys.add(keyOf(item));
@@ -1415,6 +1440,16 @@ function syncChecklistNotesToActivity(item = {}) {
   state.reviewed[activityId] = {
     ...(state.reviewed[activityId] || {}),
     notes: String(item.notes || '').trim()
+  };
+}
+
+function syncChecklistBookingRequirementToActivity(item = {}) {
+  if (item.type !== 'activity' || !item.activityId) return;
+  const activityId = String(item.activityId || '').trim();
+  if (!activityId) return;
+  state.reviewed[activityId] = {
+    ...(state.reviewed[activityId] || {}),
+    bookingNotRequired: Boolean(item.bookingNotRequired)
   };
 }
 
@@ -1489,6 +1524,7 @@ let checklistSearchRenderTimer = null;
 
 function renderChecklistItemExpanded(item) {
   const hasSecondary = item.referenceNum || item.notes || item.budgetUsd != null;
+  const showReferenceField = item.type !== 'activity' || !item.bookingNotRequired;
 
   const primaryFields = (() => {
     if (item.type === 'transportation') {
@@ -1538,6 +1574,13 @@ function renderChecklistItemExpanded(item) {
           </label>
           ` : '<div></div>'}
         </div>
+        <label class="cl-field">
+          <span class="cl-field-label">Budget Lens scope</span>
+          <select data-cl="transportScope">
+            <option value="entry_exit" ${item.transportScope === 'entry_exit' ? 'selected' : ''}>Entry/exit travel (exclude)</option>
+            <option value="experience" ${item.transportScope !== 'entry_exit' ? 'selected' : ''}>Experience-linked travel (include)</option>
+          </select>
+        </label>
       `;
     }
     if (item.type === 'accommodation') {
@@ -1598,10 +1641,12 @@ function renderChecklistItemExpanded(item) {
           More details
         </button>
         <div class="cl-secondary-fields ${hasSecondary ? '' : 'hidden'}">
+          ${showReferenceField ? `
           <label class="cl-field">
             <span class="cl-field-label">Reference #</span>
             <input type="text" data-cl="referenceNum" value="${esc(item.referenceNum)}" placeholder="Confirmation code / ticket number" />
           </label>
+          ` : ''}
           <label class="cl-field cl-field--price">
             <span class="cl-field-label">Price (USD)</span>
             <div class="cl-price-wrap">
@@ -1639,6 +1684,11 @@ function renderChecklistContainer(group, collapsedState) {
           <button type="button" class="cl-checkbox ${item.verified ? 'checked' : ''}" data-cl-check aria-label="Mark as verified" aria-pressed="${item.verified}">
             ${item.verified ? '<i class="ph-bold ph-check" aria-hidden="true"></i>' : ''}
           </button>
+          ${item.type === 'activity' ? `
+            <button type="button" class="cl-ticket-toggle ${item.bookingNotRequired ? 'cl-ticket-toggle--off' : ''}" data-cl-booking-toggle aria-label="${item.bookingNotRequired ? 'Mark booking required' : 'Mark booking not required'}" aria-pressed="${item.bookingNotRequired}">
+              <i class="ph-bold ph-ticket" aria-hidden="true"></i>
+            </button>
+          ` : ''}
           <div class="cl-item-text">
             <span class="cl-item-name">${esc(item.name || '(unnamed)')}</span>
             ${meta ? `<span class="cl-item-meta">${esc(meta)}</span>` : ''}
@@ -1658,6 +1708,88 @@ function renderChecklistContainer(group, collapsedState) {
       </div>
     `;
   }).join('');
+
+  const renderItemsBlock = (items, emptyLabelOverride) => {
+    if (!items.length) {
+      return `
+        <div class="cl-empty-state">
+          <i class="ph-bold ${emptyIcon} cl-empty-icon" aria-hidden="true"></i>
+          <p class="cl-empty-label">${esc(emptyLabelOverride || emptyLabel)}</p>
+        </div>
+      `;
+    }
+    return items.map((item) => {
+      const meta = collapsedRowText(item);
+      const checkedClass = item.verified ? ' cl-item--checked' : '';
+      return `
+        <div class="cl-item${checkedClass}" data-cl-item="${esc(item.id)}">
+          <div class="cl-item-collapsed" data-cl-collapse-row>
+            <button type="button" class="cl-checkbox ${item.verified ? 'checked' : ''}" data-cl-check aria-label="Mark as verified" aria-pressed="${item.verified}">
+              ${item.verified ? '<i class="ph-bold ph-check" aria-hidden="true"></i>' : ''}
+            </button>
+            ${item.type === 'activity' ? `
+              <button type="button" class="cl-ticket-toggle ${item.bookingNotRequired ? 'cl-ticket-toggle--off' : ''}" data-cl-booking-toggle aria-label="${item.bookingNotRequired ? 'Mark booking required' : 'Mark booking not required'}" aria-pressed="${item.bookingNotRequired}">
+                <i class="ph-bold ph-ticket" aria-hidden="true"></i>
+              </button>
+            ` : ''}
+            <div class="cl-item-text">
+              <span class="cl-item-name">${esc(item.name || '(unnamed)')}</span>
+              ${meta ? `<span class="cl-item-meta">${esc(meta)}</span>` : ''}
+            </div>
+            <i class="ph-bold ${item.expanded ? 'ph-caret-up' : 'ph-caret-down'} cl-item-chevron" aria-hidden="true"></i>
+          </div>
+          ${item.expanded ? `
+            <div class="cl-item-expanded-wrap">
+              <div class="cl-expanded-header">
+                <button type="button" class="cl-delete-btn" data-cl-delete title="Delete item">
+                  <i class="ph-bold ph-trash" aria-hidden="true"></i>
+                </button>
+              </div>
+              ${renderChecklistItemExpanded(item)}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  };
+
+  if (group.type === 'activity') {
+    const requiredItems = group.items.filter((item) => !item.bookingNotRequired).sort(sortChecklistByDateAsc);
+    const notRequiredItems = group.items.filter((item) => item.bookingNotRequired).sort(sortChecklistByDateAsc);
+    const bookingNotRequiredKey = `${group.label}::bookingNotRequired`;
+    const bookingNotRequiredCollapsed = collapsedState[bookingNotRequiredKey] !== undefined
+      ? Boolean(collapsedState[bookingNotRequiredKey])
+      : true;
+
+    return `
+      <section class="cl-container" data-cl-group="${esc(group.label)}">
+        <button type="button" class="cl-container-header" data-cl-toggle-container="${esc(group.label)}">
+          <span class="cl-container-title">${esc(group.label)}</span>
+          ${isCollapsed ? `<span class="cl-container-badge">${count}</span>` : ''}
+          <i class="ph-bold ${isCollapsed ? 'ph-caret-down' : 'ph-caret-up'} cl-container-chevron" aria-hidden="true"></i>
+        </button>
+        ${isCollapsed ? '' : `
+          <div class="cl-container-body">
+            <div class="cl-subsection">
+              <h4 class="cl-subsection-title">Booking Required</h4>
+              ${renderItemsBlock(requiredItems, 'No booking-required activities yet')}
+            </div>
+            <div class="cl-subsection">
+              <button type="button" class="cl-subsection-toggle" data-cl-toggle-container="${esc(bookingNotRequiredKey)}">
+                <span class="cl-subsection-title">Booking Not Required</span>
+                ${bookingNotRequiredCollapsed ? `<span class="cl-container-badge">${notRequiredItems.length}</span>` : ''}
+                <i class="ph-bold ${bookingNotRequiredCollapsed ? 'ph-caret-down' : 'ph-caret-up'} cl-container-chevron" aria-hidden="true"></i>
+              </button>
+              ${bookingNotRequiredCollapsed ? '' : renderItemsBlock(notRequiredItems, 'No booking-exempt activities yet')}
+            </div>
+            <button type="button" class="cl-add-btn" data-cl-add="${esc(group.label)}" data-cl-add-type="${esc(group.type)}">
+              <i class="ph-bold ph-plus" aria-hidden="true"></i> Add Item
+            </button>
+          </div>
+        `}
+      </section>
+    `;
+  }
 
   return `
     <section class="cl-container" data-cl-group="${esc(group.label)}">
@@ -1697,8 +1829,7 @@ function renderChecklistModal() {
     ? checklist.filter((it) => (it.name || '').toLowerCase().includes(query)).slice(0, 8)
     : [];
 
-  // Grand total
-  const grandTotal = checklist.reduce((s, it) => s + (it.budgetUsd ?? 0), 0);
+  const totals = computeBudgetLensBreakdown();
   const anyPrices = checklist.some((it) => it.budgetUsd != null);
 
   el.innerHTML = `
@@ -1729,7 +1860,8 @@ function renderChecklistModal() {
     <div class="cl-containers">
       ${groups.map((g) => renderChecklistContainer(g, checklistSearch.containerCollapsed)).join('')}
     </div>
-    ${anyPrices ? `<p class="cl-grand-total">Grand total: $${grandTotal.toFixed(2)}</p>` : ''}
+    ${anyPrices ? `<p class="cl-grand-total">Absolute trip total: $${totals.absoluteTripTotal.toFixed(2)}</p>
+      <p class="cl-subtotal">Budget Lens total: $${totals.budgetLensTotal.toFixed(2)} <span class="muted-text">(itinerary costs only)</span></p>` : ''}
   `;
 
   bindChecklistEvents(el);
@@ -1791,7 +1923,7 @@ function bindChecklistEvents(el) {
   // Item row click to expand/collapse
   el.querySelectorAll('[data-cl-collapse-row]').forEach((row) => {
     row.addEventListener('click', (e) => {
-      if (e.target.closest('[data-cl-check]')) return;
+      if (e.target.closest('[data-cl-check]') || e.target.closest('[data-cl-booking-toggle]')) return;
       const itemEl = row.closest('[data-cl-item]');
       if (!itemEl) return;
       const id = itemEl.dataset.clItem;
@@ -1815,6 +1947,25 @@ function bindChecklistEvents(el) {
       item.updatedAt = new Date().toISOString();
       renderChecklistModal();
       renderConfidenceBadge();
+    });
+  });
+
+  // Booking required toggle (activity only)
+  el.querySelectorAll('[data-cl-booking-toggle]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const itemEl = btn.closest('[data-cl-item]');
+      if (!itemEl) return;
+      const groupLabel = btn.closest('[data-cl-group]')?.dataset.clGroup || '';
+      const id = itemEl.dataset.clItem;
+      const item = state.confidenceChecklist.find((x) => x.id === id);
+      if (!item || item.type !== 'activity') return;
+      item.bookingNotRequired = !item.bookingNotRequired;
+      if (item.bookingNotRequired) {
+        checklistSearch.containerCollapsed[`${groupLabel || 'Other Activities'}::bookingNotRequired`] = true;
+      }
+      item.updatedAt = new Date().toISOString();
+      syncChecklistBookingRequirementToActivity(item);
+      renderChecklistModal();
     });
   });
 
@@ -1891,7 +2042,14 @@ function bindChecklistEvents(el) {
       const type = btn.dataset.clAddType || 'activity';
       const groupLabel = btn.dataset.clAdd;
       const cityDefault = !['Transportation', 'Accommodation'].includes(groupLabel) ? groupLabel : '';
-      const newItem = normalizeChecklistItem({ type, name: '', city: cityDefault, activityLocation: cityDefault, expanded: true });
+      const newItem = normalizeChecklistItem({
+        type,
+        name: '',
+        city: cityDefault,
+        activityLocation: cityDefault,
+        transportScope: type === 'transportation' ? 'experience' : undefined,
+        expanded: true
+      });
       state.confidenceChecklist = [...(state.confidenceChecklist || []), newItem];
       renderChecklistModal();
       renderConfidenceBadge();
@@ -1968,6 +2126,8 @@ function syncItemFromExpanded(el, id) {
   item.updatedAt = new Date().toISOString();
 
   if (item.type === 'transportation') {
+    const scope = get('[data-cl="transportScope"]');
+    item.transportScope = scope === 'entry_exit' ? 'entry_exit' : 'experience';
     item.startLocation = get('[data-cl="startLocation"]');
     item.endLocation = get('[data-cl="endLocation"]');
     item.departureDate = get('[data-cl="departureDate"]');
@@ -2014,6 +2174,7 @@ function syncItemFromExpanded(el, id) {
     : item.activityLocation;
 
   syncChecklistNotesToActivity(item);
+  syncChecklistBookingRequirementToActivity(item);
 }
 
 // ── renderConfidence (badge + trip health panels) ─────────────────────────
@@ -2061,9 +2222,9 @@ function renderConfidence() {
     const checklist = state.confidenceChecklist || [];
     const verifiedCount = checklist.filter((item) => item.verified || item.status === 'resolved').length;
     const unresolvedBookings = checklist.length - verifiedCount;
-    const runningBudget = checklist.reduce((sum, item) => sum + (Number(item.budgetUsd) || 0), 0);
+    const totals = computeBudgetLensBreakdown();
     const totalBudget = Number(state.tripBudget) || 0;
-    const delta = totalBudget > 0 ? totalBudget - runningBudget : null;
+    const delta = totalBudget > 0 ? totalBudget - totals.budgetLensTotal : null;
     els.confidenceSummary.innerHTML = `
       <section class="trip-health-summary-card">
         <h3>Health summary</h3>
@@ -2078,9 +2239,11 @@ function renderConfidence() {
       <section class="trip-health-summary-card">
         <h3>Budget summary</h3>
         <div class="trip-health-metrics">
-          <p><strong>Checklist running total:</strong> $${runningBudget.toFixed(2)}</p>
+          <p><strong>Budget Lens total:</strong> $${totals.budgetLensTotal.toFixed(2)}</p>
+          <p><strong>Absolute trip total:</strong> $${totals.absoluteTripTotal.toFixed(2)}</p>
           <p><strong>Total trip budget:</strong> ${totalBudget > 0 ? `$${totalBudget.toFixed(2)}` : 'Not set'}</p>
           <p><strong>Over / under:</strong> ${delta == null ? 'N/A' : (delta >= 0 ? `$${delta.toFixed(2)} under` : `$${Math.abs(delta).toFixed(2)} over`)}</p>
+          <p class="muted-text">Budget Lens excludes accommodation and entry/exit travel.</p>
         </div>
       </section>
     `;
@@ -3095,21 +3258,60 @@ function computeApprovedCost(activities) {
     }, 0);
 }
 
+function computeBudgetLensBreakdown() {
+  const checklist = buildChecklistFromState();
+  let itineraryActivityTotal = 0;
+  let itineraryTransportTotal = 0;
+  let entryExitTransportTotal = 0;
+  let accommodationTotal = 0;
+
+  (checklist || []).forEach((item) => {
+    const cost = Number(item?.budgetUsd);
+    if (!Number.isFinite(cost) || cost < 0) return;
+
+    if (item.type === 'accommodation') {
+      accommodationTotal += cost;
+      return;
+    }
+
+    if (item.type === 'transportation') {
+      if (item.transportScope === 'entry_exit') entryExitTransportTotal += cost;
+      else itineraryTransportTotal += cost;
+      return;
+    }
+
+    itineraryActivityTotal += cost;
+  });
+
+  const budgetLensTotal = itineraryActivityTotal + itineraryTransportTotal;
+  const absoluteTripTotal = budgetLensTotal + entryExitTransportTotal + accommodationTotal;
+
+  return {
+    budgetLensTotal,
+    absoluteTripTotal,
+    itineraryActivityTotal,
+    itineraryTransportTotal,
+    entryExitTransportTotal,
+    accommodationTotal
+  };
+}
+
 function renderBudgetTracker() {
   const existing = document.getElementById('budgetTracker');
   if (!state.tripBudget) { if (existing) existing.remove(); return; }
 
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true);
-  const used = computeApprovedCost(approved);
+  const used = computeBudgetLensBreakdown().budgetLensTotal;
   const remaining = state.tripBudget - used;
   const pct = Math.min(used / state.tripBudget, 1);
   const nullCount = approved.filter((a) => a.estimated_cost_usd === null || a.estimated_cost_usd === undefined).length;
   const colorClass = pct < 0.6 ? 'budget-green' : pct < 0.9 ? 'budget-yellow' : 'budget-red';
 
   const html = `<div id="budgetTracker" class="budget-tracker ${colorClass}">
-    <span class="budget-label">Budget</span>
+    <span class="budget-label">Budget Lens</span>
     <span class="budget-used">$${Math.round(used).toLocaleString()} / $${state.tripBudget.toLocaleString()}</span>
     <span class="budget-remaining">${remaining >= 0 ? `$${Math.round(remaining).toLocaleString()} left` : `$${Math.round(-remaining).toLocaleString()} over`}</span>
+    <span class="budget-caveat">Excludes accommodation and entry/exit travel</span>
     ${nullCount > 0 ? `<span class="budget-caveat">${nullCount} activit${nullCount === 1 ? 'y has' : 'ies have'} no cost estimate</span>` : ''}
   </div>`;
 

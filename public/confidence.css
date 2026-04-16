@@ -301,6 +301,64 @@
 
 .cl-item-chevron { color: var(--text-muted, #475569); font-size: 13px; flex-shrink: 0; }
 
+.cl-ticket-toggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--secondary, #C4CDD5);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent, #2A7DE1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+}
+
+.cl-ticket-toggle--off {
+  color: var(--text-muted, #475569);
+}
+
+.cl-ticket-toggle--off::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  border-top: 2px solid currentColor;
+  transform: rotate(-38deg);
+}
+
+.cl-subsection {
+  margin-top: 6px;
+}
+
+.cl-subsection-title {
+  margin: 8px 2px;
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--text-muted, #475569);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.cl-subsection-toggle {
+  width: 100%;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.cl-subsection-toggle .cl-subsection-title {
+  flex: 1;
+  text-align: left;
+}
+
 /* ── Expanded item ── */
 .cl-item-expanded-wrap {
   padding: 0 12px 12px;
