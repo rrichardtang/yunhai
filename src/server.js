@@ -938,10 +938,10 @@ app.post('/api/activity/replace', async (req, res) => {
   const prefSummary = getPreferenceSummary(null, resolvedUserId);
   const systemPrompt = prefSummary ? `${ACTIVITY_SYSTEM_PROMPT}\n\n${prefSummary}` : ACTIVITY_SYSTEM_PROMPT;
 
-  // Brave grounding: find real-world results for this specific activity + city
-  const braveResults = await search(`"${activity.name}" ${activity.city}`);
+  // Brave grounding: semantic search (no quotes) so partial/approximate names still find relevant results
+  const braveResults = await search(`${activity.name} ${activity.city}`);
   const braveBlock = braveResults.length
-    ? `\nWeb research for this specific activity (use as grounding — prefer real venues and locations found here):\n${braveResults.map(r => `- ${r.title}: ${r.description}`).join('\n')}`
+    ? `\nWeb research (use to ground the activity in a real venue or operator — find the closest real match to what the traveler described):\n${braveResults.map(r => `- ${r.title}: ${r.description}`).join('\n')}`
     : '';
 
   try {
@@ -952,7 +952,7 @@ app.post('/api/activity/replace', async (req, res) => {
       const whyClause = reason ? `\nThe traveler described it as: "${reason}"` : '';
       userContent = `The traveler wants to add this activity to their itinerary: "${activity.name}" in ${activity.city}.${whyClause}${braveBlock}
 
-Find the best real-world match for this in ${activity.city} and generate a fully detailed activity object for it. Use the web research above to ground it in a real venue, operator, or location — do not invent details.
+Find the closest real-world match to what the traveler described. If the exact activity doesn't exist in ${activity.city}, find the most similar real option (e.g. if they asked for a boat tour on a river city, find an actual river cruise or kayak tour operator). Ground it in a real venue or operator from the web research — do not invent details.
 
 Return ONLY valid JSON in this exact shape (no markdown fences):
 {
