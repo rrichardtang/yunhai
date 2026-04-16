@@ -50,7 +50,7 @@ const {
   resolveUserId
 } = require('./preferences');
 const { getSession, setTripContext, addMessage, getHistory, compactHistory, clearSession, getCachedPrompt } = require('./chat');
-const { search, searchForChat, isConfigured: isBraveConfigured, searchActivityPricesBatch, searchActivityPrice } = require('./braveSearch');
+const { search, searchForChat, isConfigured: isBraveConfigured, shouldUseBrave, searchActivityPricesBatch, searchActivityPrice } = require('./braveSearch');
 const {
   saveItinerary,
   updateItinerary,
@@ -930,8 +930,11 @@ app.post('/api/activity/replace', async (req, res) => {
   const prefSummary = getPreferenceSummary(resolvedUserId);
   const systemPrompt = prefSummary ? `${ACTIVITY_SYSTEM_PROMPT}\n\n${prefSummary}` : ACTIVITY_SYSTEM_PROMPT;
 
-  // Brave grounding: semantic search (no quotes) so partial/approximate names still find relevant results
-  const braveResults = await search(`${activity.name} ${activity.city}`);
+  const useBraveForEnrichment = isBraveConfigured() && shouldUseBrave('entity_enrichment', {
+    query: `${activity.name} ${activity.city}`,
+    needsLiveGrounding: true
+  });
+  const braveResults = useBraveForEnrichment ? await search(`${activity.name} ${activity.city}`, { task: 'entity_enrichment' }) : [];
   const braveBlock = braveResults.length
     ? `\nWeb research (use to ground the activity in a real venue or operator — find the closest real match to what the traveler described):\n${braveResults.map(r => `- ${r.title}: ${r.description}`).join('\n')}`
     : '';
@@ -1317,11 +1320,11 @@ app.post('/api/chat/message', async (req, res) => {
     const systemPrompt = getCachedPrompt(sessionId, tripContext || {}, () => buildChatSystemPrompt(tripContext || {}, prefSummary));
 
     let searchContext = '';
-    if (isBraveConfigured()) {
+    if (isBraveConfigured() && shouldUseBrave('chat_concierge', { userMessage: message })) {
       try {
-        const searchResults = await searchForChat(message);
+        const searchResults = await searchForChat(message, { count: 5 });
         if (searchResults) {
-          searchContext = `\n\n## Web Search Results\nThese are real-time search results for the user's question. When answering factual questions (recommendations, rankings, ratings, hours, prices), you MUST ground your answer in these results — name specific places, cite the source, and include the URL. Do not give vague or generic advice when the search results contain concrete answers.\n${searchResults}`;
+          searchContext = `\n\n## Web Search Results\nThese are real-time search results for the user's question. When answering factual questions (recommendations, rankings, ratings, hours, prices), you MUST ground your answer in these results — name specific places, cite the source, and include actionable links. Be concise and confident. If results are sparse or conflicting, say so plainly and provide the best fallback recommendation.\n${searchResults}`;
         }
       } catch (e) {
         console.error('[chat] brave search failed, continuing without:', e.message);
