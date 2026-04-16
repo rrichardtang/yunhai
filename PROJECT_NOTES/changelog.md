@@ -4,6 +4,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-16] Fix AI-generated summary disappearing in My Profile
+
+- Bug 1: `profileChanged` always false — slider dot-click handler mutates `state.profile` live, so by save time `prev === state.profile` already had new values, skipping enrich. Fix: capture `profileSnapshot = JSON.stringify(state.profile)` when modal opens; compare `next` against parsed snapshot in save handler; update snapshot after each save.
+- Bug 2: `GET /api/preferences` on every modal open could silently overwrite in-memory `profileInstruction` with empty string (server returned `profileInstruction: ''` for unknown reason — likely race or stale write). Fix: merge incoming prefs, keeping existing `state.learnedPrefs?.profileInstruction` if server returns empty.
+- Files: `public/app.js`
+
 ## [2026-04-16] Unified preference system rewrite
 
 - `src/preferences.js` rewritten: removed `signals`, `liked`, `disliked`, `distilledProfile`, `signalsSinceDistill`, `tokenize`, `topFrequent`, `deriveSummaries`, `recordSignal`, `needsDistillation`, `distill`. New shape: `{ profileInstruction, preferences, constraints }`

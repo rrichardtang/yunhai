@@ -2860,7 +2860,12 @@ async function openPreferencesModal() {
   profileSnapshot = JSON.stringify(state.profile);
   apiFetch('/api/preferences').then((r) => r.ok ? r.json() : null).then((data) => {
     if (data?.preferences) {
-      state.learnedPrefs = data.preferences;
+      const incoming = data.preferences;
+      // Preserve in-memory profileInstruction if server returns empty (race/stale write)
+      state.learnedPrefs = {
+        ...incoming,
+        profileInstruction: incoming.profileInstruction || state.learnedPrefs?.profileInstruction || ''
+      };
       renderPreferencesModal();
     }
   }).catch(() => {});

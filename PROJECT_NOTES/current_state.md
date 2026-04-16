@@ -1,18 +1,14 @@
 # Current State
 
-_Last updated: 2026-04-16 (session 6)_
+_Last updated: 2026-04-16 (session 7)_
 
 ## Objective
-Preference system refactor complete. Ready to push to VPS and verify end-to-end.
+Two My Profile bugs fixed. Ready to push to VPS.
 
 ## Active Workstream
-Full preference system rewrite shipped:
-- `preferences.js` stripped to 3 fields: `profileInstruction`, `preferences`, `constraints`
-- All signal/distillation machinery removed
-- `profileInstruction` (AI-generated summary) now stored server-side, not localStorage
-- Learned preferences extracted from replace/modify notes and chat; shown as editable tags in My Profile
-- AI summary only regenerates when profile answers or aboutMe change
-- Manual edits to AI summary textarea saved on blur
+Bug fixes to AI-generated summary visibility in My Profile modal:
+1. `profileChanged` check was always false — slider dot-click handler mutates `state.profile` live, so `prev === state.profile` already had new values by save time. Fixed by capturing a `profileSnapshot` JSON string on modal open and comparing against that.
+2. `GET /api/preferences` on every modal open could overwrite in-memory `profileInstruction` with an empty string from the server (race/stale write). Fixed by merging: incoming `profileInstruction` only wins if non-empty, otherwise fall back to existing `state.learnedPrefs?.profileInstruction`.
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
@@ -21,13 +17,11 @@ Full preference system rewrite shipped:
 - `planner.html` still does not load helper scripts directly; `app.js` retains runtime fallbacks
 
 ## Risks
-- Existing VPS users with `distilledProfile` in their JSON will lose it on next write — old field silently dropped by new `normalize()`. If there's valuable data, needs one-time migration before deploy.
+- Root cause of #2 (server returning empty profileInstruction) not fully confirmed — the fix is defensive but underlying cause (race condition vs userId mismatch) may resurface
 - Confidence validation is heuristic-based and intentionally lightweight for MVP
 - Email summary depends on Resend env configuration and authenticated user email claim
 - Concurrent writes from two devices remain last-write-wins
-- Mobile city card layout uses `nth-child` selectors — fragile if HTML child order changes
 
 ## Next Actions
 - Push to VPS
-- Check existing user JSON files for `distilledProfile` data worth preserving before deploy
-- Verify: My Profile shows AI summary from server, learned prefs tags appear, enrich only fires on profile change
+- Verify: AI summary persists across modal open/close cycles without needing to re-save
