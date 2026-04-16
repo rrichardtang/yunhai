@@ -1,16 +1,18 @@
 # Current State
 
-_Last updated: 2026-04-15 (session 5)_
+_Last updated: 2026-04-16 (session 6)_
 
 ## Objective
-Fix add-activity enrichment returning wrong activity (e.g. "Sunset Boat Tour" → unrelated city activity).
+Preference system refactor complete. Ready to push to VPS and verify end-to-end.
 
 ## Active Workstream
-Bug fix shipped for `/api/activity/replace` userAdded path:
-- Root cause: `claude-haiku-4-5` with `max_tokens: 600` lacked instruction-following precision for enrichment; prompt used negative guardrails that were brittle against weaker model
-- Fix: `userAdded` path now uses `claude-sonnet-4-6` + `max_tokens: 1024`; decline/replace path keeps Haiku
-- Prompt simplified to positive framing — tell the model what to do, not what not to do
-- Awaiting VPS push and live test
+Full preference system rewrite shipped:
+- `preferences.js` stripped to 3 fields: `profileInstruction`, `preferences`, `constraints`
+- All signal/distillation machinery removed
+- `profileInstruction` (AI-generated summary) now stored server-side, not localStorage
+- Learned preferences extracted from replace/modify notes and chat; shown as editable tags in My Profile
+- AI summary only regenerates when profile answers or aboutMe change
+- Manual edits to AI summary textarea saved on blur
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture
@@ -19,11 +21,13 @@ Bug fix shipped for `/api/activity/replace` userAdded path:
 - `planner.html` still does not load helper scripts directly; `app.js` retains runtime fallbacks
 
 ## Risks
+- Existing VPS users with `distilledProfile` in their JSON will lose it on next write — old field silently dropped by new `normalize()`. If there's valuable data, needs one-time migration before deploy.
 - Confidence validation is heuristic-based and intentionally lightweight for MVP
 - Email summary depends on Resend env configuration and authenticated user email claim
 - Concurrent writes from two devices remain last-write-wins
 - Mobile city card layout uses `nth-child` selectors — fragile if HTML child order changes
-- User-added activities have no image — card image area will be blank until enrichment fetches one
 
 ## Next Actions
-- Push to VPS and test add-activity with "Sunset Boat Tour" to verify correct enrichment
+- Push to VPS
+- Check existing user JSON files for `distilledProfile` data worth preserving before deploy
+- Verify: My Profile shows AI summary from server, learned prefs tags appear, enrich only fires on profile change

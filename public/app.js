@@ -802,8 +802,7 @@ function bindCityAutocompleteOutsideClick() {
 function defaultProfile() {
   return {
     answers: Object.fromEntries(PROFILE_QUESTIONS.map((q) => [q.key, PROFILE_DEFAULT])),
-    aboutMe: '',
-    profileInstruction: ''
+    aboutMe: ''
   };
 }
 
@@ -956,14 +955,9 @@ function normalizeProfile(profile) {
     const clamped = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Math.round(Number(resolved || PROFILE_DEFAULT))));
     base.answers[q.key] = clamped;
   }
-  // Keep aboutMe and profileInstruction strictly separated.
-  // Only use legacy travelNotes when aboutMe is missing and no instruction exists.
   const hasAboutMe = profile.aboutMe !== undefined && profile.aboutMe !== null;
-  const canUseLegacyTravelNotes = !hasAboutMe && !profile.profileInstruction;
-  const aboutSource = hasAboutMe ? profile.aboutMe : (canUseLegacyTravelNotes ? profile.travelNotes : '');
-
+  const aboutSource = hasAboutMe ? profile.aboutMe : (profile.travelNotes || '');
   base.aboutMe = String(aboutSource ?? '').trim();
-  base.profileInstruction = String(profile.profileInstruction || '').trim();
   return base;
 }
 
@@ -2680,21 +2674,6 @@ async function apiFetch(url, options = {}) {
   return fetch(url, next);
 }
 
-function postPreferenceSignal(activity, verdict, reason) {
-  apiFetch('/api/preferences/signal', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      userId: ensureUserId(),
-      name: activity.name,
-      type: activity.type,
-      verdict,
-      city: activity.city,
-      why_it_fits: activity.why_it_fits,
-      ...(reason ? { reason } : {})
-    })
-  }).catch(() => {});
-}
 
 function renderPreferencesModal() {
   if (!els.profileQuestions) return;
@@ -2762,7 +2741,7 @@ function renderPreferencesModal() {
   els.profileEditBtn.innerHTML = '<i class="ph-bold ph-floppy-disk"></i>';
 
   if (els.aiSummarySection && els.profileAiSummary) {
-    const instruction = profile.profileInstruction || '';
+    const instruction = state.learnedPrefs?.profileInstruction || '';
     if (instruction) {
       els.profileAiSummary.value = instruction;
       els.aiSummarySection.classList.remove('hidden');
@@ -2815,11 +2794,9 @@ function renderPreferencesModal() {
 
 function getProfilePayload() {
   const aboutMeValue = els.profileTravelNotes ? els.profileTravelNotes.value : (state.profile?.aboutMe ?? '');
-  const aiSummaryValue = els.profileAiSummary ? els.profileAiSummary.value : (state.profile?.profileInstruction ?? '');
   return normalizeProfile({
     ...(state.profile || defaultProfile()),
-    aboutMe: aboutMeValue,
-    profileInstruction: aiSummaryValue
+    aboutMe: aboutMeValue
   });
 }
 
@@ -2885,6 +2862,7 @@ async function openPreferencesModal() {
       renderPreferencesModal();
     }
   }).catch(() => {});
+
   renderPreferencesModal();
   els.prefsModal.classList.remove('hidden');
   refreshOverlayInterlocks();
@@ -3279,7 +3257,6 @@ function renderActivities() {
       const current = state.reviewed[a.id]?.approved;
       const nextApproved = current === true ? null : true;
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: nextApproved };
-      if (nextApproved === true) postPreferenceSignal(a, 'approved');
       syncVerdictClasses(card, nextApproved);
     });
     const declineReason = card.querySelector('.decline-reason');
@@ -3296,7 +3273,6 @@ function renderActivities() {
       const current = state.reviewed[a.id]?.approved;
       const nextApproved = current === false ? null : false;
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: nextApproved };
-      if (nextApproved === false) postPreferenceSignal(a, 'declined');
       syncVerdictClasses(card, nextApproved);
     });
 
@@ -3331,7 +3307,6 @@ function renderActivities() {
         if (idx !== -1) state.activities.splice(idx, 1, replacement);
         delete state.reviewed[a.id];
         state.reviewed[replacement.id] = { approved: null, notes: '' };
-        postPreferenceSignal(a, 'declined', reason);
         renderActivities();
       } catch {
         confirmDecline.textContent = 'Replace/Modify';
@@ -3399,7 +3374,6 @@ function renderActivities() {
       const current = state.reviewed[a.id]?.approved;
       const next = current === true ? null : true;
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: next };
-      if (next === true) postPreferenceSignal(a, 'approved');
       syncExpand(next);
     });
 
@@ -3413,7 +3387,6 @@ function renderActivities() {
       const current = state.reviewed[a.id]?.approved;
       const next = current === false ? null : false;
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: next };
-      if (next === false) postPreferenceSignal(a, 'declined');
       syncExpand(next);
     });
 
@@ -3448,7 +3421,6 @@ function renderActivities() {
         if (idx !== -1) state.activities.splice(idx, 1, replacement);
         delete state.reviewed[a.id];
         state.reviewed[replacement.id] = { approved: null, notes: '' };
-        postPreferenceSignal(a, 'declined', reason);
         close();
         renderActivities();
       } catch {
@@ -6582,7 +6554,7 @@ els.learnedPrefsTags?.addEventListener('click', (e) => {
   apiFetch('/api/preferences', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ constraints: lp.constraints, preferences: lp.preferences })
+    body: JSON.stringify({ constraints: lp.constraints, preferences: lp.preferences, profileInstruction: lp.profileInstruction })
   }).catch(() => {});
   renderPreferencesModal();
 });
@@ -6630,7 +6602,20 @@ els.profileEditBtn.addEventListener('click', async () => {
     stale?.click();
   }
   activeSavingToastId = showToast('Saving...', 'info');
+
+  const prev = state.profile;
+  const profileChanged = !prev ||
+    JSON.stringify(next.answers) !== JSON.stringify(prev.answers) ||
+    next.aboutMe !== prev.aboutMe;
+
   saveProfile(next);
+
+  if (!profileChanged) {
+    showToast('Profile saved!', 'success');
+    activeSavingToastId = null;
+    renderPreferencesModal();
+    return;
+  }
 
   try {
     const res = await apiFetch('/api/profile/enrich', {
@@ -6646,7 +6631,7 @@ els.profileEditBtn.addEventListener('click', async () => {
     ).trim();
 
     if (res.ok && instruction) {
-      saveProfile({ ...next, profileInstruction: instruction });
+      state.learnedPrefs = { ...(state.learnedPrefs || {}), profileInstruction: instruction };
       if (els.profileAiSummary && els.aiSummarySection) {
         els.profileAiSummary.value = instruction;
         els.aiSummarySection.classList.remove('hidden');
@@ -6668,6 +6653,17 @@ els.profileSelector?.addEventListener('change', (e) => {
   const nextId = e.target.value;
   if (!nextId) return;
   switchActiveProfile(nextId);
+});
+
+els.profileAiSummary?.addEventListener('blur', () => {
+  const instruction = els.profileAiSummary.value.trim();
+  if (instruction === (state.learnedPrefs?.profileInstruction || '')) return;
+  state.learnedPrefs = { ...(state.learnedPrefs || {}), profileInstruction: instruction };
+  apiFetch('/api/preferences', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profileInstruction: instruction })
+  }).catch(() => {});
 });
 
 els.newProfileBtn?.addEventListener('click', createNewProfile);

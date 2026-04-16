@@ -40,11 +40,8 @@ const { planCity, normalizeActivity, SYSTEM_PROMPT: ACTIVITY_SYSTEM_PROMPT } = r
 const { fetchUnsplashImage } = require('./unsplash');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('./arrangeConfig');
 const {
-  recordSignal,
   recordConstraint,
   recordPreference,
-  needsDistillation,
-  distill: distillProfile,
   load: loadPreferences,
   save: savePreferences,
   getSummary: getPreferenceSummary,
@@ -598,11 +595,10 @@ function buildChatSystemPrompt(tripContext = {}, prefSummary = '') {
 
 Respond ONLY with valid JSON: {"reply":"your response","signals":[]}
 CRITICAL: Inside the "reply" value, NEVER paste raw URLs. Always use markdown links: [label](url). Example: "Try [Sushi Dai](https://tabelog.com/...)." Raw URLs waste space and are unreadable.
-The "signals" array captures any travel preferences or constraints the user reveals. Each signal is one of:
-- Activity preference: {"type":"walk","verdict":"approved"} or {"type":"museum","verdict":"declined"}
-- Preference: {"preference":"Prefers local street food over fine dining"} — use this for nuanced tastes that don't fit a simple type approve/decline. Capture what they like AND what they don't, with specificity.
-- Constraint: {"constraint":"no activities before 9am"}
-Only include signals when the user clearly states a preference. Omit the array or leave it empty otherwise. Do NOT extract signals from your own suggestions.`;
+The "signals" array captures any travel preferences or constraints the user explicitly states. Each signal is one of:
+- Preference: {"preference":"Gets seasick easily — avoid boat-based activities"} — specific, actionable details the AI should remember.
+- Constraint: {"constraint":"no activities before 9am"} — hard limits.
+Only include signals when the user clearly states something personal. Omit if empty. Do NOT extract signals from your own suggestions.`;
   const profileBlock = prefSummary ? `\n\n## Traveler\n${prefSummary}` : '';
   const tripBlock = `\n\n## Trip: ${tripContext.tripName || 'Untitled'} (${tripContext.step || 'unknown'})\n${cities}${activityLines}`;
   const scheduleBlock = formatScheduleBlock(tripContext.scheduledByDay);
@@ -625,16 +621,8 @@ function parseChatResponse(raw) {
 function processChatSignals(signals, userId) {
   if (!signals.length) return;
   for (const sig of signals) {
-    if (sig.preference) {
-      recordPreference(userId, sig.preference);
-    } else if (sig.constraint) {
-      recordConstraint(userId, sig.constraint);
-    } else if (sig.type && sig.verdict) {
-      recordSignal({ userId, name: '', type: sig.type, verdict: sig.verdict, city: '', why_it_fits: '' });
-    }
-  }
-  if (needsDistillation(userId)) {
-    distillProfile(userId).catch((err) => console.error('[chat] distillation failed:', err.message));
+    if (sig.preference) recordPreference(userId, sig.preference);
+    else if (sig.constraint) recordConstraint(userId, sig.constraint);
   }
 }
 
@@ -936,7 +924,7 @@ app.post('/api/activity/replace', async (req, res) => {
   }
 
   const resolvedUserId = parseUserId(userId);
-  const prefSummary = getPreferenceSummary(null, resolvedUserId);
+  const prefSummary = getPreferenceSummary(resolvedUserId);
   const systemPrompt = prefSummary ? `${ACTIVITY_SYSTEM_PROMPT}\n\n${prefSummary}` : ACTIVITY_SYSTEM_PROMPT;
 
   // Brave grounding: semantic search (no quotes) so partial/approximate names still find relevant results
@@ -954,12 +942,13 @@ app.post('/api/activity/replace', async (req, res) => {
 
 Find the best real-world match — use the web research to ground it in an actual venue or operator, and fill in pricing, booking info, duration, and other details. If the traveler's note asks for something different, find that instead.
 
-Also extract any learnable preference signals from the traveler's note (omit if one-off or situational, e.g. "already did this", "too expensive this trip").
+Also extract any learnable preferences or constraints from the traveler's note. Omit if one-off or situational (e.g. "already did this", "too expensive this trip"). Preferences are specific, reusable details (e.g. "gets seasick easily"). Constraints are hard limits (e.g. "no early mornings").
 
 Return ONLY valid JSON (no markdown fences):
 {
   "activity": { ...single activity object matching the standard activity schema... },
-  "signals": []
+  "preferences": [],
+  "constraints": []
 }`;
 
     const response = await anthropic.messages.create({
@@ -978,8 +967,8 @@ Return ONLY valid JSON (no markdown fences):
 
     const normalized = normalizeActivity(parsed.activity, activity.city);
 
-    const signals = Array.isArray(parsed.signals) ? parsed.signals : [];
-    processChatSignals(signals, resolvedUserId);
+    for (const p of (Array.isArray(parsed.preferences) ? parsed.preferences : [])) recordPreference(resolvedUserId, p);
+    for (const c of (Array.isArray(parsed.constraints) ? parsed.constraints : [])) recordConstraint(resolvedUserId, c);
 
     return res.json({ activity: normalized });
   } catch (error) {
@@ -1001,11 +990,7 @@ app.post('/api/arrange', async (req, res) => {
     return res.status(400).json({ error: 'days and activities are required arrays' });
   }
   const userId = parseUserId(getAuthedUserId(req));
-  const prefs = loadPreferences(userId);
-  const prefParts = [];
-  if (prefs.distilledProfile) prefParts.push(prefs.distilledProfile);
-  if (prefs.constraints.length) prefParts.push(`Constraints: ${prefs.constraints.map((c) => c.text).join('; ')}`);
-  const prefSummary = prefParts.join('\n');
+  const prefSummary = getPreferenceSummary(userId);
 
   const daysText = days.map((d) => {
     let line = `- ${d.date} (${d.label}): available ${d.windowStart} – ${d.windowEnd}`;
@@ -1203,19 +1188,6 @@ app.post('/api/commute', async (req, res) => {
   }
 });
 
-app.post('/api/preferences/signal', (req, res) => {
-  try {
-    const { name, type, verdict, city, why_it_fits } = req.body || {};
-    const resolvedUserId = parseUserId(getAuthedUserId(req));
-    recordSignal({ userId: resolvedUserId, name, type, verdict, city, why_it_fits });
-    if (needsDistillation(resolvedUserId)) {
-      distillProfile(resolvedUserId).catch((err) => console.error('[preferences] distillation failed:', err.message));
-    }
-    return res.json({ ok: true });
-  } catch (error) {
-    return res.status(error.statusCode || 400).json({ error: error.message || 'Invalid preferences signal payload' });
-  }
-});
 
 app.get('/api/preferences', (req, res) => {
   try {
@@ -1230,10 +1202,10 @@ app.put('/api/preferences', (req, res) => {
   try {
     const userId = parseUserId(getAuthedUserId(req));
     const prefs = loadPreferences(userId);
-    const { constraints, preferences, distilledProfile } = req.body || {};
+    const { constraints, preferences, profileInstruction } = req.body || {};
     if (Array.isArray(constraints)) prefs.constraints = constraints;
     if (Array.isArray(preferences)) prefs.preferences = preferences;
-    if (typeof distilledProfile === 'string') prefs.distilledProfile = distilledProfile;
+    if (typeof profileInstruction === 'string') prefs.profileInstruction = profileInstruction;
     savePreferences(prefs, userId);
     return res.json({ ok: true, preferences: prefs });
   } catch (error) {
@@ -1295,10 +1267,11 @@ app.post('/api/profile/enrich', async (req, res) => {
   }
 
   try {
+    const userId = parseUserId(getAuthedUserId(req));
     const profile = req.body || {};
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-    const prompt = `You are writing traveler instructions for a travel planning AI agent. Based on this traveler's self-reported preferences below, write a concise 2-4 sentence instruction paragraph in second person (e.g. "This traveler...") that tells the agent how to tailor recommendations specifically for them. Be specific and direct — this is an instruction, not a summary. Focus on what they love, what to avoid, and any quirks. Output ONLY the instruction paragraph, nothing else.\n\nTraveler profile:\n${formatProfileForEnrichment(profile)}`;
+    const prompt = `You are writing a high-level traveler profile for a travel planning AI agent. Based on this traveler's self-reported preferences, write a concise 2-4 sentence paragraph in third person ("This traveler...") capturing their general style, interests, and things to avoid. Focus on broad strokes only — pace, cultural interests, food style, activity types. Do NOT include specific constraints or situational details (those are tracked separately). Output ONLY the paragraph.\n\nTraveler profile:\n${formatProfileForEnrichment(profile)}`;
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
@@ -1311,10 +1284,11 @@ app.post('/api/profile/enrich', async (req, res) => {
       return res.status(500).json({ error: 'Failed to generate profile instruction' });
     }
 
-    return res.json({
-      instruction,
-      profileInstruction: instruction
-    });
+    const prefs = loadPreferences(userId);
+    prefs.profileInstruction = instruction;
+    savePreferences(prefs, userId);
+
+    return res.json({ instruction, profileInstruction: instruction });
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Failed to enrich profile' });
   }
@@ -1332,7 +1306,7 @@ app.post('/api/chat/message', async (req, res) => {
 
   try {
     const userId = parseUserId(getAuthedUserId(req));
-    const prefSummary = getPreferenceSummary(tripContext?.profile || null, userId);
+    const prefSummary = getPreferenceSummary(userId);
 
     getSession(sessionId);
     setTripContext(sessionId, tripContext || {});

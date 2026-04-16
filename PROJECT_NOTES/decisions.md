@@ -4,6 +4,23 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-04-16] Unified preference system — server-side, user-visible, single LLM input
+
+**Decision:** Replaced the dual-track preference system (signal-derived `liked`/`disliked` + `distilledProfile` on one track; explicit `preferences`/`constraints` on another) with a single unified model: `profileInstruction` (high-level AI summary) + `preferences` + `constraints` (specific learned details). All three fields live server-side. The LLM uses exactly what the user sees and can edit.
+**Reasoning:** The old system had two parallel paths that never reconciled — signal-derived data was invisible to the user and couldn't be corrected; `distilledProfile` was a hidden AI-generated prose blob that also duplicated the role of `profileInstruction`. The user's mental model is clear: a high-level summary (editable) and a checklist of specific learned details (editable). One data shape, one render path, one LLM input path.
+**Alternatives rejected:**
+- Surfacing `liked`/`disliked` signal summaries as tags — rejected because approve/decline activity patterns don't provide enough signal value and add complexity without a clear user benefit.
+- Keeping `distilledProfile` as a background AI process — rejected because it was invisible to the user, got overwritten on distillation, and cleared `preferences`/`constraints` as a side effect.
+- Merging `profileInstruction` and `distilledProfile` into one field — rejected once it was clear they serve different roles: `profileInstruction` is generated from self-reported answers (what the user tells us), learned preferences capture specifics from interactions (what the AI picks up).
+**Tradeoffs:** Approve/decline signals no longer feed any learning mechanism. The only learning path is now explicit extraction from replace/modify notes and chat. This is intentional — signals were too noisy and the user preferred deliberate preference capture.
+
+## [2026-04-16] AI summary regenerates only on profile answer/aboutMe changes
+
+**Decision:** `/api/profile/enrich` is only called when the user's `answers` or `aboutMe` have changed since last save. Manual edits to the AI summary textarea are saved on blur directly to `/api/preferences` without triggering a regeneration.
+**Reasoning:** The AI summary and learned preferences are separate entities. Clicking Save after editing something unrelated (or editing the summary itself) should not clobber the user's manual edits with a fresh AI generation.
+**Alternatives rejected:** Always regenerate on save — rejected because it overwrites user edits. Separate "Regenerate" button — deferred as a future improvement; the change-detection approach covers the core case cleanly.
+**Tradeoffs:** If the user edits the summary and also changes their answers, save will regenerate and overwrite. This edge case is acceptable for now.
+
 ## [2026-04-15] Minimal frontend boundary split with fallback-safe loading
 
 **Decision:** Extract only three boundary concerns from `public/app.js` into helper modules: overlay/modal manager (`public/js/overlayManager.js`), API/service layer (`public/js/apiService.js`), and top-level persistence helpers (`public/js/statePersistence.js`), while keeping orchestration in `app.js`.

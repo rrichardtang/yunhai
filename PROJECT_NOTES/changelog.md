@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-16] Unified preference system rewrite
+
+- `src/preferences.js` rewritten: removed `signals`, `liked`, `disliked`, `distilledProfile`, `signalsSinceDistill`, `tokenize`, `topFrequent`, `deriveSummaries`, `recordSignal`, `needsDistillation`, `distill`. New shape: `{ profileInstruction, preferences, constraints }`
+- `getSummary()` now takes `userId` only — single path, no branching on distillation state
+- `src/server.js`: removed `POST /api/preferences/signal` endpoint; removed `recordSignal`, `needsDistillation`, `distillProfile` imports; `PUT /api/preferences` now accepts `profileInstruction`; `/api/profile/enrich` saves generated instruction server-side; `/api/activity/replace` extracts `preferences`/`constraints` arrays from LLM response instead of `signals`; chat system prompt drops approve/decline signal shape; fixed stale `distilledProfile` reference in `/api/arrange`
+- `public/app.js`: removed `profileInstruction` from localStorage profile shape and `defaultProfile()`; `renderPreferencesModal` reads AI summary from `state.learnedPrefs.profileInstruction` (server); profile save handler PUTs `profileInstruction` to server after enrich; added `blur` listener on AI summary textarea to save manual edits; enrich only fires when `answers` or `aboutMe` changed; removed `postPreferenceSignal()` function and all 6 call sites
+
 ## [2026-04-15] Fix add-activity enrichment returning wrong activity
 
 - Root cause: `userAdded` path on `/api/activity/replace` used `claude-haiku-4-5` + `max_tokens: 600` — insufficient for precise instruction-following on enrichment task; returned unrelated city activities
