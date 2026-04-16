@@ -43,6 +43,8 @@ function normalizeChecklistItem(item = {}) {
   const type = migrateType(item.type || item.kind);
   const status = migrateStatus(item);
   const budgetRaw = Number(item.budgetUsd ?? item.budget ?? item.budget_usd);
+  const rawScope = String(item.transportScope || item.transport_scope || '').toLowerCase();
+  const transportScope = rawScope === 'entry_exit' ? 'entry_exit' : 'experience';
   return {
     id: String(item.id || `chk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
     type,
@@ -51,6 +53,7 @@ function normalizeChecklistItem(item = {}) {
     dateTime: String(item.dateTime || item.when || item.date || '').trim(),
     notes: String(item.notes || '').trim(),
     bookingReference: String(item.bookingReference || item.reference || '').trim(),
+    transportScope: type === 'transportation' ? transportScope : undefined,
     verified: Boolean(item.verified || status === 'resolved' || item.state === 'verified'),
     budgetUsd: Number.isFinite(budgetRaw) && budgetRaw >= 0 ? budgetRaw : null,
     status,
