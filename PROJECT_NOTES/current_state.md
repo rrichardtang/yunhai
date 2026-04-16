@@ -6,12 +6,12 @@ _Last updated: 2026-04-15 (session 4)_
 Add user-initiated activity cards to the review step so users can manually add missing activities.
 
 ## Active Workstream
-Add Activity card feature shipped:
+Add Activity + Replace/Modify Brave grounding shipped:
 - Blank "Add activity" card appended at end of the review grid on every `renderActivities()` call
 - Clicking the card opens a modal with 4 fields: name (text), city (dropdown from existing cities), est. cost ($ input + per person/group toggle), why it fits (textarea)
-- On submit, activity is pushed to `state.activities` with `userAdded: true` and grid re-renders
-- Modal wired with close/cancel/backdrop-click dismiss; toast on success
-- CSS uses dashed border + centered Phosphor `ph-plus-circle` icon; hover accents to `--accent`
+- On submit, stub pushed with `enriching: true`, card shows spinner; `/api/activity/replace` called with `userAdded: true`; enriched result swaps in-place on success
+- `/api/activity/replace` now runs Brave search on `name + city` before every LLM call for both replace/modify and user-added flows — grounds responses in real venues
+- `userAdded` flag on endpoint controls prompt framing and skips preference signal extraction
 
 ## Constraints
 - No database — flat JSON files, consistent with existing architecture

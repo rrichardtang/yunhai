@@ -481,6 +481,18 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 .activity-notes-wrap { flex: 1; min-width: 0; }
 .activity-notes-wrap .profile-textarea-fixed { font-size: 13px; border-radius: 10px; padding: 6px 28px 6px 8px; }
 
+/* Enriching (loading) card state */
+.activity-card-enriching { min-height: 520px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(196,205,213,.4); }
+.activity-enriching-body { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px; text-align: center; }
+.activity-enriching-spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid rgba(26,111,244,.15);
+  border-top-color: var(--accent);
+  animation: enrichSpin .75s linear infinite;
+}
+@keyframes enrichSpin { to { transform: rotate(360deg); } }
+.activity-enriching-label { font-size: 0.9rem; color: var(--muted); max-width: 200px; line-height: 1.4; }
+
 /* Add Activity card */
 .add-activity-card {
   border: 2px dashed rgba(196,205,213,.55);

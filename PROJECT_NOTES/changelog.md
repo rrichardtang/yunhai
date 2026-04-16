@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-15] Enrich user-added activities and ground Replace/Modify via Brave search
+
+- `/api/activity/replace` now runs `search("${name} ${city}")` (3 results) before every LLM call, injecting results as grounding context — applies to both replace/modify and user-added flows
+- Added `userAdded` flag to `/api/activity/replace`: when true, prompt asks agent to flesh out a real-world match; when false (default), prompt asks for a replacement addressing the decline reason; signals extraction skipped for userAdded
+- `search` added to braveSearch import in `src/server.js`
+- `submitAddActivity()` in `public/app.js` now pushes an `enriching: true` stub, then calls `/api/activity/replace` with `userAdded: true`; on success swaps stub with enriched activity in-place; on failure removes enriching flag and keeps stub
+- `buildActivityCard()` short-circuits to a spinner card when `a.enriching === true`
+- Added `.activity-card-enriching` and spinner CSS to `public/styles.css`
+- Files: `src/server.js`, `public/app.js`, `public/styles.css`
+
 ## [2026-04-15] Add user-initiated "Add Activity" card to review step
 
 - Added blank add-activity card at end of review grid (dashed border, centered `ph-plus-circle` icon, hover accent)

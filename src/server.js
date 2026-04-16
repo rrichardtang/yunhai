@@ -51,7 +51,7 @@ const {
   resolveUserId
 } = require('./preferences');
 const { getSession, setTripContext, addMessage, getHistory, compactHistory, clearSession, getCachedPrompt } = require('./chat');
-const { searchForChat, isConfigured: isBraveConfigured, searchActivityPricesBatch, searchActivityPrice } = require('./braveSearch');
+const { search, searchForChat, isConfigured: isBraveConfigured, searchActivityPricesBatch, searchActivityPrice } = require('./braveSearch');
 const {
   saveItinerary,
   updateItinerary,
@@ -929,28 +929,41 @@ app.post('/api/activity/replace', async (req, res) => {
     return res.status(503).json({ error: 'Anthropic API key not configured' });
   }
 
-  const { activity, reason, notes, userId } = req.body || {};
-  if (!activity?.name || !activity?.city || !reason) {
-    return res.status(400).json({ error: 'activity, reason, and userId are required' });
+  const { activity, reason, notes, userId, userAdded = false } = req.body || {};
+  if (!activity?.name || !activity?.city || (!userAdded && !reason)) {
+    return res.status(400).json({ error: 'activity and reason are required (reason optional for userAdded)' });
   }
 
   const resolvedUserId = parseUserId(userId);
   const prefSummary = getPreferenceSummary(null, resolvedUserId);
   const systemPrompt = prefSummary ? `${ACTIVITY_SYSTEM_PROMPT}\n\n${prefSummary}` : ACTIVITY_SYSTEM_PROMPT;
 
+  // Brave grounding: find real-world results for this specific activity + city
+  const braveResults = await search(`"${activity.name}" ${activity.city}`);
+  const braveBlock = braveResults.length
+    ? `\nWeb research for this specific activity (use as grounding — prefer real venues and locations found here):\n${braveResults.map(r => `- ${r.title}: ${r.description}`).join('\n')}`
+    : '';
+
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const notesClause = notes ? `\nTraveler's saved notes for this activity: "${notes}"` : '';
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 600,
-      system: systemPrompt,
-      messages: [{
-        role: 'user',
-        content: `The traveler declined this activity: "${activity.name}" (${activity.type}, ${activity.city}).
-Their reason: "${reason}"${notesClause}
 
-Generate exactly ONE replacement activity for ${activity.city} that directly addresses their feedback. It must be different from the declined activity.
+    let userContent;
+    if (userAdded) {
+      const whyClause = reason ? `\nThe traveler described it as: "${reason}"` : '';
+      userContent = `The traveler wants to add this activity to their itinerary: "${activity.name}" in ${activity.city}.${whyClause}${braveBlock}
+
+Find the best real-world match for this in ${activity.city} and generate a fully detailed activity object for it. Use the web research above to ground it in a real venue, operator, or location — do not invent details.
+
+Return ONLY valid JSON in this exact shape (no markdown fences):
+{
+  "activity": { ...single activity object matching the standard activity schema... }
+}`;
+    } else {
+      const notesClause = notes ? `\nTraveler's saved notes for this activity: "${notes}"` : '';
+      userContent = `The traveler declined this activity: "${activity.name}" (${activity.type}, ${activity.city}).
+Their reason: "${reason}"${notesClause}${braveBlock}
+
+Generate exactly ONE replacement activity for ${activity.city} that directly addresses their feedback. It must be different from the declined activity. Use the web research above to ground the replacement in a real venue or operator.
 
 Also extract any learnable preference signals from the reason (omit signals if the reason is one-off or situational, e.g. "already did this", "too expensive this trip").
 
@@ -963,8 +976,14 @@ Return ONLY valid JSON in this exact shape (no markdown fences):
     // {"preference":"<nuanced preference string>"}
     // {"constraint":"<hard constraint string>"}
   ]
-}`
-      }]
+}`;
+    }
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 600,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userContent }]
     });
 
     const raw = extractText(response.content).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
@@ -975,8 +994,11 @@ Return ONLY valid JSON in this exact shape (no markdown fences):
     }
 
     const normalized = normalizeActivity(parsed.activity, activity.city);
-    const signals = Array.isArray(parsed.signals) ? parsed.signals : [];
-    processChatSignals(signals, resolvedUserId);
+
+    if (!userAdded) {
+      const signals = Array.isArray(parsed.signals) ? parsed.signals : [];
+      processChatSignals(signals, resolvedUserId);
+    }
 
     return res.json({ activity: normalized });
   } catch (error) {

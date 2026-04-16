@@ -3121,6 +3121,18 @@ function renderActivities() {
   }
 
   function buildActivityCard(a) {
+    if (a.enriching) {
+      const card = document.createElement('article');
+      card.className = 'card activity-card card-reveal activity-card-enriching';
+      card.dataset.activityId = a.id;
+      card.innerHTML = `
+        <div class="activity-enriching-body">
+          <div class="activity-enriching-spinner"></div>
+          <p class="activity-enriching-label">Finding best match for <strong>${esc(a.name)}</strong>…</p>
+        </div>`;
+      return card;
+    }
+
     const review = state.reviewed[a.id] || { approved: null, notes: '' };
     const approvedState = review.approved;
     const isApproved = approvedState === true;
@@ -3584,8 +3596,9 @@ function submitAddActivity() {
   const why = document.getElementById('addActivityWhy').value.trim();
   const cost = costRaw !== '' && Number.isFinite(Number(costRaw)) && Number(costRaw) >= 0 ? Number(costRaw) : null;
 
-  const activity = {
-    id: crypto.randomUUID(),
+  const stubId = crypto.randomUUID();
+  const stub = {
+    id: stubId,
     name,
     city,
     type: 'tour',
@@ -3608,12 +3621,36 @@ function submitAddActivity() {
     start_location: '',
     end_location: '',
     userAdded: true,
+    enriching: true,
   };
 
-  state.activities.push(activity);
+  state.activities.push(stub);
   closeAddActivityModal();
   renderActivities();
-  showToast(`"${name}" added to your itinerary.`, 'success');
+  showToast(`Finding the best match for "${name}"…`, 'info');
+
+  const userId = state.userId || null;
+  apiFetch('/api/activity/replace', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activity: stub, reason: why || null, userId, userAdded: true }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (!data?.activity) throw new Error('no activity returned');
+      const enriched = { ...data.activity, id: stubId, userAdded: true };
+      const idx = state.activities.findIndex((a) => a.id === stubId);
+      if (idx !== -1) state.activities[idx] = enriched;
+      renderActivities();
+      showToast(`"${enriched.name}" added to your itinerary.`, 'success');
+    })
+    .catch(() => {
+      // Enrichment failed — keep stub, remove enriching flag so card renders normally
+      const idx = state.activities.findIndex((a) => a.id === stubId);
+      if (idx !== -1) delete state.activities[idx].enriching;
+      renderActivities();
+      showToast(`"${name}" added. Details couldn't be enriched — you can edit it later.`, 'info');
+    });
 }
 
 function focusActivityCard(activityId) {
