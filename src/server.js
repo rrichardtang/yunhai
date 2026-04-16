@@ -35,6 +35,7 @@ const releaseLlmSlot = () => {
 
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
+const OpenAI = require('openai');
 const { clerkMiddleware, requireAuth } = require('@clerk/express');
 const { planCity, normalizeActivity, SYSTEM_PROMPT: ACTIVITY_SYSTEM_PROMPT } = require('./claude');
 const { fetchUnsplashImage } = require('./unsplash');
@@ -81,6 +82,8 @@ const {
   getSyncRecord,
   setSyncRecord
 } = require('./calendarSync');
+
+const CHAT_CONCIERGE_MODEL = 'gpt-5.4-mini';
 
 const app = express();
 const PORT = Number(process.env.PORT || 3457);
@@ -591,7 +594,7 @@ function buildChatSystemPrompt(tripContext = {}, prefSummary = '') {
     if (approved) activityLines = `\n- Approved: ${approved}`;
   }
 
-  const base = `You are a concise, opinionated travel advisor. You know this trip's dates, accommodations, scheduled activities, and the traveler's preferences. Answer in 2-3 sentences MAX — no exceptions. Never hedge with "there's no single best" or "rankings shift" — just pick the best option and recommend it confidently. Be honest about downsides but don't ramble. Tailor suggestions to the dates, location, and tastes.
+  const base = `You are a concise, accurate, confident travel concierge. You know this trip's dates, accommodations, scheduled activities, and the traveler's preferences. Answer in 2-3 sentences MAX — no exceptions. Be decisive and specific: give the best option first, then one sharp reason. Never hedge with "there's no single best" or "rankings shift." If search results are present, ground recommendations in them and name concrete places/operators with markdown links.
 
 Respond ONLY with valid JSON: {"reply":"your response","signals":[]}
 CRITICAL: Inside the "reply" value, NEVER paste raw URLs. Always use markdown links: [label](url). Example: "Try [Sushi Dai](https://tabelog.com/...)." Raw URLs waste space and are unreadable.
@@ -626,10 +629,10 @@ function processChatSignals(signals, userId) {
   }
 }
 
-function toAnthropicMessages(history = []) {
+function toOpenAiMessages(history = []) {
   return history.map((msg) => {
     if (msg.role === 'system') {
-      return { role: 'user', content: msg.content };
+      return { role: 'system', content: msg.content };
     }
     return {
       role: msg.role === 'assistant' ? 'assistant' : 'user',
@@ -1300,8 +1303,8 @@ app.post('/api/chat/message', async (req, res) => {
     return res.status(400).json({ error: 'sessionId and message are required' });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(503).json({ error: 'Anthropic API key not configured for chat.' });
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(503).json({ error: 'OpenAI API key not configured for chat.' });
   }
 
   try {
@@ -1325,19 +1328,18 @@ app.post('/api/chat/message', async (req, res) => {
       }
     }
 
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const response = await openai.chat.completions.create({
+      model: CHAT_CONCIERGE_MODEL,
       max_tokens: 600,
-      system: systemPrompt + searchContext,
-      messages: toAnthropicMessages(getHistory(sessionId))
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: systemPrompt + searchContext },
+        ...toOpenAiMessages(getHistory(sessionId))
+      ]
     });
 
-    const rawText = (response.content || [])
-      .filter((c) => c.type === 'text')
-      .map((c) => c.text)
-      .join('\n')
-      .trim();
+    const rawText = response.choices?.[0]?.message?.content?.trim() || '';
 
     const { reply, signals } = parseChatResponse(rawText);
     processChatSignals(signals, userId);
