@@ -4,6 +4,11 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-17] My Profile — stale AI summary on profile deletion
+
+- `public/app.js` `deleteActiveProfile()`: added `state.learnedPrefs = null` and `POST /api/preferences/reset` call on deletion so the old AI-generated summary is wiped from both memory and the server file before the forced wizard opens
+- `public/styles.css`: fixed profile icon visibility — `#profileMenuBtn` now has `color: var(--text-on-dark)` (eggshell white) and `font-size: 1.5rem`; replaced undefined `var(--text-primary)` with `var(--text)` (#1E293B) in dropdown item and email styles so text is legible on white background
+
 ## [2026-04-17] My Profile — UI consolidation, question layout fix, single-profile enforcement
 
 - `public/planner.html`: replaced `#authControls` div + `#preferencesLink` text button with `#profileMenu` (icon + dropdown); dropdown contains Account Information (email), My Profile, red Sign Out
