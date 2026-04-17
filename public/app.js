@@ -3339,6 +3339,7 @@ function exitBudgetOptMode() {
   const overlay = document.getElementById('budgetOptOverlay');
   overlay.classList.add('hidden');
   overlay.innerHTML = '';
+  document.getElementById('budgetOptFooter')?.remove();
   document.body.classList.remove('budget-opt-active');
 }
 
@@ -3347,30 +3348,39 @@ function mountBudgetOptOverlay() {
     <div class="budget-opt-shell">
       <div class="budget-opt-header">
         <h3>Budget Optimization</h3>
-        <p class="budget-opt-desc">Lock activities to keep them as-is. Unlocked approved activities will be refined to cheaper alternatives.</p>
+        <p class="budget-opt-desc">Unlock the activities you want replaced with cheaper alternatives. Locked activities stay as-is.</p>
         <div class="budget-opt-header-actions">
           <button class="secondary" id="budgetOptCancelBtn" type="button">Cancel</button>
-          <button class="primary" id="budgetOptConfirmLocksBtn" type="button"><i class="ph-bold ph-check" aria-hidden="true"></i> Confirm Locks</button>
+          <button class="primary" id="budgetOptConfirmLocksBtn" type="button"><i class="ph-bold ph-check" aria-hidden="true"></i> Confirm</button>
         </div>
       </div>
       <div id="budgetOptGrid" class="budget-opt-grid cards-grid"></div>
-      <div class="budget-opt-footer hidden" id="budgetOptFooter">
-        <div class="budget-opt-progress-wrap">
-          <div class="budget-opt-progress-bar" id="budgetOptProgressBar"></div>
-        </div>
-        <span id="budgetOptProgressLabel" class="budget-opt-progress-label"></span>
-        <button class="primary" id="budgetOptConfirmSelectionsBtn" type="button"><i class="ph-bold ph-check-circle" aria-hidden="true"></i> Confirm Selections</button>
-      </div>
     </div>`;
+
+  // Footer lives on body so position:fixed works outside the scrolling overlay
+  const footer = document.createElement('div');
+  footer.id = 'budgetOptFooter';
+  footer.className = 'budget-opt-footer hidden';
+  footer.innerHTML = `
+    <div class="budget-opt-progress-wrap">
+      <div class="budget-opt-progress-bar" id="budgetOptProgressBar"></div>
+    </div>
+    <span id="budgetOptProgressLabel" class="budget-opt-progress-label"></span>
+    <button class="primary" id="budgetOptConfirmSelectionsBtn" type="button"><i class="ph-bold ph-check-circle" aria-hidden="true"></i> Confirm Selections</button>`;
+  document.body.appendChild(footer);
+
   document.getElementById('budgetOptCancelBtn').addEventListener('click', exitBudgetOptMode);
   document.getElementById('budgetOptConfirmLocksBtn').addEventListener('click', onConfirmLocks);
   document.getElementById('budgetOptConfirmSelectionsBtn').addEventListener('click', onConfirmSelections);
 }
 
 function enterBudgetOptMode() {
-  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true);
+  const allApproved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true);
+  // Exclude free activities — no cost to optimize
+  const approved = allApproved.filter((a) => a.estimated_cost_usd != null && a.estimated_cost_usd > 0);
   if (!approved.length) return;
-  budgetOptState = { lockedIds: new Set(), refinements: new Map(), choiceIsRefined: new Map(), inFlight: false };
+  // Default all to locked — user unlocks what they want changed
+  budgetOptState = { lockedIds: new Set(approved.map((a) => a.id)), refinements: new Map(), choiceIsRefined: new Map(), inFlight: false };
   mountBudgetOptOverlay();
   renderBudgetOptCards(approved, 'lock');
   document.getElementById('budgetOptOverlay').classList.remove('hidden');
@@ -3441,19 +3451,14 @@ function buildBudgetOptCard(a, mode, approved) {
         cardEl.querySelector('.opt-lock-btn').innerHTML = '<i class="ph-bold ph-lock-key" aria-hidden="true"></i>';
       }
     });
+    cardEl.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      openOptCardExpand(a, null);
+    });
     return cardEl;
   }
 
-  // flip mode
-  if (isLocked || !hasRefinement) {
-    cardEl.innerHTML = `
-      <button class="opt-lock-btn" type="button" aria-label="Locked" disabled style="cursor:default;">
-        <i class="ph-bold ph-lock-key" aria-hidden="true"></i>
-      </button>
-      ${faceHtml(a, null)}`;
-    return cardEl;
-  }
-
+  // flip mode — only unlocked activities with refinements reach here
   cardEl.classList.add('opt-card--flip');
   if (!showingRefined) cardEl.classList.add('is-showing-original');
   cardEl.innerHTML = `
@@ -3468,7 +3473,61 @@ function buildBudgetOptCard(a, mode, approved) {
     cardEl.classList.toggle('is-showing-original', nowRefined);
     updateBudgetOptProgressBar(approved);
   });
+  cardEl.addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;
+    const nowRefined = budgetOptState.choiceIsRefined.get(a.id) ?? true;
+    openOptCardExpand(nowRefined ? refined : a, nowRefined ? 'Refined' : 'Original');
+  });
   return cardEl;
+}
+
+function openOptCardExpand(act, label) {
+  document.querySelector('.opt-card-expand-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'card-expand-overlay opt-card-expand-overlay';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'card-expand-close icon-btn red';
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.innerHTML = '<i class="ph-bold ph-x" aria-hidden="true"></i>';
+
+  const body = document.createElement('div');
+  body.className = 'card-expand-body';
+  const adults = state.numTravelers || 1;
+  const children = state.numChildren || 0;
+  const cost = act.estimated_cost_usd;
+  let costDisplay = 'No estimate';
+  if (cost != null) {
+    if (act.cost_type === 'per_group') {
+      costDisplay = `$${cost} (group)`;
+    } else {
+      const total = cost * adults + Math.round(cost * 0.6 * children);
+      costDisplay = adults + children > 1 ? `$${cost} × ${adults} = $${total}` : `$${cost} per person`;
+    }
+  }
+  body.innerHTML = `
+    <img src="${esc(act.imageUrl || '')}" alt="${esc(act.name)}" style="width:100%;height:220px;object-fit:cover;" />
+    <div class="card-content">
+      ${label ? `<span class="opt-card--refined-label">${label}</span>` : ''}
+      <h3>${esc(act.name)}</h3>
+      <p><strong>City:</strong> ${esc(act.city || '')}</p>
+      <p><strong>Est. cost:</strong> ${costDisplay}</p>
+      <p><strong>Why it fits:</strong> ${esc(act.why_it_fits || '')}</p>
+      ${act.pitfall ? `<p><strong>Pitfall:</strong> ${esc(act.pitfall)}</p>` : ''}
+      ${act.booking_advice ? `<p><strong>Booking advice:</strong> ${esc(act.booking_advice)}</p>` : ''}
+    </div>`;
+
+  overlay.appendChild(closeBtn);
+  overlay.appendChild(body);
+  document.body.appendChild(overlay);
+
+  function close() {
+    overlay.classList.add('closing');
+    overlay.addEventListener('animationend', () => overlay.remove(), { once: true });
+  }
+  closeBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 }
 
 function renderBudgetOptCards(activities, mode) {
@@ -3479,7 +3538,7 @@ function renderBudgetOptCards(activities, mode) {
 
 async function onConfirmLocks() {
   if (budgetOptState.inFlight) return;
-  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true);
+  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true && a.estimated_cost_usd != null && a.estimated_cost_usd > 0);
   const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id));
   if (!unlocked.length) {
     alert('All activities are locked — nothing to optimize.');
@@ -3527,7 +3586,9 @@ function transitionToFlipPhase(approved) {
   const confirmBtn = document.getElementById('budgetOptConfirmLocksBtn');
   if (confirmBtn) confirmBtn.style.display = 'none';
   document.getElementById('budgetOptFooter').classList.remove('hidden');
-  renderBudgetOptCards(approved, 'flip');
+  // Only show unlocked activities (those sent for refinement)
+  const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id));
+  renderBudgetOptCards(unlocked, 'flip');
   updateBudgetOptProgressBar(approved);
 }
 
@@ -3554,7 +3615,7 @@ function updateBudgetOptProgressBar(approved) {
 }
 
 function onConfirmSelections() {
-  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true);
+  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true && a.estimated_cost_usd != null && a.estimated_cost_usd > 0);
   approved.forEach((a) => {
     if (budgetOptState.choiceIsRefined.get(a.id) && budgetOptState.refinements.has(a.id)) {
       const idx = state.activities.findIndex((x) => x.id === a.id);
