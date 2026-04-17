@@ -28,16 +28,17 @@
   position: absolute;
   right: 100px;
   top: 46px;
-  background: var(--base-light, #FAF8F5);
-  border: 1px solid var(--secondary-light, #E2E8F0);
+  background: #FAF8F5;
+  border: 1px solid #E2E8F0;
   border-radius: 16px;
   padding: 16px;
   min-width: 280px;
-  box-shadow: var(--shadow-lg, 0 12px 40px rgba(11,37,69,.12));
+  box-shadow: 0 12px 40px rgba(11,37,69,.12);
   z-index: 20;
-  color: var(--text, #1E293B);
+  color: #1E293B;
 }
-.confidence-popover p { margin: 6px 0; }
+.confidence-popover p { margin: 6px 0; color: #1E293B; }
+.confidence-popover strong { color: #0F172A; }
 
 /* ── Checklist modal card ── */
 .checklist-modal-card {

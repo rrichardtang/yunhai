@@ -1,8 +1,10 @@
 # Open Items
 
-Mutable. Remove an item when it is resolved.
+## [2026-04-17] Auto arrange arrival/departure time context
+
+**Status:** Deferred
+**Description:** Pass actual arrival/departure times in the `fixedStart`/`fixedEnd` labels of the `/api/arrange` prompt so the LLM can reason about a 2-hour buffer around the transport, not just the commute-adjusted window boundary.
+**Context:** Currently `windowStart`/`windowEnd` bake in transit time but the LLM has no visibility into the raw flight/train arrival or departure time. User confirmed this is a separate fix from the Trip Health overhaul.
+**Next action:** Edit `autoArrangeActiveCity()` in `public/app.js` to append arrival/departure time to the `fixedStart`/`fixedEnd` label strings before posting to `/api/arrange`.
 
 ---
-
-
-

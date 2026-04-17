@@ -1189,8 +1189,12 @@ function normalizeChecklistItem(item = {}) {
       endLng: item.endLng ?? null,
       departureDate: String(item.departureDate || (base.dateTime ? base.dateTime.slice(0, 10) : '')).trim(),
       departureTime: String(item.departureTime || (base.dateTime && base.dateTime.length > 10 ? base.dateTime.slice(11, 16) : '')).trim(),
+      arrivalDate: String(item.arrivalDate || '').trim(),
+      arrivalTime: String(item.arrivalTime || '').trim(),
       returnDate: String(item.returnDate || '').trim(),
-      returnTime: String(item.returnTime || '').trim()
+      returnTime: String(item.returnTime || '').trim(),
+      returnArrivalDate: String(item.returnArrivalDate || '').trim(),
+      returnArrivalTime: String(item.returnArrivalTime || '').trim()
     };
   }
 
@@ -1460,37 +1464,107 @@ function syncChecklistBookingRequirementToActivity(item = {}) {
 }
 
 function computeConfidenceLocal() {
-  const issues = [];
-  const byDay = state.days.map((day) => ({ ...day, activities: state.activities.filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === day.id) }));
-  byDay.forEach((day) => {
-    const sorted = day.activities
-      .map((a) => ({ name: a.name, start: minutesFromTime(parseTimeTo24(state.placements[a.id]?.time || a.suggested_time || typeToTime(a.type))), end: minutesFromTime(parseTimeTo24(state.placements[a.id]?.time || a.suggested_time || typeToTime(a.type))) + (Number(a.duration_hours || 1) * 60) }))
-      .sort((a, b) => a.start - b.start);
-    sorted.forEach((item) => {
-      if (!Number.isFinite(item.start)) issues.push({ type: 'missing_datetime', message: `${item.name} is missing time.` });
-    });
-    for (let i = 1; i < sorted.length; i += 1) {
-      if (sorted[i].start < sorted[i - 1].end) issues.push({ type: 'overlapping_activities', message: `${sorted[i].name} overlaps ${sorted[i - 1].name}.` });
-      const gap = sorted[i].start - sorted[i - 1].end;
-      if (gap > 8 * 60) issues.push({ type: 'suspicious_gap', message: `Large gap between ${sorted[i - 1].name} and ${sorted[i].name}.` });
-    }
-  });
-
-  state.cities.forEach((city) => {
-    if (!city.startDate || !city.endDate) issues.push({ type: 'missing_datetime', message: `${city.name || 'City'} is missing dates.` });
-  });
-
   const checklist = buildChecklistFromState();
-  checklist.forEach((item) => {
-    const hasDate = item.type === 'transportation' ? item.departureDate
-      : item.type === 'accommodation' ? item.checkInDate
-      : item.activityDate;
-    if (!hasDate) {
-      const loc = item.type === 'accommodation' ? item.accommodationCity : (item.activityLocation || item.city || 'unknown');
-      issues.push({ type: 'missing_details', message: `${item.name || item.type} in ${loc || 'unknown'} is missing date/time.` });
+  const bookingRequired = checklist.filter((item) =>
+    item.type === 'transportation' || item.type === 'accommodation' ||
+    (item.type === 'activity' && !item.bookingNotRequired)
+  );
+
+  // helpers — use absolute minutes from a fixed epoch for cross-day comparison
+  function dateToAbsDay(dateStr) {
+    return Math.round((new Date(dateStr) - new Date('2020-01-01')) / 86400000);
+  }
+  function toAbsMin(dateStr, timeStr) {
+    const dayMin = dateToAbsDay(dateStr) * 1440;
+    return dayMin + minutesFromTime(parseTimeTo24(timeStr));
+  }
+
+  function getItemTimeWindows(item) {
+    if (item.type === 'accommodation') return null;
+    if (item.type === 'transportation') {
+      const windows = [];
+      if (item.departureDate && item.departureTime && item.arrivalDate && item.arrivalTime) {
+        windows.push({
+          startMin: toAbsMin(item.departureDate, item.departureTime) - 120,
+          endMin: toAbsMin(item.arrivalDate, item.arrivalTime) + 120
+        });
+      }
+      if (item.isRoundTrip && item.returnDate && item.returnTime && item.returnArrivalDate && item.returnArrivalTime) {
+        windows.push({
+          startMin: toAbsMin(item.returnDate, item.returnTime) - 120,
+          endMin: toAbsMin(item.returnArrivalDate, item.returnArrivalTime) + 120
+        });
+      }
+      return windows.length ? windows : null;
+    }
+    // activity
+    if (!item.activityDate || !item.activityTime) return null;
+    const startMin = toAbsMin(item.activityDate, item.activityTime);
+    if (!Number.isFinite(startMin)) return null;
+    const dur = (state.activities.find((a) => a.id === item.activityId)?.duration_hours ?? 1) * 60;
+    return [{ startMin, endMin: startMin + dur }];
+  }
+
+  function getItemDateRange(item) {
+    if (!item.checkInDate || !item.checkOutDate) return null;
+    return { start: item.checkInDate, end: item.checkOutDate };
+  }
+
+  function windowsOverlap(a, b) {
+    return a.startMin < b.endMin && b.startMin < a.endMin;
+  }
+
+  function dateRangesOverlap(a, b) {
+    return a.start < b.end && b.start < a.end;
+  }
+
+  function pairLabel(nameA, nameB) {
+    const [x, y] = [nameA, nameB].sort();
+    return `"${x}" and "${y}"`;
+  }
+
+  const issues = [];
+
+  // Check A — date/time overlaps (runs always)
+  for (let i = 0; i < bookingRequired.length; i++) {
+    for (let j = i + 1; j < bookingRequired.length; j++) {
+      const a = bookingRequired[i];
+      const b = bookingRequired[j];
+
+      // Accommodation ↔ Accommodation
+      if (a.type === 'accommodation' && b.type === 'accommodation') {
+        const ra = getItemDateRange(a);
+        const rb = getItemDateRange(b);
+        if (ra && rb && dateRangesOverlap(ra, rb)) {
+          issues.push({ type: 'overlapping_dates', message: `Accommodation dates overlap: ${pairLabel(a.name || 'Accommodation', b.name || 'Accommodation')}.` });
+        }
+        continue;
+      }
+
+      // Skip accommodation vs non-accommodation (intentionally not flagged)
+      if (a.type === 'accommodation' || b.type === 'accommodation') continue;
+
+      // Transportation or Activity ↔ Transportation or Activity
+      const wa = getItemTimeWindows(a);
+      const wb = getItemTimeWindows(b);
+      if (!wa || !wb) continue;
+
+      const overlaps = wa.some((winA) => wb.some((winB) => windowsOverlap(winA, winB)));
+      if (overlaps) {
+        const typeKey = (a.type === 'transportation' || b.type === 'transportation') ? 'overlapping_transport' : 'overlapping_activities';
+        issues.push({ type: typeKey, message: `Schedule conflict: ${pairLabel(a.name || a.type, b.name || b.type)}.` });
+      }
+    }
+  }
+
+  // Check B — missing booking reference (verified items only)
+  bookingRequired.filter((item) => item.verified).forEach((item) => {
+    if (!item.referenceNum) {
+      issues.push({ type: 'missing_reference', message: `${item.name || item.type} is marked booked but has no confirmation number.` });
     }
   });
 
+  const verified = bookingRequired.filter((item) => item.verified);
   const open = checklist.filter((item) => item.status !== 'resolved');
   const finalized = checklist.filter((item) => item.verified || item.status === 'resolved');
   const checklistSummary = {
@@ -1499,16 +1573,18 @@ function computeConfidenceLocal() {
     counts: { open: open.length, finalized: finalized.length, total: checklist.length }
   };
 
-  const unresolvedIssues = issues.filter((item) => {
-    const meta = state.confidenceIssueMeta[item.message] || {};
+  const unresolvedIssues = issues.filter((issue) => {
+    const meta = state.confidenceIssueMeta[issue.message] || {};
     return !['verified', 'dismissed'].includes(meta.action);
   });
-  const hasConflict = unresolvedIssues.some((item) => ['overlapping_activities', 'overlapping_dates', 'conflicting_details'].includes(item.type));
-  const hasMissing = issues.some((item) => ['missing_datetime', 'missing_details'].includes(item.type)) || checklistSummary.counts.open > 0;
+
+  const hasConflict = unresolvedIssues.some((i) => ['overlapping_activities', 'overlapping_transport', 'overlapping_dates'].includes(i.type));
+  const hasMissingRef = unresolvedIssues.some((i) => i.type === 'missing_reference');
+
   let status = 'Needs review';
   if (hasConflict) status = 'Conflicts found';
-  else if (hasMissing) status = 'Missing details';
-  else if (checklist.length && checklistSummary.counts.finalized === checklist.length && !issues.length) status = 'Ready';
+  else if (hasMissingRef) status = 'Missing details';
+  else if (verified.length > 0 && !unresolvedIssues.length) status = 'Ready';
 
   return {
     status,
@@ -1570,7 +1646,16 @@ function renderChecklistItemExpanded(item) {
               <input type="time" data-cl="departureTime" value="${esc(item.departureTime)}" />
             </div>
           </label>
-          ${item.isRoundTrip ? `
+          <label class="cl-field">
+            <span class="cl-field-label">Arrival date &amp; time</span>
+            <div class="cl-datetime-pair">
+              <input type="date" data-cl="arrivalDate" value="${esc(item.arrivalDate)}" />
+              <input type="time" data-cl="arrivalTime" value="${esc(item.arrivalTime)}" />
+            </div>
+          </label>
+        </div>
+        ${item.isRoundTrip ? `
+        <div class="cl-form-row cl-form-row--2">
           <label class="cl-field">
             <span class="cl-field-label">Return date &amp; time</span>
             <div class="cl-datetime-pair">
@@ -1578,8 +1663,15 @@ function renderChecklistItemExpanded(item) {
               <input type="time" data-cl="returnTime" value="${esc(item.returnTime)}" />
             </div>
           </label>
-          ` : '<div></div>'}
+          <label class="cl-field">
+            <span class="cl-field-label">Return arrival date &amp; time</span>
+            <div class="cl-datetime-pair">
+              <input type="date" data-cl="returnArrivalDate" value="${esc(item.returnArrivalDate)}" />
+              <input type="time" data-cl="returnArrivalTime" value="${esc(item.returnArrivalTime)}" />
+            </div>
+          </label>
         </div>
+        ` : ''}
         <label class="cl-field">
           <span class="cl-field-label">Budget Tracker scope</span>
           <select data-cl="transportScope">
@@ -2143,8 +2235,12 @@ function syncItemFromExpanded(el, id) {
     item.endLocation = get('[data-cl="endLocation"]');
     item.departureDate = get('[data-cl="departureDate"]');
     item.departureTime = get('[data-cl="departureTime"]');
+    item.arrivalDate = get('[data-cl="arrivalDate"]');
+    item.arrivalTime = get('[data-cl="arrivalTime"]');
     item.returnDate = get('[data-cl="returnDate"]');
     item.returnTime = get('[data-cl="returnTime"]');
+    item.returnArrivalDate = get('[data-cl="returnArrivalDate"]');
+    item.returnArrivalTime = get('[data-cl="returnArrivalTime"]');
 
     if (!item.startLocation) {
       item.startPlaceId = '';
@@ -7331,10 +7427,6 @@ els.newProfileBtn?.addEventListener('click', createNewProfile);
 els.deleteProfileBtn?.addEventListener('click', deleteActiveProfile);
 els.confidenceBadge?.addEventListener('click', () => els.confidencePopover?.classList.toggle('hidden'));
 document.getElementById('checklistBtn')?.addEventListener('click', openChecklistModal);
-document.getElementById('openChecklistBtn')?.addEventListener('click', () => {
-  els.confidencePopover?.classList.add('hidden');
-  openChecklistModal();
-});
 document.getElementById('checklistModalClose')?.addEventListener('click', closeChecklistModal);
 document.getElementById('checklistModal')?.addEventListener('click', (e) => {
   if (e.target === document.getElementById('checklistModal')) closeChecklistModal();
@@ -7348,6 +7440,9 @@ document.getElementById('addActivityModal')?.addEventListener('click', (e) => {
 els.openConfidenceReviewBtn?.addEventListener('click', () => {
   els.confidencePopover?.classList.add('hidden');
   setStep(4);
+  requestAnimationFrame(() => {
+    document.getElementById('tripHealthSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 });
 // confidenceEmailSummary is inside the modal; bind via event delegation on modal footer
 document.getElementById('checklistModal')?.addEventListener('change', (e) => {

@@ -4,6 +4,22 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-17] Trip Health overhaul — misinput double-checker
+
+- `public/app.js` `normalizeChecklistItem()`: added `arrivalDate`, `arrivalTime`, `returnArrivalDate`, `returnArrivalTime` to transportation item shape
+- `public/app.js` transportation checklist form: added arrival date/time inputs (and return arrival for round-trips) in 2-column layout alongside departure fields
+- `public/app.js` `collectChecklistFields()`: collects four new arrival time fields on save
+- `public/app.js` `computeConfidenceLocal()`: fully replaced — Check A runs always on all booking-required items detecting transport↔transport, transport↔activity, activity↔activity, accommodation↔accommodation overlaps using absolute-minute arithmetic (handles cross-day flights); Check B runs only on verified items flagging missing `referenceNum`; status: Conflicts found > Missing details > Ready > Needs review
+- Previous Trip Health checks (missing times, suspicious gaps, city date gaps) removed — scope tightened to misinput double-checker only
+
+## [2026-04-17] Budget Tracker + Trip Health UX fixes
+
+- `public/confidence.css`: hardcoded popover colors (`#FAF8F5` bg, `#1E293B` text) to fix invisible text (was inheriting dark topbar var)
+- `public/planner.html`: removed `#openChecklistBtn` from Trip Health popover; added `id="tripHealthSection"` to inline panel
+- `public/app.js`: "Open Trip Health" button now calls `setStep(4)` + `scrollIntoView` on `#tripHealthSection` via `requestAnimationFrame`
+- `public/app.js` `renderBudgetTracker()`: renamed "Budget Lens" → "Budget Tracker"; removed "$XXX over" text; replaced caveat text with info icon + tooltip; added border around progress bar
+- `public/styles.css`: budget tracker two-row layout with bordered progress bar; info icon tooltip styles
+
 ## [2026-04-16] Budget Optimization flow
 
 - `public/planner.html`: added `#budgetOptOverlay` mount point (fixed overlay)
