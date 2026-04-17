@@ -556,6 +556,8 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 .hidden { display: none !important; }
 
 /* ── Profile menu dropdown ── */
+#profileMenuBtn { color: var(--text-on-dark); font-size: 1.5rem; }
+#profileMenuBtn:hover { opacity: .8; }
 .profile-menu { position: relative; }
 .profile-menu-dropdown {
   position: absolute; right: 0; top: calc(100% + 8px);
@@ -574,11 +576,11 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
   color: var(--text-muted); text-transform: uppercase;
   letter-spacing: .05em; margin-bottom: 4px;
 }
-.profile-menu-email { font-size: .875rem; color: var(--text-primary); word-break: break-all; }
+.profile-menu-email { font-size: .875rem; color: var(--text); word-break: break-all; }
 .profile-menu-item {
   display: block; width: 100%; text-align: left;
   padding: 9px 16px; background: none; border: none;
-  cursor: pointer; font-size: .875rem; color: var(--text-primary);
+  cursor: pointer; font-size: .875rem; color: var(--text);
 }
 .profile-menu-item:hover { background: var(--secondary-light); }
 .profile-menu-divider { height: 1px; background: var(--secondary); margin: 4px 0; }
