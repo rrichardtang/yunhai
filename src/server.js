@@ -936,7 +936,10 @@ app.post('/api/activity/replace', async (req, res) => {
 
     const contextClause = reason ? `\nTraveler's note: "${reason}"` : '';
     const notesClause = notes ? `\nSaved notes: "${notes}"` : '';
-    const userContent = `The traveler wants "${activity.name}" in ${activity.city}.${contextClause}${notesClause}${braveBlock}
+    const mealReminderClause = ['food', 'breakfast', 'lunch', 'dinner'].includes(String(activity.type || '').toLowerCase())
+      ? '\nThis is a meal activity — name a specific restaurant and include 1–2 must-order dishes in why_it_fits.'
+      : '';
+    const userContent = `The traveler wants "${activity.name}" in ${activity.city}.${contextClause}${notesClause}${mealReminderClause}${braveBlock}
 
 Find the best real-world match — use the web research to ground it in an actual venue or operator, and fill in pricing, booking info, duration, and other details. If the traveler's note asks for something different, find that instead.
 

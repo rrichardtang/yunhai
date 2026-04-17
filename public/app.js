@@ -1581,7 +1581,7 @@ function renderChecklistItemExpanded(item) {
           ` : '<div></div>'}
         </div>
         <label class="cl-field">
-          <span class="cl-field-label">Budget Lens scope</span>
+          <span class="cl-field-label">Budget Tracker scope</span>
           <select data-cl="transportScope">
             <option value="entry_exit" ${item.transportScope === 'entry_exit' ? 'selected' : ''}>Entry/exit travel (exclude)</option>
             <option value="experience" ${item.transportScope !== 'entry_exit' ? 'selected' : ''}>Experience-linked travel (include)</option>
@@ -2250,11 +2250,11 @@ function renderConfidence() {
       <section class="trip-health-summary-card">
         <h3>Budget summary</h3>
         <div class="trip-health-metrics">
-          <p><strong>Budget Lens total:</strong> $${totals.budgetLensTotal.toFixed(2)}</p>
+          <p><strong>Budget Tracker total:</strong> $${totals.budgetLensTotal.toFixed(2)}</p>
           <p><strong>Absolute trip total:</strong> $${totals.absoluteTripTotal.toFixed(2)}</p>
           <p><strong>Total trip budget:</strong> ${totalBudget > 0 ? `$${totalBudget.toFixed(2)}` : 'Not set'}</p>
           <p><strong>Over / under:</strong> ${delta == null ? 'N/A' : (delta >= 0 ? `$${delta.toFixed(2)} under` : `$${Math.abs(delta).toFixed(2)} over`)}</p>
-          <p class="muted-text">Budget Lens excludes accommodation and entry/exit travel.</p>
+          <p class="muted-text">Tracks total cost of planned activities.</p>
         </div>
       </section>
     `;
@@ -3319,12 +3319,20 @@ function renderBudgetTracker() {
   const colorClass = pct < 0.6 ? 'budget-green' : pct < 0.9 ? 'budget-yellow' : 'budget-red';
 
   const html = `<div id="budgetTracker" class="budget-tracker ${colorClass}">
-    <span class="budget-label">Budget Lens</span>
-    <span class="budget-used">$${Math.round(used).toLocaleString()} / $${state.tripBudget.toLocaleString()}</span>
-    <span class="budget-remaining">${remaining >= 0 ? `$${Math.round(remaining).toLocaleString()} left` : `$${Math.round(-remaining).toLocaleString()} over`}</span>
-    <span class="budget-caveat">Excludes accommodation and entry/exit travel</span>
-    ${nullCount > 0 ? `<span class="budget-caveat">${nullCount} activit${nullCount === 1 ? 'y has' : 'ies have'} no cost estimate</span>` : ''}
-    ${approved.length > 0 ? `<button class="secondary budget-optimize-btn" type="button" id="budgetOptimizeBtn"><i class="ph-bold ph-lightning" aria-hidden="true"></i> Optimize</button>` : ''}
+    <div class="budget-tracker-top">
+      <div class="budget-tracker-left">
+        <span class="budget-label">Budget Tracker</span>
+        <button class="budget-info-btn" type="button" aria-label="Budget info" data-tooltip="Tracks total cost of planned activities"><i class="ph-bold ph-info" aria-hidden="true"></i></button>
+      </div>
+      <div class="budget-tracker-right">
+        ${nullCount > 0 ? `<span class="budget-caveat">${nullCount} activit${nullCount === 1 ? 'y' : 'ies'} unpriced</span>` : ''}
+        <span class="budget-remaining-amt">$${Math.round(used).toLocaleString()} / $${state.tripBudget.toLocaleString()}</span>
+        ${approved.length > 0 ? `<button class="secondary budget-optimize-btn" type="button" id="budgetOptimizeBtn"><i class="ph-bold ph-lightning" aria-hidden="true"></i> Optimize</button>` : ''}
+      </div>
+    </div>
+    <div class="budget-bar-track">
+      <div class="budget-bar-fill" style="width:${Math.min(pct,1)*100}%"></div>
+    </div>
   </div>`;
 
   if (existing) { existing.outerHTML = html; } else {

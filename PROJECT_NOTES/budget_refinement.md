@@ -1,14 +1,14 @@
 Budget Optimization flow
 
-This should live in the Review step.
+This should live in the Budget Lens bar.
 
-1. User clicks Optimize for Budget
-2. All activity cards get a clean lift animation
-3. User scrolls through and chooses which activities to lock
+1. User clicks "Optimize" button
+2. Takes user to Review step and All approved activity cards get a clean lift animation. Keep the search and city filter, everything else goes. I want the background to be darkened.
+3. User scrolls through and chooses which activities to lock. There should be golden lock icon at the top right of each card. When pressed, that activity is considered locked.
 4. User clicks Confirm
 5. Refine endpoint is called with only the unlocked activities and their information
 6. Each unlocked activity gets a refined alternative
-7. The user sees each refined alternative through a turn around button at the top of the card:
+7. The user sees each refined alternative through a turn around button at the top right of the card (where the lock icon was):
   • front side = new refinement
   • backside = previous/original card
 8. The user flips each card to the option they like
@@ -17,8 +17,8 @@ This should live in the Review step.
   • 100% = total estimated cost of all activities
   • Progress = sum of locked activities + sum of chosen activities from the refined unlocked pool
 10. User clicks Confirm
-11. The selected cards are put back into the Review step
-12. The Budget Lens total is updated
+11. The selected cards are put back into the Review step and the Budget Lens total is updated
+12. The view returns to the original Review Activities state
 
 Refinement request rules
 
