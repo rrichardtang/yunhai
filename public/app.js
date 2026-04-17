@@ -3387,6 +3387,15 @@ function buildBudgetOptCard(a, mode, approved) {
   cardEl.className = `card activity-card opt-card${isLocked ? ' opt-card--locked' : ''}`;
   cardEl.dataset.activityId = a.id;
 
+  const computeTotalCost = (act) => {
+    const cost = act.estimated_cost_usd;
+    if (cost == null) return null;
+    const adults = state.numTravelers || 1;
+    const children = state.numChildren || 0;
+    if (act.cost_type === 'per_group') return cost;
+    return cost * adults + Math.round(cost * 0.6 * children);
+  };
+
   const costHtml = (act) => {
     const cost = act.estimated_cost_usd;
     if (cost == null) return 'No estimate';
@@ -3397,8 +3406,14 @@ function buildBudgetOptCard(a, mode, approved) {
     return adults + children > 1 ? `$${cost} × ${adults} = $${total}` : `$${cost} per person`;
   };
 
-  const faceHtml = (act, label) => `
-    <img src="${esc(act.imageUrl || '')}" alt="${esc(act.name)}" loading="lazy" style="width:100%;height:160px;object-fit:cover;border-radius:12px 12px 0 0;" />
+  const faceHtml = (act, label) => {
+    const total = computeTotalCost(act);
+    const costChip = total != null ? `<span class="opt-cost-chip">$${Math.round(total).toLocaleString()}</span>` : '';
+    return `
+    <div class="opt-card-img-wrap">
+      <img src="${esc(act.imageUrl || '')}" alt="${esc(act.name)}" loading="lazy" style="width:100%;height:160px;object-fit:cover;border-radius:12px 12px 0 0;" />
+      ${costChip}
+    </div>
     <div class="card-content">
       ${label ? `<span class="opt-card--refined-label">${label}</span>` : ''}
       <h3>${esc(act.name)}</h3>
@@ -3406,6 +3421,7 @@ function buildBudgetOptCard(a, mode, approved) {
       <p><strong>Est. cost:</strong> ${costHtml(act)}</p>
       <p><strong>Why it fits:</strong> ${esc(act.why_it_fits || '')}</p>
     </div>`;
+  };
 
   if (mode === 'lock') {
     const lockIcon = isLocked ? 'ph-lock-key' : 'ph-lock-open';
