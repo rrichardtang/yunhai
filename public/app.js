@@ -3293,6 +3293,8 @@ async function deleteActiveProfile() {
   const nextStore = { activeId: null, profiles: [] };
   state.profilesStore = saveProfiles(nextStore);
   state.profile = null;
+  state.learnedPrefs = null;
+  apiFetch('/api/preferences/reset', { method: 'POST' }).catch(() => {});
   closePreferencesModal();
   showToast('Profile deleted.', 'success');
   openProfileWizard(nextStore, { forced: true });
