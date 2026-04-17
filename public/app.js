@@ -3035,10 +3035,14 @@ function renderPreferencesModal() {
   els.profileQuestions.innerHTML = PROFILE_QUESTIONS.map((q) => {
     if (q.type === 'text') {
       const val = profile.answers[q.key] || '';
+      const inputId = `profileQ_${q.key}`;
       return `
         <div class="profile-question profile-question--text" data-question="${esc(q.key)}">
           <p>${esc(q.label)}</p>
-          <textarea class="profile-text-answer" rows="2" placeholder="${esc(q.placeholder || '')}">${esc(val)}</textarea>
+          <div class="textarea-expand-wrap">
+            <textarea id="${inputId}" class="profile-text-answer profile-textarea-fixed" rows="2" placeholder="${esc(q.placeholder || '')}">${esc(val)}</textarea>
+            <button class="textarea-expand-btn" type="button" data-expand="${inputId}" data-title="${esc(q.label)}" aria-label="Expand ${esc(q.label)}"><i class="ph-bold ph-arrows-out-simple"></i></button>
+          </div>
         </div>
       `;
     }
@@ -3050,6 +3054,8 @@ function renderPreferencesModal() {
       </div>
     `;
   }).join('');
+
+  bindTextareaExpandButtons(els.profileQuestions);
 
   els.profileTravelNotes.value = profile.aboutMe || '';
   els.profileTravelNotes.disabled = false;
