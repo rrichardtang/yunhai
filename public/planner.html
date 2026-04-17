@@ -34,10 +34,20 @@
           <p>Personal AI itinerary builder</p>
         </div>
         <div class="topbar-actions">
-          <div id="authControls" class="auth-controls">
-            <span id="authUserLabel" class="muted-text"></span>
-            <button id="signInBtn" class="secondary" type="button">Sign in</button>
-            <button id="signOutBtn" class="secondary hidden" type="button">Sign out</button>
+          <button id="signInBtn" class="secondary" type="button">Sign in</button>
+          <div id="profileMenu" class="profile-menu hidden">
+            <button id="profileMenuBtn" class="icon-btn" type="button" aria-label="Profile menu" title="Profile menu">
+              <i class="ph-bold ph-user-circle" aria-hidden="true"></i>
+            </button>
+            <div id="profileMenuDropdown" class="profile-menu-dropdown hidden">
+              <div class="profile-menu-account-info">
+                <span class="profile-menu-section-label">Account Information</span>
+                <span id="profileMenuEmail" class="profile-menu-email"></span>
+              </div>
+              <button id="profileMenuMyProfile" class="profile-menu-item" type="button">My Profile</button>
+              <div class="profile-menu-divider"></div>
+              <button id="signOutBtn" class="profile-menu-signout" type="button">Sign out</button>
+            </div>
           </div>
           <div class="mode-toggle" role="group" aria-label="View mode">
             <button id="planningModeBtn" class="link-btn mode-btn active" type="button">Planning</button>
@@ -54,7 +64,6 @@
             <button id="openConfidenceReviewBtn" class="primary" type="button">Open Trip Health</button>
           </div>
           <button id="checklistBtn" class="link-btn" type="button" title="Booking Checklist"><i class="ph-bold ph-check-square" aria-hidden="true"></i> Checklist</button>
-          <button id="preferencesLink" class="link-btn" type="button">My Profile</button>
         </div>
       </div>
     </header>
@@ -140,7 +149,7 @@
             <option value="approved">Approved</option>
             <option value="declined">Declined</option>
           </select>
-          <button id="approveVisibleBtn" class="secondary" type="button"><i class="ph-bold ph-check-circle"></i> Approve visible</button>
+          <button id="approveVisibleBtn" class="secondary" type="button"><i class="ph-bold ph-check-circle"></i> Approve All</button>
         </div>
         <div id="activitiesGrid" class="cards-grid"></div>
         <div class="step-nav sticky-nav step-nav-split">
@@ -214,25 +223,22 @@
 
     <div id="prefsModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Traveler Profile">
       <div class="modal-card">
-        <div class="profile-selector-row">
-          <select id="profileSelector" class="profile-dropdown" aria-label="Select profile"></select>
-          <input id="profileNameInput" class="profile-name-input hidden" type="text" maxlength="32" aria-label="Profile name" />
-          <button id="newProfileBtn" class="secondary" type="button">+ New Profile</button>
-          <button id="profileEditBtn" class="icon-btn grey" type="button" title="Save"><i class="ph-bold ph-floppy-disk"></i></button>
-        </div>
         <div class="between">
           <h3>Traveler Profile</h3>
-          <button id="prefsClose" class="icon-btn red" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
+          <div class="modal-header-actions">
+            <button id="profileEditBtn" class="icon-btn grey" type="button" title="Save profile"><i class="ph-bold ph-floppy-disk"></i></button>
+            <button id="prefsClose" class="icon-btn red" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
+          </div>
         </div>
 
         <section class="prefs-section profile-section">
           <div id="profileQuestions" class="profile-questions"></div>
 
-          <label class="profile-label" for="profileTravelNotes">About me</label>
-          <p class="ai-summary-hint">Tell the planner your preferences as a traveler</p>
+          <label class="profile-label" for="profileTravelNotes">Anything else we might have missed?</label>
+          <p class="ai-summary-hint">Any other preferences, quirks, or context the planner should know about you</p>
           <div class="textarea-expand-wrap">
             <textarea id="profileTravelNotes" rows="5" class="profile-textarea-fixed" placeholder="e.g. I'm not a morning person, I have a smaller budget, avoid things with lots of walking..."></textarea>
-            <button class="textarea-expand-btn" type="button" data-expand="profileTravelNotes" data-title="About me" aria-label="Expand About me"><i class="ph-bold ph-arrows-out-simple"></i></button>
+            <button class="textarea-expand-btn" type="button" data-expand="profileTravelNotes" data-title="Anything else we might have missed?" aria-label="Expand Anything else we might have missed?"><i class="ph-bold ph-arrows-out-simple"></i></button>
           </div>
         </section>
 

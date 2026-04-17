@@ -30,4 +30,30 @@ If keys are missing, app still loads and shows clear warnings in UI.
 
 ## Deployment
 
-Use `deployment/docker-compose.yml` and copy to host path `/docker/travelplanner/docker-compose.yml`.
+Minimal two-environment layout:
+
+- **Production URL:** `travelplanner.srv1553531.hstgr.cloud`
+- **Shared staging URL:** `staging.travelplanner.srv1553531.hstgr.cloud`
+
+Compose files:
+
+- `deployment/docker-compose.prod.yml` (production)
+- `deployment/docker-compose.staging.yml` (staging)
+- `deployment/docker-compose.yml` (legacy/backward-compatible prod file)
+
+Recommended host layout:
+
+- Prod app path: `/docker/openclaw-fbdq/data/.openclaw/workspace-sherlock/projects/travelplanner`
+- Staging app path: `/docker/openclaw-fbdq/data/.openclaw/workspace-sherlock/projects/travelplanner-staging`
+
+Deploy with explicit compose file + project name (to avoid collisions):
+
+```bash
+# staging
+cd /docker/openclaw-fbdq/data/.openclaw/workspace-sherlock/projects/travelplanner-staging
+docker compose -p travelplanner-staging -f deployment/docker-compose.staging.yml up -d
+
+# production
+cd /docker/openclaw-fbdq/data/.openclaw/workspace-sherlock/projects/travelplanner
+docker compose -p travelplanner-prod -f deployment/docker-compose.prod.yml up -d
+```
