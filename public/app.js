@@ -128,9 +128,13 @@ const els = {
   savedItineraries: document.getElementById('savedItineraries'),
   editBtn: document.getElementById('editBtn'),
   apiBanner: document.getElementById('apiBanner'),
-  authUserLabel: document.getElementById('authUserLabel'),
   signInBtn: document.getElementById('signInBtn'),
   signOutBtn: document.getElementById('signOutBtn'),
+  profileMenu: document.getElementById('profileMenu'),
+  profileMenuBtn: document.getElementById('profileMenuBtn'),
+  profileMenuDropdown: document.getElementById('profileMenuDropdown'),
+  profileMenuEmail: document.getElementById('profileMenuEmail'),
+  profileMenuMyProfile: document.getElementById('profileMenuMyProfile'),
   forwardingPanel: document.getElementById('forwardingPanel'),
   forwardingAddress: document.getElementById('forwardingAddress'),
   planningModeBtn: document.getElementById('planningModeBtn'),
@@ -143,12 +147,8 @@ const els = {
   copyMinimalBtn: document.getElementById('copyMinimalBtn'),
   saveOfflineMinimalBtn: document.getElementById('saveOfflineMinimalBtn'),
   printMinimalBtn: document.getElementById('printMinimalBtn'),
-  preferencesLink: document.getElementById('preferencesLink'),
   prefsModal: document.getElementById('prefsModal'),
   prefsClose: document.getElementById('prefsClose'),
-  profileSelector: document.getElementById('profileSelector'),
-  profileNameInput: document.getElementById('profileNameInput'),
-  newProfileBtn: document.getElementById('newProfileBtn'),
   deleteProfileBtn: document.getElementById('deleteProfileBtn'),
   profileQuestions: document.getElementById('profileQuestions'),
   profileTravelNotes: document.getElementById('profileTravelNotes'),
@@ -824,11 +824,7 @@ function normalizeProfileName(name, fallback = 'My Profile') {
 }
 
 function defaultProfilesStore() {
-  const id = createProfileId();
-  return {
-    activeId: id,
-    profiles: [{ id, name: 'My Profile', ...defaultProfile() }]
-  };
+  return { activeId: null, profiles: [] };
 }
 
 function normalizeProfilesStore(store) {
@@ -847,7 +843,7 @@ function normalizeProfilesStore(store) {
     });
 
   if (!normalizedProfiles.length) {
-    return defaultProfilesStore();
+    return { activeId: null, profiles: [] };
   }
 
   const activeId = String(store.activeId || '');
@@ -3006,6 +3002,7 @@ async function apiFetch(url, options = {}) {
 function renderPreferencesModal() {
   if (!els.profileQuestions) return;
   const store = state.profilesStore || loadProfiles();
+  if (!store.profiles.length) return;
   const activeProfileRaw = getActiveProfile(store);
   const activeProfile = {
     ...activeProfileRaw,
@@ -3015,27 +3012,8 @@ function renderPreferencesModal() {
   // cannot leak values between profiles.
   state.profile = normalizeProfile(activeProfile);
 
-  const canCreateProfile = store.profiles.length < 3;
-  const canDeleteProfile = store.profiles.length > 1;
-
-  if (els.profileSelector) {
-    els.profileSelector.innerHTML = store.profiles
-      .map((p) => `<option value="${esc(p.id)}" ${p.id === store.activeId ? 'selected' : ''}>${esc(p.name)}</option>`)
-      .join('');
-  }
-
-  if (els.profileNameInput) {
-    els.profileNameInput.value = activeProfile.name || 'My Profile';
-    els.profileNameInput.classList.add('hidden');
-    els.profileNameInput.maxLength = 32;
-  }
-
-  if (els.newProfileBtn) {
-    els.newProfileBtn.disabled = !canCreateProfile;
-  }
-
   if (els.deleteProfileBtn) {
-    els.deleteProfileBtn.disabled = !canDeleteProfile;
+    els.deleteProfileBtn.disabled = false;
   }
 
   const profile = state.profile;
@@ -3057,10 +3035,14 @@ function renderPreferencesModal() {
   els.profileQuestions.innerHTML = PROFILE_QUESTIONS.map((q) => {
     if (q.type === 'text') {
       const val = profile.answers[q.key] || '';
+      const inputId = `profileQ_${q.key}`;
       return `
         <div class="profile-question profile-question--text" data-question="${esc(q.key)}">
           <p>${esc(q.label)}</p>
-          <textarea class="profile-text-answer" rows="2" placeholder="${esc(q.placeholder || '')}">${esc(val)}</textarea>
+          <div class="textarea-expand-wrap">
+            <textarea id="${inputId}" class="profile-text-answer profile-textarea-fixed" rows="5" placeholder="${esc(q.placeholder || '')}">${esc(val)}</textarea>
+            <button class="textarea-expand-btn" type="button" data-expand="${inputId}" data-title="${esc(q.label)}" aria-label="Expand ${esc(q.label)}"><i class="ph-bold ph-arrows-out-simple"></i></button>
+          </div>
         </div>
       `;
     }
@@ -3072,6 +3054,8 @@ function renderPreferencesModal() {
       </div>
     `;
   }).join('');
+
+  bindTextareaExpandButtons(els.profileQuestions);
 
   els.profileTravelNotes.value = profile.aboutMe || '';
   els.profileTravelNotes.disabled = false;
@@ -3165,25 +3149,33 @@ function createNewProfile() {
   openProfileWizard(store);
 }
 
-function openProfileWizard(store) {
-  const suggestedName = `Profile ${store.profiles.length + 1}`;
-  const totalSteps = PROFILE_QUESTIONS.length + 1; // +1 for name step
+function openProfileWizard(store, { forced = false } = {}) {
+  const suggestedName = 'My Profile';
+  const totalSteps = PROFILE_QUESTIONS.length + 2; // +1 for name step, +1 for aboutMe step
 
   const wizardState = {
     stepIndex: 0,
     name: suggestedName,
-    answers: Object.fromEntries(PROFILE_QUESTIONS.map((q) => [q.key, q.type === 'text' ? '' : PROFILE_DEFAULT]))
+    answers: Object.fromEntries(PROFILE_QUESTIONS.map((q) => [q.key, q.type === 'text' ? '' : PROFILE_DEFAULT])),
+    aboutMe: ''
   };
 
   const overlay = document.getElementById('profileWizardOverlay');
   overlay.classList.remove('hidden');
   document.body.classList.add('profile-wizard-active');
 
+  const cancelBtn = overlay.querySelector('#wizardCancelBtn');
+  if (cancelBtn) cancelBtn.classList.toggle('hidden', forced);
+
+  const aboutMeStepIndex = totalSteps - 1;
+
   function currentStepAnswer() {
     const input = overlay.querySelector('.wizard-input');
     if (!input) return;
     if (wizardState.stepIndex === 0) {
       wizardState.name = input.value.trim() || suggestedName;
+    } else if (wizardState.stepIndex === aboutMeStepIndex) {
+      wizardState.aboutMe = input.value;
     } else {
       const q = PROFILE_QUESTIONS[wizardState.stepIndex - 1];
       if (q.type === 'text') {
@@ -3210,6 +3202,12 @@ function openProfileWizard(store) {
         <p class="wizard-question-label">What would you like to name this profile?</p>
         <input class="wizard-input wizard-text-input" type="text" maxlength="32"
           value="${esc(wizardState.name)}" placeholder="${esc(suggestedName)}" autocomplete="off" />
+      `;
+    } else if (stepIndex === aboutMeStepIndex) {
+      bodyHtml = `
+        <p class="wizard-question-label">Anything else we might have missed?</p>
+        <textarea class="wizard-input wizard-text-input wizard-textarea" rows="4"
+          placeholder="e.g. I'm not a morning person, I have a smaller budget, avoid things with lots of walking...">${esc(wizardState.aboutMe)}</textarea>
       `;
     } else {
       const q = PROFILE_QUESTIONS[stepIndex - 1];
@@ -3238,7 +3236,7 @@ function openProfileWizard(store) {
 
     overlay.querySelector('#wizardCardBody').innerHTML = bodyHtml;
 
-    if (stepIndex > 0) {
+    if (stepIndex > 0 && stepIndex < aboutMeStepIndex) {
       const q = PROFILE_QUESTIONS[stepIndex - 1];
       if (!q.type) {
         overlay.querySelector('[data-rating]').addEventListener('click', (e) => {
@@ -3273,11 +3271,11 @@ function openProfileWizard(store) {
     }
   };
 
-  overlay.querySelector('#wizardCancelBtn').onclick = () => closeWizard();
+  overlay.querySelector('#wizardCancelBtn').onclick = () => { if (!forced) closeWizard(); };
   overlay.addEventListener('keydown', onWizardKey);
 
   function onWizardKey(e) {
-    if (e.key === 'Escape') closeWizard();
+    if (e.key === 'Escape' && !forced) closeWizard();
   }
 
   function closeWizard() {
@@ -3293,13 +3291,25 @@ function openProfileWizard(store) {
       id,
       name: normalizeProfileName(wizardState.name, suggestedName),
       answers: { ...wizardState.answers },
-      aboutMe: ''
+      aboutMe: wizardState.aboutMe || ''
     };
     const nextStore = { activeId: id, profiles: [...store.profiles, profile] };
     state.profilesStore = saveProfiles(nextStore);
     state.profile = normalizeProfile(profile);
     openPreferencesModal();
-    showToast('Profile created.', 'success');
+    showToast('Profile created — generating summary…', 'info');
+    apiFetch('/api/profile/enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(normalizeProfile(profile))
+    }).then((r) => r.json()).then((data) => {
+      const instruction = String(data?.instruction ?? data?.profileInstruction ?? '').trim();
+      if (instruction) {
+        state.learnedPrefs = { ...(state.learnedPrefs || {}), profileInstruction: instruction };
+        renderPreferencesModal();
+        showToast('AI summary ready!', 'success');
+      }
+    }).catch(() => {});
   }
 
   render();
@@ -3307,25 +3317,24 @@ function openProfileWizard(store) {
 
 async function deleteActiveProfile() {
   const store = state.profilesStore || loadProfiles();
-  if (store.profiles.length <= 1) {
-    showToast('At least one profile is required.', 'info');
-    return;
-  }
-  const confirmed = await showConfirmDialog('Delete profile?', 'This will permanently delete this profile and its preferences.', 'Delete');
+  const confirmed = await showConfirmDialog('Delete profile?', 'This will permanently delete your profile and its preferences.', 'Delete');
   if (!confirmed) return;
-  const remaining = store.profiles.filter((p) => p.id !== store.activeId);
-  const nextStore = {
-    activeId: remaining[0].id,
-    profiles: remaining
-  };
+  const nextStore = { activeId: null, profiles: [] };
   state.profilesStore = saveProfiles(nextStore);
-  state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
-  renderPreferencesModal();
+  state.profile = null;
+  state.learnedPrefs = null;
+  apiFetch('/api/preferences/reset', { method: 'POST' }).catch(() => {});
+  closePreferencesModal();
   showToast('Profile deleted.', 'success');
+  openProfileWizard(nextStore, { forced: true });
 }
 
 async function openPreferencesModal() {
   state.profilesStore = loadProfiles();
+  if (!state.profilesStore.profiles.length) {
+    openProfileWizard(state.profilesStore, { forced: true });
+    return;
+  }
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   profileSnapshot = JSON.stringify(state.profile);
   apiFetch('/api/preferences').then((r) => r.ok ? r.json() : null).then((data) => {
@@ -7194,11 +7203,10 @@ function registerServiceWorker() {
 }
 
 function renderAuthUi() {
-  if (els.authUserLabel) {
-    els.authUserLabel.textContent = state.authUserEmail || (state.authUserId ? 'Signed in' : 'Signed out');
-  }
-  if (els.signInBtn) els.signInBtn.classList.toggle('hidden', Boolean(state.authUserId));
-  if (els.signOutBtn) els.signOutBtn.classList.toggle('hidden', !state.authUserId);
+  const loggedIn = Boolean(state.authUserId);
+  if (els.signInBtn) els.signInBtn.classList.toggle('hidden', loggedIn);
+  if (els.profileMenu) els.profileMenu.classList.toggle('hidden', !loggedIn);
+  if (els.profileMenuEmail) els.profileMenuEmail.textContent = state.authUserEmail || '';
   if (els.forwardingPanel) els.forwardingPanel.classList.toggle('hidden', !state.forwardingAddress);
   if (els.forwardingAddress) els.forwardingAddress.textContent = state.forwardingAddress || 'Not available yet';
   updateCalendarControls();
@@ -7330,6 +7338,11 @@ async function initClerkAuth() {
 
   await loadAuthSessionData();
   await syncFromServer();
+
+  const store = state.profilesStore || loadProfiles();
+  if (!store.profiles.length) {
+    openProfileWizard(store, { forced: true });
+  }
 }
 
 function clearPlannedResultsKeepSetup() {
@@ -7433,7 +7446,16 @@ els.saveOfflineMinimalBtn?.addEventListener('click', () => saveMinimalOfflinePay
 els.printMinimalBtn?.addEventListener('click', () => window.print());
 els.planningModeBtn?.addEventListener('click', () => setViewMode('planning'));
 els.executionModeBtn?.addEventListener('click', () => setViewMode('execution'));
-els.preferencesLink.addEventListener('click', openPreferencesModal);
+els.profileMenuBtn?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  els.profileMenuDropdown?.classList.toggle('hidden');
+});
+els.profileMenuMyProfile?.addEventListener('click', () => {
+  els.profileMenuDropdown?.classList.add('hidden');
+  openPreferencesModal();
+});
+document.addEventListener('click', () => els.profileMenuDropdown?.classList.add('hidden'));
+els.profileMenuDropdown?.addEventListener('click', (e) => e.stopPropagation());
 els.prefsClose.addEventListener('click', closePreferencesModal);
 els.prefsModal.addEventListener('click', (e) => {
   if (e.target === els.prefsModal) closePreferencesModal();
@@ -7558,12 +7580,6 @@ els.profileEditBtn.addEventListener('click', async () => {
   renderPreferencesModal();
 });
 
-els.profileSelector?.addEventListener('change', (e) => {
-  const nextId = e.target.value;
-  if (!nextId) return;
-  switchActiveProfile(nextId);
-});
-
 els.profileAiSummary?.addEventListener('blur', () => {
   const instruction = els.profileAiSummary.value.trim();
   if (instruction === (state.learnedPrefs?.profileInstruction || '')) return;
@@ -7575,7 +7591,6 @@ els.profileAiSummary?.addEventListener('blur', () => {
   }).catch(() => {});
 });
 
-els.newProfileBtn?.addEventListener('click', createNewProfile);
 els.deleteProfileBtn?.addEventListener('click', deleteActiveProfile);
 els.confidenceBadge?.addEventListener('click', () => els.confidencePopover?.classList.toggle('hidden'));
 document.getElementById('checklistBtn')?.addEventListener('click', openChecklistModal);

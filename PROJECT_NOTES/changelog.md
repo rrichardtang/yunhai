@@ -4,6 +4,28 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-17] My Profile — stale AI summary on profile deletion
+
+- `public/app.js` `deleteActiveProfile()`: added `state.learnedPrefs = null` and `POST /api/preferences/reset` call on deletion so the old AI-generated summary is wiped from both memory and the server file before the forced wizard opens
+- `public/styles.css`: fixed profile icon visibility — `#profileMenuBtn` now has `color: var(--text-on-dark)` (eggshell white) and `font-size: 1.5rem`; replaced undefined `var(--text-primary)` with `var(--text)` (#1E293B) in dropdown item and email styles so text is legible on white background
+
+## [2026-04-17] My Profile — UI consolidation, question layout fix, single-profile enforcement
+
+- `public/planner.html`: replaced `#authControls` div + `#preferencesLink` text button with `#profileMenu` (icon + dropdown); dropdown contains Account Information (email), My Profile, red Sign Out
+- `public/planner.html`: removed `profile-selector-row` (profile dropdown, name input, New Profile button); moved save button (`#profileEditBtn`) into modal title row alongside close button
+- `public/styles.css`: added profile menu dropdown styles (`.profile-menu`, `.profile-menu-dropdown`, `.profile-menu-account-info`, `.profile-menu-signout`, etc.); added `.modal-header-actions`
+- `public/styles.css`: `.profile-question` changed from flex-row to `flex-direction: column` — question label now stacks above textarea/dot-scale on all question types; removed `flex: 1; min-width: 0` from `p`; removed `flex-shrink: 0` from `.dot-scale-wrap`
+- `public/app.js` `els`: removed `authUserLabel`, `profileSelector`, `profileNameInput`, `newProfileBtn`; added `profileMenu`, `profileMenuBtn`, `profileMenuDropdown`, `profileMenuEmail`, `profileMenuMyProfile`
+- `public/app.js` `renderAuthUi()`: rewritten to toggle `#signInBtn`/`#profileMenu` visibility and populate `#profileMenuEmail`
+- `public/app.js` `defaultProfilesStore()`: now returns `{ activeId: null, profiles: [] }` — no auto-created default profile
+- `public/app.js` `normalizeProfilesStore()`: empty profiles returns `{ activeId: null, profiles: [] }` instead of calling `defaultProfilesStore()`
+- `public/app.js` `renderPreferencesModal()`: early return if `store.profiles` is empty; removed profile selector/name/newProfile logic; delete button always enabled
+- `public/app.js` `openProfileWizard()`: added `{ forced }` option — hides cancel button and ignores Escape when forced; suggested name simplified to `'My Profile'`
+- `public/app.js` `deleteActiveProfile()`: removed single-profile guard; deletes to empty store, closes modal, opens forced wizard
+- `public/app.js` `openPreferencesModal()`: redirects to forced wizard if no profiles exist
+- `public/app.js` `initClerkAuth()`: after `syncFromServer`, opens forced wizard if `store.profiles` is empty
+- `public/app.js` event listeners: replaced `preferencesLink` click with profile menu dropdown toggle + `profileMenuMyProfile` click; removed `profileSelector` change and `newProfileBtn` click listeners
+
 ## [2026-04-17] Trip Health overhaul — misinput double-checker
 
 - `public/app.js` `normalizeChecklistItem()`: added `arrivalDate`, `arrivalTime`, `returnArrivalDate`, `returnArrivalTime` to transportation item shape
