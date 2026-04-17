@@ -91,7 +91,13 @@ promote_staging_to_main() {
   git -C "$PROD_REPO" fetch --prune origin
   git -C "$PROD_REPO" checkout main
   git -C "$PROD_REPO" reset --hard origin/main
-  git -C "$PROD_REPO" merge --ff-only "origin/$branch"
+
+  if ! git -C "$PROD_REPO" merge --no-edit "origin/$branch"; then
+    log "Merge failed (likely conflicts). Aborting merge in prod repo."
+    git -C "$PROD_REPO" merge --abort >/dev/null 2>&1 || true
+    die "Could not merge origin/$branch into main cleanly. Resolve conflicts manually and re-run promotion."
+  fi
+
   git -C "$PROD_REPO" push origin main
 
   log "Deleting feature branch '$branch' locally/remotely"
