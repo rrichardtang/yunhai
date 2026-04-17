@@ -1797,12 +1797,3 @@ body.overlay-active #chatWidget {
 
 /* Text questions in the My Profile modal */
 .profile-question--text p { margin-bottom: 6px; }
-.profile-text-answer {
-  width: 100%; box-sizing: border-box;
-  border: 1.5px solid var(--secondary); border-radius: 8px;
-  padding: 8px 12px; font-size: .875rem;
-  font-family: inherit; color: var(--text-primary);
-  background: var(--base); resize: vertical; min-height: 56px;
-  transition: border-color .15s;
-}
-.profile-text-answer:focus { outline: none; border-color: var(--accent); }

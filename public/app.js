@@ -3040,7 +3040,7 @@ function renderPreferencesModal() {
         <div class="profile-question profile-question--text" data-question="${esc(q.key)}">
           <p>${esc(q.label)}</p>
           <div class="textarea-expand-wrap">
-            <textarea id="${inputId}" class="profile-text-answer profile-textarea-fixed" rows="2" placeholder="${esc(q.placeholder || '')}">${esc(val)}</textarea>
+            <textarea id="${inputId}" class="profile-text-answer profile-textarea-fixed" rows="5" placeholder="${esc(q.placeholder || '')}">${esc(val)}</textarea>
             <button class="textarea-expand-btn" type="button" data-expand="${inputId}" data-title="${esc(q.label)}" aria-label="Expand ${esc(q.label)}"><i class="ph-bold ph-arrows-out-simple"></i></button>
           </div>
         </div>
