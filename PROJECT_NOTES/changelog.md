@@ -4,6 +4,14 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-16] Budget Optimization flow
+
+- `public/planner.html`: added `#budgetOptOverlay` mount point (fixed overlay)
+- `public/app.js`: `budgetOptState` module-level variable; "Optimize" button injected into Budget Lens bar
+- `public/app.js`: 9 new functions — `exitBudgetOptMode`, `mountBudgetOptOverlay`, `enterBudgetOptMode`, `buildBudgetOptCard`, `renderBudgetOptCards`, `onConfirmLocks` (batch `/api/activity/refine` with `budget_target`), `transitionToFlipPhase`, `updateBudgetOptProgressBar`, `onConfirmSelections`
+- `public/styles.css`: full overlay styles — lock/flip icon buttons, 3D flip card faces, sticky progress footer
+- No backend changes — existing `/api/activity/refine` with `budget_target` param handles batch refinement
+
 ## [2026-04-16] Named restaurant recommendations with must-order dishes
 
 - `braveSearch.js`: added `searchTopRestaurants(cityName)` — focused Brave query for top restaurants + must-order dishes, 7 results per city
