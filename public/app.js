@@ -3440,7 +3440,8 @@ function buildBudgetOptCard(a, mode, approved) {
         <i class="ph-bold ${lockIcon}" aria-hidden="true"></i>
       </button>
       ${faceHtml(a, null)}`;
-    cardEl.querySelector('.opt-lock-btn').addEventListener('click', () => {
+    cardEl.querySelector('.opt-lock-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
       if (budgetOptState.lockedIds.has(a.id)) {
         budgetOptState.lockedIds.delete(a.id);
         cardEl.classList.remove('opt-card--locked');
@@ -3467,7 +3468,8 @@ function buildBudgetOptCard(a, mode, approved) {
       <div class="opt-card-face opt-card-front">${faceHtml(refined, 'Refined')}</div>
       <div class="opt-card-face opt-card-back">${faceHtml(a, 'Original')}</div>
     </div>`;
-  cardEl.querySelector('.opt-flip-btn').addEventListener('click', () => {
+  cardEl.querySelector('.opt-flip-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
     const nowRefined = budgetOptState.choiceIsRefined.get(a.id) ?? true;
     budgetOptState.choiceIsRefined.set(a.id, !nowRefined);
     cardEl.classList.toggle('is-showing-original', nowRefined);
