@@ -3151,12 +3151,13 @@ function createNewProfile() {
 
 function openProfileWizard(store, { forced = false } = {}) {
   const suggestedName = 'My Profile';
-  const totalSteps = PROFILE_QUESTIONS.length + 1; // +1 for name step
+  const totalSteps = PROFILE_QUESTIONS.length + 2; // +1 for name step, +1 for aboutMe step
 
   const wizardState = {
     stepIndex: 0,
     name: suggestedName,
-    answers: Object.fromEntries(PROFILE_QUESTIONS.map((q) => [q.key, q.type === 'text' ? '' : PROFILE_DEFAULT]))
+    answers: Object.fromEntries(PROFILE_QUESTIONS.map((q) => [q.key, q.type === 'text' ? '' : PROFILE_DEFAULT])),
+    aboutMe: ''
   };
 
   const overlay = document.getElementById('profileWizardOverlay');
@@ -3166,11 +3167,15 @@ function openProfileWizard(store, { forced = false } = {}) {
   const cancelBtn = overlay.querySelector('#wizardCancelBtn');
   if (cancelBtn) cancelBtn.classList.toggle('hidden', forced);
 
+  const aboutMeStepIndex = totalSteps - 1;
+
   function currentStepAnswer() {
     const input = overlay.querySelector('.wizard-input');
     if (!input) return;
     if (wizardState.stepIndex === 0) {
       wizardState.name = input.value.trim() || suggestedName;
+    } else if (wizardState.stepIndex === aboutMeStepIndex) {
+      wizardState.aboutMe = input.value;
     } else {
       const q = PROFILE_QUESTIONS[wizardState.stepIndex - 1];
       if (q.type === 'text') {
@@ -3197,6 +3202,12 @@ function openProfileWizard(store, { forced = false } = {}) {
         <p class="wizard-question-label">What would you like to name this profile?</p>
         <input class="wizard-input wizard-text-input" type="text" maxlength="32"
           value="${esc(wizardState.name)}" placeholder="${esc(suggestedName)}" autocomplete="off" />
+      `;
+    } else if (stepIndex === aboutMeStepIndex) {
+      bodyHtml = `
+        <p class="wizard-question-label">Anything else we might have missed?</p>
+        <textarea class="wizard-input wizard-text-input wizard-textarea" rows="4"
+          placeholder="e.g. I'm not a morning person, I have a smaller budget, avoid things with lots of walking...">${esc(wizardState.aboutMe)}</textarea>
       `;
     } else {
       const q = PROFILE_QUESTIONS[stepIndex - 1];
@@ -3225,7 +3236,7 @@ function openProfileWizard(store, { forced = false } = {}) {
 
     overlay.querySelector('#wizardCardBody').innerHTML = bodyHtml;
 
-    if (stepIndex > 0) {
+    if (stepIndex > 0 && stepIndex < aboutMeStepIndex) {
       const q = PROFILE_QUESTIONS[stepIndex - 1];
       if (!q.type) {
         overlay.querySelector('[data-rating]').addEventListener('click', (e) => {
@@ -3280,13 +3291,25 @@ function openProfileWizard(store, { forced = false } = {}) {
       id,
       name: normalizeProfileName(wizardState.name, suggestedName),
       answers: { ...wizardState.answers },
-      aboutMe: ''
+      aboutMe: wizardState.aboutMe || ''
     };
     const nextStore = { activeId: id, profiles: [...store.profiles, profile] };
     state.profilesStore = saveProfiles(nextStore);
     state.profile = normalizeProfile(profile);
     openPreferencesModal();
-    showToast('Profile created.', 'success');
+    showToast('Profile created — generating summary…', 'info');
+    apiFetch('/api/profile/enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(normalizeProfile(profile))
+    }).then((r) => r.json()).then((data) => {
+      const instruction = String(data?.instruction ?? data?.profileInstruction ?? '').trim();
+      if (instruction) {
+        state.learnedPrefs = { ...(state.learnedPrefs || {}), profileInstruction: instruction };
+        renderPreferencesModal();
+        showToast('AI summary ready!', 'success');
+      }
+    }).catch(() => {});
   }
 
   render();
