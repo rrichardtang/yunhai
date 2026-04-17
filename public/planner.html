@@ -34,10 +34,20 @@
           <p>Personal AI itinerary builder</p>
         </div>
         <div class="topbar-actions">
-          <div id="authControls" class="auth-controls">
-            <span id="authUserLabel" class="muted-text"></span>
-            <button id="signInBtn" class="secondary" type="button">Sign in</button>
-            <button id="signOutBtn" class="secondary hidden" type="button">Sign out</button>
+          <button id="signInBtn" class="secondary" type="button">Sign in</button>
+          <div id="profileMenu" class="profile-menu hidden">
+            <button id="profileMenuBtn" class="icon-btn" type="button" aria-label="Profile menu" title="Profile menu">
+              <i class="ph-bold ph-user-circle" aria-hidden="true"></i>
+            </button>
+            <div id="profileMenuDropdown" class="profile-menu-dropdown hidden">
+              <div class="profile-menu-account-info">
+                <span class="profile-menu-section-label">Account Information</span>
+                <span id="profileMenuEmail" class="profile-menu-email"></span>
+              </div>
+              <button id="profileMenuMyProfile" class="profile-menu-item" type="button">My Profile</button>
+              <div class="profile-menu-divider"></div>
+              <button id="signOutBtn" class="profile-menu-signout" type="button">Sign out</button>
+            </div>
           </div>
           <div class="mode-toggle" role="group" aria-label="View mode">
             <button id="planningModeBtn" class="link-btn mode-btn active" type="button">Planning</button>
@@ -54,7 +64,6 @@
             <button id="openConfidenceReviewBtn" class="primary" type="button">Open Trip Health</button>
           </div>
           <button id="checklistBtn" class="link-btn" type="button" title="Booking Checklist"><i class="ph-bold ph-check-square" aria-hidden="true"></i> Checklist</button>
-          <button id="preferencesLink" class="link-btn" type="button">My Profile</button>
         </div>
       </div>
     </header>
@@ -214,15 +223,12 @@
 
     <div id="prefsModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Traveler Profile">
       <div class="modal-card">
-        <div class="profile-selector-row">
-          <select id="profileSelector" class="profile-dropdown" aria-label="Select profile"></select>
-          <input id="profileNameInput" class="profile-name-input hidden" type="text" maxlength="32" aria-label="Profile name" />
-          <button id="newProfileBtn" class="secondary" type="button">+ New Profile</button>
-          <button id="profileEditBtn" class="icon-btn grey" type="button" title="Save"><i class="ph-bold ph-floppy-disk"></i></button>
-        </div>
         <div class="between">
           <h3>Traveler Profile</h3>
-          <button id="prefsClose" class="icon-btn red" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
+          <div class="modal-header-actions">
+            <button id="profileEditBtn" class="icon-btn grey" type="button" title="Save profile"><i class="ph-bold ph-floppy-disk"></i></button>
+            <button id="prefsClose" class="icon-btn red" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
+          </div>
         </div>
 
         <section class="prefs-section profile-section">
