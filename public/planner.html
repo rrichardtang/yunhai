@@ -325,6 +325,25 @@
 
     <div id="budgetOptOverlay" class="budget-opt-overlay hidden" role="dialog" aria-modal="true" aria-label="Budget Optimization"></div>
 
+    <div id="profileWizardOverlay" class="profile-wizard-overlay hidden" role="dialog" aria-modal="true" aria-label="Create Profile">
+      <div class="profile-wizard-shell">
+        <div class="profile-wizard-header">
+          <span class="wizard-step-counter"></span>
+          <button id="wizardCancelBtn" class="wizard-cancel-btn" type="button" aria-label="Cancel"><i class="ph-bold ph-x"></i></button>
+        </div>
+        <div class="profile-wizard-progress-bar-wrap">
+          <div class="profile-wizard-progress-bar" id="wizardProgressBar"></div>
+        </div>
+        <div class="profile-wizard-card">
+          <div id="wizardCardBody"></div>
+        </div>
+        <div class="profile-wizard-nav">
+          <button id="wizardBackBtn" class="btn-secondary hidden" type="button">Back</button>
+          <button id="wizardNextBtn" class="btn-primary" type="button">Next</button>
+        </div>
+      </div>
+    </div>
+
     <div id="chatWidget">
       <div id="chatBubble"><i class="ph-bold ph-chats"></i></div>
       <div id="chatPanel" class="hidden">

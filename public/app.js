@@ -62,7 +62,12 @@ const PROFILE_QUESTIONS = [
   { key: 'outdoorNature', label: 'Do you enjoy outdoor / nature activities?', summary: 'Outdoor / nature activities' },
   { key: 'nightlifeBars', label: 'Are you into nightlife and bars?', summary: 'Nightlife and bars' },
   { key: 'structuredTours', label: 'Do you like guided tours?', summary: 'Structured tours' },
-  { key: 'pace', label: 'How packed do you like your days?', summary: 'Trip pace' }
+  { key: 'pace', label: 'How packed do you like your days?', summary: 'Trip pace' },
+  { key: 'dayStructure', label: 'How do you like your days structured?', summary: 'Day structure', type: 'text', placeholder: 'e.g. I like to start early and wrap up by 9pm' },
+  { key: 'dietaryRestrictions', label: 'Do you have any dietary restrictions or food preferences?', summary: 'Dietary restrictions', type: 'text', placeholder: 'e.g. I\'m vegetarian and avoid shellfish' },
+  { key: 'mobilityConsiderations', label: 'Any mobility or physical considerations we should know about?', summary: 'Mobility', type: 'text', placeholder: 'e.g. I avoid lots of walking or stairs' },
+  { key: 'budgetStyle', label: 'How would you describe your spending style while traveling?', summary: 'Budget style', type: 'text', placeholder: 'e.g. I prefer mid-range, splurge on food but save on activities' },
+  { key: 'travelCompanions', label: 'Who are you typically traveling with?', summary: 'Travel companions', type: 'text', placeholder: 'e.g. My partner and two kids aged 8 and 11' }
 ];
 const PROFILE_MIN = 1;
 const PROFILE_MAX = 5;
@@ -803,7 +808,7 @@ function bindCityAutocompleteOutsideClick() {
 
 function defaultProfile() {
   return {
-    answers: Object.fromEntries(PROFILE_QUESTIONS.map((q) => [q.key, PROFILE_DEFAULT])),
+    answers: Object.fromEntries(PROFILE_QUESTIONS.map((q) => [q.key, q.type === 'text' ? '' : PROFILE_DEFAULT])),
     aboutMe: ''
   };
 }
@@ -951,11 +956,15 @@ function normalizeProfile(profile) {
   const legacyMap = { No: 1, Meh: 3, Yes: 5 };
   for (const q of PROFILE_QUESTIONS) {
     const raw = incomingAnswers[q.key];
-    const legacy = typeof raw === 'string' ? legacyMap[raw] : undefined;
-    const numeric = Number(raw);
-    const resolved = Number.isFinite(numeric) ? numeric : legacy;
-    const clamped = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Math.round(Number(resolved || PROFILE_DEFAULT))));
-    base.answers[q.key] = clamped;
+    if (q.type === 'text') {
+      base.answers[q.key] = typeof raw === 'string' ? raw : '';
+    } else {
+      const legacy = typeof raw === 'string' ? legacyMap[raw] : undefined;
+      const numeric = Number(raw);
+      const resolved = Number.isFinite(numeric) ? numeric : legacy;
+      const clamped = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Math.round(Number(resolved || PROFILE_DEFAULT))));
+      base.answers[q.key] = clamped;
+    }
   }
   const hasAboutMe = profile.aboutMe !== undefined && profile.aboutMe !== null;
   const aboutSource = hasAboutMe ? profile.aboutMe : (profile.travelNotes || '');
@@ -3046,6 +3055,15 @@ function renderPreferencesModal() {
   };
 
   els.profileQuestions.innerHTML = PROFILE_QUESTIONS.map((q) => {
+    if (q.type === 'text') {
+      const val = profile.answers[q.key] || '';
+      return `
+        <div class="profile-question profile-question--text" data-question="${esc(q.key)}">
+          <p>${esc(q.label)}</p>
+          <textarea class="profile-text-answer" rows="2" placeholder="${esc(q.placeholder || '')}">${esc(val)}</textarea>
+        </div>
+      `;
+    }
     const active = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Number(profile.answers[q.key] || PROFILE_DEFAULT)));
     return `
       <div class="profile-question" data-question="${esc(q.key)}">
@@ -3109,6 +3127,17 @@ function renderPreferencesModal() {
       if (e.key === 'Enter' || e.key === ' ') e.target.click();
     });
   });
+
+  els.profileQuestions.querySelectorAll('.profile-text-answer').forEach((textarea) => {
+    const key = textarea.closest('.profile-question')?.dataset.question;
+    if (!key) return;
+    textarea.addEventListener('input', () => {
+      state.profile = normalizeProfile({
+        ...(state.profile || defaultProfile()),
+        answers: { ...(state.profile?.answers || {}), [key]: textarea.value }
+      });
+    });
+  });
 }
 
 function getProfilePayload() {
@@ -3133,24 +3162,147 @@ function createNewProfile() {
     showToast('You can create up to 3 profiles.', 'info');
     return;
   }
-  const suggested = `Profile ${store.profiles.length + 1}`;
-  const prompted = window.prompt('Profile name:', suggested);
-  if (prompted === null) return;
+  openProfileWizard(store);
+}
 
-  const id = createProfileId();
-  const profile = {
-    id,
-    name: normalizeProfileName(prompted, suggested),
-    ...defaultProfile()
+function openProfileWizard(store) {
+  const suggestedName = `Profile ${store.profiles.length + 1}`;
+  const totalSteps = PROFILE_QUESTIONS.length + 1; // +1 for name step
+
+  const wizardState = {
+    stepIndex: 0,
+    name: suggestedName,
+    answers: Object.fromEntries(PROFILE_QUESTIONS.map((q) => [q.key, q.type === 'text' ? '' : PROFILE_DEFAULT]))
   };
-  const nextStore = {
-    activeId: id,
-    profiles: [...store.profiles, profile]
+
+  const overlay = document.getElementById('profileWizardOverlay');
+  overlay.classList.remove('hidden');
+  document.body.classList.add('profile-wizard-active');
+
+  function currentStepAnswer() {
+    const input = overlay.querySelector('.wizard-input');
+    if (!input) return;
+    if (wizardState.stepIndex === 0) {
+      wizardState.name = input.value.trim() || suggestedName;
+    } else {
+      const q = PROFILE_QUESTIONS[wizardState.stepIndex - 1];
+      if (q.type === 'text') {
+        wizardState.answers[q.key] = input.value;
+      }
+    }
+  }
+
+  function render() {
+    const { stepIndex } = wizardState;
+    const pct = Math.max(4, Math.round((stepIndex / (totalSteps - 1)) * 100));
+
+    overlay.querySelector('.profile-wizard-progress-bar').style.width = `${pct}%`;
+    overlay.querySelector('.wizard-step-counter').textContent = `${stepIndex + 1} of ${totalSteps}`;
+
+    const backBtn = overlay.querySelector('#wizardBackBtn');
+    const nextBtn = overlay.querySelector('#wizardNextBtn');
+    backBtn.classList.toggle('hidden', stepIndex === 0);
+    nextBtn.textContent = stepIndex === totalSteps - 1 ? 'Finish' : 'Next';
+
+    let bodyHtml;
+    if (stepIndex === 0) {
+      bodyHtml = `
+        <p class="wizard-question-label">What would you like to name this profile?</p>
+        <input class="wizard-input wizard-text-input" type="text" maxlength="32"
+          value="${esc(wizardState.name)}" placeholder="${esc(suggestedName)}" autocomplete="off" />
+      `;
+    } else {
+      const q = PROFILE_QUESTIONS[stepIndex - 1];
+      if (q.type === 'text') {
+        bodyHtml = `
+          <p class="wizard-question-label">${esc(q.label)}</p>
+          <textarea class="wizard-input wizard-text-input wizard-textarea" rows="3"
+            placeholder="${esc(q.placeholder || '')}">${esc(wizardState.answers[q.key] || '')}</textarea>
+        `;
+      } else {
+        const active = Number(wizardState.answers[q.key]) || PROFILE_DEFAULT;
+        const dots = Array.from({ length: 5 }, (_, i) => {
+          const v = i + 1;
+          return `<span class="dot-scale-dot${v === active ? ' active' : ''}" data-value="${v}" role="button" tabindex="0" aria-label="${v}"></span>`;
+        }).join('');
+        const labelText = q.key === 'pace' ? pacePrefLabel(active) : profileLabel(active);
+        bodyHtml = `
+          <p class="wizard-question-label">${esc(q.label)}</p>
+          <div class="wizard-dot-scale-wrap">
+            <div class="dot-scale wizard-dot-scale" data-rating>${dots}</div>
+            <span class="dot-scale-label wizard-scale-label">${esc(labelText)}</span>
+          </div>
+        `;
+      }
+    }
+
+    overlay.querySelector('#wizardCardBody').innerHTML = bodyHtml;
+
+    if (stepIndex > 0) {
+      const q = PROFILE_QUESTIONS[stepIndex - 1];
+      if (!q.type) {
+        overlay.querySelector('[data-rating]').addEventListener('click', (e) => {
+          const dot = e.target.closest('.dot-scale-dot');
+          if (!dot) return;
+          const v = Number(dot.dataset.value);
+          wizardState.answers[q.key] = v;
+          overlay.querySelectorAll('.dot-scale-dot').forEach((d) => d.classList.toggle('active', Number(d.dataset.value) === v));
+          const labelEl = overlay.querySelector('.wizard-scale-label');
+          if (labelEl) labelEl.textContent = q.key === 'pace' ? pacePrefLabel(v) : profileLabel(v);
+        });
+      }
+    }
+
+    const input = overlay.querySelector('.wizard-input');
+    if (input) input.focus();
+  }
+
+  overlay.querySelector('#wizardBackBtn').onclick = () => {
+    currentStepAnswer();
+    wizardState.stepIndex = Math.max(0, wizardState.stepIndex - 1);
+    render();
   };
-  state.profilesStore = saveProfiles(nextStore);
-  state.profile = normalizeProfile(profile);
-  renderPreferencesModal();
-  showToast('Profile created.', 'success');
+
+  overlay.querySelector('#wizardNextBtn').onclick = () => {
+    currentStepAnswer();
+    if (wizardState.stepIndex < totalSteps - 1) {
+      wizardState.stepIndex++;
+      render();
+    } else {
+      finishWizard();
+    }
+  };
+
+  overlay.querySelector('#wizardCancelBtn').onclick = () => closeWizard();
+  overlay.addEventListener('keydown', onWizardKey);
+
+  function onWizardKey(e) {
+    if (e.key === 'Escape') closeWizard();
+  }
+
+  function closeWizard() {
+    overlay.classList.add('hidden');
+    document.body.classList.remove('profile-wizard-active');
+    overlay.removeEventListener('keydown', onWizardKey);
+  }
+
+  function finishWizard() {
+    closeWizard();
+    const id = createProfileId();
+    const profile = {
+      id,
+      name: normalizeProfileName(wizardState.name, suggestedName),
+      answers: { ...wizardState.answers },
+      aboutMe: ''
+    };
+    const nextStore = { activeId: id, profiles: [...store.profiles, profile] };
+    state.profilesStore = saveProfiles(nextStore);
+    state.profile = normalizeProfile(profile);
+    openPreferencesModal();
+    showToast('Profile created.', 'success');
+  }
+
+  render();
 }
 
 async function deleteActiveProfile() {

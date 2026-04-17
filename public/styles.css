@@ -1674,3 +1674,100 @@ body.overlay-active #chatWidget {
 @media (max-width: 600px) {
   .opt-cost-chip { display: block; }
 }
+
+/* ── Profile Creation Wizard ── */
+.profile-wizard-overlay {
+  position: fixed; inset: 0; z-index: 1700;
+  background: rgba(11,37,69,.72); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.profile-wizard-overlay.hidden { display: none; }
+
+.profile-wizard-shell {
+  width: 100%; max-width: 520px;
+  display: flex; flex-direction: column; gap: 0;
+  animation: cardExpandIn .3s ease;
+}
+
+.profile-wizard-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 0 10px;
+}
+.wizard-step-counter {
+  font-size: .8rem; font-weight: 600; color: rgba(250,248,245,.7);
+  letter-spacing: .04em;
+}
+.wizard-cancel-btn {
+  background: transparent; border: none; cursor: pointer;
+  color: rgba(250,248,245,.7); font-size: 1.1rem; padding: 4px;
+  line-height: 1; border-radius: 6px;
+  transition: color .15s;
+}
+.wizard-cancel-btn:hover { color: #fff; }
+
+.profile-wizard-progress-bar-wrap {
+  height: 4px; border-radius: 999px;
+  background: rgba(250,248,245,.2); overflow: hidden; margin-bottom: 16px;
+}
+.profile-wizard-progress-bar {
+  height: 100%; border-radius: 999px;
+  background: var(--accent); width: 0%;
+  transition: width .3s ease;
+}
+
+.profile-wizard-card {
+  background: var(--base-light);
+  border-radius: 16px; padding: 32px;
+  box-shadow: var(--shadow-md);
+  min-height: 160px;
+}
+
+.wizard-question-label {
+  font-size: 1.1rem; font-weight: 600; margin: 0 0 20px;
+  color: var(--text-primary); line-height: 1.4;
+}
+
+.wizard-text-input {
+  width: 100%; box-sizing: border-box;
+  border: 1.5px solid var(--secondary); border-radius: 10px;
+  padding: 10px 14px; font-size: .95rem;
+  font-family: inherit; color: var(--text-primary);
+  background: var(--base);
+  transition: border-color .15s;
+  resize: none;
+}
+.wizard-text-input:focus { outline: none; border-color: var(--accent); }
+
+.wizard-textarea { resize: vertical; min-height: 72px; }
+
+.wizard-dot-scale-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding-top: 8px;
+}
+.wizard-dot-scale {
+  display: flex; gap: 20px; justify-content: center;
+}
+.wizard-dot-scale .dot-scale-dot {
+  width: 20px; height: 20px;
+}
+.wizard-scale-label {
+  font-size: .875rem; color: var(--text-secondary); font-weight: 500;
+}
+
+.profile-wizard-nav {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding-top: 14px;
+}
+
+/* Text questions in the My Profile modal */
+.profile-question--text p { margin-bottom: 6px; }
+.profile-text-answer {
+  width: 100%; box-sizing: border-box;
+  border: 1.5px solid var(--secondary); border-radius: 8px;
+  padding: 8px 12px; font-size: .875rem;
+  font-family: inherit; color: var(--text-primary);
+  background: var(--base); resize: vertical; min-height: 56px;
+  transition: border-color .15s;
+}
+.profile-text-answer:focus { outline: none; border-color: var(--accent); }
