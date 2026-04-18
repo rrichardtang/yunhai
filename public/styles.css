@@ -270,6 +270,30 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--accent);
 }
 .itinerary-file-actions .btn-ghost[disabled] { opacity: .55; cursor: not-allowed; }
+.itinerary-file-actions .btn-ghost.is-loading,
+.itinerary-file-actions .btn-ghost.is-success {
+  opacity: 1;
+  cursor: default;
+}
+.itinerary-file-actions .btn-ghost.is-success {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.itinerary-file-actions .btn-ghost.is-success i { color: #fff; }
+.btn-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin .7s linear infinite;
+  vertical-align: -2px;
+}
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
 
 .attachment-viewer-card { max-width: 560px; }
 .attachment-viewer-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }

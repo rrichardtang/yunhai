@@ -6403,9 +6403,31 @@ function formatBytes(bytes) {
 }
 
 let _pendingUploadActivityId = null;
+let _pendingUploadButton = null;
 
-async function uploadActivityAttachments(activityId, fileList) {
-  if (!state.currentItineraryId || !activityId || !fileList?.length) return;
+function setUploadBtnState(btn, stateKind) {
+  if (!btn) return;
+  btn.classList.remove('is-loading', 'is-success');
+  btn.disabled = false;
+  if (stateKind === 'loading') {
+    btn.classList.add('is-loading');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Uploading…';
+  } else if (stateKind === 'success') {
+    btn.classList.add('is-success');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ph-bold ph-check" aria-hidden="true"></i> Uploaded';
+  } else {
+    btn.innerHTML = '<i class="ph-bold ph-upload-simple" aria-hidden="true"></i> Upload tickets';
+  }
+}
+
+async function uploadActivityAttachments(activityId, fileList, buttonEl = null) {
+  if (!state.currentItineraryId || !activityId || !fileList?.length) {
+    setUploadBtnState(buttonEl, 'idle');
+    return;
+  }
+  setUploadBtnState(buttonEl, 'loading');
   const formData = new FormData();
   for (const f of fileList) formData.append('files', f);
   try {
@@ -6413,18 +6435,19 @@ async function uploadActivityAttachments(activityId, fileList) {
       `/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/activity/${encodeURIComponent(activityId)}/attachments`,
       { method: 'POST', body: formData }
     );
-    if (res.status === 413) { showToast('File exceeds 10 MB limit.', 'error'); return; }
-    if (res.status === 415) { showToast('Unsupported file type.', 'error'); return; }
-    if (!res.ok) { showToast('Upload failed.', 'error'); return; }
+    if (res.status === 413) { setUploadBtnState(buttonEl, 'idle'); showToast('File exceeds 10 MB limit.', 'error'); return; }
+    if (res.status === 415) { setUploadBtnState(buttonEl, 'idle'); showToast('Unsupported file type.', 'error'); return; }
+    if (!res.ok) { setUploadBtnState(buttonEl, 'idle'); showToast('Upload failed.', 'error'); return; }
     const data = await res.json();
     const added = Array.isArray(data?.attachments) ? data.attachments : [];
     const activity = state.activities.find((a) => a.id === activityId);
     if (activity) {
       activity.attachments = [...(activity.attachments || []), ...added];
     }
-    renderItineraryMode();
-    showToast(`${added.length} file${added.length !== 1 ? 's' : ''} uploaded.`, 'success');
+    setUploadBtnState(buttonEl, 'success');
+    setTimeout(() => renderItineraryMode(), 1000);
   } catch {
+    setUploadBtnState(buttonEl, 'idle');
     showToast('Upload failed.', 'error');
   }
 }
@@ -7649,6 +7672,7 @@ els.itineraryModeList?.addEventListener('click', (e) => {
   const action = btn.dataset.action;
   if (action === 'upload-files') {
     _pendingUploadActivityId = activityId;
+    _pendingUploadButton = btn;
     if (els.attachmentFileInput) {
       els.attachmentFileInput.value = '';
       els.attachmentFileInput.click();
@@ -7662,9 +7686,10 @@ els.itineraryModeList?.addEventListener('click', (e) => {
 els.attachmentFileInput?.addEventListener('change', () => {
   const files = els.attachmentFileInput.files;
   if (_pendingUploadActivityId && files?.length) {
-    uploadActivityAttachments(_pendingUploadActivityId, files);
+    uploadActivityAttachments(_pendingUploadActivityId, files, _pendingUploadButton);
   }
   _pendingUploadActivityId = null;
+  _pendingUploadButton = null;
 });
 
 // Attachment viewer modal
