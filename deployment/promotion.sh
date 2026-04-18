@@ -5,7 +5,8 @@ ENV_FILE="/docker/travelplanner/.env"
 HOST_ROOT="/docker/openclaw-fbdq/data/.openclaw/workspace-sherlock/projects"
 PROD_REPO="${HOST_ROOT}/travelplanner"
 STAGING_REPO="${HOST_ROOT}/travelplanner-staging"
-COMPOSE_FILE="deployment/docker-compose.yml"
+PROD_COMPOSE_FILE="deployment/docker-compose.prod.yml"
+STAGING_COMPOSE_FILE="deployment/docker-compose.staging.yml"
 
 log() {
   printf '[promotion] %s\n' "$*"
@@ -24,8 +25,8 @@ require_paths() {
   [[ -f "$ENV_FILE" ]] || die "Missing env file: $ENV_FILE"
   [[ -d "$PROD_REPO/.git" ]] || die "Prod repo missing or not a git repo: $PROD_REPO"
   [[ -d "$STAGING_REPO/.git" ]] || die "Staging repo missing or not a git repo: $STAGING_REPO"
-  [[ -f "$PROD_REPO/$COMPOSE_FILE" ]] || die "Missing compose file: $PROD_REPO/$COMPOSE_FILE"
-  [[ -f "$STAGING_REPO/$COMPOSE_FILE" ]] || die "Missing compose file: $STAGING_REPO/$COMPOSE_FILE"
+  [[ -f "$PROD_REPO/$PROD_COMPOSE_FILE" ]] || die "Missing compose file: $PROD_REPO/$PROD_COMPOSE_FILE"
+  [[ -f "$STAGING_REPO/$STAGING_COMPOSE_FILE" ]] || die "Missing compose file: $STAGING_REPO/$STAGING_COMPOSE_FILE"
 }
 
 assert_clean_repo() {
@@ -50,11 +51,14 @@ staging_current_branch() {
 redeploy_repo() {
   local repo="$1"
   local project="$2"
+  local compose_file="$3"
+  local repo="$1"
+  local project="$2"
   log "Redeploying $project from $repo"
   docker compose \
     --project-name "$project" \
     --env-file "$ENV_FILE" \
-    -f "$repo/$COMPOSE_FILE" \
+    -f "$repo/$compose_file" \
     up -d --force-recreate
 }
 
@@ -68,7 +72,7 @@ deploy_feature_to_staging() {
 
   log "Deploying origin/${branch} to staging"
   git -C "$STAGING_REPO" checkout -B "$branch" "origin/$branch"
-  redeploy_repo "$STAGING_REPO" "travelplanner-staging"
+  redeploy_repo "$STAGING_REPO" "travelplanner-staging" "$STAGING_COMPOSE_FILE"
 
   log "Staging is now running branch: $branch"
 }
@@ -110,8 +114,8 @@ promote_staging_to_main() {
   git -C "$STAGING_REPO" checkout main
   git -C "$STAGING_REPO" reset --hard origin/main
 
-  redeploy_repo "$STAGING_REPO" "travelplanner-staging"
-  redeploy_repo "$PROD_REPO" "travelplanner-prod"
+  redeploy_repo "$STAGING_REPO" "travelplanner-staging" "$STAGING_COMPOSE_FILE"
+  redeploy_repo "$PROD_REPO" "travelplanner-prod" "$PROD_COMPOSE_FILE"
 
   log "Promotion complete: main deployed to prod and staging reset to main"
 }
