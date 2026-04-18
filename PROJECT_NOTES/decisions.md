@@ -90,6 +90,20 @@ Append-only. Records permanent architectural and design decisions.
 **Alternatives rejected:** Trusting Claude's output and adding smarter fallback logic — rejected because the root cause is upstream data quality, not the scheduler.
 **Tradeoffs:** A breakfast spot that genuinely serves until midnight would be constrained to `07:30-10:30`. Acceptable given the scheduling correctness benefit.
 
+## [2026-04-18] Local filesystem for activity ticket attachments (swappable to cloud)
+
+**Decision:** Store user-uploaded ticket files under `/data/attachments/{userId}/` (flat files + per-user `manifest.json`) with a multer-backed `POST /api/itinerary/:id/activity/:actId/attachments` route. Auth guard ensures files are scoped by Clerk userId. A thin `src/attachmentStore.js` module wraps all disk I/O so the storage backend can be swapped (e.g. to Cloudflare R2) by re-implementing four functions without touching routes or frontend.
+**Reasoning:** Fits the existing flat-file / no-database philosophy documented in CLAUDE.md. Zero new credentials or vendors. At 10 MB × ~20 activities × 100 users = ~20 GB worst case, it's comfortable on a standard VPS. Migration trigger: if `/data/attachments/` approaches ~50 GB or backup complexity grows, swap internals for R2.
+**Alternatives rejected:** Cloudflare R2 / S3 immediately — rejected because it adds new API credentials, SDK dependency, and complexity for a small user base. Deferring uploads entirely — rejected because the user explicitly wanted this feature now.
+**Tradeoffs:** VPS disk is finite. No CDN. Files are not backed up separately unless the VPS backup includes `/data/attachments/`. These are all acceptable given current scale.
+
+## [2026-04-18] Rename "Execution" mode to "Itinerary" mode
+
+**Decision:** Renamed the final step from "Execution" to "Itinerary" everywhere: button label, HTML IDs (prefixed `itineraryMode*`), CSS classes (`.itinerary-mode-*`), JS function names, and share URL param (`mode=itinerary`). Old `mode=execution` share links are handled gracefully (backward compat in `setViewMode` and `maybeLoadSharedItineraryFromUrl`). Old `localStorage` value `'execution'` is also mapped to `'itinerary'` on read.
+**Reasoning:** "Execution" was jargon with no travel context. "Itinerary" is what travelers call this view.
+**Alternatives rejected:** "My Trip", "Day-of" — rejected in favor of the clearest option.
+**Tradeoffs:** Old share links with `?mode=execution` show itinerary mode correctly but the URL is not updated. Negligible — share links are short-lived.
+
 ## [2026-04-07] Add date range to city main row with auto-population
 
 **Decision:** Start/end dates are now set at the city row level and auto-populate accommodation check-in/check-out, arrival date, and departure date.

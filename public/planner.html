@@ -37,7 +37,7 @@
           <button id="signInBtn" class="secondary" type="button">Sign in</button>
           <div class="mode-toggle" role="group" aria-label="View mode">
             <button id="planningModeBtn" class="link-btn mode-btn active" type="button">Planning</button>
-            <button id="executionModeBtn" class="link-btn mode-btn" type="button">Execution</button>
+            <button id="itineraryModeBtn" class="link-btn mode-btn" type="button">Itinerary</button>
           </div>
           <button id="confidenceBadge" class="confidence-badge needs-review" type="button" aria-label="Open Trip Health" title="Trip Health">
             <i class="ph-bold ph-heartbeat" aria-hidden="true"></i>
@@ -76,26 +76,38 @@
         <p><code id="forwardingAddress">Not available yet</code></p>
       </section>
 
-      <section id="executionModeView" class="panel execution-panel hidden" aria-live="polite">
-        <div class="between execution-head">
+      <section id="itineraryModeView" class="panel itinerary-mode-panel hidden" aria-live="polite">
+        <div class="between itinerary-mode-head">
           <div>
-            <h2>Execution Mode · Smart Minimal Itinerary</h2>
+            <h2>Itinerary</h2>
             <p class="muted-text">Lightweight, shareable, and ready offline.</p>
           </div>
-          <div class="execution-toolbar">
+          <div class="itinerary-mode-toolbar">
             <button id="shareMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-share-network"></i> Share</button>
             <button id="copyMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-clipboard"></i> Copy</button>
             <button id="saveOfflineMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-download-simple"></i> Save Offline</button>
             <button id="printMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-printer"></i> Print</button>
           </div>
         </div>
-        <div id="executionSummary" class="execution-summary"></div>
-        <section class="execution-confirmations-panel">
+        <div id="itineraryModeSummary" class="itinerary-mode-summary"></div>
+        <section class="itinerary-mode-confirmations-panel">
           <h3>Consolidated Confirmations</h3>
-          <div id="executionConfirmations" class="execution-confirmations"></div>
+          <div id="itineraryModeConfirmations" class="itinerary-mode-confirmations"></div>
         </section>
-        <div id="executionModeList" class="execution-list"></div>
+        <div id="itineraryModeList" class="itinerary-mode-list"></div>
       </section>
+
+      <div id="attachmentViewerModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Activity attachments">
+        <div class="modal-card attachment-viewer-card">
+          <div class="between">
+            <h3 id="attachmentViewerTitle">Attachments</h3>
+            <button id="attachmentViewerClose" class="icon-btn red" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
+          </div>
+          <div id="attachmentViewerList" class="attachment-viewer-list"></div>
+        </div>
+      </div>
+
+      <input id="attachmentFileInput" type="file" accept="application/pdf,image/png,image/jpeg,image/webp,image/heic" multiple class="hidden" />
 
       <nav class="steps" id="stepIndicator">
         <div class="step active">1. Setup</div>

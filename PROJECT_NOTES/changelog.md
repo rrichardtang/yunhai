@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-18] Itinerary view overhaul (formerly "Execution" mode)
+
+- `public/planner.html`: renamed `#executionModeBtn` → `#itineraryModeBtn` (text "Execution" → "Itinerary"), `#executionModeView` → `#itineraryModeView`, all child IDs/classes; added `#attachmentViewerModal`, `#attachmentFileInput`
+- `public/styles.css`: renamed all `.execution-*` → `.itinerary-mode-*`; added `.itinerary-item` card layout, `.itinerary-item-head`, `.itinerary-title`, `.itinerary-time`, `.itinerary-subtitle`, `.itinerary-notes`, `.itinerary-reference`, `.itinerary-file-actions .btn-ghost`, `.attachment-viewer-card`, `.attachment-row`; renamed `body.execution-mode` → `body.itinerary-mode`
+- `public/app.js`: renamed DOM refs, functions (`getExecutionRows` → `getItineraryRows`, `renderExecutionMode` → `renderItineraryMode`, etc.); rewrote card render to show name + time range, location subtitle, notes, reference # with `ph-bold ph-ticket`, Upload/View buttons with `ph-bold ph-upload-simple`/`ph-bold ph-folder-open`, Navigate link with `ph-bold ph-navigation-arrow`; added `formatTimeRangeLabel`, `getActivityReferenceNum`, `uploadActivityAttachments`, `openAttachmentViewer`, `renderAttachmentViewerList`, `deleteAttachment`; updated `formatChecklistDate` to accept optional end time; added `checklistActivityEndTime` to derive end from `duration_hours`; backward-compat for old `mode=execution` share links and `localStorage` value
+- `src/attachmentStore.js`: new module — `saveAttachment`, `getAttachmentFile`, `listAttachments`, `deleteAttachment` backed by `/data/attachments/{userId}/manifest.json` + flat files
+- `src/server.js`: 4 new routes — `POST /api/itinerary/:id/activity/:actId/attachments`, `GET /api/itinerary/:id/activity/:actId/attachments`, `GET /api/attachments/:attachmentId`, `DELETE /api/attachments/:attachmentId`; multer 2.x with 10 MB limit + MIME allowlist
+- `package.json`: added `multer@^2`
+
 ## [2026-04-17] My Profile — stale AI summary on profile deletion
 
 - `public/app.js` `deleteActiveProfile()`: added `state.learnedPrefs = null` and `POST /api/preferences/reset` call on deletion so the old AI-generated summary is wiped from both memory and the server file before the forced wizard opens

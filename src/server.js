@@ -70,6 +70,15 @@ const {
 const { Resend } = require('resend');
 const { computeConfidence, normalizeChecklistItem } = require('./confidenceCheck');
 const { getUserData, setUserData, getUserField, setUserField } = require('./userDataStore');
+const multer = require('multer');
+const {
+  saveAttachment: saveAttachmentFile,
+  getAttachmentFile,
+  listAttachments: listAttachmentsForActivity,
+  deleteAttachment: deleteAttachmentFile,
+  isAllowedMime: isAllowedAttachmentMime,
+  MAX_BYTES: ATTACHMENT_MAX_BYTES
+} = require('./attachmentStore');
 const {
   buildCalendarItems,
   computeFingerprint,
@@ -1599,6 +1608,98 @@ app.get('/api/itinerary/:id/calendar.ics', (req, res) => {
   res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${safeName || 'itinerary'}.ics"`);
   return res.send(ics);
+});
+
+// ── Activity attachments ──────────────────────────────────────────────
+const attachmentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: ATTACHMENT_MAX_BYTES, files: 5 },
+  fileFilter: (_req, file, cb) => {
+    if (isAllowedAttachmentMime(file.mimetype)) return cb(null, true);
+    const err = new Error('Unsupported file type');
+    err.code = 'UNSUPPORTED_TYPE';
+    cb(err);
+  }
+});
+
+function handleAttachmentError(err, res) {
+  if (err?.code === 'LIMIT_FILE_SIZE' || err?.code === 'TOO_LARGE') {
+    return res.status(413).json({ error: 'File exceeds 10 MB limit' });
+  }
+  if (err?.code === 'UNSUPPORTED_TYPE') {
+    return res.status(415).json({ error: 'Unsupported file type' });
+  }
+  if (err?.code === 'LIMIT_FILE_COUNT') {
+    return res.status(400).json({ error: 'Too many files in one upload' });
+  }
+  return res.status(500).json({ error: 'Upload failed' });
+}
+
+app.post(
+  '/api/itinerary/:itineraryId/activity/:activityId/attachments',
+  (req, res, next) => {
+    attachmentUpload.array('files', 5)(req, res, (err) => {
+      if (err) return handleAttachmentError(err, res);
+      next();
+    });
+  },
+  (req, res) => {
+    const userId = parseUserId(getAuthedUserId(req));
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const itinerary = getItineraryById(req.params.itineraryId, userId);
+    if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
+
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (!files.length) return res.status(400).json({ error: 'No files provided' });
+
+    const saved = [];
+    for (const file of files) {
+      try {
+        const entry = saveAttachmentFile({
+          userId,
+          itineraryId: itinerary.id,
+          activityId: req.params.activityId,
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          buffer: file.buffer
+        });
+        saved.push(entry);
+      } catch (err) {
+        return handleAttachmentError(err, res);
+      }
+    }
+    return res.json({ attachments: saved });
+  }
+);
+
+app.get('/api/itinerary/:itineraryId/activity/:activityId/attachments', (req, res) => {
+  const userId = parseUserId(getAuthedUserId(req));
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const itinerary = getItineraryById(req.params.itineraryId, userId);
+  if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
+  const attachments = listAttachmentsForActivity({ userId, activityId: req.params.activityId });
+  return res.json({ attachments });
+});
+
+app.get('/api/attachments/:attachmentId', (req, res) => {
+  const userId = parseUserId(getAuthedUserId(req));
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const file = getAttachmentFile({ userId, attachmentId: req.params.attachmentId });
+  if (!file) return res.status(404).json({ error: 'Attachment not found' });
+  res.setHeader('Content-Type', file.mimeType);
+  const safeName = String(file.filename || 'attachment').replace(/[^a-zA-Z0-9._-]+/g, '_');
+  res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+  res.setHeader('Content-Length', String(file.size));
+  fs.createReadStream(file.path).pipe(res);
+});
+
+app.delete('/api/attachments/:attachmentId', (req, res) => {
+  const userId = parseUserId(getAuthedUserId(req));
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const ok = deleteAttachmentFile({ userId, attachmentId: req.params.attachmentId });
+  if (!ok) return res.status(404).json({ error: 'Attachment not found' });
+  return res.json({ ok: true });
 });
 
 app.get('*', (_req, res) => {

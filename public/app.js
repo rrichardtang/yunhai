@@ -138,11 +138,16 @@ const els = {
   forwardingPanel: document.getElementById('forwardingPanel'),
   forwardingAddress: document.getElementById('forwardingAddress'),
   planningModeBtn: document.getElementById('planningModeBtn'),
-  executionModeBtn: document.getElementById('executionModeBtn'),
-  executionModeView: document.getElementById('executionModeView'),
-  executionModeList: document.getElementById('executionModeList'),
-  executionSummary: document.getElementById('executionSummary'),
-  executionConfirmations: document.getElementById('executionConfirmations'),
+  itineraryModeBtn: document.getElementById('itineraryModeBtn'),
+  itineraryModeView: document.getElementById('itineraryModeView'),
+  itineraryModeList: document.getElementById('itineraryModeList'),
+  itineraryModeSummary: document.getElementById('itineraryModeSummary'),
+  itineraryModeConfirmations: document.getElementById('itineraryModeConfirmations'),
+  attachmentViewerModal: document.getElementById('attachmentViewerModal'),
+  attachmentViewerTitle: document.getElementById('attachmentViewerTitle'),
+  attachmentViewerList: document.getElementById('attachmentViewerList'),
+  attachmentViewerClose: document.getElementById('attachmentViewerClose'),
+  attachmentFileInput: document.getElementById('attachmentFileInput'),
   shareMinimalBtn: document.getElementById('shareMinimalBtn'),
   copyMinimalBtn: document.getElementById('copyMinimalBtn'),
   saveOfflineMinimalBtn: document.getElementById('saveOfflineMinimalBtn'),
@@ -1292,17 +1297,40 @@ function groupChecklist(items = []) {
 }
 
 // collapsed display helpers
-function formatChecklistDate(dateStr, timeStr) {
+function formatChecklistDate(dateStr, timeStr, endTimeStr = '') {
   if (!dateStr) return '';
   const d = new Date(dateStr + 'T12:00:00');
   const month = d.toLocaleString('en-US', { month: 'short' });
   const day = d.getDate();
   const base = `${month} ${day}`;
   if (!timeStr) return base;
-  const [h, m] = timeStr.split(':').map(Number);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = ((h % 12) || 12);
-  return `${base}, ${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+  const fmtTime = (t) => {
+    const [h, m] = String(t || '').split(':').map(Number);
+    if (!Number.isFinite(h)) return '';
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = (h % 12) || 12;
+    return `${h12}:${String(m || 0).padStart(2, '0')} ${ampm}`;
+  };
+  const startFmt = fmtTime(timeStr);
+  if (!startFmt) return base;
+  if (endTimeStr) {
+    const endFmt = fmtTime(endTimeStr);
+    if (endFmt) return `${base}, ${startFmt} – ${endFmt}`;
+  }
+  return `${base}, ${startFmt}`;
+}
+
+function checklistActivityEndTime(item) {
+  if (!item.activityTime || !item.activityId) return '';
+  const activity = (state.activities || []).find((a) => a.id === item.activityId);
+  if (!activity) return '';
+  const durationMins = Math.max(30, Number(activity.duration_hours || 1) * 60);
+  const [h, m] = item.activityTime.split(':').map(Number);
+  if (!Number.isFinite(h)) return '';
+  const totalMins = h * 60 + (m || 0) + durationMins;
+  const eh = Math.floor(totalMins / 60) % 24;
+  const em = totalMins % 60;
+  return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
 }
 
 function truncateLocation(loc, max = 28) {
@@ -1337,7 +1365,7 @@ function collapsedRowText(item) {
     return [city, dates].filter(Boolean).join(' • ');
   }
   // activity
-  return formatChecklistDate(item.activityDate, item.activityTime) || '';
+  return formatChecklistDate(item.activityDate, item.activityTime, checklistActivityEndTime(item)) || '';
 }
 
 function buildChecklistFromState() {
@@ -6056,11 +6084,30 @@ function renderItinerary() {
     return `<section class="day-col"><div class="day-head">${d.date} • ${esc(d.city)}</div><div class="list">${accommodationInfo}${items || '<em>No activities assigned.</em>'}</div></section>`;
   }).join('');
 
-  renderExecutionMode();
+  renderItineraryMode();
   renderConfidence();
 }
 
-function getExecutionRows() {
+function formatTimeRangeLabel(startMinutes, endMinutes) {
+  const fmt = (mins) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = (h % 12) || 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+  };
+  if (!Number.isFinite(startMinutes)) return '';
+  if (!Number.isFinite(endMinutes) || endMinutes <= startMinutes) return fmt(startMinutes);
+  return `${fmt(startMinutes)} – ${fmt(endMinutes)}`;
+}
+
+function getActivityReferenceNum(activityId) {
+  const items = Array.isArray(state.confidenceChecklist) ? state.confidenceChecklist : [];
+  const match = items.find((x) => x && x.type === 'activity' && x.activityId === activityId);
+  return match ? String(match.referenceNum || '').trim() : '';
+}
+
+function getItineraryRows() {
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
   return approved
     .map((activity) => {
@@ -6068,29 +6115,36 @@ function getExecutionRows() {
       const day = state.days.find((d) => d.id === placement.dayId);
       if (!day) return null;
 
-      const time = placement.time || parseTimeTo24(activity.suggested_time || typeToTime(activity.type));
-      const place = String(activity.start_location || activity.end_location || activity.city || '').trim();
-      const note = String(activity.why_it_fits || activity.type || '').trim();
-      const locationQuery = place || `${activity.name} ${activity.city || ''}`;
-      const navigateHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`;
-      const phone = String(activity.phone || activity.phone_number || activity.contact_phone || '').trim();
+      const startTime = placement.time || parseTimeTo24(activity.suggested_time || typeToTime(activity.type));
+      const range = getPlacementTimeRange(activity, placement);
+      const timeLabel = formatTimeRangeLabel(range.startMinutes, range.endMinutes);
+      const location = String(activity.start_location || activity.end_location || activity.city || '').trim();
+      const locationQuery = location || `${activity.name} ${activity.city || ''}`;
+      const navigateHref = location || activity.name
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`
+        : '';
+      const notes = String(state.reviewed[activity.id]?.notes || '').trim();
+      const referenceNum = getActivityReferenceNum(activity.id);
+      const attachments = Array.isArray(activity.attachments) ? activity.attachments : [];
 
       return {
         id: activity.id,
         date: day.date,
         city: day.city,
-        time,
+        startTime,
+        timeLabel,
         title: activity.name,
-        place,
-        note,
+        location,
+        notes,
+        referenceNum,
         navigateHref,
-        callHref: phone ? `tel:${phone}` : ''
+        fileCount: attachments.length
       };
     })
     .filter(Boolean)
     .sort((a, b) => {
-      const aKey = `${a.date}T${parseTimeTo24(a.time)}`;
-      const bKey = `${b.date}T${parseTimeTo24(b.time)}`;
+      const aKey = `${a.date}T${parseTimeTo24(a.startTime)}`;
+      const bKey = `${b.date}T${parseTimeTo24(b.startTime)}`;
       return new Date(aKey).getTime() - new Date(bKey).getTime();
     });
 }
@@ -6134,7 +6188,7 @@ function getConsolidatedConfirmations() {
 }
 
 function getMinimalPayload() {
-  const executionRows = getExecutionRows();
+  const itineraryRows = getItineraryRows();
   const confirmations = getConsolidatedConfirmations();
   const firstDate = state.days[0]?.date || '';
   const lastDate = state.days[state.days.length - 1]?.date || '';
@@ -6145,8 +6199,8 @@ function getMinimalPayload() {
     firstDate,
     lastDate,
     cities: [...new Set(state.days.map((d) => d.city).filter(Boolean))],
-    itemCount: executionRows.length,
-    executionRows,
+    itemCount: itineraryRows.length,
+    itineraryRows,
     confirmations
   };
 }
@@ -6186,7 +6240,7 @@ function copyMinimalItineraryText() {
     payload.firstDate && payload.lastDate ? `${payload.firstDate} → ${payload.lastDate}` : '',
     '',
     'SCHEDULE',
-    ...payload.executionRows.map((row) => `${row.date} ${parseTimeTo24(row.time)} • ${row.title}${row.place ? ` — ${row.place}` : ''}`),
+    ...payload.itineraryRows.map((row) => `${row.date} ${row.timeLabel} • ${row.title}${row.location ? ` — ${row.location}` : ''}${row.referenceNum ? ` [ref ${row.referenceNum}]` : ''}`),
     '',
     'CONSOLIDATED CONFIRMATIONS',
     ...payload.confirmations.map((row) => `${row.type}: ${row.title}${row.meta ? ` (${row.meta})` : ''}${row.city ? ` [${row.city}]` : ''}`)
@@ -6203,12 +6257,12 @@ async function shareMinimalItinerary() {
     return;
   }
 
-  const shareUrl = `${window.location.origin}/planner.html?itinerary=${encodeURIComponent(state.currentItineraryId)}&mode=execution`;
+  const shareUrl = `${window.location.origin}/planner.html?itinerary=${encodeURIComponent(state.currentItineraryId)}&mode=itinerary`;
 
   if (navigator.share) {
     try {
       await navigator.share({
-        title: `${state.tripName || 'Trip'} — Smart Minimal Itinerary`,
+        title: `${state.tripName || 'Trip'} — Itinerary`,
         text: 'Open this lightweight itinerary view',
         url: shareUrl
       });
@@ -6223,53 +6277,86 @@ async function shareMinimalItinerary() {
     .catch(() => showToast('Could not copy share link.', 'error'));
 }
 
-function renderExecutionSummary(payload) {
-  if (!els.executionSummary) return;
+function renderItineraryModeSummary(payload) {
+  if (!els.itineraryModeSummary) return;
   const range = payload.firstDate && payload.lastDate ? `${payload.firstDate} → ${payload.lastDate}` : 'No date range';
-  els.executionSummary.innerHTML = `
-    <article class="execution-summary-card">
+  els.itineraryModeSummary.innerHTML = `
+    <article class="itinerary-mode-summary-card">
       <h4>Trip</h4>
       <p>${esc(payload.tripName)}</p>
     </article>
-    <article class="execution-summary-card">
+    <article class="itinerary-mode-summary-card">
       <h4>Dates</h4>
       <p>${esc(range)}</p>
     </article>
-    <article class="execution-summary-card">
+    <article class="itinerary-mode-summary-card">
       <h4>Cities</h4>
       <p>${esc(payload.cities.join(', ') || '—')}</p>
     </article>
-    <article class="execution-summary-card">
+    <article class="itinerary-mode-summary-card">
       <h4>Items</h4>
       <p>${payload.itemCount}</p>
     </article>
   `;
 }
 
-function renderExecutionConfirmations(confirmations = []) {
-  if (!els.executionConfirmations) return;
+function renderItineraryModeConfirmations(confirmations = []) {
+  if (!els.itineraryModeConfirmations) return;
   if (!confirmations.length) {
-    els.executionConfirmations.innerHTML = '<p class="muted-text">No confirmations captured yet.</p>';
+    els.itineraryModeConfirmations.innerHTML = '<p class="muted-text">No confirmations captured yet.</p>';
     return;
   }
 
-  els.executionConfirmations.innerHTML = confirmations.map((row) => `
-    <article class="execution-confirmation-item">
+  els.itineraryModeConfirmations.innerHTML = confirmations.map((row) => `
+    <article class="itinerary-mode-confirmation-item">
       <p><strong>${esc(row.type)}:</strong> ${esc(row.title || '—')}</p>
       <p class="muted-text">${esc([row.city, row.meta].filter(Boolean).join(' • '))}</p>
     </article>
   `).join('');
 }
 
-function renderExecutionMode() {
-  if (!els.executionModeList) return;
+function renderItineraryItemCard(row) {
+  const hasRef = Boolean(row.referenceNum);
+  const refText = hasRef ? row.referenceNum : 'No reference #';
+  const viewDisabled = row.fileCount === 0;
+  const fileCountText = row.fileCount ? ` (${row.fileCount})` : '';
+  const navigateBtn = row.navigateHref
+    ? `<a class="btn-ghost" href="${esc(row.navigateHref)}" target="_blank" rel="noopener noreferrer" data-action="navigate"><i class="ph-bold ph-navigation-arrow"></i> Navigate</a>`
+    : '';
+  return `
+    <article class="itinerary-item" data-activity-id="${esc(row.id)}">
+      <header class="itinerary-item-head">
+        <h3 class="itinerary-title">${esc(row.title)}</h3>
+        <time class="itinerary-time">${esc(row.timeLabel || '')}</time>
+      </header>
+      ${row.location ? `<div class="itinerary-subtitle">${esc(row.location)}</div>` : ''}
+      ${row.notes ? `<p class="itinerary-notes">${esc(row.notes)}</p>` : ''}
+      <div class="itinerary-reference${hasRef ? ' has-value' : ''}">
+        <i class="ph-bold ph-ticket" aria-hidden="true"></i>
+        <span>${esc(refText)}</span>
+      </div>
+      <div class="itinerary-file-actions">
+        <button class="btn-ghost" type="button" data-action="upload-files">
+          <i class="ph-bold ph-upload-simple"></i> Upload tickets
+        </button>
+        <button class="btn-ghost" type="button" data-action="view-files"${viewDisabled ? ' disabled' : ''}>
+          <i class="ph-bold ph-folder-open"></i> View files${fileCountText}
+        </button>
+        ${navigateBtn}
+      </div>
+    </article>
+  `;
+}
+
+function renderItineraryMode() {
+  if (!els.itineraryModeList) return;
   const payload = getMinimalPayload();
-  const rows = payload.executionRows;
-  renderExecutionSummary(payload);
-  renderExecutionConfirmations(payload.confirmations);
+  const rows = payload.itineraryRows;
+  renderItineraryModeSummary(payload);
+  renderItineraryModeConfirmations(payload.confirmations);
 
   if (!rows.length) {
-    els.executionModeList.innerHTML = '<p class="muted-text">No scheduled itinerary yet. Build your plan in Planning Mode first.</p>';
+    els.itineraryModeList.innerHTML = '<p class="muted-text">No scheduled itinerary yet. Build your plan in Planning Mode first.</p>';
     return;
   }
 
@@ -6280,34 +6367,121 @@ function renderExecutionMode() {
     return acc;
   }, {});
 
-  els.executionModeList.innerHTML = Object.values(groups).map((group) => `
-    <section class="execution-day-group">
+  els.itineraryModeList.innerHTML = Object.values(groups).map((group) => `
+    <section class="itinerary-mode-day-group">
       <h3>${esc(group.date)} • ${esc(group.city)}</h3>
-      ${group.items.map((row) => `
-    <article class="execution-item">
-      <div class="execution-time">${esc(row.time)}</div>
-      <div class="execution-place">${esc(row.title)}${row.place ? ` — ${esc(row.place)}` : ''}</div>
-      <p class="execution-note">${esc(row.note || 'No note')}</p>
-      <div class="execution-actions">
-        <a href="${esc(row.navigateHref)}" target="_blank" rel="noopener noreferrer">🧭 Navigate</a>
-        ${row.callHref ? `<a href="${esc(row.callHref)}">📞 Call</a>` : '<button type="button" disabled>📞 Call</button>'}
-      </div>
-    </article>
-      `).join('')}
+      ${group.items.map(renderItineraryItemCard).join('')}
     </section>
   `).join('');
 }
 
 function setViewMode(mode = 'planning') {
-  const resolved = mode === 'execution' ? 'execution' : 'planning';
+  const resolved = mode === 'itinerary' || mode === 'execution' ? 'itinerary' : 'planning';
   state.viewMode = resolved;
   localStorage.setItem(VIEW_MODE_KEY, resolved);
   syncToServer('viewMode', resolved);
-  document.body.classList.toggle('execution-mode', resolved === 'execution');
+  document.body.classList.toggle('itinerary-mode', resolved === 'itinerary');
   if (els.planningModeBtn) els.planningModeBtn.classList.toggle('active', resolved === 'planning');
-  if (els.executionModeBtn) els.executionModeBtn.classList.toggle('active', resolved === 'execution');
-  if (resolved === 'execution') renderExecutionMode();
+  if (els.itineraryModeBtn) els.itineraryModeBtn.classList.toggle('active', resolved === 'itinerary');
+  if (resolved === 'itinerary') renderItineraryMode();
 }
+
+// ── Attachment helpers ───────────────────────────────────────────────
+
+function mimeToPhosphorIcon(mimeType) {
+  const m = String(mimeType || '').toLowerCase();
+  if (m === 'application/pdf') return 'ph-file-pdf';
+  if (m.startsWith('image/')) return 'ph-image';
+  return 'ph-file';
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+let _pendingUploadActivityId = null;
+
+async function uploadActivityAttachments(activityId, fileList) {
+  if (!state.currentItineraryId || !activityId || !fileList?.length) return;
+  const formData = new FormData();
+  for (const f of fileList) formData.append('files', f);
+  try {
+    const res = await apiFetch(
+      `/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/activity/${encodeURIComponent(activityId)}/attachments`,
+      { method: 'POST', body: formData }
+    );
+    if (res.status === 413) { showToast('File exceeds 10 MB limit.', 'error'); return; }
+    if (res.status === 415) { showToast('Unsupported file type.', 'error'); return; }
+    if (!res.ok) { showToast('Upload failed.', 'error'); return; }
+    const data = await res.json();
+    const added = Array.isArray(data?.attachments) ? data.attachments : [];
+    const activity = state.activities.find((a) => a.id === activityId);
+    if (activity) {
+      activity.attachments = [...(activity.attachments || []), ...added];
+    }
+    renderItineraryMode();
+    showToast(`${added.length} file${added.length !== 1 ? 's' : ''} uploaded.`, 'success');
+  } catch {
+    showToast('Upload failed.', 'error');
+  }
+}
+
+function openAttachmentViewer(activityId) {
+  if (!els.attachmentViewerModal) return;
+  const activity = state.activities.find((a) => a.id === activityId);
+  const attachments = Array.isArray(activity?.attachments) ? activity.attachments : [];
+  if (els.attachmentViewerTitle) {
+    els.attachmentViewerTitle.textContent = `Attachments${activity?.name ? ` — ${activity.name}` : ''}`;
+  }
+  renderAttachmentViewerList(activityId, attachments);
+  els.attachmentViewerModal.classList.remove('hidden');
+}
+
+function renderAttachmentViewerList(activityId, attachments) {
+  if (!els.attachmentViewerList) return;
+  if (!attachments.length) {
+    els.attachmentViewerList.innerHTML = '<p class="muted-text">No files uploaded yet.</p>';
+    return;
+  }
+  els.attachmentViewerList.innerHTML = attachments.map((att) => {
+    const icon = mimeToPhosphorIcon(att.mimeType);
+    return `
+      <div class="attachment-row" data-attachment-id="${esc(att.id)}" data-activity-id="${esc(activityId)}">
+        <i class="ph-bold ${icon} file-icon" aria-hidden="true"></i>
+        <div class="attachment-meta">
+          <span class="attachment-name" title="${esc(att.filename)}">${esc(att.filename)}</span>
+          <span class="attachment-size">${esc(formatBytes(att.size))}</span>
+        </div>
+        <div class="attachment-actions">
+          <a href="/api/attachments/${esc(att.id)}" target="_blank" rel="noopener noreferrer" class="secondary" style="padding:4px 10px;font-size:.84rem;">Open</a>
+          <button class="icon-btn red" type="button" data-action="delete-attachment" title="Delete file"><i class="ph-bold ph-trash" aria-hidden="true"></i></button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function deleteAttachment(activityId, attachmentId) {
+  try {
+    const res = await apiFetch(`/api/attachments/${encodeURIComponent(attachmentId)}`, { method: 'DELETE' });
+    if (!res.ok) { showToast('Could not delete file.', 'error'); return; }
+    const activity = state.activities.find((a) => a.id === activityId);
+    if (activity) {
+      activity.attachments = (activity.attachments || []).filter((a) => a.id !== attachmentId);
+    }
+    const remaining = activity?.attachments || [];
+    renderAttachmentViewerList(activityId, remaining);
+    renderItineraryMode();
+    showToast('File deleted.', 'success');
+  } catch {
+    showToast('Could not delete file.', 'error');
+  }
+}
+
+// ── End attachment helpers ───────────────────────────────────────────
 
 async function fetchSavedItineraries() {
   try {
@@ -7172,28 +7346,43 @@ async function maybeLoadSharedItineraryFromUrl() {
 
   try {
     await loadItineraryById(itineraryId);
-    if (mode === 'execution') setViewMode('execution');
+    if (mode === 'itinerary' || mode === 'execution') setViewMode('itinerary');
     return true;
   } catch {
     const offline = loadMinimalOfflinePayload(itineraryId);
     if (!offline) return false;
 
-    if (els.executionSummary) {
-      renderExecutionSummary(offline);
+    const offlineRows = Array.isArray(offline.itineraryRows)
+      ? offline.itineraryRows
+      : (Array.isArray(offline.executionRows) ? offline.executionRows : []);
+
+    if (els.itineraryModeSummary) {
+      renderItineraryModeSummary(offline);
     }
-    if (els.executionConfirmations) {
-      renderExecutionConfirmations(offline.confirmations || []);
+    if (els.itineraryModeConfirmations) {
+      renderItineraryModeConfirmations(offline.confirmations || []);
     }
-    if (els.executionModeList) {
-      els.executionModeList.innerHTML = (offline.executionRows || []).map((row) => `
-        <article class="execution-item">
-          <div class="execution-time">${esc(row.time)} • ${esc(row.date)}</div>
-          <div class="execution-place">${esc(row.title)}${row.place ? ` — ${esc(row.place)}` : ''}</div>
-          <p class="execution-note">${esc(row.note || '')}</p>
-        </article>
-      `).join('');
+    if (els.itineraryModeList) {
+      els.itineraryModeList.innerHTML = offlineRows.map((row) => {
+        const title = row.title || '';
+        const location = row.location || row.place || '';
+        const timeLabel = row.timeLabel || row.time || '';
+        const notes = row.notes || row.note || '';
+        const refNum = row.referenceNum || '';
+        return `
+          <article class="itinerary-item">
+            <header class="itinerary-item-head">
+              <h3 class="itinerary-title">${esc(title)}</h3>
+              <time class="itinerary-time">${esc(timeLabel)} • ${esc(row.date || '')}</time>
+            </header>
+            ${location ? `<div class="itinerary-subtitle">${esc(location)}</div>` : ''}
+            ${notes ? `<p class="itinerary-notes">${esc(notes)}</p>` : ''}
+            ${refNum ? `<div class="itinerary-reference has-value"><i class="ph-bold ph-ticket"></i><span>${esc(refNum)}</span></div>` : ''}
+          </article>
+        `;
+      }).join('');
     }
-    setViewMode('execution');
+    setViewMode('itinerary');
     return true;
   }
 }
@@ -7448,7 +7637,54 @@ els.copyMinimalBtn?.addEventListener('click', copyMinimalItineraryText);
 els.saveOfflineMinimalBtn?.addEventListener('click', () => saveMinimalOfflinePayload(getMinimalPayload()));
 els.printMinimalBtn?.addEventListener('click', () => window.print());
 els.planningModeBtn?.addEventListener('click', () => setViewMode('planning'));
-els.executionModeBtn?.addEventListener('click', () => setViewMode('execution'));
+els.itineraryModeBtn?.addEventListener('click', () => setViewMode('itinerary'));
+
+// Delegated handler for itinerary item buttons
+els.itineraryModeList?.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const card = btn.closest('[data-activity-id]');
+  if (!card) return;
+  const activityId = card.dataset.activityId;
+  const action = btn.dataset.action;
+  if (action === 'upload-files') {
+    _pendingUploadActivityId = activityId;
+    if (els.attachmentFileInput) {
+      els.attachmentFileInput.value = '';
+      els.attachmentFileInput.click();
+    }
+  } else if (action === 'view-files') {
+    openAttachmentViewer(activityId);
+  }
+});
+
+// File input triggers upload
+els.attachmentFileInput?.addEventListener('change', () => {
+  const files = els.attachmentFileInput.files;
+  if (_pendingUploadActivityId && files?.length) {
+    uploadActivityAttachments(_pendingUploadActivityId, files);
+  }
+  _pendingUploadActivityId = null;
+});
+
+// Attachment viewer modal
+els.attachmentViewerClose?.addEventListener('click', () => {
+  els.attachmentViewerModal?.classList.add('hidden');
+});
+els.attachmentViewerModal?.addEventListener('click', (e) => {
+  if (e.target === els.attachmentViewerModal) els.attachmentViewerModal.classList.add('hidden');
+});
+els.attachmentViewerList?.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-action="delete-attachment"]');
+  if (!btn) return;
+  const row = btn.closest('[data-attachment-id]');
+  if (!row) return;
+  const attachmentId = row.dataset.attachmentId;
+  const activityId = row.dataset.activityId;
+  if (!attachmentId || !activityId) return;
+  deleteAttachment(activityId, attachmentId);
+});
+
 els.profileMenuBtn?.addEventListener('click', (e) => {
   e.stopPropagation();
   els.profileMenuDropdown?.classList.toggle('hidden');
@@ -7704,7 +7940,8 @@ history.replaceState({ spa: true, step: 1 }, '');
     els.calendarMetadataMode.value = state.calendarMetadataMode;
   }
   updateCalendarControls();
-  setViewMode(localStorage.getItem(VIEW_MODE_KEY) === 'execution' ? 'execution' : 'planning');
+  const savedViewMode = localStorage.getItem(VIEW_MODE_KEY);
+  setViewMode(savedViewMode === 'itinerary' || savedViewMode === 'execution' ? 'itinerary' : 'planning');
   const loadedFromShare = await maybeLoadSharedItineraryFromUrl();
   if (!loadedFromShare) renderMyTrips();
 })();
