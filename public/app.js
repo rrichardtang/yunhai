@@ -6423,11 +6423,30 @@ function setUploadBtnState(btn, stateKind) {
 }
 
 async function uploadActivityAttachments(activityId, fileList, buttonEl = null) {
-  if (!state.currentItineraryId || !activityId || !fileList?.length) {
+  if (!fileList?.length) return;
+  setUploadBtnState(buttonEl, 'loading');
+
+  if (!activityId) {
     setUploadBtnState(buttonEl, 'idle');
+    showToast('Could not identify activity. Please refresh and try again.', 'error');
     return;
   }
-  setUploadBtnState(buttonEl, 'loading');
+
+  if (!state.currentItineraryId) {
+    try {
+      await generateItinerary();
+    } catch {
+      setUploadBtnState(buttonEl, 'idle');
+      showToast('Save your trip first, then upload files.', 'error');
+      return;
+    }
+    if (!state.currentItineraryId) {
+      setUploadBtnState(buttonEl, 'idle');
+      showToast('Save your trip first, then upload files.', 'error');
+      return;
+    }
+  }
+
   const formData = new FormData();
   for (const f of fileList) formData.append('files', f);
   try {
@@ -6435,9 +6454,17 @@ async function uploadActivityAttachments(activityId, fileList, buttonEl = null) 
       `/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/activity/${encodeURIComponent(activityId)}/attachments`,
       { method: 'POST', body: formData }
     );
+    if (res.status === 401) { setUploadBtnState(buttonEl, 'idle'); showToast('Sign in to upload files.', 'error'); return; }
+    if (res.status === 404) { setUploadBtnState(buttonEl, 'idle'); showToast('Activity not found on the server. Try saving the trip again.', 'error'); return; }
     if (res.status === 413) { setUploadBtnState(buttonEl, 'idle'); showToast('File exceeds 10 MB limit.', 'error'); return; }
     if (res.status === 415) { setUploadBtnState(buttonEl, 'idle'); showToast('Unsupported file type.', 'error'); return; }
-    if (!res.ok) { setUploadBtnState(buttonEl, 'idle'); showToast('Upload failed.', 'error'); return; }
+    if (!res.ok) {
+      setUploadBtnState(buttonEl, 'idle');
+      let msg = 'Upload failed.';
+      try { const j = await res.json(); if (j?.error) msg = `Upload failed: ${j.error}`; } catch {}
+      showToast(msg, 'error');
+      return;
+    }
     const data = await res.json();
     const added = Array.isArray(data?.attachments) ? data.attachments : [];
     const activity = state.activities.find((a) => a.id === activityId);
@@ -6446,9 +6473,9 @@ async function uploadActivityAttachments(activityId, fileList, buttonEl = null) 
     }
     setUploadBtnState(buttonEl, 'success');
     setTimeout(() => renderItineraryMode(), 1000);
-  } catch {
+  } catch (err) {
     setUploadBtnState(buttonEl, 'idle');
-    showToast('Upload failed.', 'error');
+    showToast(`Upload failed: ${err?.message || 'network error'}`, 'error');
   }
 }
 
