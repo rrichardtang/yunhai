@@ -3016,6 +3016,9 @@ function renderPreferencesModal() {
     els.deleteProfileBtn.disabled = false;
   }
 
+  const titleEl = document.getElementById('prefsModalTitle');
+  if (titleEl) titleEl.textContent = `${activeProfile.name || 'My Profile'}'s Traveler Profile`;
+
   const profile = state.profile;
 
   const dotsHtml = (active, key) => {
