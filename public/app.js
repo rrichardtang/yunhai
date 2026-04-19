@@ -6773,36 +6773,27 @@ async function loadItineraryById(id) {
       ? itinerary.days.map((day) => ({ id: day.id || `${day.city}-${day.date}`, city: day.city, date: day.date }))
       : [];
 
-    const activities = [];
-    const reviewed = {};
-    const placements = {};
-    (itinerary.days || []).forEach((day) => {
-      (day.activities || []).forEach((activity) => {
-        const normalizedActivity = normalizeActivityMetadata(activity);
-        const idValue = normalizedActivity.id || uid();
-        activities.push({ ...normalizedActivity, id: idValue });
-        reviewed[idValue] = { approved: true, notes: activity.notes || '' };
-        placements[idValue] = { dayId: day.id || `${day.city}-${day.date}`, time: parseTimeTo24(activity.time || activity.suggested_time || typeToTime(activity.type)) };
+    if (Array.isArray(itinerary.activities) && itinerary.activities.length) {
+      state.activities = itinerary.activities.map((a) => normalizeActivityMetadata(a));
+      state.reviewed = itinerary.reviewed || {};
+      state.placements = itinerary.placements || {};
+    } else {
+      const activities = [];
+      const reviewed = {};
+      const placements = {};
+      (itinerary.days || []).forEach((day) => {
+        (day.activities || []).forEach((activity) => {
+          const normalizedActivity = normalizeActivityMetadata(activity);
+          const idValue = normalizedActivity.id || uid();
+          activities.push({ ...normalizedActivity, id: idValue });
+          reviewed[idValue] = { approved: true, notes: activity.notes || '' };
+          placements[idValue] = { dayId: day.id || `${day.city}-${day.date}`, time: parseTimeTo24(activity.time || activity.suggested_time || typeToTime(activity.type)) };
+        });
       });
-    });
-    (itinerary.unplacedActivities || []).forEach((activity) => {
-      const normalizedActivity = normalizeActivityMetadata(activity);
-      const idValue = normalizedActivity.id || uid();
-      activities.push({ ...normalizedActivity, id: idValue });
-      reviewed[idValue] = { approved: true, notes: activity.notes || '' };
-      placements[idValue] = { dayId: null, time: parseTimeTo24(activity.time || activity.suggested_time || typeToTime(activity.type)) };
-    });
-    (itinerary.pendingActivities || []).forEach((activity) => {
-      const normalizedActivity = normalizeActivityMetadata(activity);
-      const idValue = normalizedActivity.id || uid();
-      activities.push({ ...normalizedActivity, id: idValue });
-      reviewed[idValue] = activity.reviewState || { approved: false, notes: '' };
-      placements[idValue] = { dayId: null, time: parseTimeTo24(activity.suggested_time || typeToTime(activity.type)) };
-    });
-
-    state.activities = activities;
-    state.reviewed = reviewed;
-    state.placements = placements;
+      state.activities = activities;
+      state.reviewed = reviewed;
+      state.placements = placements;
+    }
     hydrateTravelIntoCities();
     renderCities();
     state.lastPlannedFingerprint = step1Fingerprint();
@@ -6997,17 +6988,10 @@ async function generateItinerary() {
     time: state.placements[a.id]?.time || parseTimeTo24(a.suggested_time || typeToTime(a.type))
   }));
 
-  const validDayIds = new Set(state.days.map((d) => d.id));
   const byDay = state.days.map((d) => ({
     ...d,
     activities: arranged.filter((a) => a.dayId === d.id).sort((x,y) => x.order - y.order)
   }));
-  const unplacedActivities = arranged.filter((a) => !a.dayId || !validDayIds.has(a.dayId));
-  const placedIds = new Set(byDay.flatMap((d) => d.activities.map((a) => a.id)));
-  const unplacedIds = new Set(unplacedActivities.map((a) => a.id));
-  const pendingActivities = state.activities
-    .filter((a) => !placedIds.has(a.id) && !unplacedIds.has(a.id))
-    .map((a) => ({ ...a, reviewState: state.reviewed[a.id] || null }));
 
   const payload = {
     tripName: state.tripName,
@@ -7017,8 +7001,9 @@ async function generateItinerary() {
     cities: state.cities,
     travels: state.travels,
     days: byDay,
-    unplacedActivities,
-    pendingActivities,
+    activities: state.activities,
+    placements: state.placements,
+    reviewed: state.reviewed,
     confidence: {
       checklist: state.confidenceChecklist,
       notificationPrefs: state.confidenceNotificationPrefs,
@@ -7460,7 +7445,12 @@ function saveSnapshot() {
         tripBudget: state.tripBudget,
         numTravelers: state.numTravelers,
         numChildren: state.numChildren,
-        cities: state.cities
+        cities: state.cities,
+        travels: state.travels,
+        activities: state.activities,
+        placements: state.placements,
+        reviewed: state.reviewed,
+        days: state.days
       })
     }).catch(() => {});
   }
