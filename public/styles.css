@@ -177,29 +177,33 @@ h1, h2, h3, h4, h5, h6 {
 }
 .itinerary-mode-summary-card p { margin: 0; font-weight: 700; color: var(--text); }
 
-.itinerary-mode-confirmations-panel {
-  border: 1px solid var(--secondary-light);
-  border-radius: 14px;
-  padding: 14px;
-  background: var(--base-light);
-  margin-bottom: 10px;
-  box-shadow: var(--shadow-sm);
+.itinerary-mode-list { display: flex; flex-direction: column; gap: 18px; }
+.itinerary-city-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-.itinerary-mode-confirmations-panel h3 { margin: 0 0 8px; font-size: 1rem; }
-.itinerary-mode-confirmations { display: grid; gap: 6px; }
-.itinerary-mode-confirmation-item {
-  border: 1px solid var(--secondary-light);
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: var(--base-light);
-}
-.itinerary-mode-confirmation-item p { margin: 2px 0; font-size: .9rem; }
-
-.itinerary-mode-list { display: flex; flex-direction: column; gap: 10px; }
-.itinerary-mode-day-group h3 {
-  margin: 12px 0 6px;
-  font-size: 1rem;
+.itinerary-city-title {
+  margin: 4px 0 2px;
+  font-size: 1.35rem;
+  font-weight: 800;
   color: var(--heading);
+  letter-spacing: -0.01em;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--secondary-light);
+}
+.itinerary-city-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.itinerary-block-head {
+  margin: 6px 0 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .itinerary-item {

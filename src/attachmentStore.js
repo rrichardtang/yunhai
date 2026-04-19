@@ -131,12 +131,12 @@ function getAttachmentFile({ userId, attachmentId }) {
   };
 }
 
-function listAttachments({ userId, activityId }) {
+function listAttachments({ userId, activityId, itineraryId }) {
   const manifest = readManifest(userId);
-  const filtered = activityId
-    ? manifest.filter((e) => e.activityId === String(activityId))
-    : manifest;
-  return filtered.map(publicEntry);
+  return manifest
+    .filter((e) => (activityId ? e.activityId === String(activityId) : true))
+    .filter((e) => (itineraryId ? e.itineraryId === String(itineraryId) : true))
+    .map(publicEntry);
 }
 
 function deleteAttachment({ userId, attachmentId }) {
