@@ -15,6 +15,7 @@ const state = {
   itinerary: null,
   currentItineraryId: null,
   savedItineraries: [],
+  attachmentsByItem: {},
   commutes: {},
   arrangeCity: null,
   chatSessionId: '',
@@ -142,7 +143,6 @@ const els = {
   itineraryModeView: document.getElementById('itineraryModeView'),
   itineraryModeList: document.getElementById('itineraryModeList'),
   itineraryModeSummary: document.getElementById('itineraryModeSummary'),
-  itineraryModeConfirmations: document.getElementById('itineraryModeConfirmations'),
   attachmentViewerModal: document.getElementById('attachmentViewerModal'),
   attachmentViewerTitle: document.getElementById('attachmentViewerTitle'),
   attachmentViewerList: document.getElementById('attachmentViewerList'),
@@ -6107,6 +6107,34 @@ function getActivityReferenceNum(activityId) {
   return match ? String(match.referenceNum || '').trim() : '';
 }
 
+function getItemAttachments(itemId) {
+  const list = state.attachmentsByItem?.[itemId];
+  return Array.isArray(list) ? list : [];
+}
+
+function setItemAttachments(itemId, list) {
+  if (!state.attachmentsByItem) state.attachmentsByItem = {};
+  state.attachmentsByItem[itemId] = Array.isArray(list) ? list : [];
+}
+
+function formatDateShort(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return String(dateStr);
+  return `${d.toLocaleString('en-US', { month: 'short' })} ${d.getDate()}`;
+}
+
+function formatDateTimeLabel(dateStr, timeStr) {
+  const date = formatDateShort(dateStr);
+  if (!timeStr) return date;
+  const [h, m] = String(timeStr).split(':').map(Number);
+  if (!Number.isFinite(h)) return date;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = (h % 12) || 12;
+  const timeFmt = `${h12}:${String(m || 0).padStart(2, '0')} ${ampm}`;
+  return date ? `${date}, ${timeFmt}` : timeFmt;
+}
+
 function getItineraryRows() {
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
   return approved
@@ -6125,7 +6153,6 @@ function getItineraryRows() {
         : '';
       const notes = String(state.reviewed[activity.id]?.notes || '').trim();
       const referenceNum = getActivityReferenceNum(activity.id);
-      const attachments = Array.isArray(activity.attachments) ? activity.attachments : [];
 
       return {
         id: activity.id,
@@ -6138,7 +6165,7 @@ function getItineraryRows() {
         notes,
         referenceNum,
         navigateHref,
-        fileCount: attachments.length
+        fileCount: getItemAttachments(activity.id).length
       };
     })
     .filter(Boolean)
@@ -6147,6 +6174,66 @@ function getItineraryRows() {
       const bKey = `${b.date}T${parseTimeTo24(b.startTime)}`;
       return new Date(aKey).getTime() - new Date(bKey).getTime();
     });
+}
+
+function buildNavigateHref(location) {
+  return location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}` : '';
+}
+
+function getCityAccomTravelRows(city, cityIdx) {
+  const rows = [];
+  const logistics = city?.logistics || {};
+  const accommodation = city?.accommodation || {};
+  const logAcc = logistics.accommodation || {};
+  const arrival = logistics.arrival || {};
+  const departure = logistics.departure || {};
+
+  const address = String(accommodation.address || '').trim();
+  if (address || logAcc.checkIn || logAcc.checkOut) {
+    const inFmt = formatDateShort(logAcc.checkIn);
+    const outFmt = formatDateShort(logAcc.checkOut);
+    const timeLabel = [inFmt, outFmt].filter(Boolean).join(' → ');
+    rows.push({
+      id: `acc_${cityIdx}`,
+      title: address || 'Accommodation',
+      timeLabel,
+      location: '',
+      notes: '',
+      referenceNum: '',
+      navigateHref: buildNavigateHref(address),
+      fileCount: getItemAttachments(`acc_${cityIdx}`).length
+    });
+  }
+
+  if (arrival.location || arrival.date || arrival.time) {
+    const loc = String(arrival.location || '').trim();
+    rows.push({
+      id: `arr_${cityIdx}`,
+      title: loc ? `Arrival: ${loc}` : 'Arrival',
+      timeLabel: formatDateTimeLabel(arrival.date, arrival.time),
+      location: '',
+      notes: '',
+      referenceNum: '',
+      navigateHref: buildNavigateHref(loc),
+      fileCount: getItemAttachments(`arr_${cityIdx}`).length
+    });
+  }
+
+  if (departure.location || departure.date || departure.time) {
+    const loc = String(departure.location || '').trim();
+    rows.push({
+      id: `dep_${cityIdx}`,
+      title: loc ? `Departure: ${loc}` : 'Departure',
+      timeLabel: formatDateTimeLabel(departure.date, departure.time),
+      location: '',
+      notes: '',
+      referenceNum: '',
+      navigateHref: buildNavigateHref(loc),
+      fileCount: getItemAttachments(`dep_${cityIdx}`).length
+    });
+  }
+
+  return rows;
 }
 
 function getConsolidatedConfirmations() {
@@ -6300,21 +6387,6 @@ function renderItineraryModeSummary(payload) {
   `;
 }
 
-function renderItineraryModeConfirmations(confirmations = []) {
-  if (!els.itineraryModeConfirmations) return;
-  if (!confirmations.length) {
-    els.itineraryModeConfirmations.innerHTML = '<p class="muted-text">No confirmations captured yet.</p>';
-    return;
-  }
-
-  els.itineraryModeConfirmations.innerHTML = confirmations.map((row) => `
-    <article class="itinerary-mode-confirmation-item">
-      <p><strong>${esc(row.type)}:</strong> ${esc(row.title || '—')}</p>
-      <p class="muted-text">${esc([row.city, row.meta].filter(Boolean).join(' • '))}</p>
-    </article>
-  `).join('');
-}
-
 function renderItineraryItemCard(row) {
   const hasRef = Boolean(row.referenceNum);
   const refText = hasRef ? row.referenceNum : 'No reference #';
@@ -6353,26 +6425,67 @@ function renderItineraryMode() {
   const payload = getMinimalPayload();
   const rows = payload.itineraryRows;
   renderItineraryModeSummary(payload);
-  renderItineraryModeConfirmations(payload.confirmations);
 
-  if (!rows.length) {
+  const cityOrder = [];
+  const cityIdxByName = new Map();
+  (state.cities || []).forEach((city, idx) => {
+    const name = String(city?.name || '').trim();
+    if (!name || cityIdxByName.has(name)) return;
+    cityIdxByName.set(name, idx);
+    cityOrder.push(name);
+  });
+  rows.forEach((row) => {
+    if (!cityIdxByName.has(row.city)) {
+      cityIdxByName.set(row.city, cityIdxByName.size);
+      cityOrder.push(row.city);
+    }
+  });
+
+  if (!cityOrder.length) {
     els.itineraryModeList.innerHTML = '<p class="muted-text">No scheduled itinerary yet. Build your plan in Planning Mode first.</p>';
     return;
   }
 
-  const groups = rows.reduce((acc, row) => {
-    const key = `${row.date}__${row.city}`;
-    if (!acc[key]) acc[key] = { date: row.date, city: row.city, items: [] };
-    acc[key].items.push(row);
+  const rowsByCity = rows.reduce((acc, row) => {
+    (acc[row.city] = acc[row.city] || []).push(row);
     return acc;
   }, {});
 
-  els.itineraryModeList.innerHTML = Object.values(groups).map((group) => `
-    <section class="itinerary-mode-day-group">
-      <h3>${esc(group.date)} • ${esc(group.city)}</h3>
-      ${group.items.map(renderItineraryItemCard).join('')}
-    </section>
-  `).join('');
+  const html = cityOrder.map((cityName) => {
+    const cityIdx = cityIdxByName.get(cityName);
+    const cityObj = (state.cities || []).find((c) => String(c?.name || '').trim() === cityName) || {};
+    const accomTravelRows = getCityAccomTravelRows(cityObj, cityIdx);
+    const cityRows = rowsByCity[cityName] || [];
+    const dayGroups = cityRows.reduce((acc, row) => {
+      (acc[row.date] = acc[row.date] || []).push(row);
+      return acc;
+    }, {});
+    const dayOrder = Object.keys(dayGroups).sort();
+
+    const accomTravelHtml = accomTravelRows.length
+      ? `<section class="itinerary-city-block">
+          <h4 class="itinerary-block-head">Accommodation &amp; Travel</h4>
+          ${accomTravelRows.map(renderItineraryItemCard).join('')}
+        </section>`
+      : '';
+
+    const daysHtml = dayOrder.map((date) => `
+      <section class="itinerary-city-block">
+        <h4 class="itinerary-block-head">${esc(formatDateShort(date))}</h4>
+        ${dayGroups[date].map(renderItineraryItemCard).join('')}
+      </section>
+    `).join('');
+
+    return `
+      <section class="itinerary-city-group">
+        <h3 class="itinerary-city-title">${esc(cityName)}</h3>
+        ${accomTravelHtml}
+        ${daysHtml}
+      </section>
+    `;
+  }).join('');
+
+  els.itineraryModeList.innerHTML = html;
 }
 
 function setViewMode(mode = 'planning') {
@@ -6383,7 +6496,12 @@ function setViewMode(mode = 'planning') {
   document.body.classList.toggle('itinerary-mode', resolved === 'itinerary');
   if (els.planningModeBtn) els.planningModeBtn.classList.toggle('active', resolved === 'planning');
   if (els.itineraryModeBtn) els.itineraryModeBtn.classList.toggle('active', resolved === 'itinerary');
-  if (resolved === 'itinerary') renderItineraryMode();
+  if (resolved === 'itinerary') {
+    renderItineraryMode();
+    if (state.currentItineraryId) {
+      hydrateAttachmentsForItinerary(state.currentItineraryId).then(() => renderItineraryMode());
+    }
+  }
 }
 
 // ── Attachment helpers ───────────────────────────────────────────────
@@ -6467,10 +6585,7 @@ async function uploadActivityAttachments(activityId, fileList, buttonEl = null) 
     }
     const data = await res.json();
     const added = Array.isArray(data?.attachments) ? data.attachments : [];
-    const activity = state.activities.find((a) => a.id === activityId);
-    if (activity) {
-      activity.attachments = [...(activity.attachments || []), ...added];
-    }
+    setItemAttachments(activityId, [...getItemAttachments(activityId), ...added]);
     setUploadBtnState(buttonEl, 'success');
     setTimeout(() => renderItineraryMode(), 1000);
   } catch (err) {
@@ -6481,8 +6596,8 @@ async function uploadActivityAttachments(activityId, fileList, buttonEl = null) 
 
 function openAttachmentViewer(activityId) {
   if (!els.attachmentViewerModal) return;
+  const attachments = getItemAttachments(activityId);
   const activity = state.activities.find((a) => a.id === activityId);
-  const attachments = Array.isArray(activity?.attachments) ? activity.attachments : [];
   if (els.attachmentViewerTitle) {
     els.attachmentViewerTitle.textContent = `Attachments${activity?.name ? ` — ${activity.name}` : ''}`;
   }
@@ -6518,16 +6633,32 @@ async function deleteAttachment(activityId, attachmentId) {
   try {
     const res = await apiFetch(`/api/attachments/${encodeURIComponent(attachmentId)}`, { method: 'DELETE' });
     if (!res.ok) { showToast('Could not delete file.', 'error'); return; }
-    const activity = state.activities.find((a) => a.id === activityId);
-    if (activity) {
-      activity.attachments = (activity.attachments || []).filter((a) => a.id !== attachmentId);
-    }
-    const remaining = activity?.attachments || [];
+    const remaining = getItemAttachments(activityId).filter((a) => a.id !== attachmentId);
+    setItemAttachments(activityId, remaining);
     renderAttachmentViewerList(activityId, remaining);
     renderItineraryMode();
     showToast('File deleted.', 'success');
   } catch {
     showToast('Could not delete file.', 'error');
+  }
+}
+
+async function hydrateAttachmentsForItinerary(itineraryId) {
+  if (!itineraryId) return;
+  try {
+    const res = await apiFetch(`/api/itinerary/${encodeURIComponent(itineraryId)}/attachments`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const attachments = Array.isArray(data?.attachments) ? data.attachments : [];
+    const grouped = {};
+    for (const att of attachments) {
+      const key = String(att.activityId || '');
+      if (!key) continue;
+      (grouped[key] = grouped[key] || []).push(att);
+    }
+    state.attachmentsByItem = grouped;
+  } catch {
+    // non-fatal
   }
 }
 
@@ -6659,6 +6790,7 @@ async function loadItineraryById(id) {
     renderSavedItineraries();
     ensureChatSessionId();
     await restoreChatHistory();
+    await hydrateAttachmentsForItinerary(state.currentItineraryId);
     setStep(4);
   } catch {
     showToast('Could not load itinerary.', 'error');
@@ -7408,9 +7540,6 @@ async function maybeLoadSharedItineraryFromUrl() {
 
     if (els.itineraryModeSummary) {
       renderItineraryModeSummary(offline);
-    }
-    if (els.itineraryModeConfirmations) {
-      renderItineraryModeConfirmations(offline.confirmations || []);
     }
     if (els.itineraryModeList) {
       els.itineraryModeList.innerHTML = offlineRows.map((row) => {

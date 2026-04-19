@@ -1682,6 +1682,15 @@ app.get('/api/itinerary/:itineraryId/activity/:activityId/attachments', (req, re
   return res.json({ attachments });
 });
 
+app.get('/api/itinerary/:itineraryId/attachments', (req, res) => {
+  const userId = parseUserId(getAuthedUserId(req));
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const itinerary = getItineraryById(req.params.itineraryId, userId);
+  if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
+  const attachments = listAttachmentsForActivity({ userId, itineraryId: req.params.itineraryId });
+  return res.json({ attachments });
+});
+
 app.get('/api/attachments/:attachmentId', (req, res) => {
   const userId = parseUserId(getAuthedUserId(req));
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
