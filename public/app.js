@@ -7233,7 +7233,7 @@ function showRegenerateConfirmDialog() {
     if (existing) existing.remove();
 
     const allCityNames = state.cities.map((c) => c.name);
-    const lockedSet = new Set();
+    const prevBudgetOptState = budgetOptState;
 
     const dialog = document.createElement('div');
     dialog.id = 'regenerateConfirmDialog';
@@ -7242,44 +7242,14 @@ function showRegenerateConfirmDialog() {
     refreshOverlayInterlocks();
 
     const cleanup = (result) => {
+      budgetOptState = prevBudgetOptState;
+      document.querySelector('.opt-card-expand-overlay')?.remove();
       dialog.remove();
       refreshOverlayInterlocks();
       resolve(result);
     };
 
     dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(null); });
-
-    function buildRegenLockCard(a) {
-      const cardEl = document.createElement('article');
-      cardEl.className = 'card opt-card';
-      cardEl.style.minHeight = 'unset';
-      cardEl.dataset.activityId = a.id;
-      const meta = [a.type, a.suggested_time].filter(Boolean).join(' · ');
-      cardEl.innerHTML = `
-        <button class="opt-lock-btn" type="button" aria-label="Lock activity">
-          <i class="ph-bold ph-lock-open" aria-hidden="true"></i>
-        </button>
-        <div class="card-content" style="padding-right:52px">
-          <h3 style="font-size:.9rem;margin:0 0 3px;line-height:1.3">${esc(a.name)}</h3>
-          ${meta ? `<p style="margin:0;font-size:.78rem;opacity:.65">${esc(meta)}</p>` : ''}
-        </div>`;
-      const lockBtn = cardEl.querySelector('.opt-lock-btn');
-      lockBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (lockedSet.has(a.id)) {
-          lockedSet.delete(a.id);
-          cardEl.classList.remove('opt-card--locked');
-          lockBtn.innerHTML = '<i class="ph-bold ph-lock-open" aria-hidden="true"></i>';
-          lockBtn.setAttribute('aria-label', 'Lock activity');
-        } else {
-          lockedSet.add(a.id);
-          cardEl.classList.add('opt-card--locked');
-          lockBtn.innerHTML = '<i class="ph-bold ph-lock-key" aria-hidden="true"></i>';
-          lockBtn.setAttribute('aria-label', 'Unlock activity');
-        }
-      });
-      return cardEl;
-    }
 
     function renderPhase1(prevSelected = null) {
       const cityCheckboxes = allCityNames.map((name, i) => `
@@ -7318,6 +7288,11 @@ function showRegenerateConfirmDialog() {
     }
 
     function renderPhase2(selectedCities, citiesWithActivities) {
+      // Borrow budgetOptState so buildBudgetOptCard works as-is; start all unlocked
+      budgetOptState = { lockedIds: new Set(), refinements: new Map(), choiceIsRefined: new Map(), inFlight: false };
+
+      const allActivities = citiesWithActivities.flatMap((cn) => state.activities.filter((a) => a.city === cn));
+
       const card = document.createElement('div');
       card.className = 'modal-card';
       card.style.cssText = 'max-width:560px;gap:16px';
@@ -7335,8 +7310,9 @@ function showRegenerateConfirmDialog() {
         const section = document.createElement('section');
         section.innerHTML = `<h4 style="font-size:.9rem;font-weight:700;margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--secondary-light)">${esc(cn)}</h4>`;
         const grid = document.createElement('div');
-        grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px';
-        state.activities.filter((a) => a.city === cn).forEach((a) => grid.appendChild(buildRegenLockCard(a)));
+        grid.className = 'budget-opt-grid cards-grid';
+        state.activities.filter((a) => a.city === cn)
+          .forEach((a) => grid.appendChild(buildBudgetOptCard(a, 'lock', allActivities)));
         section.appendChild(grid);
         sectionsWrap.appendChild(section);
       });
@@ -7344,14 +7320,11 @@ function showRegenerateConfirmDialog() {
       dialog.innerHTML = '';
       dialog.appendChild(card);
 
-      card.querySelector('#regenBack').addEventListener('click', () => {
-        lockedSet.clear();
-        renderPhase1(selectedCities);
-      });
+      card.querySelector('#regenBack').addEventListener('click', () => renderPhase1(selectedCities));
       card.querySelector('#regenConfirm').addEventListener('click', () => {
         const lockedByCity = {};
         selectedCities.forEach((cn) => {
-          const locked = state.activities.filter((a) => a.city === cn && lockedSet.has(a.id));
+          const locked = state.activities.filter((a) => a.city === cn && budgetOptState.lockedIds.has(a.id));
           if (locked.length) lockedByCity[cn] = locked;
         });
         cleanup({ cities: selectedCities, lockedByCity });
