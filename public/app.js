@@ -189,7 +189,9 @@ const els = {
 const SNAPSHOT_KEY = 'travelplanner_snapshot';
 const VIEW_MODE_KEY = 'travelplanner_view_mode_v1';
 const MINIMAL_OFFLINE_KEY = 'travelplanner_minimal_offline_v1';
-const GEO_CACHE_KEY = 'travelplanner_geo_cache_v1';
+const GEO_CACHE_KEY = 'travelplanner_geo_cache_v2';
+const PLACES_CACHE_KEY = 'travelplanner_places_cache_v1';
+const PLACES_CACHE_MAX = 500;
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s='') => s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalizeCity = (str = '') => String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -257,19 +259,152 @@ function geocodeQueryQueued(query) {
   return geocodeQueue.catch(() => null);
 }
 
+const MEAL_PREFIX_RE = /^(Lunch|Dinner|Breakfast|Brunch|Drinks|Coffee|Visit)\s+at\s+/i;
+
+function stripMealPrefix(name = '') {
+  return String(name || '').replace(MEAL_PREFIX_RE, '').replace(/^Visit\s+/i, '').trim();
+}
+
+function priceLevelBadge(level) {
+  if (typeof level !== 'number' || level < 0 || level > 4) return '';
+  if (level === 0) return 'Free';
+  return '$'.repeat(level);
+}
+
+const PRICE_LEVEL_USD = { 0: 0, 1: 15, 2: 40, 3: 90, 4: 200 };
+
+function representativeCostUsd(activity = {}) {
+  const type = String(activity?.type || '').toLowerCase();
+  const bookingType = String(activity?.booking_type || '').toLowerCase();
+  const mealTypes = ['food', 'breakfast', 'lunch', 'dinner'];
+  if (mealTypes.includes(type) || bookingType === 'restaurant') {
+    const lvl = activity?.price_level;
+    if (typeof lvl === 'number' && PRICE_LEVEL_USD[lvl] != null) return PRICE_LEVEL_USD[lvl];
+    return null;
+  }
+  if (bookingType === 'tour' || type === 'tour') return 75;
+  if (bookingType === 'attraction' || type === 'cultural' || type === 'sports') return 25;
+  if (type === 'show') return 80;
+  return null;
+}
+
+function getGetYourGuideLink(activity = {}) {
+  const links = Array.isArray(activity?.booking_links) ? activity.booking_links : [];
+  return links.find((l) => /getyourguide/i.test(l?.site || '')) || links.find((l) => /viator/i.test(l?.site || '')) || null;
+}
+
+function renderActivityCostCell(activity = {}, { userBudget = null } = {}) {
+  if (userBudget != null && Number.isFinite(Number(userBudget))) {
+    return `$${Math.round(Number(userBudget)).toLocaleString()}`;
+  }
+  const bookingType = String(activity?.booking_type || '').toLowerCase();
+  if (bookingType === 'tour' || bookingType === 'attraction') {
+    const link = getGetYourGuideLink(activity);
+    if (link?.url) return `<a href="${esc(link.url)}" target="_blank" rel="noopener" class="booking-link">Price on ${esc(link.site || 'GetYourGuide')} →</a>`;
+  }
+  const badge = priceLevelBadge(activity?.price_level);
+  if (badge) return `<span class="price-level-badge">${esc(badge)}</span>`;
+  return '';
+}
+
+function loadPlacesCache() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PLACES_CACHE_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+const placesCache = loadPlacesCache();
+
+function persistPlacesCache() {
+  try {
+    const keys = Object.keys(placesCache);
+    if (keys.length > PLACES_CACHE_MAX) {
+      const overflow = keys.length - PLACES_CACHE_MAX;
+      for (let i = 0; i < overflow; i += 1) delete placesCache[keys[i]];
+    }
+    localStorage.setItem(PLACES_CACHE_KEY, JSON.stringify(placesCache));
+  } catch {}
+}
+
+function placesKey(q, city) {
+  return `${String(q || '').trim().toLowerCase()}|${String(city || '').trim().toLowerCase()}`;
+}
+
+async function resolvePlace(activity = {}, cityName = '') {
+  const city = String(cityName || activity.city || '').trim();
+  const venue = String(activity.venue_name || '').trim();
+  const stripped = stripMealPrefix(activity.name || '');
+  const query = venue || (stripped ? `${stripped}${city ? `, ${city}` : ''}` : '');
+  if (!query) return null;
+
+  const key = placesKey(query, city);
+  if (placesCache[key]) {
+    const hit = placesCache[key];
+    return hit && hit.lat != null ? hit : null;
+  }
+
+  try {
+    const url = `/api/places/resolve?q=${encodeURIComponent(query)}&city=${encodeURIComponent(city)}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.error) return null;
+    if (!data || data.lat == null || data.lng == null) {
+      placesCache[key] = { placeId: null };
+      persistPlacesCache();
+      return null;
+    }
+    const value = {
+      lat: Number(data.lat),
+      lng: Number(data.lng),
+      placeId: data.placeId || null,
+      priceLevel: typeof data.priceLevel === 'number' ? data.priceLevel : null,
+      rating: typeof data.rating === 'number' ? data.rating : null,
+      label: data.formattedAddress || data.name || query
+    };
+    placesCache[key] = value;
+    persistPlacesCache();
+    return value;
+  } catch {
+    return null;
+  }
+}
+
 async function geocodeActivity(activity = {}) {
   const name = String(activity.name || '').trim();
   const city = String(activity.city || '').trim();
-  const specific = [activity.start_location, activity.end_location, activity.location]
-    .map((x) => String(x || '').trim()).filter(Boolean);
-  const fallbacks = [[name, city].filter(Boolean).join(', '), city].filter(Boolean);
 
-  // Cache-hit only on specific fields — fallbacks are shared across activities and cause stale hits
-  for (const candidate of specific) {
+  const place = await resolvePlace(activity, city);
+  if (place && Number.isFinite(place.lat) && Number.isFinite(place.lng)) {
+    activity.place_id = place.placeId || activity.place_id || null;
+    activity.place_lat = place.lat;
+    activity.place_lng = place.lng;
+    if (place.priceLevel != null) activity.price_level = place.priceLevel;
+    if (place.rating != null) activity.google_rating = place.rating;
+    return { lat: place.lat, lng: place.lng, label: place.label };
+  }
+
+  const venue = String(activity.venue_name || '').trim();
+  const strippedName = stripMealPrefix(name);
+  const candidates = [
+    venue,
+    strippedName && city ? `${strippedName}, ${city}` : '',
+    activity.start_location && city ? `${String(activity.start_location).trim()}, ${city}` : String(activity.start_location || '').trim(),
+    activity.end_location && city ? `${String(activity.end_location).trim()}, ${city}` : String(activity.end_location || '').trim(),
+    name && city ? `${name}, ${city}` : '',
+    city
+  ].map((x) => String(x || '').trim()).filter(Boolean);
+  const seen = new Set();
+  const ordered = candidates.filter((c) => { const k = c.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+
+  for (const candidate of ordered) {
     const cached = geocodeCache[geocodeKey(candidate)];
     if (cached?.lat != null && cached?.lng != null) return cached;
   }
-  for (const candidate of [...specific, ...fallbacks]) {
+  for (const candidate of ordered) {
     const result = await geocodeQueryQueued(candidate);
     if (result?.lat != null && result?.lng != null) return result;
   }
@@ -1392,11 +1527,11 @@ function buildChecklistFromState() {
     const time = day ? parseTimeTo24(placement.time || a.suggested_time || typeToTime(a.type)) : '';
     const notes = String(state.reviewed[a.id]?.notes || '').trim();
     const activityEstimatedCost = (() => {
-      if (a.estimated_cost_usd === null || a.estimated_cost_usd === undefined) return null;
-      if (a.cost_type === 'per_group') return Number(a.estimated_cost_usd);
+      const perPerson = representativeCostUsd(a);
+      if (perPerson == null) return null;
       const adults = state.numTravelers || 1;
       const children = state.numChildren || 0;
-      return Number(a.estimated_cost_usd) * adults + Number(a.estimated_cost_usd) * 0.6 * children;
+      return perPerson * adults + perPerson * 0.6 * children;
     })();
     const item = normalizeChecklistItem({
       type: 'activity',
@@ -3697,28 +3832,11 @@ function buildBudgetOptCard(a, mode, approved) {
   cardEl.className = `card activity-card opt-card${isLocked ? ' opt-card--locked' : ''}`;
   cardEl.dataset.activityId = a.id;
 
-  const computeTotalCost = (act) => {
-    const cost = act.estimated_cost_usd;
-    if (cost == null) return null;
-    const adults = state.numTravelers || 1;
-    const children = state.numChildren || 0;
-    if (act.cost_type === 'per_group') return cost;
-    return cost * adults + Math.round(cost * 0.6 * children);
-  };
-
-  const costHtml = (act) => {
-    const cost = act.estimated_cost_usd;
-    if (cost == null) return 'No estimate';
-    const adults = state.numTravelers || 1;
-    const children = state.numChildren || 0;
-    if (act.cost_type === 'per_group') return `$${cost} (group)`;
-    const total = cost * adults + Math.round(cost * 0.6 * children);
-    return adults + children > 1 ? `$${cost} × ${adults} = $${total}` : `$${cost} per person`;
-  };
+  const costHtml = (act) => renderActivityCostCell(act) || '—';
 
   const faceHtml = (act, label) => {
-    const total = computeTotalCost(act);
-    const costChip = total != null ? `<span class="opt-cost-chip">$${Math.round(total).toLocaleString()}</span>` : '';
+    const badge = priceLevelBadge(act?.price_level);
+    const costChip = badge ? `<span class="opt-cost-chip">${esc(badge)}</span>` : '';
     return `
     <div class="opt-card-img-wrap">
       <img src="${esc(act.imageUrl || '')}" alt="${esc(act.name)}" loading="lazy" style="width:100%;height:160px;object-fit:cover;border-radius:12px 12px 0 0;" />
@@ -3796,18 +3914,7 @@ function openOptCardExpand(act, label) {
 
   const body = document.createElement('div');
   body.className = 'card-expand-body';
-  const adults = state.numTravelers || 1;
-  const children = state.numChildren || 0;
-  const cost = act.estimated_cost_usd;
-  let costDisplay = 'No estimate';
-  if (cost != null) {
-    if (act.cost_type === 'per_group') {
-      costDisplay = `$${cost} (group)`;
-    } else {
-      const total = cost * adults + Math.round(cost * 0.6 * children);
-      costDisplay = adults + children > 1 ? `$${cost} × ${adults} = $${total}` : `$${cost} per person`;
-    }
-  }
+  const costDisplay = renderActivityCostCell(act) || '—';
   body.innerHTML = `
     <img src="${esc(act.imageUrl || '')}" alt="${esc(act.name)}" style="width:100%;height:220px;object-fit:cover;" />
     <div class="card-content">
@@ -4039,35 +4146,10 @@ function renderActivities() {
             <h3>${esc(a.name)}</h3>
             <p><strong>City:</strong> ${esc(a.city || '')}</p>
             ${(() => {
-              const adults = state.numTravelers || 1;
-              const children = state.numChildren || 0;
-              const isPerGroup = a.cost_type === 'per_group';
-              const cost = a.estimated_cost_usd;
-              let costHtml = '';
               const links = Array.isArray(a.booking_links) && a.booking_links.length
                 ? a.booking_links.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="booking-link">${esc(l.site)}</a>`).join('')
                 : '';
-              if (cost !== null && cost !== undefined) {
-                if (isPerGroup) {
-                  costHtml = `$${cost} (group)`;
-                  return `<p class="activity-cost"><strong>Est. cost:</strong> ${costHtml}${links ? `<span class="booking-links">${links}</span>` : ''}</p>`;
-                }
-                const totalFn = (pp) => {
-                  const adultTotal = pp * adults;
-                  const childTotal = Math.round(pp * 0.6 * children);
-                  return adultTotal + childTotal;
-                };
-                const totalDisplay = adults + children > 1
-                  ? (() => {
-                    const parts = [`× ${adults} adult${adults > 1 ? 's' : ''}`];
-                    if (children > 0) parts.push(`$${Math.round(cost * 0.6)} × ${children} child${children > 1 ? 'ren' : ''}`);
-                    return ` ${parts.join(' + ')} = <span class="cost-total">$${totalFn(cost)}</span>`;
-                  })()
-                  : ' per person';
-                costHtml = `$<input type="number" min="0" step="1" class="cost-per-person-input" data-activity-id="${esc(a.id)}" value="${cost}" aria-label="Cost per person">${totalDisplay}`;
-              } else {
-                costHtml = `$<input type="number" min="0" step="1" class="cost-per-person-input" data-activity-id="${esc(a.id)}" value="" placeholder="0" aria-label="Cost per person"> per person`;
-              }
+              const costHtml = renderActivityCostCell(a) || '—';
               return `<p class="activity-cost"><strong>Est. cost:</strong> ${costHtml}${links ? `<span class="booking-links">${links}</span>` : ''}</p>`;
             })()}
             <p><strong>Why it fits:</strong> ${esc(a.why_it_fits || '')}</p>
@@ -4125,27 +4207,6 @@ function renderActivities() {
 
     if (isFlipped) {
       setTimeout(() => ensureMiniMapForCard(card, a), 0);
-    }
-
-    const costInput = card.querySelector('.cost-per-person-input');
-    if (costInput) {
-      const commitCost = () => {
-        const val = parseFloat(costInput.value);
-        const activity = state.activities.find((x) => x.id === a.id);
-        if (!activity) return;
-        activity.estimated_cost_usd = Number.isFinite(val) && val >= 0 ? val : null;
-        renderBudgetTracker();
-        // Update total display inline without re-rendering the whole card
-        const adults = state.numTravelers || 1;
-        const children = state.numChildren || 0;
-        const totalEl = costInput.closest('.activity-cost')?.querySelector('.cost-total');
-        if (totalEl && Number.isFinite(val)) {
-          const total = val * adults + Math.round(val * 0.6 * children);
-          totalEl.textContent = `$${total}`;
-        }
-      };
-      costInput.addEventListener('change', commitCost);
-      costInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { costInput.blur(); } });
     }
 
     card.querySelector('.approve').addEventListener('click', () => {
