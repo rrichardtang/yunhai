@@ -226,7 +226,7 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
   };
 }
 
-async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0) {
+async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0, lockedActivities = []) {
   const { name, startDate, endDate, leaveTime, notes, accommodations } = city;
   const client = getClient();
   if (!client) {
@@ -282,7 +282,15 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     ? `\nBudget context: The traveler has a total trip budget of $${budget} for ${travelersDesc} across ${numCities} cit${numCities > 1 ? 'ies' : 'y'} (~$${Math.round(budget / numCities)} per city). Children's tickets/meals are typically ~60% of adult price. Be budget-conscious — prefer good-value activities and flag expensive options with a caveat in the verdict.`
     : '';
 
-  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace. Generate a number of activities proportional to the length of stay and their pace preference — fewer for relaxed travelers, more for active ones. Use accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Respect the computed time windows exactly on arrival/departure/transfer days. Be concise.${budgetBlock}${webBlock}${restaurantBlock}\n\nReturn JSON only.`;
+  const lockedBlock = Array.isArray(lockedActivities) && lockedActivities.length
+    ? `\n\nAlready locked activities — DO NOT re-suggest or generate similar alternatives for these (same name, same venue, same cuisine type, or same attraction type at the same location):\n${
+        lockedActivities.map((a) =>
+          `- "${a.name}" | type: ${a.type || ''} | category: ${a.category || ''} | location: ${a.start_location || ''} | time: ${a.suggested_time || 'flexible'}, ~${a.duration_hours || 1}h`
+        ).join('\n')
+      }\n\nNew activities must: (1) not overlap with the above time blocks, (2) not duplicate any of the above venues, cuisines, or experience types, (3) complement the locked set rather than replace it.`
+    : '';
+
+  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace. Generate a number of activities proportional to the length of stay and their pace preference — fewer for relaxed travelers, more for active ones. Use accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Respect the computed time windows exactly on arrival/departure/transfer days. Be concise.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}\n\nReturn JSON only.`;
 
   const learnedSummary = getSummary(userId);
   const effectiveSystemPrompt = learnedSummary
