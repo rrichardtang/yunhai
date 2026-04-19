@@ -293,6 +293,21 @@ function getGetYourGuideLink(activity = {}) {
   return links.find((l) => /getyourguide/i.test(l?.site || '')) || links.find((l) => /viator/i.test(l?.site || '')) || null;
 }
 
+function headerPriceBadgeHtml(activity = {}) {
+  const bookingType = String(activity?.booking_type || '').toLowerCase();
+  if (bookingType === 'tour' || bookingType === 'attraction') {
+    const link = getGetYourGuideLink(activity);
+    if (link?.url) return `<a href="${esc(link.url)}" target="_blank" rel="noopener" class="badge badge-price booking-link">Price on ${esc(link.site || 'GetYourGuide')} →</a>`;
+    return '';
+  }
+  const lvl = activity?.price_level;
+  if (typeof lvl === 'number' && lvl >= 0 && lvl <= 4) {
+    const label = lvl === 0 ? 'Free' : '$'.repeat(lvl);
+    return `<span class="badge badge-price">${label}</span>`;
+  }
+  return '';
+}
+
 function renderActivityCostCell(activity = {}, { userBudget = null } = {}) {
   if (userBudget != null && Number.isFinite(Number(userBudget))) {
     return `$${Math.round(Number(userBudget)).toLocaleString()}`;
@@ -3832,21 +3847,21 @@ function buildBudgetOptCard(a, mode, approved) {
   cardEl.className = `card activity-card opt-card${isLocked ? ' opt-card--locked' : ''}`;
   cardEl.dataset.activityId = a.id;
 
-  const costHtml = (act) => renderActivityCostCell(act) || '—';
-
   const faceHtml = (act, label) => {
-    const badge = priceLevelBadge(act?.price_level);
-    const costChip = badge ? `<span class="opt-cost-chip">${esc(badge)}</span>` : '';
     return `
     <div class="opt-card-img-wrap">
       <img src="${esc(act.imageUrl || '')}" alt="${esc(act.name)}" loading="lazy" style="width:100%;height:160px;object-fit:cover;border-radius:12px 12px 0 0;" />
-      ${costChip}
     </div>
     <div class="card-content">
       ${label ? `<span class="opt-card--refined-label">${label}</span>` : ''}
+      <div class="activity-card-head-actions" style="margin-bottom:8px;">
+        <div>
+          <span class="badge">${esc(act.type || '')}</span>
+          ${headerPriceBadgeHtml(act)}
+        </div>
+      </div>
       <h3>${esc(act.name)}</h3>
       <p><strong>City:</strong> ${esc(act.city || '')}</p>
-      <p><strong>Est. cost:</strong> ${costHtml(act)}</p>
       <p><strong>Why it fits:</strong> ${esc(act.why_it_fits || '')}</p>
     </div>`;
   };
@@ -3914,14 +3929,18 @@ function openOptCardExpand(act, label) {
 
   const body = document.createElement('div');
   body.className = 'card-expand-body';
-  const costDisplay = renderActivityCostCell(act) || '—';
   body.innerHTML = `
     <img src="${esc(act.imageUrl || '')}" alt="${esc(act.name)}" style="width:100%;height:220px;object-fit:cover;" />
     <div class="card-content">
       ${label ? `<span class="opt-card--refined-label">${label}</span>` : ''}
+      <div class="activity-card-head-actions" style="margin-bottom:8px;">
+        <div>
+          <span class="badge">${esc(act.type || '')}</span>
+          ${headerPriceBadgeHtml(act)}
+        </div>
+      </div>
       <h3>${esc(act.name)}</h3>
       <p><strong>City:</strong> ${esc(act.city || '')}</p>
-      <p><strong>Est. cost:</strong> ${costDisplay}</p>
       <p><strong>Why it fits:</strong> ${esc(act.why_it_fits || '')}</p>
       ${act.pitfall ? `<p><strong>Pitfall:</strong> ${esc(act.pitfall)}</p>` : ''}
       ${act.booking_advice ? `<p><strong>Booking advice:</strong> ${esc(act.booking_advice)}</p>` : ''}
@@ -4140,18 +4159,12 @@ function renderActivities() {
               <div>
                 <span class="badge">${esc(a.type)}</span>
                 <span class="badge ${verdictClass}">${esc(a.verdict || 'N/A')}</span>
+                ${headerPriceBadgeHtml(a)}
               </div>
               <button class="secondary flip-btn" type="button" title="Flip to map" aria-label="Flip card"><i class="ph-bold ph-map-trifold" aria-hidden="true"></i></button>
             </div>
             <h3>${esc(a.name)}</h3>
             <p><strong>City:</strong> ${esc(a.city || '')}</p>
-            ${(() => {
-              const links = Array.isArray(a.booking_links) && a.booking_links.length
-                ? a.booking_links.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="booking-link">${esc(l.site)}</a>`).join('')
-                : '';
-              const costHtml = renderActivityCostCell(a) || '—';
-              return `<p class="activity-cost"><strong>Est. cost:</strong> ${costHtml}${links ? `<span class="booking-links">${links}</span>` : ''}</p>`;
-            })()}
             <p><strong>Why it fits:</strong> ${esc(a.why_it_fits || '')}</p>
             <p><strong>Pitfall:</strong> ${esc(a.pitfall || '')}</p>
             <p><strong>Booking advice:</strong> ${esc(a.booking_advice || '')}</p>
