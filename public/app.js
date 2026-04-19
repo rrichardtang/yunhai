@@ -1369,7 +1369,10 @@ function collapsedRowText(item) {
 }
 
 function buildChecklistFromState() {
-  const existing = Array.isArray(state.confidenceChecklist) ? state.confidenceChecklist.map(normalizeChecklistItem) : [];
+  const activityIds = new Set((state.activities || []).map((a) => a.id));
+  const existing = (Array.isArray(state.confidenceChecklist) ? state.confidenceChecklist : [])
+    .map(normalizeChecklistItem)
+    .filter((item) => item.type !== 'activity' || !item.activityId || activityIds.has(item.activityId));
 
   // Key by type + primary location + primary date to avoid duplicates
   const keyOf = (item) => {
@@ -1830,9 +1833,11 @@ function renderChecklistContainer(group, collapsedState) {
         ${item.expanded ? `
           <div class="cl-item-expanded-wrap">
             <div class="cl-expanded-header">
-              <button type="button" class="cl-delete-btn" data-cl-delete title="Delete item">
-                <i class="ph-bold ph-trash" aria-hidden="true"></i>
-              </button>
+              ${item.type !== 'activity' ? `
+                <button type="button" class="cl-delete-btn" data-cl-delete title="Delete item">
+                  <i class="ph-bold ph-trash" aria-hidden="true"></i>
+                </button>
+              ` : ''}
             </div>
             ${renderChecklistItemExpanded(item)}
           </div>
@@ -1874,9 +1879,11 @@ function renderChecklistContainer(group, collapsedState) {
           ${item.expanded ? `
             <div class="cl-item-expanded-wrap">
               <div class="cl-expanded-header">
-                <button type="button" class="cl-delete-btn" data-cl-delete title="Delete item">
-                  <i class="ph-bold ph-trash" aria-hidden="true"></i>
-                </button>
+                ${item.type !== 'activity' ? `
+                  <button type="button" class="cl-delete-btn" data-cl-delete title="Delete item">
+                    <i class="ph-bold ph-trash" aria-hidden="true"></i>
+                  </button>
+                ` : ''}
               </div>
               ${renderChecklistItemExpanded(item)}
             </div>
@@ -2112,7 +2119,7 @@ function bindChecklistEvents(el) {
       if (!itemEl) return;
       const id = itemEl.dataset.clItem;
       const deleted = state.confidenceChecklist.find((x) => x.id === id);
-      if (!deleted) return;
+      if (!deleted || deleted.type === 'activity') return;
       state.confidenceChecklist = state.confidenceChecklist.filter((x) => x.id !== id);
       renderChecklistModal();
       renderConfidenceBadge();
@@ -6842,6 +6849,8 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
       const [from, to] = key.split('->');
       if (removedIds.has(from) || removedIds.has(to)) delete state.commutes[key];
     });
+    state.confidenceChecklist = (state.confidenceChecklist || [])
+      .filter((item) => !(item.type === 'activity' && removedIds.has(item.activityId)));
   } else {
     state.activities = [];
     state.reviewed = {};
