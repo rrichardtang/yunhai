@@ -954,8 +954,9 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
     const updatedBookingType = updates.booking_type || activity.booking_type || 'none';
 
     if (updatedBookingType !== 'none') {
-      const q = encodeURIComponent(updatedName);
-      const qCity = encodeURIComponent(`${updatedName} ${updatedCity}`);
+      const searchName = updates.venue_name || activity.venue_name || updatedName;
+      const q = encodeURIComponent(searchName);
+      const qCity = encodeURIComponent(`${searchName} ${updatedCity}`);
       const date = activity.scheduled_date || '';
       if (updatedBookingType === 'tour') {
         updates.booking_links = [
@@ -1172,8 +1173,9 @@ app.post('/api/plan', async (req, res) => {
         // Enrich with booking links
         const cityStartDate = city.startDate || '';
         for (const a of activities) {
-          const q = encodeURIComponent(a.name);
-          const qCity = encodeURIComponent(`${a.name} ${city.name}`);
+          const searchName = a.venue_name || a.name;
+          const q = encodeURIComponent(searchName);
+          const qCity = encodeURIComponent(`${searchName} ${city.name}`);
           if (a.booking_type === 'tour') {
             a.booking_links = [
               { site: 'GetYourGuide', url: `https://www.getyourguide.com/s/?q=${q}&date_from=${cityStartDate}&adults=${resolvedTravelers}${resolvedChildren ? `&children=${resolvedChildren}` : ''}` },
