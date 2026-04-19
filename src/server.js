@@ -1069,10 +1069,13 @@ Respond ONLY with JSON:
 });
 
 app.post('/api/plan', async (req, res) => {
-  const { cities, travels, profile, budget, numTravelers, numChildren } = req.body || {};
+  const { cities, travels, profile, budget, numTravelers, numChildren, lockedActivities } = req.body || {};
   const resolvedBudget = Number.isFinite(Number(budget)) && Number(budget) > 0 ? Number(budget) : null;
   const resolvedTravelers = Math.max(1, Math.round(Number(numTravelers) || 1));
   const resolvedChildren = Math.max(0, Math.round(Number(numChildren) || 0));
+  const resolvedLockedActivities = lockedActivities && typeof lockedActivities === 'object' && !Array.isArray(lockedActivities)
+    ? lockedActivities
+    : {};
   if (!Array.isArray(cities) || cities.length === 0) {
     return res.status(400).json({ error: 'cities must be a non-empty array' });
   }
@@ -1099,9 +1102,12 @@ app.post('/api/plan', async (req, res) => {
 
     const planAndEnrich = async (city) => {
       const timing = cityTravelTiming[String(city?.name || '').trim()] || null;
+      const cityLocked = Array.isArray(resolvedLockedActivities[city.name])
+        ? resolvedLockedActivities[city.name]
+        : [];
       await acquireLlmSlot();
       try {
-        const activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren);
+        const activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren, cityLocked);
 
         // Enrich with Brave prices and booking links in parallel
         const priceMap = await searchActivityPricesBatch(activities, city.name);

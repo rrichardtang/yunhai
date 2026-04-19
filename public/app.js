@@ -2489,14 +2489,16 @@ async function goToNextStep(fromStep = state.step) {
     }
 
     let citiesToRegenerate = null;
+    let lockedByCity = {};
     if (hasExistingActivities && step1Changed) {
-      const selected = await showRegenerateConfirmDialog();
-      if (!selected) {
+      const result = await showRegenerateConfirmDialog();
+      if (!result) {
         syncTripMetaFromInputs();
         setStep(2);
         return;
       }
-      citiesToRegenerate = selected;
+      citiesToRegenerate = result.cities;
+      lockedByCity = result.lockedByCity;
     }
 
     if (!validateLocationsBeforePlanning()) {
@@ -2506,7 +2508,7 @@ async function goToNextStep(fromStep = state.step) {
     clearSnapshot();
     if (!citiesToRegenerate) clearPlannedResultsKeepSetup();
     setPlanningLoading(true);
-    try { await planTrip(citiesToRegenerate); }
+    try { await planTrip(citiesToRegenerate, lockedByCity); }
     catch (e) { showToast(e?.message || 'Failed to plan trip.', 'error'); }
     finally { setPlanningLoading(false); }
     return;
@@ -6805,7 +6807,7 @@ function syncTripMetaFromInputs() {
   state.numChildren = Math.max(0, parseInt(els.numChildren?.value, 10) || 0);
 }
 
-async function planTrip(citiesToRegenerate = null) {
+async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
   syncTripMetaFromInputs();
   syncLegacyTravelsFromCities();
   const allCities = state.cities.map(({name,startDate,endDate,leaveTime,notes,accommodation,travelEntry,logistics}) => ({
@@ -6824,17 +6826,47 @@ async function planTrip(citiesToRegenerate = null) {
   const regenSet = citiesToRegenerate ? new Set(citiesToRegenerate) : null;
   const cities = regenSet ? allCities.filter((c) => regenSet.has(c.name)) : allCities;
   if (regenSet) {
-    state.activities = state.activities.filter((a) => !regenSet.has(a.city));
-    Object.keys(state.reviewed).forEach((id) => {
-      const act = state.activities.find((a) => a.id === id);
-      if (!act) delete state.reviewed[id];
+    const lockedIds = new Set(Object.values(lockedByCity).flat().map((a) => a.id));
+    const removedIds = new Set(
+      state.activities
+        .filter((a) => regenSet.has(a.city) && !lockedIds.has(a.id))
+        .map((a) => a.id)
+    );
+    state.activities = state.activities.filter(
+      (a) => !regenSet.has(a.city) || lockedIds.has(a.id)
+    );
+    removedIds.forEach((id) => {
+      delete state.reviewed[id];
+      delete state.placements[id];
+    });
+    Object.keys(state.commutes || {}).forEach((key) => {
+      const [from, to] = key.split('->');
+      if (removedIds.has(from) || removedIds.has(to)) delete state.commutes[key];
     });
   } else {
     state.activities = [];
     state.reviewed = {};
+    state.placements = {};
   }
 
-  const payload = { cities, travels, profile: state.profile || loadProfile(), userId: ensureUserId(), budget: state.tripBudget, numTravelers: state.numTravelers, numChildren: state.numChildren };
+  const lockedForApi = {};
+  Object.entries(lockedByCity).forEach(([city, acts]) => {
+    if (acts.length) {
+      lockedForApi[city] = acts.map(({ name, type, category, start_location, suggested_time, duration_hours }) =>
+        ({ name, type, category, start_location, suggested_time, duration_hours })
+      );
+    }
+  });
+
+  const payload = {
+    cities, travels,
+    profile: state.profile || loadProfile(),
+    userId: ensureUserId(),
+    budget: state.tripBudget,
+    numTravelers: state.numTravelers,
+    numChildren: state.numChildren,
+    ...(Object.keys(lockedForApi).length && { lockedActivities: lockedForApi })
+  };
 
   renderActivities();
 
@@ -7200,26 +7232,12 @@ function showRegenerateConfirmDialog() {
     const existing = document.getElementById('regenerateConfirmDialog');
     if (existing) existing.remove();
 
-    const cities = state.cities.map((c) => c.name);
-    const cityCheckboxes = cities.map((name, i) => `
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
-        <input type="checkbox" class="regen-city-cb" data-index="${i}" checked style="width:16px;height:16px;cursor:pointer">
-        <span>${esc(name)}</span>
-      </label>`).join('');
+    const allCityNames = state.cities.map((c) => c.name);
+    const lockedSet = new Set();
 
     const dialog = document.createElement('div');
     dialog.id = 'regenerateConfirmDialog';
     dialog.className = 'modal';
-    dialog.innerHTML = `
-      <div class="modal-card" style="max-width:400px;gap:16px">
-        <h3 style="margin:0">Regenerate trip</h3>
-        <p class="muted-text" style="margin:0">Your trip settings have changed. Select which cities to regenerate:</p>
-        <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">${cityCheckboxes}</div>
-        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
-          <button id="regenNo" class="secondary" type="button">Cancel</button>
-          <button id="regenYes" class="primary" type="button">Regenerate selected</button>
-        </div>
-      </div>`;
     document.body.appendChild(dialog);
     refreshOverlayInterlocks();
 
@@ -7229,12 +7247,118 @@ function showRegenerateConfirmDialog() {
       resolve(result);
     };
 
-    dialog.querySelector('#regenYes').addEventListener('click', () => {
-      const checked = [...dialog.querySelectorAll('.regen-city-cb:checked')].map((cb) => cities[parseInt(cb.dataset.index, 10)]);
-      cleanup(checked.length ? checked : null);
-    });
-    dialog.querySelector('#regenNo').addEventListener('click', () => cleanup(null));
     dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(null); });
+
+    function buildRegenLockCard(a) {
+      const cardEl = document.createElement('article');
+      cardEl.className = 'card opt-card';
+      cardEl.style.minHeight = 'unset';
+      cardEl.dataset.activityId = a.id;
+      const meta = [a.type, a.suggested_time].filter(Boolean).join(' · ');
+      cardEl.innerHTML = `
+        <button class="opt-lock-btn" type="button" aria-label="Lock activity">
+          <i class="ph-bold ph-lock-open" aria-hidden="true"></i>
+        </button>
+        <div class="card-content" style="padding-right:52px">
+          <h3 style="font-size:.9rem;margin:0 0 3px;line-height:1.3">${esc(a.name)}</h3>
+          ${meta ? `<p style="margin:0;font-size:.78rem;opacity:.65">${esc(meta)}</p>` : ''}
+        </div>`;
+      const lockBtn = cardEl.querySelector('.opt-lock-btn');
+      lockBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (lockedSet.has(a.id)) {
+          lockedSet.delete(a.id);
+          cardEl.classList.remove('opt-card--locked');
+          lockBtn.innerHTML = '<i class="ph-bold ph-lock-open" aria-hidden="true"></i>';
+          lockBtn.setAttribute('aria-label', 'Lock activity');
+        } else {
+          lockedSet.add(a.id);
+          cardEl.classList.add('opt-card--locked');
+          lockBtn.innerHTML = '<i class="ph-bold ph-lock-key" aria-hidden="true"></i>';
+          lockBtn.setAttribute('aria-label', 'Unlock activity');
+        }
+      });
+      return cardEl;
+    }
+
+    function renderPhase1(prevSelected = null) {
+      const cityCheckboxes = allCityNames.map((name, i) => `
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
+          <input type="checkbox" class="regen-city-cb" data-index="${i}"
+            ${!prevSelected || prevSelected.includes(name) ? 'checked' : ''}
+            style="width:16px;height:16px;cursor:pointer">
+          <span>${esc(name)}</span>
+        </label>`).join('');
+
+      dialog.innerHTML = `
+        <div class="modal-card" style="max-width:400px;gap:16px">
+          <h3 style="margin:0">Regenerate trip</h3>
+          <p class="muted-text" style="margin:0">Your trip settings have changed. Select which cities to regenerate:</p>
+          <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">${cityCheckboxes}</div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+            <button id="regenCancel" class="secondary" type="button">Cancel</button>
+            <button id="regenNext" class="primary" type="button">Next →</button>
+          </div>
+        </div>`;
+
+      dialog.querySelector('#regenCancel').addEventListener('click', () => cleanup(null));
+      dialog.querySelector('#regenNext').addEventListener('click', () => {
+        const selectedCities = [...dialog.querySelectorAll('.regen-city-cb:checked')]
+          .map((cb) => allCityNames[parseInt(cb.dataset.index, 10)]);
+        if (!selectedCities.length) { cleanup(null); return; }
+        const citiesWithActivities = selectedCities.filter(
+          (cn) => state.activities.some((a) => a.city === cn)
+        );
+        if (!citiesWithActivities.length) {
+          cleanup({ cities: selectedCities, lockedByCity: {} });
+          return;
+        }
+        renderPhase2(selectedCities, citiesWithActivities);
+      });
+    }
+
+    function renderPhase2(selectedCities, citiesWithActivities) {
+      const card = document.createElement('div');
+      card.className = 'modal-card';
+      card.style.cssText = 'max-width:560px;gap:16px';
+      card.innerHTML = `
+        <h3 style="margin:0">Lock activities to keep</h3>
+        <p class="muted-text" style="margin:0">Locked activities are preserved exactly as-is. Unlocked ones will be replaced.</p>
+        <div class="regen-lock-sections" style="display:flex;flex-direction:column;gap:20px;max-height:52vh;overflow-y:auto;padding-right:4px"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+          <button id="regenBack" class="secondary" type="button">← Back</button>
+          <button id="regenConfirm" class="primary" type="button">Regenerate selected</button>
+        </div>`;
+
+      const sectionsWrap = card.querySelector('.regen-lock-sections');
+      citiesWithActivities.forEach((cn) => {
+        const section = document.createElement('section');
+        section.innerHTML = `<h4 style="font-size:.9rem;font-weight:700;margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--secondary-light)">${esc(cn)}</h4>`;
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px';
+        state.activities.filter((a) => a.city === cn).forEach((a) => grid.appendChild(buildRegenLockCard(a)));
+        section.appendChild(grid);
+        sectionsWrap.appendChild(section);
+      });
+
+      dialog.innerHTML = '';
+      dialog.appendChild(card);
+
+      card.querySelector('#regenBack').addEventListener('click', () => {
+        lockedSet.clear();
+        renderPhase1(selectedCities);
+      });
+      card.querySelector('#regenConfirm').addEventListener('click', () => {
+        const lockedByCity = {};
+        selectedCities.forEach((cn) => {
+          const locked = state.activities.filter((a) => a.city === cn && lockedSet.has(a.id));
+          if (locked.length) lockedByCity[cn] = locked;
+        });
+        cleanup({ cities: selectedCities, lockedByCity });
+      });
+    }
+
+    renderPhase1();
   });
 }
 
