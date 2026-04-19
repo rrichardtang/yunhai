@@ -293,6 +293,16 @@ function getGetYourGuideLink(activity = {}) {
   return links.find((l) => /getyourguide/i.test(l?.site || '')) || links.find((l) => /viator/i.test(l?.site || '')) || null;
 }
 
+function googleMapsLinkHtml(activity = {}) {
+  const venue = activity.venue_name || activity.name;
+  if (!venue) return '';
+  const q = encodeURIComponent(venue);
+  const url = activity.place_id
+    ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(activity.place_id)}`
+    : `https://www.google.com/maps/search/?api=1&query=${q}`;
+  return `<a href="${url}" target="_blank" rel="noopener" class="badge badge-maps" title="Open in Google Maps" aria-label="Google Maps"><i class="ph-bold ph-map-pin" aria-hidden="true"></i> Maps</a>`;
+}
+
 function headerPriceBadgeHtml(activity = {}) {
   const bookingType = String(activity?.booking_type || '').toLowerCase();
   if (bookingType === 'tour' || bookingType === 'attraction') {
@@ -4096,6 +4106,17 @@ function renderActivities() {
       const card = buildActivityCard(a);
       placeholder.replaceWith(card);
       requestAnimationFrame(() => card.classList.add('card-revealed'));
+      if (a.price_level == null || !a.place_id) {
+        resolvePlace(a, a.city).then((place) => {
+          if (!place) return;
+          if (place.priceLevel != null) a.price_level = place.priceLevel;
+          if (place.placeId) a.place_id = place.placeId;
+          const badgeEl = card.querySelector(`[data-price-badges="${CSS.escape(a.id)}"]`);
+          if (badgeEl) badgeEl.innerHTML = headerPriceBadgeHtml(a);
+          const mapsEl = badgeEl?.nextElementSibling;
+          if (mapsEl && mapsEl.classList.contains('badge-maps')) mapsEl.outerHTML = googleMapsLinkHtml(a);
+        });
+      }
     });
   }, { rootMargin: '200px' });
   window._cardRevealObserver = observer;
@@ -4159,7 +4180,8 @@ function renderActivities() {
               <div>
                 <span class="badge">${esc(a.type)}</span>
                 <span class="badge ${verdictClass}">${esc(a.verdict || 'N/A')}</span>
-                ${headerPriceBadgeHtml(a)}
+                <span data-price-badges="${esc(a.id)}">${headerPriceBadgeHtml(a)}</span>
+                ${googleMapsLinkHtml(a)}
               </div>
               <button class="secondary flip-btn" type="button" title="Flip to map" aria-label="Flip card"><i class="ph-bold ph-map-trifold" aria-hidden="true"></i></button>
             </div>
