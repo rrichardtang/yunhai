@@ -6785,6 +6785,13 @@ async function loadItineraryById(id) {
         placements[idValue] = { dayId: day.id || `${day.city}-${day.date}`, time: parseTimeTo24(activity.time || activity.suggested_time || typeToTime(activity.type)) };
       });
     });
+    (itinerary.unplacedActivities || []).forEach((activity) => {
+      const normalizedActivity = normalizeActivityMetadata(activity);
+      const idValue = normalizedActivity.id || uid();
+      activities.push({ ...normalizedActivity, id: idValue });
+      reviewed[idValue] = { approved: true, notes: activity.notes || '' };
+      placements[idValue] = { dayId: null, time: parseTimeTo24(activity.time || activity.suggested_time || typeToTime(activity.type)) };
+    });
 
     state.activities = activities;
     state.reviewed = reviewed;
@@ -6983,10 +6990,12 @@ async function generateItinerary() {
     time: state.placements[a.id]?.time || parseTimeTo24(a.suggested_time || typeToTime(a.type))
   }));
 
+  const validDayIds = new Set(state.days.map((d) => d.id));
   const byDay = state.days.map((d) => ({
     ...d,
     activities: arranged.filter((a) => a.dayId === d.id).sort((x,y) => x.order - y.order)
   }));
+  const unplacedActivities = arranged.filter((a) => !a.dayId || !validDayIds.has(a.dayId));
 
   const payload = {
     tripName: state.tripName,
@@ -6996,6 +7005,7 @@ async function generateItinerary() {
     cities: state.cities,
     travels: state.travels,
     days: byDay,
+    unplacedActivities,
     confidence: {
       checklist: state.confidenceChecklist,
       notificationPrefs: state.confidenceNotificationPrefs,
