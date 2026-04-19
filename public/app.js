@@ -6838,9 +6838,12 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
         .filter((a) => regenSet.has(a.city) && !lockedIds.has(a.id))
         .map((a) => a.id)
     );
+    console.log('[regen] regenSet:', [...regenSet], 'lockedIds:', [...lockedIds]);
+    console.log('[regen] activities before filter:', state.activities.map((a) => ({ id: a.id, city: a.city, name: a.name })));
     state.activities = state.activities.filter(
       (a) => !regenSet.has(a.city) || lockedIds.has(a.id)
     );
+    console.log('[regen] activities after filter:', state.activities.map((a) => ({ id: a.id, city: a.city, name: a.name })));
     removedIds.forEach((id) => {
       delete state.reviewed[id];
       delete state.placements[id];
@@ -6925,6 +6928,7 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
         };
       });
 
+      console.log('[regen] SSE city event:', evt.city, 'incoming:', cityActivities.length, 'cities in state.activities:', [...new Set(state.activities.map((a) => a.city))]);
       state.activities.push(...cityActivities);
       setStep(2);
       renderActivities();
