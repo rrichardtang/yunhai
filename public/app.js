@@ -297,7 +297,7 @@ function headerPriceBadgeHtml(activity = {}) {
   const bookingType = String(activity?.booking_type || '').toLowerCase();
   if (bookingType === 'tour' || bookingType === 'attraction') {
     const link = getGetYourGuideLink(activity);
-    if (link?.url) return `<a href="${esc(link.url)}" target="_blank" rel="noopener" class="badge badge-price booking-link">Price on ${esc(link.site || 'GetYourGuide')} →</a>`;
+    if (link?.url) return `<a href="${esc(link.url)}" target="_blank" rel="noopener" class="badge badge-price booking-link">${esc(link.site || 'GetYourGuide')}</a>`;
     return '';
   }
   const lvl = activity?.price_level;
