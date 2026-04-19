@@ -50,7 +50,7 @@ const {
   resolveUserId
 } = require('./preferences');
 const { getSession, setTripContext, addMessage, getHistory, compactHistory, clearSession, getCachedPrompt } = require('./chat');
-const { search, searchForChat, isConfigured: isBraveConfigured, shouldUseBrave, searchActivityPricesBatch, searchActivityPrice } = require('./braveSearch');
+const { search, searchForChat, isConfigured: isBraveConfigured, shouldUseBrave } = require('./braveSearch');
 const {
   saveItinerary,
   updateItinerary,
@@ -844,6 +844,72 @@ app.get('/api/geocode', async (req, res) => {
 
 app.use('/api', requireConfiguredAuth);
 
+const placesCache = new Map();
+const PLACES_CACHE_MAX = 500;
+
+function placesCacheGet(key) {
+  if (!placesCache.has(key)) return null;
+  const value = placesCache.get(key);
+  placesCache.delete(key);
+  placesCache.set(key, value);
+  return value;
+}
+
+function placesCacheSet(key, value) {
+  if (placesCache.has(key)) placesCache.delete(key);
+  placesCache.set(key, value);
+  if (placesCache.size > PLACES_CACHE_MAX) {
+    const oldestKey = placesCache.keys().next().value;
+    placesCache.delete(oldestKey);
+  }
+}
+
+app.get('/api/places/resolve', async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  const city = String(req.query.city || '').trim();
+  if (!q) return res.status(400).json({ error: 'Missing q parameter' });
+
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return res.json({ error: 'maps_disabled' });
+
+  const cacheKey = `${q.toLowerCase()}|${city.toLowerCase()}`;
+  const cached = placesCacheGet(cacheKey);
+  if (cached) return res.json(cached);
+
+  const input = city ? `${q}, ${city}` : q;
+  const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id,geometry,name,price_level,rating,user_ratings_total,formatted_address&key=${apiKey}`;
+
+  try {
+    const r = await fetch(url);
+    if (!r.ok) {
+      console.warn(`[places] lookup failed ${r.status} for "${input}"`);
+      return res.json({ error: 'lookup_failed' });
+    }
+    const data = await r.json();
+    const candidate = Array.isArray(data.candidates) ? data.candidates[0] : null;
+    if (!candidate) {
+      const response = { placeId: null };
+      placesCacheSet(cacheKey, response);
+      return res.json(response);
+    }
+    const response = {
+      placeId: candidate.place_id || null,
+      lat: candidate.geometry?.location?.lat ?? null,
+      lng: candidate.geometry?.location?.lng ?? null,
+      name: candidate.name || null,
+      formattedAddress: candidate.formatted_address || null,
+      priceLevel: typeof candidate.price_level === 'number' ? candidate.price_level : null,
+      rating: typeof candidate.rating === 'number' ? candidate.rating : null,
+      userRatingsTotal: typeof candidate.user_ratings_total === 'number' ? candidate.user_ratings_total : null
+    };
+    placesCacheSet(cacheKey, response);
+    return res.json(response);
+  } catch (err) {
+    console.warn(`[places] exception for "${input}": ${err.message}`);
+    return res.json({ error: 'lookup_failed' });
+  }
+});
+
 app.post('/api/activity/refine', async (req, res) => {
   if (!process.env.OPENAI_API_KEY) {
     return res.status(503).json({ error: 'OpenAI API key not configured' });
@@ -888,12 +954,6 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
     const updatedBookingType = updates.booking_type || activity.booking_type || 'none';
 
     if (updatedBookingType !== 'none') {
-      const bravePrice = await searchActivityPrice(updatedName, updatedCity);
-      if (bravePrice !== null) {
-        const currentCost = updates.estimated_cost_usd ?? activity.estimated_cost_usd ?? null;
-        updates.estimated_cost_usd = currentCost !== null ? Math.max(currentCost, bravePrice) : bravePrice;
-      }
-
       const q = encodeURIComponent(updatedName);
       const qCity = encodeURIComponent(`${updatedName} ${updatedCity}`);
       const date = activity.scheduled_date || '';
@@ -1109,15 +1169,9 @@ app.post('/api/plan', async (req, res) => {
       try {
         const activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren, cityLocked);
 
-        // Enrich with Brave prices and booking links in parallel
-        const priceMap = await searchActivityPricesBatch(activities, city.name);
+        // Enrich with booking links
         const cityStartDate = city.startDate || '';
         for (const a of activities) {
-          const bravePrice = priceMap.get(a.name) ?? null;
-          if (bravePrice !== null) {
-            a.estimated_cost_usd = a.estimated_cost_usd !== null ? Math.max(a.estimated_cost_usd, bravePrice) : bravePrice;
-          }
-
           const q = encodeURIComponent(a.name);
           const qCity = encodeURIComponent(`${a.name} ${city.name}`);
           if (a.booking_type === 'tour') {

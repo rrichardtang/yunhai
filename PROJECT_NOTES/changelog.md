@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-19] Replace Brave price scraping with Google Places for pins and price signal
+
+- `src/server.js`: dropped `searchActivityPricesBatch` / `searchActivityPrice` imports; removed Brave price enrichment branches in `/api/plan` (~L1113) and `/api/activity/refine` (~L891); added `/api/places/resolve` endpoint (Google Places "Find Place From Text" proxy) with in-memory LRU cache (max 500)
+- `src/braveSearch.js`: removed `parseFirstPrice`, `searchActivityPrice`, `searchActivityPricesBatch`, and the `CURRENCY_TO_USD` constant
+- `src/claude.js`: added required `venue_name` field to the SYSTEM_PROMPT activity schema and example; `normalizeActivity` now emits `venue_name`, auto-backfilled for meals as `"<name>, <city>"`
+- `public/app.js`: added `resolvePlace()`, `priceLevelBadge()`, `representativeCostUsd()`, `renderActivityCostCell()`, and `stripMealPrefix()` helpers; reordered `geocodeActivity` candidates so `venue_name` wins over `start_location`; bumped `GEO_CACHE_KEY` → `_v2` to flush stale pins; added `PLACES_CACHE_KEY` localStorage cache; activity/opt cards now show `$`–`$$$$` badge or GetYourGuide link instead of numeric estimate; budget rollup seeds via `representativeCostUsd` keyed off `price_level` / booking type; removed the now-unused cost-per-person numeric input editor on activity cards
+
 ## [2026-04-18] Itinerary view overhaul (formerly "Execution" mode)
 
 - `public/planner.html`: renamed `#executionModeBtn` → `#itineraryModeBtn` (text "Execution" → "Itinerary"), `#executionModeView` → `#itineraryModeView`, all child IDs/classes; added `#attachmentViewerModal`, `#attachmentFileInput`

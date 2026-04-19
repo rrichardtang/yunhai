@@ -110,3 +110,13 @@ Append-only. Records permanent architectural and design decisions.
 **Reasoning:** User wanted a single source of truth for dates rather than filling in the same dates across three sections.
 **Alternatives rejected:** Keeping dates only in the expandable drawer — rejected because it required too many clicks and redundant input.
 **Tradeoffs:** Accommodation dates are now tied to arrival/departure by default. Users can still override them in the drawer, but the initial values are driven by the city-level date range.
+
+## [2026-04-19] Google Places replaces Brave for pins and restaurant price signal
+
+**Decision:** Activity map pins resolve via a new `/api/places/resolve` endpoint that calls Google Places "Find Place From Text" using a required LLM-emitted `venue_name` field. Restaurant cost is shown as Google's `$`–`$$$$` `price_level` badge only — no fabricated per-person dollar number is rendered on the card. Tour and attraction cards show a "Price on GetYourGuide →" affiliate-search link instead of a number. A small representative-per-category number (meals keyed off `price_level`, tours $75, attractions $25, shows $80) is used ONLY to seed the hidden budget rollup so totals still function; user-entered `budgetUsd` on each checklist item continues to override everything downstream.
+**Reasoning:** Brave snippet scraping produced wildly wrong values (e.g. $1,987 for Casa Lucio) because `Math.max(claude, brave)` let any outlier win and `parseFirstPrice` matched any currency-shaped number in a snippet. Google Places provides an authoritative landmark coordinate and a coarse but reliable price signal. Showing the badge as-is avoids inventing precision we don't have. Linking out to GetYourGuide defers the price question to the booking funnel where it's accurate.
+**Alternatives rejected:**
+- Keep Brave scraping with sanity thresholds — user explicitly rejected hard-coded threshold fixes; the underlying signal is too noisy to salvage.
+- Apply for the GetYourGuide Partner API to fetch real tour prices — gated behind 100k monthly visitors, which we do not currently meet. Revisit when traffic crosses that threshold.
+- Trust the LLM's `estimated_cost_usd` as the display number — unreliable in isolation; still emitted and retained in the schema for backward compatibility with stored itineraries, but no longer consumed by rendering paths.
+**Tradeoffs:** (a) Existing stored itineraries have no `venue_name` or `price_level` and will fall back to Nominatim until replanned. (b) Google Places API usage increases — one lookup per activity on first render, cached in localStorage and in server-side LRU. (c) Users who want an exact per-person number for meals will need to enter it manually in the checklist.

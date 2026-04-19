@@ -38,6 +38,7 @@ Return a JSON array of activity objects. Each object must have these fields:
 - name (string)
 - type (string: show / tour / food / sports / cultural / walk / sunset / neighborhood / breakfast / lunch / dinner)
 - city (string)
+- venue_name (string or null) — the specific place as it appears on Google Maps (e.g. \`Casa Lucio, Madrid\`, \`Colosseum, Rome\`). For meals, this MUST be the restaurant name + city. For generic activities (free time, walks, sunsets, neighborhoods), set to null.
 - start_location (string)
 - end_location (string)
 - why_it_fits (string, 1-2 sentences)
@@ -64,6 +65,7 @@ Example object:
   "name": "Wander Alfama at Dawn",
   "type": "walk",
   "city": "Lisbon",
+  "venue_name": null,
   "start_location": "Alfama neighborhood, Lisbon",
   "end_location": "Miradouro da Graça, Lisbon",
   "why_it_fits": "..."
@@ -194,10 +196,19 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
   const duration = Number(raw.duration_hours);
   const durationHours = Number.isFinite(duration) && duration > 0 ? duration : defaults.durationHours;
 
+  const name = String(raw.name || 'Untitled activity').trim();
+  const type = String(raw.type || 'tour').trim().toLowerCase();
+  const city = String(raw.city || fallbackCity).trim();
+  const rawVenue = raw.venue_name == null ? '' : String(raw.venue_name).trim();
+  const mealTypes = ['food', 'breakfast', 'lunch', 'dinner', 'restaurant'];
+  const venue_name = rawVenue
+    || (mealTypes.includes(type) && name ? `${name}, ${city}` : null);
+
   return {
-    name: String(raw.name || 'Untitled activity').trim(),
-    type: String(raw.type || 'tour').trim().toLowerCase(),
-    city: String(raw.city || fallbackCity).trim(),
+    name,
+    type,
+    city,
+    venue_name,
     start_location: String(raw.start_location || '').trim(),
     end_location: String(raw.end_location || '').trim(),
     why_it_fits: String(raw.why_it_fits || '').trim(),
