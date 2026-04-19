@@ -3647,29 +3647,24 @@ function mountBudgetOptOverlay() {
       <div class="budget-opt-header">
         <h3>Budget Optimization</h3>
         <p class="budget-opt-desc">Unlock the activities you want replaced with cheaper alternatives. Locked activities stay as-is.</p>
-        <div class="budget-opt-header-actions">
-          <button class="secondary" id="budgetOptCancelBtn" type="button">Cancel</button>
-          <button class="primary" id="budgetOptConfirmLocksBtn" type="button"><i class="ph-bold ph-check" aria-hidden="true"></i> Confirm</button>
-        </div>
       </div>
       <div id="budgetOptGrid" class="budget-opt-grid cards-grid"></div>
     </div>`;
 
-  // Footer lives on body so position:fixed works outside the scrolling overlay
   const footer = document.createElement('div');
   footer.id = 'budgetOptFooter';
-  footer.className = 'budget-opt-footer hidden';
+  footer.className = 'budget-opt-footer';
   footer.innerHTML = `
-    <div class="budget-opt-progress-wrap">
+    <button class="secondary" id="budgetOptCancelBtn" type="button">← Back</button>
+    <div class="budget-opt-progress-wrap hidden">
       <div class="budget-opt-progress-bar" id="budgetOptProgressBar"></div>
     </div>
-    <span id="budgetOptProgressLabel" class="budget-opt-progress-label"></span>
-    <button class="primary" id="budgetOptConfirmSelectionsBtn" type="button"><i class="ph-bold ph-check-circle" aria-hidden="true"></i> Confirm Selections</button>`;
+    <span id="budgetOptProgressLabel" class="budget-opt-progress-label hidden"></span>
+    <button class="primary" id="budgetOptConfirmLocksBtn" type="button"><i class="ph-bold ph-check" aria-hidden="true"></i> Confirm</button>`;
   document.body.appendChild(footer);
 
   document.getElementById('budgetOptCancelBtn').addEventListener('click', exitBudgetOptMode);
   document.getElementById('budgetOptConfirmLocksBtn').addEventListener('click', onConfirmLocks);
-  document.getElementById('budgetOptConfirmSelectionsBtn').addEventListener('click', onConfirmSelections);
 }
 
 function enterBudgetOptMode() {
@@ -3884,9 +3879,13 @@ async function onConfirmLocks() {
 
 function transitionToFlipPhase(approved) {
   const confirmBtn = document.getElementById('budgetOptConfirmLocksBtn');
-  if (confirmBtn) confirmBtn.style.display = 'none';
-  document.getElementById('budgetOptFooter').classList.remove('hidden');
-  // Only show unlocked activities (those sent for refinement)
+  if (confirmBtn) {
+    confirmBtn.id = 'budgetOptConfirmSelectionsBtn';
+    confirmBtn.innerHTML = '<i class="ph-bold ph-check-circle" aria-hidden="true"></i> Confirm Selections';
+    confirmBtn.addEventListener('click', onConfirmSelections);
+  }
+  document.querySelector('#budgetOptFooter .budget-opt-progress-wrap')?.classList.remove('hidden');
+  document.getElementById('budgetOptProgressLabel')?.classList.remove('hidden');
   const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id));
   renderBudgetOptCards(unlocked, 'flip');
   updateBudgetOptProgressBar(approved);
@@ -7244,6 +7243,7 @@ function showRegenerateConfirmDialog() {
     const cleanup = (result) => {
       budgetOptState = prevBudgetOptState;
       document.querySelector('.opt-card-expand-overlay')?.remove();
+      document.getElementById('regenFooter')?.remove();
       dialog.remove();
       refreshOverlayInterlocks();
       resolve(result);
@@ -7288,24 +7288,21 @@ function showRegenerateConfirmDialog() {
     }
 
     function renderPhase2(selectedCities, citiesWithActivities) {
-      // Borrow budgetOptState so buildBudgetOptCard works as-is; start all unlocked
       budgetOptState = { lockedIds: new Set(), refinements: new Map(), choiceIsRefined: new Map(), inFlight: false };
 
       const allActivities = citiesWithActivities.flatMap((cn) => state.activities.filter((a) => a.city === cn));
 
-      const card = document.createElement('div');
-      card.className = 'modal-card';
-      card.style.cssText = 'max-width:560px;gap:16px';
-      card.innerHTML = `
-        <h3 style="margin:0">Lock activities to keep</h3>
-        <p class="muted-text" style="margin:0">Locked activities are preserved exactly as-is. Unlocked ones will be replaced.</p>
-        <div class="regen-lock-sections" style="display:flex;flex-direction:column;gap:20px;max-height:52vh;overflow-y:auto;padding-right:4px"></div>
-        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
-          <button id="regenBack" class="secondary" type="button">← Back</button>
-          <button id="regenConfirm" class="primary" type="button">Regenerate selected</button>
+      // Swap to full-screen overlay style matching budget optimization
+      dialog.className = 'budget-opt-overlay';
+
+      const shell = document.createElement('div');
+      shell.className = 'budget-opt-shell';
+      shell.innerHTML = `
+        <div class="budget-opt-header">
+          <h3>Lock activities to keep</h3>
+          <p class="budget-opt-desc">Locked activities are preserved exactly as-is. Unlocked ones will be replaced.</p>
         </div>`;
 
-      const sectionsWrap = card.querySelector('.regen-lock-sections');
       citiesWithActivities.forEach((cn) => {
         const section = document.createElement('section');
         section.innerHTML = `<h4 style="font-size:.9rem;font-weight:700;margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--secondary-light)">${esc(cn)}</h4>`;
@@ -7314,14 +7311,28 @@ function showRegenerateConfirmDialog() {
         state.activities.filter((a) => a.city === cn)
           .forEach((a) => grid.appendChild(buildBudgetOptCard(a, 'lock', allActivities)));
         section.appendChild(grid);
-        sectionsWrap.appendChild(section);
+        shell.appendChild(section);
       });
 
       dialog.innerHTML = '';
-      dialog.appendChild(card);
+      dialog.appendChild(shell);
 
-      card.querySelector('#regenBack').addEventListener('click', () => renderPhase1(selectedCities));
-      card.querySelector('#regenConfirm').addEventListener('click', () => {
+      // Floating footer
+      const footer = document.createElement('div');
+      footer.id = 'regenFooter';
+      footer.className = 'budget-opt-footer';
+      footer.innerHTML = `
+        <button id="regenBack" class="secondary" type="button">← Back</button>
+        <button id="regenConfirm" class="primary" type="button"><i class="ph-bold ph-check" aria-hidden="true"></i> Confirm</button>`;
+      document.body.appendChild(footer);
+
+      footer.querySelector('#regenBack').addEventListener('click', () => {
+        footer.remove();
+        dialog.className = 'modal';
+        renderPhase1(selectedCities);
+      });
+      footer.querySelector('#regenConfirm').addEventListener('click', () => {
+        footer.remove();
         const lockedByCity = {};
         selectedCities.forEach((cn) => {
           const locked = state.activities.filter((a) => a.city === cn && budgetOptState.lockedIds.has(a.id));
