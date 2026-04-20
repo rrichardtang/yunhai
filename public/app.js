@@ -195,6 +195,43 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s='') => s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalizeCity = (str = '') => String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
+function actDurationHours(a, fallback = 1) {
+  if (a == null) return fallback;
+  if (a.timing != null) return (a.timing.duration_minutes ?? 60) / 60;
+  return Number(a.duration_hours) || fallback;
+}
+function actPreferredTime(a) {
+  if (a == null) return null;
+  if (a.timing != null) return a.timing.preferred_time ?? null;
+  const s = String(a.suggested_time || '').trim();
+  return (s && s !== '10:00am') ? s : null;
+}
+function actAddress(a) {
+  if (a == null) return '';
+  if (a.location != null) return a.location.address ?? '';
+  return String(a.start_location || '').trim();
+}
+function actCostUsd(a) {
+  if (a == null) return null;
+  return a.cost != null ? a.cost.estimated_usd : a.estimated_cost_usd;
+}
+function actCostType(a) {
+  if (a == null) return 'per_person';
+  return a.cost != null ? a.cost.type : (a.cost_type || 'per_person');
+}
+function actBookingType(a) {
+  if (a == null) return 'none';
+  return a.booking != null ? a.booking.type : (a.booking_type || 'none');
+}
+function actBookingLinks(a) {
+  if (a == null) return [];
+  return a.booking != null ? (a.booking.links || []) : (a.booking_links || []);
+}
+function actOpeningHours(a) {
+  if (a == null) return '';
+  return a.timing != null ? (a.timing.opening_hours || '') : (a.opening_hours || '');
+}
+
 const geocodeCache = loadGeocodeCache();
 let geocodeQueue = Promise.resolve();
 let activityMapOverlay = null;
@@ -225,9 +262,8 @@ function getActivityLocationCandidates(activity = {}) {
   const name = String(activity.name || '').trim();
   const city = String(activity.city || '').trim();
   const candidates = [
-    activity.start_location,
-    activity.end_location,
-    activity.location,
+    actAddress(activity),
+    activity.location?.name,
     [name, city].filter(Boolean).join(', '),
     city
   ].map((x) => String(x || '').trim()).filter(Boolean);
@@ -274,7 +310,7 @@ const PRICE_LEVEL_USD = { 0: 0, 1: 15, 2: 40, 3: 90, 4: 200 };
 
 function representativeCostUsd(activity = {}) {
   const type = String(activity?.type || '').toLowerCase();
-  const bookingType = String(activity?.booking_type || '').toLowerCase();
+  const bookingType = actBookingType(activity);
   const mealTypes = ['food', 'breakfast', 'lunch', 'dinner'];
   if (mealTypes.includes(type) || bookingType === 'restaurant') {
     const lvl = activity?.price_level;
@@ -288,7 +324,7 @@ function representativeCostUsd(activity = {}) {
 }
 
 function getGetYourGuideLink(activity = {}) {
-  const links = Array.isArray(activity?.booking_links) ? activity.booking_links : [];
+  const links = actBookingLinks(activity);
   return links.find((l) => /getyourguide/i.test(l?.site || '')) || links.find((l) => /viator/i.test(l?.site || '')) || null;
 }
 
@@ -303,7 +339,7 @@ function googleMapsLinkHtml(activity = {}) {
 }
 
 function headerPriceBadgeHtml(activity = {}) {
-  const bookingType = String(activity?.booking_type || '').toLowerCase();
+  const bookingType = actBookingType(activity);
   if (bookingType === 'tour' || bookingType === 'attraction') {
     const link = getGetYourGuideLink(activity);
     if (link?.url) return `<a href="${esc(link.url)}" target="_blank" rel="noopener" class="badge badge-price booking-link">${esc(link.site || 'GetYourGuide')}</a>`;
@@ -321,7 +357,7 @@ function renderActivityCostCell(activity = {}, { userBudget = null } = {}) {
   if (userBudget != null && Number.isFinite(Number(userBudget))) {
     return `$${Math.round(Number(userBudget)).toLocaleString()}`;
   }
-  const bookingType = String(activity?.booking_type || '').toLowerCase();
+  const bookingType = actBookingType(activity);
   if (bookingType === 'tour' || bookingType === 'attraction') {
     const link = getGetYourGuideLink(activity);
     if (link?.url) return `<a href="${esc(link.url)}" target="_blank" rel="noopener" class="booking-link">Price on ${esc(link.site || 'GetYourGuide')} →</a>`;
@@ -406,6 +442,10 @@ async function geocodeActivity(activity = {}) {
     activity.place_id = place.placeId || activity.place_id || null;
     activity.place_lat = place.lat;
     activity.place_lng = place.lng;
+    if (activity.location != null) {
+      activity.location.lat = place.lat;
+      activity.location.lng = place.lng;
+    }
     if (place.priceLevel != null) activity.price_level = place.priceLevel;
     if (place.rating != null) activity.google_rating = place.rating;
     return { lat: place.lat, lng: place.lng, label: place.label };
@@ -416,8 +456,7 @@ async function geocodeActivity(activity = {}) {
   const candidates = [
     venue,
     strippedName && city ? `${strippedName}, ${city}` : '',
-    activity.start_location && city ? `${String(activity.start_location).trim()}, ${city}` : String(activity.start_location || '').trim(),
-    activity.end_location && city ? `${String(activity.end_location).trim()}, ${city}` : String(activity.end_location || '').trim(),
+    actAddress(activity) && city ? `${actAddress(activity)}, ${city}` : actAddress(activity),
     name && city ? `${name}, ${city}` : '',
     city
   ].map((x) => String(x || '').trim()).filter(Boolean);
@@ -1483,7 +1522,7 @@ function checklistActivityEndTime(item) {
   if (!item.activityTime || !item.activityId) return '';
   const activity = (state.activities || []).find((a) => a.id === item.activityId);
   if (!activity) return '';
-  const durationMins = Math.max(30, Number(activity.duration_hours || 1) * 60);
+  const durationMins = Math.max(30, actDurationHours(activity) * 60);
   const [h, m] = item.activityTime.split(':').map(Number);
   if (!Number.isFinite(h)) return '';
   const totalMins = h * 60 + (m || 0) + durationMins;
@@ -1548,7 +1587,7 @@ function buildChecklistFromState() {
     if (!state.reviewed[a.id]?.approved) return;
     const placement = state.placements[a.id];
     const day = placement ? state.days.find((d) => d.id === placement.dayId) : null;
-    const time = day ? parseTimeTo24(placement.time || a.suggested_time || typeToTime(a.type)) : '';
+    const time = day ? parseTimeTo24(placement.time || actPreferredTime(a) || typeToTime(a.type)) : '';
     const notes = String(state.reviewed[a.id]?.notes || '').trim();
     const activityEstimatedCost = (() => {
       const perPerson = representativeCostUsd(a);
@@ -1696,7 +1735,7 @@ function computeConfidenceLocal() {
     if (!item.activityDate || !item.activityTime) return null;
     const startMin = toAbsMin(item.activityDate, item.activityTime);
     if (!Number.isFinite(startMin)) return null;
-    const dur = (state.activities.find((a) => a.id === item.activityId)?.duration_hours ?? 1) * 60;
+    const dur = actDurationHours(state.activities.find((a) => a.id === item.activityId)) * 60;
     return [{ startMin, endMin: startMin + dur }];
   }
 
@@ -2682,7 +2721,7 @@ async function goToNextStep(fromStep = state.step) {
     state.days = expandDays(state.cities);
     state.arrangeCity = state.days[0]?.city || null;
     approved.forEach((a) => {
-      state.placements[a.id] = state.placements[a.id] || { dayId: null, time: parseTimeTo24(a.suggested_time || typeToTime(a.type)) };
+      state.placements[a.id] = state.placements[a.id] || { dayId: null, time: parseTimeTo24(actPreferredTime(a) || typeToTime(a.type)) };
     });
     setStep(3);
     return;
@@ -3715,9 +3754,10 @@ function computeApprovedCost(activities) {
   const children = state.numChildren || 0;
   return (activities || state.activities.filter((a) => state.reviewed[a.id]?.approved === true))
     .reduce((sum, a) => {
-      if (a.estimated_cost_usd === null || a.estimated_cost_usd === undefined) return sum;
-      if (a.cost_type === 'per_group') return sum + a.estimated_cost_usd;
-      return sum + (a.estimated_cost_usd * adults) + (a.estimated_cost_usd * 0.6 * children);
+      const cost = actCostUsd(a);
+      if (cost === null || cost === undefined) return sum;
+      if (actCostType(a) === 'per_group') return sum + cost;
+      return sum + (cost * adults) + (cost * 0.6 * children);
     }, 0);
 }
 
@@ -3767,7 +3807,7 @@ function renderBudgetTracker() {
   const used = computeBudgetLensBreakdown().budgetLensTotal;
   const remaining = state.tripBudget - used;
   const pct = Math.min(used / state.tripBudget, 1);
-  const nullCount = approved.filter((a) => a.estimated_cost_usd === null || a.estimated_cost_usd === undefined).length;
+  const nullCount = approved.filter((a) => actCostUsd(a) === null || actCostUsd(a) === undefined).length;
   const colorClass = pct < 0.6 ? 'budget-green' : pct < 0.9 ? 'budget-yellow' : 'budget-red';
 
   const html = `<div id="budgetTracker" class="budget-tracker ${colorClass}">
@@ -3832,7 +3872,7 @@ function mountBudgetOptOverlay() {
 function enterBudgetOptMode() {
   const allApproved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true);
   // Exclude free activities — no cost to optimize
-  const approved = allApproved.filter((a) => a.estimated_cost_usd != null && a.estimated_cost_usd > 0);
+  const approved = allApproved.filter((a) => actCostUsd(a) != null && actCostUsd(a) > 0);
   if (!approved.length) return;
   // Default all to locked — user unlocks what they want changed
   budgetOptState = { lockedIds: new Set(approved.map((a) => a.id)), refinements: new Map(), choiceIsRefined: new Map(), inFlight: false };
@@ -3971,7 +4011,7 @@ function renderBudgetOptCards(activities, mode) {
 
 async function onConfirmLocks() {
   if (budgetOptState.inFlight) return;
-  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true && a.estimated_cost_usd != null && a.estimated_cost_usd > 0);
+  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true && actCostUsd(a) != null && actCostUsd(a) > 0);
   const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id));
   if (!unlocked.length) {
     alert('All activities are locked — nothing to optimize.');
@@ -4036,11 +4076,11 @@ function updateBudgetOptProgressBar(approved) {
     const showingRefined = budgetOptState.choiceIsRefined.get(a.id) ?? true;
     const refined = budgetOptState.refinements.get(a.id);
     const act = (showingRefined && refined) ? refined : a;
-    const cost = act.estimated_cost_usd;
+    const cost = actCostUsd(act);
     if (cost == null) return;
     const adults = state.numTravelers || 1;
     const children = state.numChildren || 0;
-    selectedCost += act.cost_type === 'per_group' ? cost : cost * adults + Math.round(cost * 0.6 * children);
+    selectedCost += actCostType(act) === 'per_group' ? cost : cost * adults + Math.round(cost * 0.6 * children);
   });
 
   const pct = totalCost > 0 ? Math.min(selectedCost / totalCost, 1.2) * 100 : 0;
@@ -4052,7 +4092,7 @@ function updateBudgetOptProgressBar(approved) {
 }
 
 function onConfirmSelections() {
-  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true && a.estimated_cost_usd != null && a.estimated_cost_usd > 0);
+  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true && actCostUsd(a) != null && actCostUsd(a) > 0);
   approved.forEach((a) => {
     if (budgetOptState.choiceIsRefined.get(a.id) && budgetOptState.refinements.has(a.id)) {
       const idx = state.activities.findIndex((x) => x.id === a.id);
@@ -4863,7 +4903,7 @@ function getArrangeCategoryDefaults(category = '') {
 
 function inferActivityCategory(activity = {}) {
   const raw = String(activity.category || activity.type || '').trim().toLowerCase();
-  const text = `${activity.name || ''} ${activity.type || ''} ${activity.suggested_time || ''}`;
+  const text = `${activity.name || ''} ${activity.type || ''} ${actPreferredTime(activity) || ''}`;
   if (raw && getArrangeCategoryDefaults(raw)) return raw;
   if (/\b(arrival|arrive|check[- ]?in)\b/i.test(text)) return 'arrival';
   if (/\b(depart|departure|check[- ]?out)\b/i.test(text)) return 'departure';
@@ -4889,9 +4929,8 @@ function normalizeActivityMetadata(activity = {}) {
   const category = inferActivityCategory(activity);
   const defaults = getArrangeCategoryDefaults(category);
   const parsedDuration = parseDurationHoursFromText(activity.duration);
-  const durationHours = Number(activity.duration_hours || 0) > 0
-    ? Number(activity.duration_hours)
-    : (parsedDuration || defaults.durationHours || 1.5);
+  const _rawDurH = actDurationHours(activity, 0);
+  const durationHours = _rawDurH > 0 ? _rawDurH : (parsedDuration || defaults.durationHours || 1.5);
   const FIXED_HOUR_CATEGORIES = new Set(['breakfast', 'lunch', 'dinner', 'nightlife', 'sunset']);
   const openingHours = (FIXED_HOUR_CATEGORIES.has(category)
     ? defaults.openingHours
@@ -5120,11 +5159,11 @@ function formatDurationHoursLong(hours = 1) {
 function makePlacedCard(item) {
   const { icon, colorClass } = getActivityStyle(item.type);
   const placement = state.placements[item.id] || {};
-  const time = parseTimeTo24(placement.time || item.suggested_time || typeToTime(item.type));
-  const h = Math.max(28, Number(item.duration_hours || 1) * PX_PER_HOUR);
+  const time = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
+  const h = Math.max(28, actDurationHours(item) * PX_PER_HOUR);
   const y = yFromTime(time);
   const typeLabel = formatTypeLabel(item.type);
-  const durationLabel = formatDurationHoursLong(item.duration_hours || 1);
+  const durationLabel = formatDurationHoursLong(actDurationHours(item));
   return `
     <article class="placed-card ${colorClass}" data-id="${item.id}" style="height:${h}px;top:${y}px;">
       <div class="placed-body">
@@ -5142,8 +5181,7 @@ function makePlacedCard(item) {
                 data-tooltip-duration="${esc(durationLabel)}"
                 data-tooltip-verdict="${esc(item.verdict || 'N/A')}"
                 data-tooltip-why="${esc(item.why_it_fits || '')}"
-                data-tooltip-start-location="${esc(item.start_location || '')}"
-                data-tooltip-end-location="${esc(item.end_location || '')}"
+                data-tooltip-start-location="${esc(actAddress(item))}"
               >
                 <span class="placed-info-icon" aria-hidden="true">ℹ</span>
               </button>
@@ -5193,8 +5231,8 @@ function renderCommuteSelector(fromId, toId, y) {
 
 function makeCommuteIndicator(currentItem, nextItem) {
   const placement = state.placements[currentItem.id] || {};
-  const time = parseTimeTo24(placement.time || currentItem.suggested_time || typeToTime(currentItem.type));
-  const h = Math.max(28, Number(currentItem.duration_hours || 1) * PX_PER_HOUR);
+  const time = parseTimeTo24(placement.time || actPreferredTime(currentItem) || typeToTime(currentItem.type));
+  const h = Math.max(28, actDurationHours(currentItem) * PX_PER_HOUR);
   return renderCommuteSelector(currentItem.id, nextItem.id, yFromTime(time) + h + 6);
 }
 
@@ -5333,9 +5371,9 @@ function makeLogisticsCommuteIndicator(fromId, toId, baseTime, cardHeight) {
 
 function getPlacementTimeRange(activity, placementOverride = null) {
   const placement = placementOverride || state.placements[activity.id] || {};
-  const startTime = parseTimeTo24(placement.time || activity.suggested_time || typeToTime(activity.type));
+  const startTime = parseTimeTo24(placement.time || actPreferredTime(activity) || typeToTime(activity.type));
   const startMinutes = minutesFromTime(startTime);
-  const durationMinutes = Math.max(30, Number(activity.duration_hours || 1) * 60);
+  const durationMinutes = Math.max(30, actDurationHours(activity) * 60);
   return {
     startMinutes,
     endMinutes: startMinutes + durationMinutes
@@ -5519,8 +5557,8 @@ function renderArrange() {
       if (items.length > 0) {
         const lastItem = items[items.length - 1];
         const lastPlacement = state.placements[lastItem.id] || {};
-        const lastTime = parseTimeTo24(lastPlacement.time || lastItem.suggested_time || typeToTime(lastItem.type));
-        const lastEndMins = minutesFromTime(lastTime) + Math.max(30, Number(lastItem.duration_hours || 1) * 60);
+        const lastTime = parseTimeTo24(lastPlacement.time || actPreferredTime(lastItem) || typeToTime(lastItem.type));
+        const lastEndMins = minutesFromTime(lastTime) + Math.max(30, actDurationHours(lastItem) * 60);
         // 1. Commute: last activity → accommodation
         html += makeLogisticsCommuteIndicator(lastItem.id, depAccId, timeFromMinutes(lastEndMins), 0);
       }
@@ -5610,7 +5648,7 @@ function renderArrange() {
           state.placements[id] = {
             ...(state.placements[id] || {}),
             dayId: prevPlacement.dayId || null,
-            time: prevPlacement.time || parseTimeTo24(state.activities.find((a) => a.id === id)?.suggested_time || typeToTime(state.activities.find((a) => a.id === id)?.type))
+            time: prevPlacement.time || parseTimeTo24(actPreferredTime(state.activities.find((a) => a.id === id)) || typeToTime(state.activities.find((a) => a.id === id)?.type))
           };
           showToast('Overlap detected, placement reverted', 'info');
           delete evt.item.dataset.prevPlacement;
@@ -5674,8 +5712,8 @@ function enforceDayTimeBoundaries(dayId) {
       return;
     }
 
-    const durationMinutes = Math.max(30, Number(activity.duration_hours || 1) * 60);
-    const currentStart = minutesFromTime(parseTimeTo24(state.placements[activity.id]?.time || activity.suggested_time || typeToTime(activity.type)));
+    const durationMinutes = Math.max(30, actDurationHours(activity) * 60);
+    const currentStart = minutesFromTime(parseTimeTo24(state.placements[activity.id]?.time || actPreferredTime(activity) || typeToTime(activity.type)));
     const latestStart = Math.max(dayStartMinutes, dayEndMinutes - durationMinutes);
     const boundedStart = Math.max(dayStartMinutes, Math.min(currentStart, latestStart));
     state.placements[activity.id] = {
@@ -5704,9 +5742,9 @@ function recalculateDayFromIndex(dayId, startIndex = 1) {
     const selected = resolveSelectedCommuteDetails(commute);
     if (!selected || !Number.isFinite(selected.durationMinutes)) continue;
 
-    const prevStart = minutesFromTime(parseTimeTo24(state.placements[previous.id]?.time || previous.suggested_time || typeToTime(previous.type)));
-    const prevDurationMinutes = Number(previous.duration_hours || 1) * 60;
-    const currentStart = minutesFromTime(parseTimeTo24(state.placements[current.id]?.time || current.suggested_time || typeToTime(current.type)));
+    const prevStart = minutesFromTime(parseTimeTo24(state.placements[previous.id]?.time || actPreferredTime(previous) || typeToTime(previous.type)));
+    const prevDurationMinutes = actDurationHours(previous) * 60;
+    const currentStart = minutesFromTime(parseTimeTo24(state.placements[current.id]?.time || actPreferredTime(current) || typeToTime(current.type)));
     const minByTravel = prevStart + prevDurationMinutes + selected.durationMinutes;
 
     state.placements[current.id] = {
@@ -5733,12 +5771,12 @@ async function updateCommutesForCityDays(dayIds = []) {
     const { arrival, arrivalAccommodation, departure, departureAccommodation } = buildLogisticsPseudoActivities(cityObj, day.date, day.city);
     const payloadActivities = orderedActivities.map((a) => ({
       id: a.id, name: a.name, city: a.city,
-      start_location: a.start_location, end_location: a.end_location,
+      start_location: actAddress(a),
       accommodation_location: accommodationLocation,
       hotel_location: accommodationLocation,
       hotel_latitude: normalizeCoordinate(accommodation?.latitude),
       hotel_longitude: normalizeCoordinate(accommodation?.longitude),
-      suggested_time: state.placements[a.id]?.time || parseTimeTo24(a.suggested_time || typeToTime(a.type))
+      suggested_time: state.placements[a.id]?.time || parseTimeTo24(actPreferredTime(a) || typeToTime(a.type))
     }));
 
     const fullPayload = [
@@ -5862,15 +5900,7 @@ async function autoArrangeActiveCity() {
       body: JSON.stringify({
         days: dayPayload,
         activities: approvedInCity.map((a) => {
-          const obj = { id: a.id, name: a.name, category: a.category, duration_hours: a.duration_hours };
-          if (a.opening_hours) obj.opening_hours = a.opening_hours;
-          const st = String(a.suggested_time || '').trim();
-          if (st && st !== '10:00am') obj.suggested_time = st;
-          const loc = (a.start_location || a.end_location || '').trim();
-          if (loc) obj.location = loc;
-          if (a.estimated_cost_usd !== null && a.estimated_cost_usd !== undefined) obj.estimated_cost_usd = a.estimated_cost_usd;
-          if (a.cost_type) obj.cost_type = a.cost_type;
-          return obj;
+          return a;
         }),
         userId: ensureUserId(),
         profile: getProfilePayload(),
@@ -5891,13 +5921,16 @@ async function autoArrangeActiveCity() {
         state.placements[id] = { dayId: day.id, time: placement.time };
         // Update booking link dates to use the actual scheduled date
         const activity = state.activities.find((a) => a.id === id);
-        if (activity && Array.isArray(activity.booking_links)) {
-          activity.booking_links = activity.booking_links.map((l) => {
+        if (activity) {
+          const links = actBookingLinks(activity);
+          const updated = links.map((l) => {
             const url = new URL(l.url);
             if (l.site === 'GetYourGuide') url.searchParams.set('date_from', placement.date);
             if (l.site === 'Viator') url.searchParams.set('startDate', placement.date);
             return { ...l, url: url.toString() };
           });
+          if (activity.booking != null) activity.booking.links = updated;
+          else activity.booking_links = updated;
         }
       }
     }
@@ -6073,7 +6106,13 @@ function bindPlacedCardInteractions() {
         card.style.height = `${snappedHeight}px`;
 
         const activity = state.activities.find((a) => a.id === id);
-        if (activity) activity.duration_hours = nextDurationHours;
+        if (activity) {
+          if (activity.timing != null) {
+            activity.timing.duration_minutes = roundedMinutes;
+          } else {
+            activity.duration_hours = nextDurationHours;
+          }
+        }
       };
 
       const move = (ev) => {
@@ -6138,7 +6177,7 @@ function renderItineraryInsights(approvedActivities) {
       .filter((a) => state.placements[a.id]?.dayId === day.id)
       .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
 
-    const activityHours = items.reduce((sum, item) => sum + Number(item.duration_hours || 1), 0);
+    const activityHours = items.reduce((sum, item) => sum + actDurationHours(item), 0);
     let commuteMinutes = 0;
     for (let i = 1; i < items.length; i += 1) {
       const commute = state.commutes[commutePairKey(items[i - 1].id, items[i].id)] || getIncomingCommuteForActivity(items[i].id);
@@ -6171,8 +6210,8 @@ function renderItinerary() {
       .map((a) => `
         <div class="item">
           <h4>${esc(a.name)}</h4>
-          <p><strong>Time:</strong> ${esc(state.placements[a.id]?.time || parseTimeTo24(a.suggested_time || typeToTime(a.type)))}</p>
-          <p><strong>Duration:</strong> ${esc(formatDuration(a.duration_hours || 1))}</p>
+          <p><strong>Time:</strong> ${esc(state.placements[a.id]?.time || parseTimeTo24(actPreferredTime(a) || typeToTime(a.type)))}</p>
+          <p><strong>Duration:</strong> ${esc(formatDuration(actDurationHours(a)))}</p>
           <p><strong>Type:</strong> ${esc(a.type)}</p>
           <p><strong>Why:</strong> ${esc(a.why_it_fits || '')}</p>
         </div>
@@ -6244,10 +6283,10 @@ function getItineraryRows() {
       const day = state.days.find((d) => d.id === placement.dayId);
       if (!day) return null;
 
-      const startTime = placement.time || parseTimeTo24(activity.suggested_time || typeToTime(activity.type));
+      const startTime = placement.time || parseTimeTo24(actPreferredTime(activity) || typeToTime(activity.type));
       const range = getPlacementTimeRange(activity, placement);
       const timeLabel = formatTimeRangeLabel(range.startMinutes, range.endMinutes);
-      const location = String(activity.start_location || activity.end_location || activity.city || '').trim();
+      const location = actAddress(activity) || activity.city || '';
       const locationQuery = location || `${activity.name} ${activity.city || ''}`;
       const navigateHref = location || activity.name
         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`
@@ -6880,7 +6919,7 @@ async function loadItineraryById(id) {
           const idValue = normalizedActivity.id || uid();
           activities.push({ ...normalizedActivity, id: idValue });
           reviewed[idValue] = { approved: true, notes: activity.notes || '' };
-          placements[idValue] = { dayId: day.id || `${day.city}-${day.date}`, time: parseTimeTo24(activity.time || activity.suggested_time || typeToTime(activity.type)) };
+          placements[idValue] = { dayId: day.id || `${day.city}-${day.date}`, time: parseTimeTo24(activity.time || actPreferredTime(normalizedActivity) || typeToTime(activity.type)) };
         });
       });
       state.activities = activities;
@@ -7016,13 +7055,12 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
       }
 
       const cityActivities = (evt.activities || []).map((a, i) => {
-        const normalized = normalizeActivityMetadata(a);
+        const migrated = window.ActivityMigration ? window.ActivityMigration.migrateActivity(a) : a;
+        const normalized = normalizeActivityMetadata(migrated);
         return {
           id: normalized.id || `${evt.city}-${i}-${uid()}`,
           ...normalized,
-          city: canonicalizeActivityCity(normalized.city, evt.city),
-          start_location: String(normalized.start_location || '').trim(),
-          end_location: String(normalized.end_location || '').trim()
+          city: canonicalizeActivityCity(normalized.city, evt.city)
         };
       });
 
@@ -7077,8 +7115,8 @@ async function generateItinerary() {
     ...a,
     notes: state.reviewed[a.id]?.notes || '',
     dayId: state.placements[a.id]?.dayId || null,
-    order: minutesFromTime(parseTimeTo24(state.placements[a.id]?.time || a.suggested_time || typeToTime(a.type))),
-    time: state.placements[a.id]?.time || parseTimeTo24(a.suggested_time || typeToTime(a.type))
+    order: minutesFromTime(parseTimeTo24(state.placements[a.id]?.time || actPreferredTime(a) || typeToTime(a.type))),
+    time: state.placements[a.id]?.time || parseTimeTo24(actPreferredTime(a) || typeToTime(a.type))
   }));
 
   const byDay = state.days.map((d) => ({
@@ -7150,7 +7188,7 @@ function buildScheduledDays() {
     activities: state.activities
       .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === d.id)
       .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)))
-      .map((a) => ({ name: a.name, type: a.type, time: state.placements[a.id]?.time, duration: a.duration, location: a.start_location }))
+      .map((a) => ({ name: a.name, type: a.type, time: state.placements[a.id]?.time, duration: a.duration, location: actAddress(a) }))
   })).filter((d) => d.activities.length);
 }
 
@@ -7594,13 +7632,21 @@ function hydrateFromSnapshot(snapshot) {
   state.cities = (snapshot.cities || []).map(normalizeCityData);
   state.travels = Array.isArray(snapshot.travels) ? snapshot.travels.slice(0, 1).map(normalizeTravelEntry) : [];
   hydrateTravelIntoCities();
-  state.activities = snapshot.activities || [];
+  state.activities = (snapshot.activities || []).map(
+    (a) => window.ActivityMigration ? window.ActivityMigration.migrateActivity(a) : a
+  );
   state.placements = snapshot.placements || {};
   state.commutes = normalizeCommuteStateMap(snapshot.commutes || {});
   state.reviewed = snapshot.reviewed || {};
   const snapshotDays = Array.isArray(snapshot.days) ? snapshot.days : [];
+  const migrateDay = (d) => ({
+    ...d,
+    activities: Array.isArray(d.activities)
+      ? d.activities.map((a) => window.ActivityMigration ? window.ActivityMigration.migrateActivity(a) : a)
+      : []
+  });
   state.days = daysMatchCities(snapshotDays, state.cities)
-    ? snapshotDays
+    ? snapshotDays.map(migrateDay)
     : expandDays(state.cities);
   state.arrangeCity = snapshot.arrangeCity || state.days[0]?.city || null;
 
@@ -8264,7 +8310,7 @@ els.activitiesGrid.addEventListener('change', () => {
   state.days = expandDays(state.cities);
   state.arrangeCity = state.arrangeCity || state.days[0]?.city || null;
   approved.forEach((a) => {
-    state.placements[a.id] = state.placements[a.id] || { dayId: null, time: parseTimeTo24(a.suggested_time || typeToTime(a.type)) };
+    state.placements[a.id] = state.placements[a.id] || { dayId: null, time: parseTimeTo24(actPreferredTime(a) || typeToTime(a.type)) };
   });
   renderArrange();
 });

@@ -951,23 +951,35 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
     // Re-enrich cost and booking links
     const updatedName = updates.name || activity.name;
     const updatedCity = updates.city || activity.city;
-    const updatedBookingType = updates.booking_type || activity.booking_type || 'none';
+    const isNewShape = activity.booking !== undefined;
+    const existingBookingType = isNewShape ? activity.booking?.type : activity.booking_type;
+    const updatedBookingType = updates.booking_type || existingBookingType || 'none';
 
     if (updatedBookingType !== 'none') {
       const searchName = updates.venue_name || activity.venue_name || updatedName;
       const q = encodeURIComponent(searchName);
       const qCity = encodeURIComponent(`${searchName} ${updatedCity}`);
       const date = activity.scheduled_date || '';
-      if (updatedBookingType === 'tour') {
-        updates.booking_links = [
-          { site: 'GetYourGuide', url: `https://www.getyourguide.com/s/?q=${q}${date ? `&date_from=${date}` : ''}` },
-          { site: 'Viator', url: `https://www.viator.com/searchResults/all?text=${q}${date ? `&startDate=${date}` : ''}` }
-        ];
-      } else if (updatedBookingType === 'attraction') {
-        updates.booking_links = [{ site: 'Tickets', url: `https://www.google.com/search?q=${qCity}+tickets` }];
-      } else if (updatedBookingType === 'restaurant') {
-        updates.booking_links = [{ site: 'Google Maps', url: `https://www.google.com/maps/search/${qCity}` }];
+      const newLinks = updatedBookingType === 'tour'
+        ? [
+            { site: 'GetYourGuide', url: `https://www.getyourguide.com/s/?q=${q}${date ? `&date_from=${date}` : ''}` },
+            { site: 'Viator', url: `https://www.viator.com/searchResults/all?text=${q}${date ? `&startDate=${date}` : ''}` }
+          ]
+        : updatedBookingType === 'attraction'
+          ? [{ site: 'Tickets', url: `https://www.google.com/search?q=${qCity}+tickets` }]
+          : [{ site: 'Google Maps', url: `https://www.google.com/maps/search/${qCity}` }];
+
+      if (isNewShape) {
+        updates.booking = { ...(activity.booking || {}), type: updatedBookingType, links: newLinks };
+        delete updates.booking_type;
+        delete updates.booking_links;
+      } else {
+        updates.booking_links = newLinks;
       }
+    } else if (isNewShape) {
+      updates.booking = { ...(activity.booking || {}), type: 'none', links: [] };
+      delete updates.booking_type;
+      delete updates.booking_links;
     } else {
       updates.booking_links = [];
     }
@@ -1051,6 +1063,21 @@ app.get('/api/arrange-config', (_req, res) => {
   res.json({ categoryDefaults: DEFAULT_ACTIVITY_CATEGORY_CONFIG });
 });
 
+function activityForPrompt(a) {
+  const isNew = a.timing !== undefined;
+  return {
+    id: a.id,
+    name: a.name,
+    category: a.category,
+    durationHours: isNew ? a.timing.duration_minutes / 60 : (Number(a.duration_hours) || 1),
+    opening_hours: isNew ? a.timing.opening_hours : (a.opening_hours || ''),
+    preferred_time: isNew ? a.timing.preferred_time : null,
+    location: isNew ? a.location.address : (a.start_location || ''),
+    estimated_cost_usd: isNew ? a.cost.estimated_usd : a.estimated_cost_usd,
+    cost_type: isNew ? a.cost.type : (a.cost_type || 'per_person')
+  };
+}
+
 app.post('/api/arrange', async (req, res) => {
   if (!process.env.ANTHROPIC_API_KEY) {
     return res.status(503).json({ error: 'Anthropic API key not configured' });
@@ -1071,12 +1098,12 @@ app.post('/api/arrange', async (req, res) => {
   }).join('\n');
 
   const activitiesText = activities.map((a) => {
-    const parts = [`id:${a.id}`, `"${a.name}"`, a.category, `${a.duration_hours}h`];
-    if (a.opening_hours) parts.push(`hours:${a.opening_hours}`);
-    const suggested = String(a.suggested_time || '').trim();
-    if (suggested && suggested !== '10:00am') parts.push(`preferred:${suggested}`);
-    if (a.location) parts.push(`at:${a.location}`);
-    if (a.estimated_cost_usd !== null && a.estimated_cost_usd !== undefined) parts.push(`cost:$${a.estimated_cost_usd}${a.cost_type === 'per_group' ? '/group' : '/person'}`);
+    const p = activityForPrompt(a);
+    const parts = [`id:${p.id}`, `"${p.name}"`, p.category, `${p.durationHours}h`];
+    if (p.opening_hours) parts.push(`hours:${p.opening_hours}`);
+    if (p.preferred_time) parts.push(`preferred:${p.preferred_time}`);
+    if (p.location) parts.push(`at:${p.location}`);
+    if (p.estimated_cost_usd !== null && p.estimated_cost_usd !== undefined) parts.push(`cost:$${p.estimated_cost_usd}${p.cost_type === 'per_group' ? '/group' : '/person'}`);
     return `- ${parts.join(' | ')}`;
   }).join('\n');
   const perDay = Math.ceil(activities.length / days.length);
@@ -1176,15 +1203,16 @@ app.post('/api/plan', async (req, res) => {
           const searchName = a.venue_name || a.name;
           const q = encodeURIComponent(searchName);
           const qCity = encodeURIComponent(`${searchName} ${city.name}`);
-          if (a.booking_type === 'tour') {
-            a.booking_links = [
+          const bookingType = a.booking?.type ?? a.booking_type;
+          if (bookingType === 'tour') {
+            a.booking.links = [
               { site: 'GetYourGuide', url: `https://www.getyourguide.com/s/?q=${q}&date_from=${cityStartDate}&adults=${resolvedTravelers}${resolvedChildren ? `&children=${resolvedChildren}` : ''}` },
               { site: 'Viator', url: `https://www.viator.com/searchResults/all?text=${q}&startDate=${cityStartDate}&adults=${resolvedTravelers}${resolvedChildren ? `&children=${resolvedChildren}` : ''}` }
             ];
-          } else if (a.booking_type === 'attraction') {
-            a.booking_links = [{ site: 'Tickets', url: `https://www.google.com/search?q=${qCity}+tickets` }];
-          } else if (a.booking_type === 'restaurant') {
-            a.booking_links = [{ site: 'Google Maps', url: `https://www.google.com/maps/search/${qCity}` }];
+          } else if (bookingType === 'attraction') {
+            a.booking.links = [{ site: 'Tickets', url: `https://www.google.com/search?q=${qCity}+tickets` }];
+          } else if (bookingType === 'restaurant') {
+            a.booking.links = [{ site: 'Google Maps', url: `https://www.google.com/maps/search/${qCity}` }];
           }
         }
 

@@ -2,6 +2,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { getSummary } = require('./preferences');
 const { inferCategory, getCategoryDefaults } = require('./arrangeConfig');
 const { searchCityActivities, searchTopRestaurants } = require('./braveSearch');
+const { isLegacyActivity, migrateActivity, parseTimeString, parseDurationToMinutes, inferMealType } = require('./activityMigration');
 
 const MODEL = 'claude-sonnet-4-6';
 
@@ -185,11 +186,54 @@ function tryParseJsonArray(raw = '') {
   return null;
 }
 
+function blankActivity(overrides = {}) {
+  return {
+    id: overrides.id || '',
+    name: overrides.name || 'Untitled activity',
+    city: overrides.city || '',
+    venue_name: overrides.venue_name || null,
+
+    location: {
+      name: overrides.venue_name || overrides.name || 'Untitled activity',
+      address: '',
+      lat: null,
+      lng: null
+    },
+
+    category: overrides.category || 'sightseeing',
+    tags: [],
+    meal_type: null,
+
+    timing: {
+      duration_minutes: 60,
+      opening_hours: '',
+      preferred_time: null,
+      fixed: null,
+      must_happen_on_day: null
+    },
+
+    experience: { intensity: 'medium', is_highlight: false },
+
+    booking: { type: 'none', links: [], reference: null },
+
+    cost: { estimated_usd: null, type: 'per_person' },
+
+    verdict: 'Recommend',
+    dedicated_time_block: false,
+    why_it_fits: '',
+    pitfall: '',
+    booking_advice: '',
+    smarter_alternative: null,
+    ...overrides
+  };
+}
+
 function normalizeActivity(raw = {}, fallbackCity = '') {
+  if (!isLegacyActivity(raw)) return raw;
+
   const verdictRaw = String(raw.verdict || '').trim();
   const verdict = ['Recommend', 'Recommend with caveats', 'Skip'].includes(verdictRaw)
-    ? verdictRaw
-    : 'Recommend';
+    ? verdictRaw : 'Recommend';
 
   const normalizedCategory = inferCategory(raw);
   const defaults = getCategoryDefaults(normalizedCategory);
@@ -201,40 +245,70 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
   const city = String(raw.city || fallbackCity).trim();
   const rawVenue = raw.venue_name == null ? '' : String(raw.venue_name).trim();
   const mealTypes = ['food', 'breakfast', 'lunch', 'dinner', 'restaurant'];
-  const venue_name = rawVenue
-    || (mealTypes.includes(type) && name ? `${name}, ${city}` : null);
+  const venue_name = rawVenue || (mealTypes.includes(type) && name ? `${name}, ${city}` : null);
+
+  const rawSuggested = String(raw.suggested_time || '').trim();
+  const preferred_time = (rawSuggested && rawSuggested !== '10:00am')
+    ? parseTimeString(rawSuggested) : null;
+
+  const bookingType = (() => {
+    if (['tour', 'attraction', 'restaurant', 'none'].includes(raw.booking_type)) return raw.booking_type;
+    if (type === 'tour' || type === 'show') return 'tour';
+    if (['cultural', 'sports'].includes(type)) return 'attraction';
+    if (['food', 'breakfast', 'lunch', 'dinner'].includes(type)) return 'restaurant';
+    return 'none';
+  })();
 
   return {
+    id: raw.id,
     name,
-    type,
     city,
     venue_name,
-    start_location: String(raw.start_location || '').trim(),
-    end_location: String(raw.end_location || '').trim(),
+
+    location: {
+      name: venue_name || name,
+      address: String(raw.start_location || '').trim(),
+      lat: null,
+      lng: null
+    },
+
+    category: normalizedCategory,
+    tags: [],
+    meal_type: inferMealType({ type, name }),
+
+    timing: {
+      duration_minutes: parseDurationToMinutes(durationHours),
+      opening_hours: String(raw.opening_hours || defaults.openingHours || '').trim(),
+      preferred_time,
+      fixed: null,
+      must_happen_on_day: null
+    },
+
+    experience: { intensity: 'medium', is_highlight: false },
+
+    booking: {
+      type: bookingType,
+      links: Array.isArray(raw.booking_links) ? raw.booking_links : [],
+      reference: null
+    },
+
+    cost: {
+      estimated_usd: (Number.isFinite(Number(raw.estimated_cost_usd)) && Number(raw.estimated_cost_usd) >= 0)
+        ? Number(raw.estimated_cost_usd) : null,
+      type: raw.cost_type === 'per_group' ? 'per_group' : 'per_person'
+    },
+
+    verdict,
+    dedicated_time_block: Boolean(raw.dedicated_time_block),
     why_it_fits: String(raw.why_it_fits || '').trim(),
     pitfall: String(raw.pitfall || '').trim(),
     booking_advice: String(raw.booking_advice || '').trim(),
-    smarter_alternative: raw.smarter_alternative == null ? null : String(raw.smarter_alternative).trim(),
-    verdict,
-    dedicated_time_block: Boolean(raw.dedicated_time_block),
-    suggested_time: String(raw.suggested_time || '').trim() || '10:00am',
-    duration_hours: durationHours,
-    duration: String(raw.duration || `${durationHours} hours`).trim(),
-    category: normalizedCategory,
-    opening_hours: String(raw.opening_hours || defaults.openingHours || '').trim(),
-    estimated_cost_usd: (Number.isFinite(Number(raw.estimated_cost_usd)) && Number(raw.estimated_cost_usd) >= 0) ? Number(raw.estimated_cost_usd) : null,
-    cost_type: raw.cost_type === 'per_group' ? 'per_group' : 'per_person',
-    booking_type: (() => {
-      if (['tour', 'attraction', 'restaurant', 'none'].includes(raw.booking_type)) return raw.booking_type;
-      // Claude omitted or gave invalid booking_type — infer from type field
-      const t = String(raw.type || '').toLowerCase();
-      if (t === 'tour' || t === 'show') return 'tour';
-      if (['cultural', 'sports'].includes(t)) return 'attraction';
-      if (['food', 'breakfast', 'lunch', 'dinner'].includes(t)) return 'restaurant';
-      return 'none';
-    })(),
-    booking_links: []
+    smarter_alternative: raw.smarter_alternative == null ? null : String(raw.smarter_alternative).trim()
   };
+}
+
+function normalizeLegacyActivity(raw, fallbackCity = '') {
+  return normalizeActivity(raw, fallbackCity);
 }
 
 async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0, lockedActivities = []) {
@@ -341,4 +415,4 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   return parsed.map((item) => normalizeActivity(item, name));
 }
 
-module.exports = { planCity, normalizeActivity, SYSTEM_PROMPT };
+module.exports = { planCity, normalizeActivity, normalizeLegacyActivity, blankActivity, SYSTEM_PROMPT };
