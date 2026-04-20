@@ -4072,7 +4072,7 @@ function transitionToFlipPhase(approved) {
   }
   document.querySelector('#budgetOptFooter .budget-opt-progress-wrap')?.classList.remove('hidden');
   document.getElementById('budgetOptProgressLabel')?.classList.remove('hidden');
-  const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id));
+  const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id) && budgetOptState.refinements.has(a.id));
   renderBudgetOptCards(unlocked, 'flip');
   updateBudgetOptProgressBar(approved);
 }
@@ -4108,6 +4108,24 @@ function onConfirmSelections() {
     }
   });
   exitBudgetOptMode();
+  renderActivities();
+}
+
+function replaceActivityInState(oldId, newActivity) {
+  const idx = state.activities.findIndex((x) => x.id === oldId);
+  if (idx !== -1) state.activities.splice(idx, 1, newActivity);
+  delete state.reviewed[oldId];
+  state.reviewed[newActivity.id] = { approved: null, notes: '' };
+  geocodeActivity(newActivity).catch(() => {});
+  renderActivities();
+}
+
+function updateActivityInState(id, updates) {
+  const idx = state.activities.findIndex((x) => x.id === id);
+  if (idx === -1) return;
+  const updated = { ...state.activities[idx], ...updates, id };
+  state.activities[idx] = updated;
+  geocodeActivity(updated).catch(() => {});
   renderActivities();
 }
 
@@ -4227,7 +4245,7 @@ function renderActivities() {
           <div class="card-content">
             <div class="activity-card-head-actions">
               <div>
-                <span class="badge">${esc(a.type)}</span>
+                ${a.type ? `<span class="badge">${esc(a.type)}</span>` : ''}
                 <span class="badge ${verdictClass}">${esc(a.verdict || 'N/A')}</span>
                 <span data-price-badges="${esc(a.id)}">${headerPriceBadgeHtml(a)}</span>
                 ${googleMapsLinkHtml(a)}
@@ -4343,9 +4361,7 @@ function renderActivities() {
         });
         if (!resp.ok) throw new Error('Modify failed');
         const { updates } = await resp.json();
-        const idx = state.activities.findIndex((x) => x.id === a.id);
-        if (idx !== -1) state.activities[idx] = { ...a, ...updates, id: a.id };
-        renderActivities();
+        updateActivityInState(a.id, updates);
       } catch {
         confirmModify.innerHTML = '<i class="ph-bold ph-pencil-simple"></i>';
         confirmModify.disabled = false;
@@ -4368,11 +4384,7 @@ function renderActivities() {
         const { activity: rawReplacement } = await resp.json();
         if (!rawReplacement) throw new Error('No activity in response');
         const replacement = { id: `${rawReplacement.city || a.city}-replacement-${uid()}`, ...normalizeActivityMetadata(rawReplacement), city: canonicalizeActivityCity(rawReplacement.city, a.city) };
-        const idx = state.activities.findIndex((x) => x.id === a.id);
-        if (idx !== -1) state.activities.splice(idx, 1, replacement);
-        delete state.reviewed[a.id];
-        state.reviewed[replacement.id] = { approved: null, notes: '' };
-        renderActivities();
+        replaceActivityInState(a.id, replacement);
       } catch {
         confirmReplace.innerHTML = '<i class="ph-bold ph-arrows-clockwise"></i>';
         confirmReplace.disabled = false;
@@ -4484,10 +4496,8 @@ function renderActivities() {
         });
         if (!resp.ok) throw new Error('Modify failed');
         const { updates } = await resp.json();
-        const idx = state.activities.findIndex((x) => x.id === a.id);
-        if (idx !== -1) state.activities[idx] = { ...a, ...updates, id: a.id };
         close();
-        renderActivities();
+        updateActivityInState(a.id, updates);
       } catch {
         expandConfirmModify.innerHTML = '<i class="ph-bold ph-pencil-simple"></i>';
         expandConfirmModify.disabled = false;
@@ -4510,12 +4520,8 @@ function renderActivities() {
         const { activity: rawReplacement } = await resp.json();
         if (!rawReplacement) throw new Error('No activity in response');
         const replacement = { id: `${rawReplacement.city || a.city}-replacement-${uid()}`, ...normalizeActivityMetadata(rawReplacement), city: canonicalizeActivityCity(rawReplacement.city, a.city) };
-        const idx = state.activities.findIndex((x) => x.id === a.id);
-        if (idx !== -1) state.activities.splice(idx, 1, replacement);
-        delete state.reviewed[a.id];
-        state.reviewed[replacement.id] = { approved: null, notes: '' };
         close();
-        renderActivities();
+        replaceActivityInState(a.id, replacement);
       } catch {
         expandConfirmReplace.innerHTML = '<i class="ph-bold ph-arrows-clockwise"></i>';
         expandConfirmReplace.disabled = false;
