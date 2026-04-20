@@ -4744,18 +4744,13 @@ function submitAddActivity() {
     })
     .then((data) => {
       if (!data?.activity) throw new Error('no activity returned');
-      // Preserve the stub's city exactly so filters match; keep userAdded flag; drop enriching
       const enriched = { ...data.activity, id: stubId, city: stub.city, userAdded: true };
-      const idx = state.activities.findIndex((a) => a.id === stubId);
-      if (idx !== -1) state.activities[idx] = enriched;
-      renderActivities();
+      replaceActivityInState(stubId, enriched);
       showToast(`"${enriched.name}" added to your itinerary.`, 'success');
     })
     .catch((err) => {
       console.error('[addActivity] enrichment failed:', err);
-      const idx = state.activities.findIndex((a) => a.id === stubId);
-      if (idx !== -1) delete state.activities[idx].enriching;
-      renderActivities();
+      updateActivityInState(stubId, { enriching: false });
       showToast(`"${name}" added. Details couldn't be enriched — you can edit it later.`, 'info');
     });
 }
