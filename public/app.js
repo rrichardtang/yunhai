@@ -4047,7 +4047,7 @@ async function onConfirmLocks() {
           userId: ensureUserId()
         })
       })
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((r) => r.ok ? r.json() : r.json().then((e) => Promise.reject(e)))
         .then(({ updates }) => ({ id: a.id, refined: { ...a, ...updates, id: a.id } }))
     )
   );
