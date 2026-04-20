@@ -3732,29 +3732,25 @@ function applyVerdictToVisibleActivities(verdict = null) {
   renderActivities();
 }
 
-let reviewImageEnrichInFlight = false;
 
-function enrichImages(items = []) {
-  const itemsToFetch = (items || []).filter((item) => item && !item.imageUrl && item.name);
-  if (!itemsToFetch.length) return Promise.resolve();
-
-  return Promise.all(itemsToFetch.map(async (item) => {
-    try {
-      const params = new URLSearchParams({ q: item.name, city: item.city || '', type: item.type || '' });
-      const res = await apiFetch(`/api/image?${params}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data?.imageUrl) item.imageUrl = data.imageUrl;
-    } catch {}
-  }));
+async function enrichActivity(a) {
+  if (!a?.name) return;
+  await Promise.all([
+    a.place_id == null && a.price_level == null ? geocodeActivity(a).catch(() => {}) : Promise.resolve(),
+    !a.imageUrl ? (async () => {
+      try {
+        const params = new URLSearchParams({ q: a.name, city: a.city || '', type: a.type || '' });
+        const res = await apiFetch(`/api/image?${params}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.imageUrl) a.imageUrl = data.imageUrl;
+      } catch {}
+    })() : Promise.resolve()
+  ]);
 }
 
-function enrichPlaces(items = []) {
-  const toFetch = (items || []).filter((a) => a && a.name && a.price_level == null && !a.place_id);
-  if (!toFetch.length) return Promise.resolve();
-  return Promise.all(toFetch.map(async (a) => {
-    try { await geocodeActivity(a); } catch {}
-  }));
+function enrichActivities(items = []) {
+  return Promise.all((items || []).filter((a) => a?.name).map(enrichActivity));
 }
 
 function computeApprovedCost(activities) {
@@ -4060,6 +4056,7 @@ async function onConfirmLocks() {
   });
 
   budgetOptState.inFlight = false;
+  await enrichActivities([...budgetOptState.refinements.values()]);
   transitionToFlipPhase(approved);
 }
 
@@ -4116,7 +4113,7 @@ function replaceActivityInState(oldId, newActivity) {
   if (idx !== -1) state.activities.splice(idx, 1, newActivity);
   delete state.reviewed[oldId];
   state.reviewed[newActivity.id] = { approved: null, notes: '' };
-  geocodeActivity(newActivity).catch(() => {});
+  enrichActivity(newActivity).then(() => renderActivities());
   renderActivities();
 }
 
@@ -4125,7 +4122,7 @@ function updateActivityInState(id, updates) {
   if (idx === -1) return;
   const updated = { ...state.activities[idx], ...updates, id };
   state.activities[idx] = updated;
-  geocodeActivity(updated).catch(() => {});
+  enrichActivity(updated).then(() => renderActivities());
   renderActivities();
 }
 
@@ -4133,18 +4130,6 @@ function renderActivities() {
   updateReviewNav();
   populateReviewCityFilter();
   destroyMiniMaps();
-
-  if (state.step === 2 && !reviewImageEnrichInFlight) {
-    reviewImageEnrichInFlight = true;
-    Promise.all([
-      enrichImages(state.activities),
-      enrichPlaces(state.activities)
-    ]).then(() => {
-      if (state.step === 2) renderActivities();
-    }).catch(() => {}).finally(() => {
-      reviewImageEnrichInFlight = false;
-    });
-  }
 
   const filteredActivities = getFilteredReviewActivities();
 
@@ -7078,6 +7063,7 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
 
       console.log('[regen] SSE city event:', evt.city, 'incoming:', cityActivities.length, 'cities in state.activities:', [...new Set(state.activities.map((a) => a.city))]);
       state.activities.push(...cityActivities);
+      enrichActivities(cityActivities).then(() => { if (state.step === 2) renderActivities(); });
       setStep(2);
       renderActivities();
 
