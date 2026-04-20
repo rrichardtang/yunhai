@@ -941,7 +941,7 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await openai.chat.completions.create({
       model: ACTIVITY_REFINE_MODEL,
-      max_tokens: 500,
+      max_completion_tokens: 500,
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: userContent }]
     });
@@ -987,7 +987,7 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
     return res.json({ updates });
   } catch (error) {
     console.error('[/api/activity/refine]', error);
-    return res.status(500).json({ error: error.message || 'Failed to refine activity', stack: error.stack });
+    return res.status(500).json({ error: error.message || 'Failed to refine activity' });
   }
 });
 
@@ -1429,7 +1429,7 @@ app.post('/api/chat/message', async (req, res) => {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await openai.chat.completions.create({
       model: CHAT_CONCIERGE_MODEL,
-      max_tokens: 600,
+      max_completion_tokens: 600,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt + searchContext },
