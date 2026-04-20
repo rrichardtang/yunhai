@@ -2308,6 +2308,7 @@ function bindChecklistEvents(el) {
       item.updatedAt = new Date().toISOString();
       renderChecklistModal();
       renderConfidenceBadge();
+      updateFinalizeBtn();
     });
   });
 
@@ -5877,12 +5878,13 @@ function renderArrangeDiagnostics() {
 function updateFinalizeBtn() {
   if (!els.finalizeArrangeBtn) return;
   const activeCity = state.arrangeCity;
-  const approvedInCity = state.activities.filter(
-    (a) => state.reviewed[a.id]?.approved && cityMatches(a.city, activeCity)
-  );
+  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
+  const approvedInCity = activeCity
+    ? approved.filter((a) => cityMatches(a.city, activeCity))
+    : approved;
+  const approvedIds = new Set(approvedInCity.map((a) => String(a.id)));
   const hasVerified = (state.confidenceChecklist || []).some(
-    (item) => item.type === 'activity' && item.verified &&
-      approvedInCity.some((a) => String(a.id) === String(item.activityId))
+    (item) => item.type === 'activity' && item.verified && approvedIds.has(String(item.activityId))
   );
   const hasFixed = approvedInCity.some((a) => a.timing?.fixed?.date && a.timing?.fixed?.time);
   els.finalizeArrangeBtn.disabled = !(hasVerified || hasFixed);
