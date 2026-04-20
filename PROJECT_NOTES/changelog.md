@@ -631,3 +631,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Add Google Places location inputs for accommodation, arrival, departure
 - Simplify trip setup date/time UX
 - Scaffolded PROJECT_NOTES/
+
+## [2026-04-20] Phase 1 activity schema migration
+
+- Created `src/activityMigration.js`: `isLegacyActivity`, `migrateActivity`, `parseTimeString`, `parseDurationToMinutes`, `inferMealType`
+- Rewrote `normalizeActivity` in `src/claude.js` to emit new v2 shape; added `blankActivity` helper and `normalizeLegacyActivity` export
+- Updated `src/itineraryStore.js`: in-memory migration on load, `_schemaVersion: 2` on save/update
+- Added `activityForPrompt` adapter in `src/server.js` before `/api/arrange` prompt assembly; updated booking-link enrichment and `/refine` to handle both shapes
+- Created `public/js/activityMigration.js` (plain JS, no imports); wired into `planner.html` before `app.js`
+- Added `actDurationHours`, `actPreferredTime`, `actAddress`, `actCostUsd`, `actCostType`, `actBookingType`, `actBookingLinks`, `actOpeningHours` accessor helpers in `public/app.js`; updated all ~40 legacy field read sites
+- Applied client-side migration at state hydration path (snapshot load and SSE city event)
+- Added `src/activityMigration.test.js` with 11 tests (all passing); `npm test` 22/22 green
+- Pushed branch `feature/arrange-schema-migration`

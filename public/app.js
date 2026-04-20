@@ -3749,6 +3749,14 @@ function enrichImages(items = []) {
   }));
 }
 
+function enrichPlaces(items = []) {
+  const toFetch = (items || []).filter((a) => a && a.name && a.price_level == null && !a.place_id);
+  if (!toFetch.length) return Promise.resolve();
+  return Promise.all(toFetch.map(async (a) => {
+    try { await geocodeActivity(a); } catch {}
+  }));
+}
+
 function computeApprovedCost(activities) {
   const adults = state.numTravelers || 1;
   const children = state.numChildren || 0;
@@ -3901,7 +3909,7 @@ function buildBudgetOptCard(a, mode, approved) {
       ${label ? `<span class="opt-card--refined-label">${label}</span>` : ''}
       <div class="activity-card-head-actions" style="margin-bottom:8px;">
         <div>
-          <span class="badge">${esc(act.type || '')}</span>
+          ${act.type ? `<span class="badge">${esc(act.type)}</span>` : ''}
           ${headerPriceBadgeHtml(act)}
         </div>
       </div>
@@ -3980,7 +3988,7 @@ function openOptCardExpand(act, label) {
       ${label ? `<span class="opt-card--refined-label">${label}</span>` : ''}
       <div class="activity-card-head-actions" style="margin-bottom:8px;">
         <div>
-          <span class="badge">${esc(act.type || '')}</span>
+          ${act.type ? `<span class="badge">${esc(act.type)}</span>` : ''}
           ${headerPriceBadgeHtml(act)}
         </div>
       </div>
@@ -4110,7 +4118,10 @@ function renderActivities() {
 
   if (state.step === 2 && !reviewImageEnrichInFlight) {
     reviewImageEnrichInFlight = true;
-    enrichImages(state.activities).then(() => {
+    Promise.all([
+      enrichImages(state.activities),
+      enrichPlaces(state.activities)
+    ]).then(() => {
       if (state.step === 2) renderActivities();
     }).catch(() => {}).finally(() => {
       reviewImageEnrichInFlight = false;
