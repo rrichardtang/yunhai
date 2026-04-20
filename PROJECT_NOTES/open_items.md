@@ -1,11 +1,11 @@
 # Open Items
 
-## [2026-04-17] Auto arrange arrival/departure time context
+## [2026-04-20] Phase 3 — Finalize Modal implementation
 
 **Status:** Deferred
-**Description:** Pass actual arrival/departure times in the `fixedStart`/`fixedEnd` labels of the `/api/arrange` prompt so the LLM can reason about a 2-hour buffer around the transport, not just the commute-adjusted window boundary.
-**Context:** Currently `windowStart`/`windowEnd` bake in transit time but the LLM has no visibility into the raw flight/train arrival or departure time. User confirmed this is a separate fix from the Trip Health overhaul.
-**Next action:** Edit `autoArrangeActiveCity()` in `public/app.js` to append arrival/departure time to the `fixedStart`/`fixedEnd` label strings before posting to `/api/arrange`.
+**Description:** Finalize button is visible and enabled when verified/fixed activities exist, but clicking it shows a "coming soon" toast. Phase 3 must implement the Finalize Modal: activity list with lock toggles, inline time editing, live overlap validation, `lockedActivities` server payload, `ALREADY OCCUPIED` prompt injection, lock icons on arrange cards, and drag protection.
+**Context:** Plan spec in `PROJECT_NOTES/arrange_phase3_locks.md`. Save-button plan (this branch) provides the hook point (Finalize button) and data source (verified checklist items persist correctly). Phase 3 wires up the modal and lock semantics.
+**Next action:** Implement Phase 3 on a new branch after this branch is deployed and smoke-tested.
 
 ---
 

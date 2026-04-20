@@ -40,6 +40,7 @@ const { clerkMiddleware, requireAuth } = require('@clerk/express');
 const { planCity, normalizeActivity, SYSTEM_PROMPT: ACTIVITY_SYSTEM_PROMPT } = require('./claude');
 const { fetchUnsplashImage } = require('./unsplash');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('./arrangeConfig');
+const { showUpEarlyMins } = require('./arrangeArrivalBuffers');
 const {
   recordConstraint,
   recordPreference,
@@ -1075,7 +1076,9 @@ function activityForPrompt(a) {
     preferred_time: isNew ? a.timing.preferred_time : null,
     location: isNew ? a.location.address : (a.start_location || ''),
     estimated_cost_usd: isNew ? a.cost.estimated_usd : a.estimated_cost_usd,
-    cost_type: isNew ? a.cost.type : (a.cost_type || 'per_person')
+    cost_type: isNew ? a.cost.type : (a.cost_type || 'per_person'),
+    booking_type: isNew ? (a.booking?.type || 'none') : (a.booking_type || 'none'),
+    user_notes: String(a.user_notes || '').trim()
   };
 }
 
@@ -1105,7 +1108,11 @@ app.post('/api/arrange', async (req, res) => {
     if (p.preferred_time) parts.push(`preferred:${p.preferred_time}`);
     if (p.location) parts.push(`at:${p.location}`);
     if (p.estimated_cost_usd !== null && p.estimated_cost_usd !== undefined) parts.push(`cost:$${p.estimated_cost_usd}${p.cost_type === 'per_group' ? '/group' : '/person'}`);
-    return `- ${parts.join(' | ')}`;
+    const earlyMins = showUpEarlyMins(p.booking_type);
+    if (earlyMins > 0) parts.push(`arrive:${earlyMins}min early (ticketed)`);
+    let line = `- ${parts.join(' | ')}`;
+    if (p.user_notes) line += `\n  USER NOTE: "${p.user_notes}"`;
+    return line;
   }).join('\n');
   const perDay = Math.ceil(activities.length / days.length);
 
@@ -1132,8 +1139,10 @@ RULES (priority order):
 7. Group nearby locations on the same day when possible.
 8. Honor preferred time hints when they fit.
 9. Respect the traveler's ${paceDesc} pace preference — ${paceValue <= 2 ? 'leave generous gaps between activities and favor fewer, longer experiences' : paceValue >= 4 ? 'pack days tightly with minimal downtime between activities' : 'balance activity with reasonable breaks'}.
-10. If an activity cannot fit, include it in unplaced with a reason.
-${budget && approvedCostTotal !== undefined ? `11. Budget note: The traveler's total budget is $${budget} for ${numTravelers || 1} adult(s)${numChildren ? ` and ${numChildren} child(ren)` : ''}. Total estimated cost of approved activities is $${approvedCostTotal}. If over budget, note it in a top-level "budget_warning" string field.` : ''}
+10. Tours and attractions marked "arrive:N min early (ticketed)" require arrival N minutes before the ticket start time — block that arrival time plus the full duration as occupied.
+11. Honor USER NOTE instructions when scheduling (e.g., "arrive 30 min early", "must be before sunset").
+12. If an activity cannot fit, include it in unplaced with a reason.
+${budget && approvedCostTotal !== undefined ? `13. Budget note: The traveler's total budget is $${budget} for ${numTravelers || 1} adult(s)${numChildren ? ` and ${numChildren} child(ren)` : ''}. Total estimated cost of approved activities is $${approvedCostTotal}. If over budget, note it in a top-level "budget_warning" string field.` : ''}
 
 Respond ONLY with JSON:
 {"placements":{"<id>":{"date":"YYYY-MM-DD","time":"HH:MM"}},"unplaced":[{"id":"<id>","reason":"..."}]}`;

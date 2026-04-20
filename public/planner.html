@@ -172,7 +172,8 @@
         <div class="between arrange-header">
           <h2>Arrange Approved Activities</h2>
           <div class="arrange-actions">
-            <button id="autoArrangeBtn" class="secondary auto-arrange-btn" type="button"><i class="ph-bold ph-magic-wand"></i> Auto-arrange</button>
+            <button id="autoArrangeBtn" class="secondary auto-arrange-btn" type="button"><i class="ph-bold ph-magic-wand"></i> Draft</button>
+            <button id="finalizeArrangeBtn" class="primary auto-arrange-btn" type="button" disabled><i class="ph-bold ph-lock"></i> Finalize</button>
           </div>
         </div>
         <div id="arrangeCityNav" class="arrange-city-nav"></div>
@@ -381,6 +382,7 @@
     <script crossorigin="anonymous" data-clerk-publishable-key="" src="https://__CLERK_FAPI_DOMAIN__/npm/@clerk/clerk-js@6/dist/clerk.browser.js"></script>
     <script src="/js/activityMigration.js"></script>
     <script src="/js/arrangeBuffers.js"></script>
+    <script src="/js/arrangeArrivalBuffers.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

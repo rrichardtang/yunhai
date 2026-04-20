@@ -4,6 +4,27 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-20] Checklist save fix + arrive-early buffer + Draft/Finalize buttons
+
+- `public/app.js` — added `syncChecklistDateTimeToPlacement`: writes checklist date/time edits back to `state.placements` before the `buildChecklistFromState` rebuild (fixes silent save bug)
+- `public/app.js` — `syncItemFromExpanded`: calls `syncChecklistDateTimeToPlacement` alongside existing notes sync
+- `public/app.js` — `autoArrangeActiveCity`: merges `state.reviewed[id].notes` into each activity as `user_notes` for the arrange payload
+- `src/arrangeArrivalBuffers.js` + `public/js/arrangeArrivalBuffers.js`: new `showUpEarlyMins(bookingType)` helper (15 min for tour/attraction, 0 otherwise)
+- `src/arrangeArrivalBuffers.test.js`: 6 unit tests, all passing
+- `src/server.js`: `activityForPrompt` now exposes `booking_type` and `user_notes`; activitiesText emits `arrive:N min early (ticketed)` and `USER NOTE` lines; two new RULES (10, 11)
+- `public/planner.html`: renamed Auto-arrange button to "Draft"; added "Finalize" button (disabled by default); loads `arrangeArrivalBuffers.js`
+- `public/app.js` — `updateFinalizeBtn`: enables Finalize when ≥1 verified checklist activity or `timing.fixed` activity exists in active city; called from `renderArrange` and checklist Save
+- `public/app.js` — Finalize button shows "coming soon" toast until Phase 3 ships
+
+## [2026-04-20] Phase 2: transport mode + arrival/departure buffers
+
+- `src/arrangeBuffers.js`: new module with buffer tables and `arrivalBufferMins`/`departureBufferMins` helpers
+- `public/js/arrangeBuffers.js`: client mirror of above (plain script); loaded via `planner.html`
+- `src/arrangeBuffers.test.js`: 5 unit tests, all passing
+- `public/app.js` — `normalizeCityLogistics`: coerces `mode` (default `'flight'`) and `international` (default `true`) on arrival/departure
+- `public/app.js` — city drawer: added mode `<select>` and international `<checkbox>` per logistics row; intl toggle hides/shows based on flight selection
+- `public/app.js` — `autoArrangeActiveCity`: applies mode-based arrival/departure buffers on top of transit commute; Distance Matrix failure uses mode-aware fallback + surfaces diagnostic toast; same-day arrival+departure with no schedulable window aborts with warning
+
 ## [2026-04-19] Replace Brave price scraping with Google Places for pins and price signal
 
 - `src/server.js`: dropped `searchActivityPricesBatch` / `searchActivityPrice` imports; removed Brave price enrichment branches in `/api/plan` (~L1113) and `/api/activity/refine` (~L891); added `/api/places/resolve` endpoint (Google Places "Find Place From Text" proxy) with in-memory LRU cache (max 500)
