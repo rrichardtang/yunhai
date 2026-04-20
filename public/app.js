@@ -4081,8 +4081,8 @@ function updateBudgetOptProgressBar(approved) {
   const totalCost = computeApprovedCost(approved);
   let selectedCost = 0;
   approved.forEach((a) => {
-    const showingRefined = budgetOptState.choiceIsRefined.get(a.id) ?? true;
     const refined = budgetOptState.refinements.get(a.id);
+    const showingRefined = budgetOptState.choiceIsRefined.get(a.id) ?? !!refined;
     const act = (showingRefined && refined) ? refined : a;
     const cost = actCostUsd(act);
     if (cost == null) return;
