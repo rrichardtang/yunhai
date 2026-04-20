@@ -558,7 +558,9 @@ function normalizeCityLogistics(city = {}) {
       location: String(arrival.location || ''),
       placeId: String(arrival.placeId || ''),
       latitude: normalizeCoordinate(arrival.latitude),
-      longitude: normalizeCoordinate(arrival.longitude)
+      longitude: normalizeCoordinate(arrival.longitude),
+      mode: ['flight', 'train', 'car', 'other'].includes(arrival.mode) ? arrival.mode : 'flight',
+      international: arrival.international !== undefined ? Boolean(arrival.international) : true
     },
     departure: {
       date: String(departure.date || departureDate || ''),
@@ -566,7 +568,9 @@ function normalizeCityLogistics(city = {}) {
       location: String(departure.location || ''),
       placeId: String(departure.placeId || ''),
       latitude: normalizeCoordinate(departure.latitude),
-      longitude: normalizeCoordinate(departure.longitude)
+      longitude: normalizeCoordinate(departure.longitude),
+      mode: ['flight', 'train', 'car', 'other'].includes(departure.mode) ? departure.mode : 'flight',
+      international: departure.international !== undefined ? Boolean(departure.international) : true
     }
   };
 }
@@ -2966,6 +2970,16 @@ function renderCities() {
                   <input type="text" placeholder="Arrival location (e.g. airport)" value="${esc(city.logistics.arrival.location)}" data-logistics="arrivalLocation" autocomplete="off" aria-label="Arrival location" />
                 </div>
                 <input type="time" value="${esc(city.logistics.arrival.time || '')}" data-logistics="arrivalTime" aria-label="Arrival time" />
+                <select data-logistics="arrivalMode" aria-label="Arrival transport">
+                  <option value="flight" ${city.logistics.arrival.mode === 'flight' ? 'selected' : ''}>Flight</option>
+                  <option value="train" ${city.logistics.arrival.mode === 'train' ? 'selected' : ''}>Train</option>
+                  <option value="car" ${city.logistics.arrival.mode === 'car' ? 'selected' : ''}>Car</option>
+                  <option value="other" ${city.logistics.arrival.mode === 'other' ? 'selected' : ''}>Other</option>
+                </select>
+                <label class="intl-toggle" data-mode-dep="arrivalMode" ${city.logistics.arrival.mode !== 'flight' ? 'hidden' : ''}>
+                  <input type="checkbox" data-logistics="arrivalInternational" ${city.logistics.arrival.international ? 'checked' : ''}>
+                  International
+                </label>
               </div>
             </div>
 
@@ -2976,6 +2990,16 @@ function renderCities() {
                   <input type="text" placeholder="Departure location (e.g. train station)" value="${esc(city.logistics.departure.location)}" data-logistics="departureLocation" autocomplete="off" aria-label="Departure location" />
                 </div>
                 <input type="time" value="${esc(city.logistics.departure.time || '')}" data-logistics="departureTime" aria-label="Departure time" />
+                <select data-logistics="departureMode" aria-label="Departure transport">
+                  <option value="flight" ${city.logistics.departure.mode === 'flight' ? 'selected' : ''}>Flight</option>
+                  <option value="train" ${city.logistics.departure.mode === 'train' ? 'selected' : ''}>Train</option>
+                  <option value="car" ${city.logistics.departure.mode === 'car' ? 'selected' : ''}>Car</option>
+                  <option value="other" ${city.logistics.departure.mode === 'other' ? 'selected' : ''}>Other</option>
+                </select>
+                <label class="intl-toggle" data-mode-dep="departureMode" ${city.logistics.departure.mode !== 'flight' ? 'hidden' : ''}>
+                  <input type="checkbox" data-logistics="departureInternational" ${city.logistics.departure.international ? 'checked' : ''}>
+                  International
+                </label>
               </div>
             </div>
 
@@ -3149,7 +3173,7 @@ function renderCities() {
     });
 
     row.querySelectorAll('[data-logistics]').forEach((input) => {
-      const eventType = (input.type === 'date' || input.type === 'time') ? 'change' : 'input';
+      const eventType = (input.type === 'date' || input.type === 'time' || input.type === 'checkbox' || input.tagName === 'SELECT') ? 'change' : 'input';
       input.addEventListener(eventType, () => {
         const field = input.dataset.logistics;
 
@@ -3169,6 +3193,22 @@ function renderCities() {
         }
         if (field === 'departureTime') {
           city.logistics.departure.time = parseTimeTo24(input.value || '');
+        }
+        if (field === 'arrivalMode') {
+          city.logistics.arrival.mode = input.value;
+          const label = row.querySelector('[data-mode-dep="arrivalMode"]');
+          if (label) label.hidden = input.value !== 'flight';
+        }
+        if (field === 'arrivalInternational') {
+          city.logistics.arrival.international = input.checked;
+        }
+        if (field === 'departureMode') {
+          city.logistics.departure.mode = input.value;
+          const label = row.querySelector('[data-mode-dep="departureMode"]');
+          if (label) label.hidden = input.value !== 'flight';
+        }
+        if (field === 'departureInternational') {
+          city.logistics.departure.international = input.checked;
         }
 
         syncCityLegacyDates(city);
@@ -5854,13 +5894,25 @@ async function autoArrangeActiveCity() {
       : []
   ]);
 
-  let arrivalTransitMins = 0;
-  const arrCommute = resolveSelectedCommuteDetails(arrivalCommutes[0]);
-  if (arrCommute && Number.isFinite(arrCommute.durationMinutes)) arrivalTransitMins = arrCommute.durationMinutes;
+  const diagnostics = [];
 
-  let departureTransitMins = 0;
+  let arrivalTransitMins;
+  const arrCommute = resolveSelectedCommuteDetails(arrivalCommutes[0]);
+  if (arrCommute && Number.isFinite(arrCommute.durationMinutes)) {
+    arrivalTransitMins = arrCommute.durationMinutes;
+  } else {
+    arrivalTransitMins = TRANSIT_FALLBACK_MINS[cityLogistics.arrival?.mode] ?? 30;
+    diagnostics.push(`Distance Matrix unavailable for arrival — used ${arrivalTransitMins}min fallback`);
+  }
+
+  let departureTransitMins;
   const depCommute = resolveSelectedCommuteDetails(departureCommutes[0]);
-  if (depCommute && Number.isFinite(depCommute.durationMinutes)) departureTransitMins = depCommute.durationMinutes;
+  if (depCommute && Number.isFinite(depCommute.durationMinutes)) {
+    departureTransitMins = depCommute.durationMinutes;
+  } else {
+    departureTransitMins = TRANSIT_FALLBACK_MINS[cityLogistics.departure?.mode] ?? 30;
+    diagnostics.push(`Distance Matrix unavailable for departure — used ${departureTransitMins}min fallback`);
+  }
 
   const dayPayload = activeDays.map((day) => {
     const startMins = getCityDayWindowStart(cityPlan, day.date);
@@ -5872,15 +5924,35 @@ async function autoArrangeActiveCity() {
       : isDeparture ? 'departure day'
       : 'full day';
 
+    const arrBuf = isArrival
+      ? arrivalBufferMins(cityLogistics.arrival.mode, cityLogistics.arrival.international)
+      : 0;
+    const depBuf = isDeparture
+      ? departureBufferMins(cityLogistics.departure.mode, cityLogistics.departure.international)
+      : 0;
+
     const fixedStart = isArrival
-      ? { label: `Transit: ${arrivalLocation} → ${accommodationLabel}`, time: timeFromMinutes(startMins + arrivalTransitMins) }
+      ? { label: `Arrival + ${cityLogistics.arrival.mode} buffer → accommodation`, time: timeFromMinutes(startMins + arrivalTransitMins + arrBuf) }
       : null;
     const fixedEnd = isDeparture
-      ? { label: `Transit: ${accommodationLabel} → ${departureLocation}`, time: timeFromMinutes(endMins - departureTransitMins) }
+      ? { label: `Depart for ${departureLocation}`, time: timeFromMinutes(endMins - departureTransitMins - depBuf) }
       : null;
 
     return { date: day.date, label, windowStart: timeFromMinutes(startMins), windowEnd: timeFromMinutes(endMins), fixedStart, fixedEnd };
   });
+
+  // Guard: same-day arrival+departure with no schedulable window
+  const sameDayEntry = dayPayload.find(d => d.fixedStart && d.fixedEnd);
+  if (sameDayEntry) {
+    const fsMin = minutesFromTime(sameDayEntry.fixedStart.time);
+    const feMin = minutesFromTime(sameDayEntry.fixedEnd.time);
+    if (feMin <= fsMin) {
+      showToast('No schedulable window for this city — consider extending the stay', 'warning');
+      return;
+    }
+  }
+
+  if (diagnostics.length) showToast(diagnostics.join(' | '), 'info');
 
   approvedInCity.forEach((a) => {
     state.activities = state.activities.map((current) => (current.id === a.id ? a : current));
