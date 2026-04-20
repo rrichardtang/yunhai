@@ -987,7 +987,7 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
     return res.json({ updates });
   } catch (error) {
     console.error('[/api/activity/refine]', error);
-    return res.status(500).json({ error: error.message || 'Failed to refine activity' });
+    return res.status(500).json({ error: error.message || 'Failed to refine activity', stack: error.stack });
   }
 });
 
