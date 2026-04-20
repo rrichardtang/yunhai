@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { isLegacyActivity, migrateActivity } = require('./activityMigration');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'itineraries.json');
@@ -12,12 +13,26 @@ function ensureStoreFile() {
   }
 }
 
+function migrateItinerary(itinerary) {
+  if (!itinerary || itinerary._schemaVersion >= 2) return itinerary;
+  const days = Array.isArray(itinerary.days) ? itinerary.days : [];
+  return {
+    ...itinerary,
+    days: days.map((day) => ({
+      ...day,
+      activities: Array.isArray(day.activities)
+        ? day.activities.map((a) => isLegacyActivity(a) ? migrateActivity(a) : a)
+        : []
+    }))
+  };
+}
+
 function readStore() {
   ensureStoreFile();
   try {
     const raw = fs.readFileSync(STORE_PATH, 'utf8');
     const parsed = JSON.parse(raw);
-    const items = Array.isArray(parsed.items) ? parsed.items : [];
+    const items = Array.isArray(parsed.items) ? parsed.items.map(migrateItinerary) : [];
     const latestByUser = parsed.latestByUser && typeof parsed.latestByUser === 'object' ? parsed.latestByUser : {};
     return { latestByUser, items };
   } catch {
@@ -57,6 +72,7 @@ function saveItinerary(payload = {}, userId) {
     ...payload,
     id: createId(),
     userId,
+    _schemaVersion: 2,
     bookings: Array.isArray(payload.bookings) ? payload.bookings : [],
     generatedAt: now,
     updatedAt: now
@@ -90,6 +106,7 @@ function updateItinerary(id, payload = {}, userId) {
     ...payload,
     id: existing.id,
     userId: existing.userId,
+    _schemaVersion: 2,
     bookings: Array.isArray(payload.bookings) ? payload.bookings : existing.bookings,
     generatedAt: existing.generatedAt,
     updatedAt: new Date().toISOString()
