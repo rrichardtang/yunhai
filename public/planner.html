@@ -288,13 +288,12 @@
       <div class="modal-card checklist-modal-card">
         <div class="between checklist-modal-header">
           <h3>Booking Checklist</h3>
-          <button id="checklistModalClose" class="icon-btn red" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button id="checklistModalSave" class="icon-btn grey" type="button" title="Save Progress" aria-label="Save"><i class="ph-bold ph-floppy-disk"></i></button>
+            <button id="checklistModalClose" class="icon-btn red" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
+          </div>
         </div>
         <div id="confidenceChecklist"></div>
-        <div class="checklist-modal-footer">
-          <label class="checklist-email-label"><input id="confidenceEmailSummary" type="checkbox" /> Email critical summary</label>
-          <button id="sendConfidenceEmailBtn" class="secondary" type="button">Send summary now</button>
-        </div>
       </div>
     </div>
 

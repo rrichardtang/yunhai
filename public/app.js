@@ -182,8 +182,7 @@ const els = {
   confidenceSummary: document.getElementById('confidenceSummary'),
   confidenceIssues: document.getElementById('confidenceIssues'),
 
-  confidenceChecklist: document.getElementById('confidenceChecklist'),
-  sendConfidenceEmailBtn: document.getElementById('sendConfidenceEmailBtn')
+  confidenceChecklist: document.getElementById('confidenceChecklist')
 };
 
 const SNAPSHOT_KEY = 'travelplanner_snapshot';
@@ -2139,7 +2138,6 @@ function renderChecklistModal() {
           <i class="ph-bold ph-magnifying-glass cl-search-icon" aria-hidden="true"></i>
           <input type="search" class="cl-search-input" id="clSearchInput" placeholder="Search bookings…" value="${esc(checklistSearch.query)}" autocomplete="off" />
         </div>
-        <button id="checklistModalSave" class="icon-btn grey" type="button" title="Save Progress"><i class="ph-bold ph-floppy-disk"></i></button>
       </div>
       ${searchMatches.length > 0 ? `
         <ul class="cl-search-dropdown" id="clSearchDropdown" role="listbox">
@@ -2595,9 +2593,6 @@ function renderConfidence() {
       });
     });
   }
-
-  const emailCheckbox = document.getElementById('confidenceEmailSummary');
-  if (emailCheckbox) emailCheckbox.checked = Boolean(state.confidenceNotificationPrefs?.emailSummary);
 
   const signatures = state.confidence.unresolvedIssues.map((x) => x.message);
   const newlyAdded = signatures.filter((x) => !(state.confidenceIssueSignatures || []).includes(x));
@@ -8262,31 +8257,6 @@ els.openConfidenceReviewBtn?.addEventListener('click', () => {
   requestAnimationFrame(() => {
     document.getElementById('tripHealthSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-});
-// confidenceEmailSummary is inside the modal; bind via event delegation on modal footer
-document.getElementById('checklistModal')?.addEventListener('change', (e) => {
-  if (e.target.id === 'confidenceEmailSummary') {
-    state.confidenceNotificationPrefs.emailSummary = Boolean(e.target.checked);
-  }
-});
-els.sendConfidenceEmailBtn?.addEventListener('click', async () => {
-  if (!state.currentItineraryId) {
-    showToast('Save itinerary first.', 'info');
-    return;
-  }
-  try {
-    const syncRes = await apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/confidence`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ checklist: state.confidenceChecklist, notificationPrefs: state.confidenceNotificationPrefs, issueMeta: state.confidenceIssueMeta })
-    });
-    if (!syncRes.ok) throw new Error('Could not save confidence checklist');
-    const emailRes = await apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/confidence/email-summary`, { method: 'POST' });
-    if (!emailRes.ok) throw new Error('Could not send summary email');
-    showToast('Confidence summary email sent.', 'success');
-  } catch (error) {
-    showToast(error?.message || 'Failed to send confidence email.', 'error');
-  }
 });
 
 els.activitiesGrid.addEventListener('change', () => {
