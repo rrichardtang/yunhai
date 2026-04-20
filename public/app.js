@@ -4174,7 +4174,10 @@ function renderActivities() {
     card.innerHTML = `
       <div class="activity-card-inner">
         <div class="activity-card-face activity-card-front">
-          <img src="${esc(a.imageUrl || '')}" alt="${esc(a.name)}" loading="lazy" />
+          <div class="activity-card-img-wrap">
+            <img src="${esc(a.imageUrl || '')}" alt="${esc(a.name)}" loading="lazy" />
+            <button class="secondary flip-btn activity-flip-btn-overlay" type="button" title="Flip to map" aria-label="Flip card"><i class="ph-bold ph-map-trifold" aria-hidden="true"></i></button>
+          </div>
           <div class="card-content">
             <div class="activity-card-head-actions">
               <div>
@@ -4183,7 +4186,6 @@ function renderActivities() {
                 <span data-price-badges="${esc(a.id)}">${headerPriceBadgeHtml(a)}</span>
                 ${googleMapsLinkHtml(a)}
               </div>
-              <button class="secondary flip-btn" type="button" title="Flip to map" aria-label="Flip card"><i class="ph-bold ph-map-trifold" aria-hidden="true"></i></button>
             </div>
             <h3>${esc(a.name)}</h3>
             <p><strong>City:</strong> ${esc(a.city || '')}</p>
