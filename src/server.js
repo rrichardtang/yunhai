@@ -749,13 +749,13 @@ app.get('/api/status', (_req, res) => {
     ok: true,
     keys: {
       anthropicConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
+      openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
       unsplashConfigured: Boolean(process.env.UNSPLASH_ACCESS_KEY),
       googleMapsConfigured: Boolean(process.env.GOOGLE_MAPS_API_KEY),
       clerkConfigured: Boolean(process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY),
       resendConfigured: Boolean(process.env.RESEND_API_KEY)
     },
-    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
-    clerkPublishableKey: process.env.CLERK_PUBLISHABLE_KEY || ''
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
   });
 });
 
