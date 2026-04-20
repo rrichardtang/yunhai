@@ -300,7 +300,7 @@ function googleMapsLinkHtml(activity = {}) {
   const url = activity.place_id
     ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(activity.place_id)}`
     : `https://www.google.com/maps/search/?api=1&query=${q}`;
-  return `<a href="${url}" target="_blank" rel="noopener" class="badge badge-maps" title="Open in Google Maps" aria-label="Google Maps"><i class="ph-bold ph-map-pin" aria-hidden="true"></i> Maps</a>`;
+  return `<a href="${url}" target="_blank" rel="noopener" class="badge badge-maps" title="Open in Google Maps" aria-label="Google Maps"><i class="ph-bold ph-map-pin" aria-hidden="true"></i></a>`;
 }
 
 function headerPriceBadgeHtml(activity = {}) {
