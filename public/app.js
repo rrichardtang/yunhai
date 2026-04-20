@@ -164,6 +164,7 @@ const els = {
   profileEditBtn: document.getElementById('profileEditBtn'),
 
   autoArrangeBtn: document.getElementById('autoArrangeBtn'),
+  finalizeArrangeBtn: document.getElementById('finalizeArrangeBtn'),
   myTripsPanel: document.getElementById('myTripsPanel'),
   myTripsList: document.getElementById('myTripsList'),
   chatBubble: document.getElementById('chatBubble'),
@@ -1691,6 +1692,21 @@ function syncChecklistNotesToActivity(item = {}) {
   };
 }
 
+function syncChecklistDateTimeToPlacement(item = {}) {
+  if (item.type !== 'activity' || !item.activityId) return;
+  const activityId = String(item.activityId).trim();
+  if (!activityId) return;
+  const existing = state.placements[activityId] || { dayId: null, time: null };
+  const desiredDate = String(item.activityDate || '').slice(0, 10);
+  const desiredTime = parseTimeTo24(item.activityTime || '');
+  const matchingDay = desiredDate ? (state.days || []).find((d) => d.date === desiredDate) : null;
+  state.placements[activityId] = {
+    ...existing,
+    dayId: matchingDay ? matchingDay.id : existing.dayId,
+    time: desiredTime || existing.time || null
+  };
+}
+
 function syncChecklistBookingRequirementToActivity(item = {}) {
   if (item.type !== 'activity' || !item.activityId) return;
   const activityId = String(item.activityId || '').trim();
@@ -2216,6 +2232,7 @@ function bindChecklistEvents(el) {
     buildChecklistFromState();
     saveSnapshot();
     renderActivities();
+    updateFinalizeBtn();
   });
 
   // Search input
@@ -2522,6 +2539,7 @@ function syncItemFromExpanded(el, id) {
     : item.activityLocation;
 
   syncChecklistNotesToActivity(item);
+  syncChecklistDateTimeToPlacement(item);
   syncChecklistBookingRequirementToActivity(item);
 }
 
@@ -5516,6 +5534,7 @@ function renderArrange() {
   const cityGroups = getArrangeCities();
   renderArrangeCityNav(cityGroups);
   renderArrangeDiagnostics();
+  updateFinalizeBtn();
 
   const activeCity = state.arrangeCity;
   const activeDays = state.days.filter((d) => cityMatches(d.city, activeCity));
@@ -5855,6 +5874,20 @@ function renderArrangeDiagnostics() {
   els.arrangeDiagnostics.innerHTML = `<ul>${diagnostics.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>`;
 }
 
+function updateFinalizeBtn() {
+  if (!els.finalizeArrangeBtn) return;
+  const activeCity = state.arrangeCity;
+  const approvedInCity = state.activities.filter(
+    (a) => state.reviewed[a.id]?.approved && cityMatches(a.city, activeCity)
+  );
+  const hasVerified = (state.confidenceChecklist || []).some(
+    (item) => item.type === 'activity' && item.verified &&
+      approvedInCity.some((a) => String(a.id) === String(item.activityId))
+  );
+  const hasFixed = approvedInCity.some((a) => a.timing?.fixed?.date && a.timing?.fixed?.time);
+  els.finalizeArrangeBtn.disabled = !(hasVerified || hasFixed);
+}
+
 async function autoArrangeActiveCity() {
   const activeCity = state.arrangeCity;
   if (!activeCity) return;
@@ -5969,7 +6002,8 @@ async function autoArrangeActiveCity() {
       body: JSON.stringify({
         days: dayPayload,
         activities: approvedInCity.map((a) => {
-          return a;
+          const notes = String(state.reviewed[a.id]?.notes || '').trim();
+          return notes ? { ...a, user_notes: notes } : a;
         }),
         userId: ensureUserId(),
         profile: getProfilePayload(),
@@ -8143,6 +8177,9 @@ document.getElementById('saveConfidenceBtn')?.addEventListener('click', async ()
   }
 });
 els.autoArrangeBtn?.addEventListener('click', autoArrangeActiveCity);
+els.finalizeArrangeBtn?.addEventListener('click', () => {
+  showToast('Finalize modal coming in the next update. Use Draft to arrange freely for now.');
+});
 els.downloadCalendarBtn?.addEventListener('click', () => {
   if (!state.currentItineraryId) return;
   const metadataMode = encodeURIComponent(state.calendarMetadataMode || 'compact');

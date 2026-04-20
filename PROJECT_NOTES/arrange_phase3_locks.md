@@ -1,77 +1,142 @@
-# Arrange Rebuild — Phase 3: Time Locks
+# Arrange Rebuild — Phase 3: Time Locks (Finalize Modal)
 
 **Branch:** `feature/arrange-time-locks`
-**Depends on:** Phase 1 merged (`timing.fixed` exists on schema), Phase 2 merged (transport buffers)
-**Goal:** Users can mark an activity as locked to a specific date + time. Locks never move during auto-arrange, even with the old prompt.
-**Non-goals:** No hybrid scheduler. No server prompt rewrite. Server-side changes are minimal — just accept a new `lockedActivities` field and don't send those activities to the LLM.
+**Depends on:** Phase 1 merged (`timing.fixed` exists on schema), Phase 2 merged (transport buffers), save-button plan merged (checklist `verified` flag + Draft/Finalize buttons)
+**Goal:** Clicking "Finalize" opens a modal listing all approved activities in the active city. Pre-checked = locked. User can toggle any lock on/off. Live overlap validation prevents confirming an invalid set. On confirm, locks feed into arrange as hard constraints.
+**Non-goals:** No hybrid scheduler. No per-card lock toggle on Review cards.
 
 ---
 
 ## 1. Concept
 
-A locked activity carries `timing.fixed = { date, time, reason }`. That field is authoritative:
-1. Client never sends locked activities to `/api/arrange`.
-2. Client writes `state.placements[id]` from `timing.fixed` directly, both before and after the arrange call.
-3. Drag handlers refuse to move locked activities.
-4. If the user wants to move a locked activity, they must unlock it first.
+A locked activity is pinned to a specific date + time. Two lock sources:
+1. **`timing.fixed = { date, time, reason }`** — persistent schema field
+2. **Checklist `item.verified === true`** — user checked it off in the checklist
 
-Locks bypass the LLM entirely. Client-authoritative. Server never needs to reason about them.
+The Finalize modal unifies both. It:
+- Shows every approved activity in the active city
+- Pre-checks activities with either lock source
+- Lets the user toggle locks on/off for this arrange run
+- Validates overlaps live
+- On confirm: turns checked items into `lockedActivities` payload; excludes them from the LLM input; applies their placements client-side after arrange
+
+Locks bypass the LLM entirely. Client-authoritative. The LLM only sees flexible activities plus `ALREADY OCCUPIED` day windows.
 
 ---
 
-## 2. UI — Lock toggle on Review cards
+## 2. UI — Finalize Modal
 
-### 2.1 Card markup
+### 2.1 Trigger
 
-On each activity card in the Review step, add a lock control at the top-right (grep for the Review card render fn — it's the one that shows verdict + cost + buttons). Markup:
+The "Finalize" button (from the save-button plan) opens this modal. Button is enabled when at least one activity has a lock source (verified checklist OR `timing.fixed`).
 
-```html
-<button class="lock-toggle" data-activity-id="${a.id}" aria-label="Lock date and time">
-  <svg class="icon-unlocked" ...></svg>
-  <svg class="icon-locked" ...></svg>
-</button>
-```
-
-When the activity is locked, add class `is-locked` to the card and a gold pill badge reading `Locked · Tue May 5 · 14:00 (reason)` near the name.
-
-### 2.2 Lock editor popover
-
-Clicking the toggle opens a small popover (reuse existing popover mechanism from `overlayManager` if one exists; otherwise a simple absolute-positioned div):
+### 2.2 Modal markup
 
 ```
-📌 Lock this activity
-Date  [date input, default today or current placement date]
-Time  [time input, default current placement time or 10:00]
-Reason (optional) [text input, e.g. "Booked tickets"]
-[Save] [Cancel] [Unlock]  ← Unlock only shown when already locked
+┌─ Finalize Arrangement ──────────────────────────── ✕ ┐
+│                                                      │
+│  Lock activities to their current times. Unlocked    │
+│  activities will be scheduled by AI.                 │
+│                                                      │
+│  Day 1 · Mon Apr 24                                  │
+│    ☑ 🔒 10:00  Alcázar de los Reyes Cristianos       │
+│    ☑ 🔒 15:00  Mezquita-Catedral Guided Tour  📋     │
+│    ☐    19:00  Dinner at Casa Pepe                   │
+│                                                      │
+│  Day 2 · Tue Apr 25                                  │
+│    ☑ 🔒 11:00  Medina Azahara Tour  📋               │
+│    ☐    14:00  Patios de Córdoba walk                │
+│                                                      │
+│  ⚠️ Conflict: "Alcázar" and "Mezquita" overlap on    │
+│     Mon Apr 24 (10:00–12:00 vs 15:00–17:00) — OK     │
+│     or show if real                                  │
+│                                                      │
+│              [Cancel]  [Confirm]                     │
+└──────────────────────────────────────────────────────┘
 ```
 
-Validation on Save:
-- Date must be within the city's arrival–departure window.
-- Time must be within that day's window (after `arrivalTime + arrivalTransit + arrivalBuffer` on arrival day; before `departureTime − departureTransit − departureBuffer` on departure day).
-- No other locked activity on the same day may overlap `[time, time + duration + 20min]`.
-- If the activity's `timing.opening_hours` is set and the chosen time is outside it, show a non-fatal warning: "This is outside listed opening hours — continue anyway?" with a confirm.
+Each row shows:
+- Checkbox (lock toggle for this arrange run)
+- Lock icon when checked
+- Time (editable inline — clicking opens a time picker)
+- Activity name
+- 📋 badge if sourced from checklist `verified`; no badge if sourced from `timing.fixed`
 
-If validation fails, show inline error and do not save.
+### 2.3 Default state on open
 
-### 2.3 Save handler
+- Activity with `timing.fixed.date && timing.fixed.time` → checked
+- Activity with matching checklist item where `item.verified === true` → checked
+- All others → unchecked
+
+### 2.4 Live validation
+
+On every checkbox toggle and every inline time edit, re-run `findLockedOverlaps(lockedSet)`:
 
 ```js
-function saveLock(activity, date, time, reason) {
-  activity.timing.fixed = { date, time, reason: reason || '' };
-  const day = findDayForDate(date, activeCity);
-  state.placements[activity.id] = { dayId: day.id, time };
-  persistState();
-  rerenderCard(activity);
-}
-function unlock(activity) {
-  activity.timing.fixed = null;
-  // Do NOT remove state.placements — user may want to keep the current time;
-  // it's just no longer locked.
-  persistState();
-  rerenderCard(activity);
+function findLockedOverlaps(locked) {
+  const intervals = locked.map((entry) => {
+    const duration = entry.activity.timing?.duration_minutes || 60;
+    return {
+      id: entry.activity.id,
+      name: entry.activity.name,
+      date: entry.date,
+      time: entry.time,
+      end: addMinutes(entry.time, duration)
+    };
+  });
+  const conflicts = [];
+  for (let i = 0; i < intervals.length; i++) {
+    for (let j = i + 1; j < intervals.length; j++) {
+      const a = intervals[i], b = intervals[j];
+      if (a.date === b.date && a.time < b.end && b.time < a.end) {
+        conflicts.push([a, b]);
+      }
+    }
+  }
+  return conflicts;
 }
 ```
+
+If `conflicts.length > 0`:
+- Show inline warning banner naming the conflicting pairs
+- Disable "Confirm & Arrange" button
+
+### 2.5 Confirm handler
+
+```js
+function confirmFinalize(lockedSet) {
+  // Persist inline time edits back to state
+  for (const entry of lockedSet) {
+    if (entry.sourceKind === 'fixed') {
+      entry.activity.timing.fixed = {
+        date: entry.date,
+        time: entry.time,
+        reason: entry.activity.timing.fixed?.reason || ''
+      };
+    } else if (entry.sourceKind === 'verified') {
+      const item = state.confidenceChecklist.find(
+        (c) => c.type === 'activity' && String(c.activityId) === String(entry.activity.id)
+      );
+      if (item) {
+        item.activityDate = entry.date;
+        item.activityTime = formatTime12(entry.time);
+        syncChecklistDateTimeToPlacement(item);
+      }
+    }
+  }
+  persistState();
+  closeModal();
+  autoArrangeActiveCity({ finalize: true, lockedSet });
+}
+```
+
+### 2.6 Unlocking inside the modal
+
+Unchecking a `timing.fixed` activity in the modal is a **session-scoped** override — it does NOT clear `timing.fixed`. The activity is flexible for this arrange run only. Next time the modal opens, it's pre-checked again.
+
+Unchecking a verified checklist item does NOT clear `item.verified` either. Same session-scoped semantics.
+
+Rationale: the modal is a "which locks apply to THIS arrange run" picker, not a lock-management UI. Persistent lock/unlock happens in the checklist (toggle verified) or via `timing.fixed` edits elsewhere.
 
 ---
 
@@ -81,22 +146,30 @@ In `public/app.js` around line 5783:
 
 ### 3.1 Partition before the server call
 
+The `lockedSet` passed from the Finalize modal is authoritative. If called without `lockedSet` (Draft mode), no partition — all activities go as flexible.
+
 ```js
-const approvedInCity = ...; // existing filter
-const locked   = approvedInCity.filter(a => a.timing?.fixed?.date && a.timing?.fixed?.time);
-const flexible = approvedInCity.filter(a => !(a.timing?.fixed?.date && a.timing?.fixed?.time));
+async function autoArrangeActiveCity(opts = {}) {
+  const finalize = Boolean(opts.finalize);
+  const lockedSet = Array.isArray(opts.lockedSet) ? opts.lockedSet : [];
+  const lockedIds = new Set(lockedSet.map((e) => String(e.activity.id)));
+
+  const locked   = approvedInCity.filter((a) => lockedIds.has(String(a.id)));
+  const flexible = approvedInCity.filter((a) => !lockedIds.has(String(a.id)));
+  // ...
+}
 ```
 
-Build the payload sending **only** `flexible` as `activities`. Add a new top-level `lockedActivities` array:
+Build the payload sending **only** `flexible` as `activities`. Add a new top-level `lockedActivities` array (derived from `lockedSet`, not just `timing.fixed`):
 
 ```js
-lockedActivities: locked.map(a => ({
-  id: a.id,
-  date: a.timing.fixed.date,
-  time: a.timing.fixed.time,
-  duration_minutes: a.timing.duration_minutes,
-  category: a.category,
-  name: a.name
+lockedActivities: lockedSet.map((entry) => ({
+  id: entry.activity.id,
+  date: entry.date,
+  time: entry.time,
+  duration_minutes: entry.activity.timing?.duration_minutes || 60,
+  category: entry.activity.category,
+  name: entry.activity.name
 }))
 ```
 
@@ -110,9 +183,9 @@ for (const [id, p] of Object.entries(result.placements || {})) {
   state.placements[id] = p;
 }
 // Then overwrite from locks — locks always win
-for (const a of locked) {
-  const day = findDayForDate(a.timing.fixed.date, activeCity);
-  if (day) state.placements[a.id] = { dayId: day.id, time: a.timing.fixed.time };
+for (const entry of lockedSet) {
+  const day = findDayForDate(entry.date, activeCity);
+  if (day) state.placements[entry.activity.id] = { dayId: day.id, time: entry.time };
 }
 ```
 
@@ -149,53 +222,56 @@ Belt-and-suspenders — client merge already overrides, but cleaner wire format.
 
 ---
 
-## 4. Drag handler protection
+## 4. Lock icon on Arrange cards
 
-Find the drag/drop handler for placed activity cards in the Arrange step (grep for `dragend`, `dragover`, or drag logic around `state.placements` mutations). On `dragstart`:
+After Finalize runs, activities whose placement came from a lock show a lock icon in the top-right corner of their Arrange card (matching the budget optimization step's icon style). The icon is derived from the last `lockedSet` used for this city — stored on `state.lastFinalizeLocks[cityId] = lockedSet`.
 
+Draft mode clears `state.lastFinalizeLocks[cityId]` so no lock icons show after a Draft run.
+
+Drag handlers refuse to move activities shown as locked:
 ```js
-if (activity.timing?.fixed) {
+if ((state.lastFinalizeLocks[cityId] || []).some((e) => e.activity.id === activity.id)) {
   e.preventDefault();
-  showToast("This activity is locked. Unlock it first to move.");
+  showToast('This activity is locked. Re-open Finalize to unlock.');
   return;
 }
 ```
-
-Also protect the Review step's time-shift controls (if any) the same way.
 
 ---
 
 ## 5. Edge cases
 
-- **User locks then edits duration:** the lock's `time` stays but the occupied interval grows. If the new interval overlaps another lock, show a validation error when the duration change is committed and refuse the edit (or offer to auto-shrink).
-- **User deletes the city:** locked activities in that city are removed with the city, same as non-locked. No special handling.
-- **User moves arrival time earlier/later:** a lock might fall outside the new window. On logistics save, validate all locks for that city; any invalid one is automatically unlocked with a toast "Unlocked X — its time is outside the new city window". Do not silently delete the `fixed` field without notice.
-- **Conflicting locks at save time:** validation in §2.2 prevents creation. If somehow persisted (e.g., migrated data), on the first auto-arrange call, server rejects `lockedActivities` with `400 { error: 'Conflicting locks', ids: [...] }` and the client shows them in a resolution UI (lightweight — just highlight the offending cards and ask the user to unlock one).
-- **Lock outside opening hours:** allowed with warning at save time. Never blocks; locks are authoritative.
-- **Auto-arrange with only locks and no flexible:** short-circuit, no LLM call.
+- **Arrival/departure window changes** invalidate a `timing.fixed` lock: on logistics save, scan fixed locks in this city; drop any that fall outside the new window with a toast "Unlocked X — time now outside city window". Checklist-verified locks are not auto-dropped (their `activityDate`/`activityTime` are user-entered); modal overlap validation will flag it at next Finalize.
+- **Lock outside opening hours:** allowed — modal warns inline but doesn't block.
+- **Only locks, zero flexible:** skip `/api/arrange`, apply locked placements directly.
+- **Duration edit causes overlap:** caught at next Finalize open — modal shows conflict, disables Confirm.
 
 ---
 
 ## 6. Testing
 
-Manual QA script:
-1. Create a trip with 6 activities across 3 days. Run auto-arrange. Note placements.
-2. Lock activity A to Day 2 14:00 with reason "booked tickets".
-3. Re-run auto-arrange. Expect A to be at Day 2 14:00 exactly. Other placements may reshuffle but should not overlap A (within 20-min buffer).
-4. Try to drag A in the Arrange step. Expect toast "This activity is locked…".
-5. Unlock A, drag to Day 3. Expect drag succeeds.
-6. Lock A to Day 2 14:00. Lock B to Day 2 15:00 with duration 90 min. Expect validation error on B save ("overlaps existing lock").
+Manual QA:
+1. Create a trip, approve 6 activities across 3 days. Run Draft. Note placements.
+2. Check off activity A in checklist with time 14:00 on Day 2.
+3. Click Finalize → modal shows A pre-checked at 14:00 with 📋 badge.
+4. Confirm. A lands at 14:00 Day 2; others rearranged around it; lock icon on A's Arrange card.
+5. Try dragging A → toast "This activity is locked…".
+6. Click Draft → A moves freely; lock icon disappears.
+7. In modal, manually check two activities with overlapping times → warning banner; Confirm disabled.
 
 Automated:
-- `src/server.test.js`: POST `/api/arrange` with `lockedActivities: [{id, date, time, duration_minutes: 60}]`. Assert the response `placements` does not include the locked id. Assert the prompt sent to Claude (mock the client) contains `ALREADY OCCUPIED`.
+- `src/server.test.js`: POST `/api/arrange` with `lockedActivities: [{id, date, time, duration_minutes: 60}]`. Assert response `placements` excludes locked id. Assert prompt contains `ALREADY OCCUPIED`.
+- `src/findLockedOverlaps.test.js`: unit-test the overlap detector with same-day / different-day / touching-boundaries cases.
 
 ---
 
 ## 7. Exit criteria
 
-- [ ] Lock toggle appears on every Review card
-- [ ] Locking + re-running auto-arrange never moves the locked activity
-- [ ] Dragging a locked activity is blocked with a clear message
-- [ ] Overlap validation prevents saving conflicting locks
-- [ ] Flexible activities respect `ALREADY OCCUPIED` intervals in the prompt (spot-check a few generations)
+- [ ] Finalize button opens modal listing all approved activities for the city
+- [ ] Activities with `timing.fixed` or checklist `verified` are pre-checked
+- [ ] Inline time editing works in the modal
+- [ ] Live overlap validation shows warning + disables Confirm
+- [ ] Confirm triggers arrange with `lockedActivities`; flexible activities avoid locked intervals
+- [ ] Lock icon shown on Arrange cards after Finalize; absent after Draft
+- [ ] Dragging a locked card blocked with clear message
 - [ ] `npm test` green

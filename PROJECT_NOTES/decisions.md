@@ -4,6 +4,13 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-04-20] Duplicate buffer tables in src/ and public/js/
+
+**Decision:** Buffer values are defined twice — `src/arrangeBuffers.js` (CommonJS for server-side tests) and `public/js/arrangeBuffers.js` (plain script for the browser). No build step, no shared module system.
+**Reasoning:** The project uses vanilla JS on the frontend with no bundler. The only way to share constants without adding a build tool is to duplicate the file.
+**Alternatives rejected:** Adding webpack/esbuild just for this file; inlining the values in `app.js` (no testability).
+**Tradeoffs:** Any change to buffer values must be applied to both files. Documented in this file to prevent drift.
+
 ## [2026-04-16] Unified preference system — server-side, user-visible, single LLM input
 
 **Decision:** Replaced the dual-track preference system (signal-derived `liked`/`disliked` + `distilledProfile` on one track; explicit `preferences`/`constraints` on another) with a single unified model: `profileInstruction` (high-level AI summary) + `preferences` + `constraints` (specific learned details). All three fields live server-side. The LLM uses exactly what the user sees and can edit.
