@@ -1,28 +1,26 @@
 # Current State
 
-_Last updated: 2026-04-20 (session 18)_
+_Last updated: 2026-04-21 (session 19)_
 
 ## Objective
-Checklist save fix + arrive-early buffer + Draft/Finalize buttons implemented on `feature/arrange-transport-buffers`. Next: VPS deploy + smoke test, then Phase 3 (Finalize Modal).
+Phase 3 (Finalize Modal + time locks) implemented on `feature/arrange-time-locks`. Ready for VPS deploy + smoke test.
 
 ## Active Workstream
-`feature/arrange-transport-buffers` — save-button plan implemented, pending push/deploy.
+`feature/arrange-time-locks` — all Phase 3 features complete, tests green. Pending push and deploy.
 
 ## Constraints
 - No database — flat JSON files
 - Migration is in-memory only on load; write-back happens on next user save
 - New itineraries tagged `_schemaVersion: 2` after save
-- `actDurationHours`, `actPreferredTime`, `actAddress`, `actCostUsd`, `actCostType`, `actBookingType`, `actBookingLinks`, `actOpeningHours` helpers in `app.js` handle both old and new activity shapes
-- `public/js/activityMigration.js`, `public/js/arrangeBuffers.js`, `public/js/arrangeArrivalBuffers.js` loaded before `app.js` via `<script>` in `planner.html`
-- Buffer tables are duplicated in `src/` (server/test) and `public/js/` (client) — must stay in sync
+- Buffer tables duplicated in `src/` (server/test) and `public/js/` (client) — must stay in sync
+- `state.lastFinalizeLocks` is in-memory only (not persisted to localStorage/server) — clears on page reload
 
 ## Risks
-- Half-migrated localStorage state — optional chaining in accessor helpers prevents crashes but may show stale data until user re-saves
-- Existing itineraries on VPS are legacy shape — `normalizeCityLogistics` defaults mode=flight/international=true on first load
+- `state.lastFinalizeLocks` is ephemeral — lock icons and drag protection disappear on reload. Acceptable per spec (modal is a per-run picker, not persistent lock management)
+- `openFinalizeModal` inline time picker sets `entry.date` from the initially computed placement day; if no placement exists yet, falls back to first city day — should be fine for most cases
 - `/refine` still depends on `OPENAI_API_KEY`
-- Finalize button shows "coming soon" toast — Phase 3 must wire the modal before the button is functional
 
 ## Next Actions
-- Push `feature/arrange-transport-buffers` to remote and deploy to VPS
-- Run Phase 2 exit criteria from `arrange_phase2_buffers.md` §8 + verify checklist save fix
-- Implement Phase 3 (Finalize Modal) per `arrange_phase3_locks.md` on a new branch
+- Push `feature/arrange-time-locks` to remote: `git push -u origin feature/arrange-time-locks`
+- Deploy to VPS and run Phase 3 exit criteria from `arrange_phase3_locks.md` §7
+- Smoke test: verify Draft clears lock icons, Finalize pins activity at chosen time
