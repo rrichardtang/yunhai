@@ -5961,14 +5961,23 @@ function openFinalizeModal() {
       const dateLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
       const rowsHtml = entries.map((entry, idx) => {
         const globalIdx = modalState.indexOf(entry);
-        const badgeHtml = entry.sourceKind === 'verified' ? ' <span class="finalize-badge">📋</span>' : '';
-        const lockHtml = entry.checked ? ' <i class="ph-bold ph-lock-simple finalize-lock-icon" aria-hidden="true"></i>' : '';
+        const lockHtml = (entry.sourceKind === 'fixed' || entry.sourceKind === 'verified')
+          ? '<i class="ph-bold ph-lock-simple cl-item-chevron" aria-hidden="true" title="Source lock"></i>'
+          : '';
+        const checkedClass = entry.checked ? ' cl-item--checked' : '';
         return `
-          <div class="finalize-row" data-idx="${globalIdx}">
-            <input type="checkbox" class="finalize-check" ${entry.checked ? 'checked' : ''} />
-            ${lockHtml}
-            <input type="time" class="finalize-time" value="${entry.time}" />
-            <span class="finalize-name">${esc(entry.activity.name)}${badgeHtml}</span>
+          <div class="cl-item${checkedClass} finalize-item" data-idx="${globalIdx}">
+            <div class="cl-item-collapsed">
+              <button type="button" class="cl-checkbox finalize-check ${entry.checked ? 'checked' : ''}" aria-label="Lock this activity" aria-pressed="${entry.checked}">
+                ${entry.checked ? '<i class="ph-bold ph-check" aria-hidden="true"></i>' : ''}
+              </button>
+              <div class="cl-item-text">
+                <span class="cl-item-name">${esc(entry.activity.name)}</span>
+                ${entry.sourceKind === 'verified' ? '<span class="cl-item-meta">📋 from checklist</span>' : ''}
+              </div>
+              <input type="time" class="finalize-time" value="${entry.time}" />
+              ${lockHtml}
+            </div>
           </div>`;
       }).join('');
       return `<div class="finalize-day-group"><div class="finalize-day-label">${esc(dateLabel)}</div>${rowsHtml}</div>`;
@@ -5977,7 +5986,7 @@ function openFinalizeModal() {
     document.getElementById('finalizeRows').innerHTML = dayRows;
     document.querySelectorAll('#finalizeModal .finalize-check').forEach((cb) => {
       cb.addEventListener('change', () => {
-        const idx = Number(cb.closest('.finalize-row').dataset.idx);
+        const idx = Number(cb.closest('.finalize-item').dataset.idx);
         modalState[idx].checked = cb.checked;
         updateConflicts();
         renderRows();
@@ -5985,7 +5994,7 @@ function openFinalizeModal() {
     });
     document.querySelectorAll('#finalizeModal .finalize-time').forEach((inp) => {
       inp.addEventListener('change', () => {
-        const idx = Number(inp.closest('.finalize-row').dataset.idx);
+        const idx = Number(inp.closest('.finalize-item').dataset.idx);
         modalState[idx].time = inp.value;
         updateConflicts();
       });
