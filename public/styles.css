@@ -1913,7 +1913,7 @@ body.overlay-active #chatWidget {
 .profile-question--text p { margin-bottom: 6px; }
 
 /* Finalize modal */
-.finalize-modal-card { max-width: 500px; }
+.finalize-modal-card { max-width: 640px; }
 .finalize-day-group { margin-bottom: 16px; }
 .finalize-day-label { font-weight: 600; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px; }
 .finalize-time {
@@ -1922,6 +1922,8 @@ body.overlay-active #chatWidget {
   border: 1px solid var(--secondary-light); border-radius: 6px;
   background: var(--base-light); color: var(--text);
 }
+.finalize-check--locked { color: #d97706; border-color: #fcd34d; background: #fef3c7; cursor: default; }
+.finalize-check--locked:hover { color: #d97706; border-color: #fcd34d; background: #fef3c7; }
 .finalize-conflict-banner {
   margin-top: 12px; padding: 10px 14px;
   background: var(--warning-bg, #fff8e7); color: var(--warning-text, #7a5a00);
