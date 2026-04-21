@@ -1916,22 +1916,12 @@ body.overlay-active #chatWidget {
 .finalize-modal-card { max-width: 500px; }
 .finalize-day-group { margin-bottom: 16px; }
 .finalize-day-label { font-weight: 600; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px; }
-.finalize-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--secondary-light);
-}
-.finalize-row:last-child { border-bottom: none; }
-.finalize-check { flex-shrink: 0; }
-.finalize-lock-icon { flex-shrink: 0; font-size: 14px; color: var(--text-muted); }
 .finalize-time {
   flex-shrink: 0; width: 90px;
   font-size: 0.85rem; padding: 2px 6px;
   border: 1px solid var(--secondary-light); border-radius: 6px;
   background: var(--base-light); color: var(--text);
 }
-.finalize-name { flex: 1; font-size: 0.9rem; }
-.finalize-badge { font-size: 12px; }
 .finalize-conflict-banner {
   margin-top: 12px; padding: 10px 14px;
   background: var(--warning-bg, #fff8e7); color: var(--warning-text, #7a5a00);
