@@ -5948,7 +5948,10 @@ function openFinalizeModal() {
 
   function deriveEndTime(entry) {
     const durMins = entry.activity.timing?.duration_minutes || actDurationHours(entry.activity) * 60 || 60;
-    return clampTime(minutesFromTime(entry.time) + durMins);
+    const totalMins = minutesFromTime(entry.time) + durMins;
+    const h = Math.floor(totalMins / 60) % 24;
+    const m = totalMins % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   }
 
   // State for the modal (mutable during interaction)
