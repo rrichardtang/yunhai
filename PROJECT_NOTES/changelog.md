@@ -4,6 +4,20 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-21] Phase 3: Finalize Modal + time locks
+
+- `public/app.js` — added `state.lastFinalizeLocks` field
+- `public/app.js` — `findLockedOverlaps(locked)`: overlap detector for the modal's live validation
+- `public/app.js` — `openFinalizeModal()`: full Finalize modal — activity rows grouped by day, checkboxes, inline time picker, lock icons, live conflict banner, Confirm handler
+- `public/app.js` — Finalize button now calls `openFinalizeModal()` instead of showing "coming soon" toast
+- `public/app.js` — `autoArrangeActiveCity(opts={})`: accepts `finalize` + `lockedSet`; partitions into locked/flexible; skips LLM if all activities locked; merges locked placements client-side after fetch; stores/clears `lastFinalizeLocks`
+- `public/app.js` — `makePlacedCard`: shows `placed-lock-badge` and `placed-card--locked` class for locked activities
+- `public/app.js` — `bindPlacedCardInteractions`: mousedown guard blocks drag on locked cards with toast
+- `src/server.js` — `/api/arrange`: accepts `lockedActivities` array; injects `ALREADY OCCUPIED` lines into daysText; adds rule 2a; defensively drops locked IDs from LLM placements
+- `src/findLockedOverlaps.js` + `src/findLockedOverlaps.test.js`: server-side module + 7 unit tests (all passing)
+- `public/styles.css` — `.placed-lock-badge`, `.placed-card--locked`, finalize modal styles
+- `npm test`: 40/40 passing
+
 ## [2026-04-20] Checklist save fix + arrive-early buffer + Draft/Finalize buttons
 
 - `public/app.js` — added `syncChecklistDateTimeToPlacement`: writes checklist date/time edits back to `state.placements` before the `buildChecklistFromState` rebuild (fixes silent save bug)

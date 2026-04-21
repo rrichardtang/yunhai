@@ -48,7 +48,8 @@ const state = {
   confidenceChecklist: [],
   confidenceNotificationPrefs: { emailSummary: false, reminderBeforeDeparture: false },
   confidenceIssueSignatures: [],
-  confidenceIssueMeta: {}
+  confidenceIssueMeta: {},
+  lastFinalizeLocks: {}
 };
 
 let budgetOptState = null;
@@ -5220,8 +5221,12 @@ function makePlacedCard(item) {
   const y = yFromTime(time);
   const typeLabel = formatTypeLabel(item.type);
   const durationLabel = formatDurationHoursLong(actDurationHours(item));
+  const activeCity = state.arrangeCity;
+  const isLocked = (state.lastFinalizeLocks[activeCity] || []).some((e) => String(e.activity.id) === String(item.id));
+  const lockBadge = isLocked ? '<span class="placed-lock-badge" title="Locked"><i class="ph-bold ph-lock-simple" aria-hidden="true"></i></span>' : '';
   return `
-    <article class="placed-card ${colorClass}" data-id="${item.id}" style="height:${h}px;top:${y}px;">
+    <article class="placed-card ${colorClass}${isLocked ? ' placed-card--locked' : ''}" data-id="${item.id}" style="height:${h}px;top:${y}px;">
+      ${lockBadge}
       <div class="placed-body">
         <div class="placed-head-row">
           <h4>
@@ -5875,6 +5880,25 @@ function renderArrangeDiagnostics() {
   els.arrangeDiagnostics.innerHTML = `<ul>${diagnostics.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>`;
 }
 
+function findLockedOverlaps(locked) {
+  const intervals = locked.map((entry) => {
+    const duration = entry.activity.timing?.duration_minutes || actDurationHours(entry.activity) * 60 || 60;
+    const startMin = minutesFromTime(entry.time);
+    return { id: entry.activity.id, name: entry.activity.name, date: entry.date, startMin, endMin: startMin + duration };
+  });
+  const conflicts = [];
+  for (let i = 0; i < intervals.length; i++) {
+    for (let j = i + 1; j < intervals.length; j++) {
+      const a = intervals[i];
+      const b = intervals[j];
+      if (a.date === b.date && a.startMin < b.endMin && b.startMin < a.endMin) {
+        conflicts.push([a, b]);
+      }
+    }
+  }
+  return conflicts;
+}
+
 function updateFinalizeBtn() {
   if (!els.finalizeArrangeBtn) return;
   const activeCity = state.arrangeCity;
@@ -5890,7 +5914,169 @@ function updateFinalizeBtn() {
   els.finalizeArrangeBtn.disabled = !(hasVerified || hasFixed);
 }
 
-async function autoArrangeActiveCity() {
+function openFinalizeModal() {
+  const activeCity = state.arrangeCity;
+  if (!activeCity) return;
+
+  const approved = state.activities
+    .filter((a) => state.reviewed[a.id]?.approved && cityMatches(a.city, activeCity))
+    .map((a) => normalizeActivityMetadata(a));
+
+  const activeDays = state.days
+    .filter((d) => cityMatches(d.city, activeCity))
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  // Build initial lockedSet from timing.fixed + verified checklist
+  const lockedSet = [];
+  for (const activity of approved) {
+    const fixed = activity.timing?.fixed;
+    if (fixed?.date && fixed?.time) {
+      lockedSet.push({ activity, date: fixed.date, time: fixed.time, sourceKind: 'fixed', checked: true });
+      continue;
+    }
+    const item = (state.confidenceChecklist || []).find(
+      (c) => c.type === 'activity' && c.verified && String(c.activityId) === String(activity.id)
+    );
+    if (item?.activityDate && item?.activityTime) {
+      lockedSet.push({ activity, date: item.activityDate, time: parseTimeTo24(item.activityTime), sourceKind: 'verified', checked: true });
+    } else {
+      const placement = state.placements[activity.id];
+      const day = placement?.dayId ? state.days.find((d) => d.id === placement.dayId) : activeDays[0];
+      lockedSet.push({ activity, date: day?.date || activeDays[0]?.date || '', time: parseTimeTo24(placement?.time || actPreferredTime(activity) || typeToTime(activity.type)), sourceKind: item ? 'verified' : 'none', checked: false });
+    }
+  }
+
+  // State for the modal (mutable during interaction)
+  const modalState = lockedSet.map((e) => ({ ...e }));
+
+  function renderRows() {
+    const byDate = {};
+    for (const day of activeDays) byDate[day.date] = [];
+    for (const entry of modalState) {
+      if (!byDate[entry.date]) byDate[entry.date] = [];
+      byDate[entry.date].push(entry);
+    }
+    const dayRows = activeDays.map((day) => {
+      const entries = byDate[day.date] || [];
+      const dateLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const rowsHtml = entries.map((entry, idx) => {
+        const globalIdx = modalState.indexOf(entry);
+        const badgeHtml = entry.sourceKind === 'verified' ? ' <span class="finalize-badge">📋</span>' : '';
+        const lockHtml = entry.checked ? ' <i class="ph-bold ph-lock-simple finalize-lock-icon" aria-hidden="true"></i>' : '';
+        return `
+          <div class="finalize-row" data-idx="${globalIdx}">
+            <input type="checkbox" class="finalize-check" ${entry.checked ? 'checked' : ''} />
+            ${lockHtml}
+            <input type="time" class="finalize-time" value="${entry.time}" />
+            <span class="finalize-name">${esc(entry.activity.name)}${badgeHtml}</span>
+          </div>`;
+      }).join('');
+      return `<div class="finalize-day-group"><div class="finalize-day-label">${esc(dateLabel)}</div>${rowsHtml}</div>`;
+    }).join('');
+
+    document.getElementById('finalizeRows').innerHTML = dayRows;
+    document.querySelectorAll('#finalizeModal .finalize-check').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        const idx = Number(cb.closest('.finalize-row').dataset.idx);
+        modalState[idx].checked = cb.checked;
+        updateConflicts();
+        renderRows();
+      });
+    });
+    document.querySelectorAll('#finalizeModal .finalize-time').forEach((inp) => {
+      inp.addEventListener('change', () => {
+        const idx = Number(inp.closest('.finalize-row').dataset.idx);
+        modalState[idx].time = inp.value;
+        updateConflicts();
+      });
+    });
+  }
+
+  function updateConflicts() {
+    const checked = modalState.filter((e) => e.checked);
+    const conflicts = findLockedOverlaps(checked);
+    const banner = document.getElementById('finalizeConflictBanner');
+    const confirmBtn = document.getElementById('finalizeConfirmBtn');
+    if (conflicts.length) {
+      const msgs = conflicts.map(([a, b]) => `"${a.name}" and "${b.name}" overlap on ${a.date}`);
+      banner.innerHTML = `<span class="finalize-conflict-icon">⚠️</span> ${msgs.map(esc).join('; ')}`;
+      banner.hidden = false;
+      confirmBtn.disabled = true;
+    } else {
+      banner.hidden = true;
+      confirmBtn.disabled = false;
+    }
+  }
+
+  async function onConfirm() {
+    const checked = modalState.filter((e) => e.checked);
+    // Persist inline time edits back to state
+    for (const entry of checked) {
+      if (entry.sourceKind === 'fixed') {
+        entry.activity.timing.fixed = {
+          date: entry.date,
+          time: entry.time,
+          reason: entry.activity.timing.fixed?.reason || ''
+        };
+        state.activities = state.activities.map((a) => (a.id === entry.activity.id ? entry.activity : a));
+      } else if (entry.sourceKind === 'verified') {
+        const item = (state.confidenceChecklist || []).find(
+          (c) => c.type === 'activity' && String(c.activityId) === String(entry.activity.id)
+        );
+        if (item) {
+          item.activityDate = entry.date;
+          item.activityTime = entry.time;
+          syncChecklistDateTimeToPlacement(item);
+        }
+      }
+    }
+    saveSnapshot();
+    closeModal();
+    await autoArrangeActiveCity({ finalize: true, lockedSet: checked });
+  }
+
+  function closeModal() {
+    document.getElementById('finalizeModal')?.remove();
+    refreshOverlayInterlocks?.();
+  }
+
+  const existing = document.getElementById('finalizeModal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'finalizeModal';
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-card finalize-modal-card">
+      <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <h3 style="margin:0">Finalize Arrangement</h3>
+        <button type="button" id="finalizeCloseBtn" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="muted-text" style="margin:0 0 16px">Lock activities to their current times. Unlocked activities will be scheduled by AI.</p>
+      <div id="finalizeRows"></div>
+      <div id="finalizeConflictBanner" class="finalize-conflict-banner" hidden></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+        <button type="button" class="secondary" id="finalizeCancelBtn">Cancel</button>
+        <button type="button" id="finalizeConfirmBtn">Confirm &amp; Arrange</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  refreshOverlayInterlocks?.();
+
+  renderRows();
+  updateConflicts();
+
+  modal.querySelector('#finalizeCloseBtn').addEventListener('click', closeModal);
+  modal.querySelector('#finalizeCancelBtn').addEventListener('click', closeModal);
+  modal.querySelector('#finalizeConfirmBtn').addEventListener('click', onConfirm);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+}
+
+async function autoArrangeActiveCity(opts = {}) {
+  const finalize = Boolean(opts.finalize);
+  const lockedSet = Array.isArray(opts.lockedSet) ? opts.lockedSet : [];
+  const lockedIds = new Set(lockedSet.map((e) => String(e.activity.id)));
+
   const activeCity = state.arrangeCity;
   if (!activeCity) return;
 
@@ -5899,25 +6085,31 @@ async function autoArrangeActiveCity() {
     .sort((a, b) => new Date(a.date) - new Date(b.date));
   if (!activeDays.length) return;
 
-  const approvedInCity = state.activities
+  const allApprovedInCity = state.activities
     .filter((a) => state.reviewed[a.id]?.approved && cityMatches(a.city, activeCity))
     .map((a) => normalizeActivityMetadata(a));
 
-  const hasExistingPlacements = approvedInCity.some((a) => state.placements[a.id]?.dayId);
-  if (hasExistingPlacements) {
+  const locked = allApprovedInCity.filter((a) => lockedIds.has(String(a.id)));
+  const flexible = allApprovedInCity.filter((a) => !lockedIds.has(String(a.id)));
+
+  const hasExistingPlacements = allApprovedInCity.some((a) => state.placements[a.id]?.dayId);
+  if (!finalize && hasExistingPlacements) {
     const confirmed = await showConfirmDialog('Replace arrangement?', 'This will replace your current schedule for this city.', 'Replace');
     if (!confirmed) return;
+  }
+
+  if (finalize) {
+    state.lastFinalizeLocks[activeCity] = lockedSet;
+  } else {
+    delete state.lastFinalizeLocks[activeCity];
   }
 
   const cityPlan = state.cities.find((c) => cityMatches(c.name, activeCity));
 
   const cityLogistics = cityPlan?.logistics || {};
-  const arrivalLocation = String(cityLogistics.arrival?.location || '').trim() || 'arrival point';
   const departureLocation = String(cityLogistics.departure?.location || '').trim() || 'departure point';
   const primaryAccommodation = cityPlan?.accommodation;
-  const accommodationLabel = String(primaryAccommodation?.address || '').trim() || 'accommodation';
 
-  // Fetch arrival→accommodation and accommodation→departure commute durations via Google Maps
   const arrLogistics = buildLogisticsPseudoActivities(cityPlan, cityPlan?.startDate, activeCity);
   const depLogistics = buildLogisticsPseudoActivities(cityPlan, cityPlan?.endDate, activeCity);
   const [arrivalCommutes, departureCommutes] = await Promise.all([
@@ -5976,7 +6168,6 @@ async function autoArrangeActiveCity() {
     return { date: day.date, label, windowStart: timeFromMinutes(startMins), windowEnd: timeFromMinutes(endMins), fixedStart, fixedEnd };
   });
 
-  // Guard: same-day arrival+departure with no schedulable window
   const sameDayEntry = dayPayload.find(d => d.fixedStart && d.fixedEnd);
   if (sameDayEntry) {
     const fsMin = minutesFromTime(sameDayEntry.fixedStart.time);
@@ -5989,30 +6180,54 @@ async function autoArrangeActiveCity() {
 
   if (diagnostics.length) showToast(diagnostics.join(' | '), 'info');
 
-  approvedInCity.forEach((a) => {
+  allApprovedInCity.forEach((a) => {
     state.activities = state.activities.map((current) => (current.id === a.id ? a : current));
     state.placements[a.id] = { ...(state.placements[a.id] || {}), dayId: null, time: null };
   });
+
+  // If all activities are locked, skip the LLM call and apply locks directly
+  if (finalize && flexible.length === 0) {
+    const dateToDay = Object.fromEntries(activeDays.map((d) => [d.date, d]));
+    for (const entry of lockedSet) {
+      const day = dateToDay[entry.date];
+      if (day) state.placements[entry.activity.id] = { dayId: day.id, time: entry.time };
+    }
+    state.arrangeDiagnostics[activeCity] = [];
+    const activeDayIds = activeDays.map((d) => d.id);
+    await updateCommutesForCityDays(activeDayIds);
+    renderArrange();
+    return;
+  }
 
   els.autoArrangeBtn.disabled = true;
   els.autoArrangeBtn.textContent = 'Arranging…';
 
   try {
+    const lockedActivities = lockedSet.map((entry) => ({
+      id: entry.activity.id,
+      date: entry.date,
+      time: entry.time,
+      duration_minutes: entry.activity.timing?.duration_minutes || actDurationHours(entry.activity) * 60 || 60,
+      category: entry.activity.category,
+      name: entry.activity.name
+    }));
+
     const res = await apiFetch('/api/arrange', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         days: dayPayload,
-        activities: approvedInCity.map((a) => {
+        activities: flexible.map((a) => {
           const notes = String(state.reviewed[a.id]?.notes || '').trim();
           return notes ? { ...a, user_notes: notes } : a;
         }),
+        lockedActivities,
         userId: ensureUserId(),
         profile: getProfilePayload(),
         budget: state.tripBudget,
         numTravelers: state.numTravelers,
         numChildren: state.numChildren,
-        approvedCostTotal: computeApprovedCost(approvedInCity)
+        approvedCostTotal: computeApprovedCost(allApprovedInCity)
       })
     });
 
@@ -6024,7 +6239,6 @@ async function autoArrangeActiveCity() {
       const day = dateToDay[placement.date];
       if (day) {
         state.placements[id] = { dayId: day.id, time: placement.time };
-        // Update booking link dates to use the actual scheduled date
         const activity = state.activities.find((a) => a.id === id);
         if (activity) {
           const links = actBookingLinks(activity);
@@ -6040,8 +6254,14 @@ async function autoArrangeActiveCity() {
       }
     }
 
+    // Locked activities always win — overwrite any placements the LLM may have emitted
+    for (const entry of lockedSet) {
+      const day = dateToDay[entry.date];
+      if (day) state.placements[entry.activity.id] = { dayId: day.id, time: entry.time };
+    }
+
     state.arrangeDiagnostics[activeCity] = unplaced.map((u) => {
-      const a = approvedInCity.find((x) => x.id === u.id);
+      const a = flexible.find((x) => x.id === u.id);
       return a ? `${a.name}: unplaced — ${u.reason}` : null;
     }).filter(Boolean);
   } catch (e) {
@@ -6170,6 +6390,14 @@ function bindPlacedCardInteractions() {
     card.addEventListener('mousedown', (e) => {
       e.stopPropagation();
       if (e.button !== 0) return;
+
+      const activeCity = state.arrangeCity;
+      if ((state.lastFinalizeLocks[activeCity] || []).some((entry) => String(entry.activity.id) === id)) {
+        e.preventDefault();
+        showToast('This activity is locked. Re-open Finalize to unlock.');
+        return;
+      }
+
       e.preventDefault();
       hidePlacedTooltip();
 
@@ -8179,9 +8407,7 @@ document.getElementById('saveConfidenceBtn')?.addEventListener('click', async ()
   }
 });
 els.autoArrangeBtn?.addEventListener('click', autoArrangeActiveCity);
-els.finalizeArrangeBtn?.addEventListener('click', () => {
-  showToast('Finalize modal coming in the next update. Use Draft to arrange freely for now.');
-});
+els.finalizeArrangeBtn?.addEventListener('click', openFinalizeModal);
 els.downloadCalendarBtn?.addEventListener('click', () => {
   if (!state.currentItineraryId) return;
   const metadataMode = encodeURIComponent(state.calendarMetadataMode || 'compact');

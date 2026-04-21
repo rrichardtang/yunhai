@@ -1087,17 +1087,35 @@ app.post('/api/arrange', async (req, res) => {
     return res.status(503).json({ error: 'Anthropic API key not configured' });
   }
 
-  const { days, activities, profile, budget, numTravelers, numChildren, approvedCostTotal } = req.body || {};
+  const { days, activities, lockedActivities, profile, budget, numTravelers, numChildren, approvedCostTotal } = req.body || {};
   if (!Array.isArray(days) || !Array.isArray(activities)) {
     return res.status(400).json({ error: 'days and activities are required arrays' });
   }
+  const resolvedLocked = Array.isArray(lockedActivities) ? lockedActivities : [];
   const userId = parseUserId(getAuthedUserId(req));
   const prefSummary = getPreferenceSummary(userId);
+
+  const lockedByDate = {};
+  for (const lock of resolvedLocked) {
+    if (!lock.date) continue;
+    if (!lockedByDate[lock.date]) lockedByDate[lock.date] = [];
+    lockedByDate[lock.date].push(lock);
+  }
 
   const daysText = days.map((d) => {
     let line = `- ${d.date} (${d.label}): available ${d.windowStart} – ${d.windowEnd}`;
     if (d.fixedStart) line += `\n  FIXED FIRST: "${d.fixedStart.label}" at ${d.fixedStart.time} — schedule NO activities before this`;
     if (d.fixedEnd) line += `\n  FIXED LAST: "${d.fixedEnd.label}" at ${d.fixedEnd.time} — schedule NO activities after this`;
+    const locks = lockedByDate[d.date] || [];
+    for (const lock of locks) {
+      const durMins = Number(lock.duration_minutes) || 60;
+      const [lh, lm] = String(lock.time || '00:00').split(':').map(Number);
+      const endMins = (lh * 60 + (lm || 0)) + durMins;
+      const endH = Math.floor(endMins / 60);
+      const endM = endMins % 60;
+      const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+      line += `\n  ALREADY OCCUPIED (do not overlap): ${lock.time}–${endTime} "${lock.name}"`;
+    }
     return line;
   }).join('\n');
 
@@ -1132,6 +1150,7 @@ ${travelerBlock}
 RULES (priority order):
 1. Distribute ~${perDay} activities per day.
 2. Stay within each day's available window (windowStart–windowEnd).
+2a. ALREADY OCCUPIED intervals are booked — do not place any activity that overlaps them (including a 20-minute travel buffer on each side).
 3. FIXED FIRST/LAST bookends are immovable.
 4. Respect opening hours.
 5. Meals at realistic times: breakfast 7–9am, lunch 11:30am–1:30pm, dinner 6–8:30pm.
@@ -1160,6 +1179,11 @@ Respond ONLY with JSON:
     if (!jsonMatch) return res.status(500).json({ error: 'Failed to parse arrangement' });
 
     const result = JSON.parse(jsonMatch[0]);
+    // Belt-and-suspenders: drop any locked IDs the LLM emitted (client merge already overrides)
+    const lockedIdSet = new Set(resolvedLocked.map((l) => String(l.id)));
+    for (const id of lockedIdSet) {
+      if (result.placements && result.placements[id]) delete result.placements[id];
+    }
     return res.json(result);
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Failed to arrange activities' });
