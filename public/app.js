@@ -5946,8 +5946,13 @@ function openFinalizeModal() {
     }
   }
 
+  function deriveEndTime(entry) {
+    const durMins = entry.activity.timing?.duration_minutes || actDurationHours(entry.activity) * 60 || 60;
+    return clampTime(minutesFromTime(entry.time) + durMins);
+  }
+
   // State for the modal (mutable during interaction)
-  const modalState = lockedSet.map((e) => ({ ...e }));
+  const modalState = lockedSet.map((e) => ({ ...e, endTime: deriveEndTime(e), expanded: false }));
 
   function renderRows() {
     const byDate = {};
@@ -5962,40 +5967,69 @@ function openFinalizeModal() {
       const rowsHtml = entries.map((entry) => {
         const globalIdx = modalState.indexOf(entry);
         const checkedClass = entry.checked ? ' cl-item--checked' : '';
-        const checkboxInner = entry.checked
-          ? '<i class="ph-bold ph-lock-key" aria-hidden="true"></i>'
-          : '';
+        const checkboxInner = entry.checked ? '<i class="ph-bold ph-lock-key" aria-hidden="true"></i>' : '';
         const checkboxClass = entry.checked ? 'cl-checkbox finalize-check finalize-check--locked checked' : 'cl-checkbox finalize-check';
+        const chevron = `<i class="ph-bold ${entry.expanded ? 'ph-caret-up' : 'ph-caret-down'} cl-item-chevron" aria-hidden="true"></i>`;
+        const sourceIcon = entry.sourceKind === 'verified'
+          ? '<span class="cl-item-meta"><i class="ph-bold ph-clipboard-text" aria-hidden="true"></i> from checklist</span>'
+          : '';
+        const why = entry.activity.why_it_fits || '';
+        const pitfall = entry.activity.pitfall || '';
+        const notes = state.reviewed[entry.activity.id]?.notes || '';
+        const expandedHtml = entry.expanded ? `
+          <div class="cl-item-expanded-wrap finalize-expanded">
+            ${why ? `<p class="finalize-exp-line"><strong>Why it fits:</strong> ${esc(why)}</p>` : ''}
+            ${pitfall ? `<p class="finalize-exp-line"><strong>Pitfall:</strong> ${esc(pitfall)}</p>` : ''}
+            ${notes ? `<p class="finalize-exp-line"><strong>Notes:</strong> ${esc(notes)}</p>` : ''}
+          </div>` : '';
         return `
           <div class="cl-item${checkedClass} finalize-item" data-idx="${globalIdx}">
-            <div class="cl-item-collapsed">
-              <button type="button" class="${checkboxClass}" aria-label="Lock this activity" aria-pressed="${entry.checked}">
+            <div class="cl-item-collapsed" data-finalize-collapse-row>
+              <button type="button" class="${checkboxClass}" aria-label="Lock this activity" aria-pressed="${entry.checked}" data-finalize-check>
                 ${checkboxInner}
               </button>
               <div class="cl-item-text">
                 <span class="cl-item-name">${esc(entry.activity.name)}</span>
-                ${entry.sourceKind === 'verified' ? '<span class="cl-item-meta">📋 from checklist</span>' : ''}
+                ${sourceIcon}
               </div>
-              <input type="time" class="finalize-time" value="${entry.time}" />
+              <input type="time" class="finalize-time finalize-time-start" value="${entry.time}" data-finalize-time="start" />
+              <span class="finalize-time-sep">–</span>
+              <input type="time" class="finalize-time finalize-time-end" value="${entry.endTime}" data-finalize-time="end" />
+              ${chevron}
             </div>
+            ${expandedHtml}
           </div>`;
       }).join('');
       return `<div class="finalize-day-group"><div class="finalize-day-label">${esc(dateLabel)}</div>${rowsHtml}</div>`;
     }).join('');
 
     document.getElementById('finalizeRows').innerHTML = dayRows;
-    document.querySelectorAll('#finalizeModal .finalize-check').forEach((cb) => {
-      cb.addEventListener('click', () => {
+    document.querySelectorAll('#finalizeModal [data-finalize-collapse-row]').forEach((row) => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('[data-finalize-check]') || e.target.closest('[data-finalize-time]')) return;
+        const idx = Number(row.closest('.finalize-item').dataset.idx);
+        modalState[idx].expanded = !modalState[idx].expanded;
+        renderRows();
+      });
+    });
+    document.querySelectorAll('#finalizeModal [data-finalize-check]').forEach((cb) => {
+      cb.addEventListener('click', (e) => {
+        e.stopPropagation();
         const idx = Number(cb.closest('.finalize-item').dataset.idx);
         modalState[idx].checked = !modalState[idx].checked;
         updateConflicts();
         renderRows();
       });
     });
-    document.querySelectorAll('#finalizeModal .finalize-time').forEach((inp) => {
+    document.querySelectorAll('#finalizeModal [data-finalize-time]').forEach((inp) => {
+      inp.addEventListener('click', (e) => e.stopPropagation());
       inp.addEventListener('change', () => {
         const idx = Number(inp.closest('.finalize-item').dataset.idx);
-        modalState[idx].time = inp.value;
+        if (inp.dataset.finalizeTime === 'start') {
+          modalState[idx].time = inp.value;
+        } else {
+          modalState[idx].endTime = inp.value;
+        }
         updateConflicts();
       });
     });
@@ -6003,7 +6037,10 @@ function openFinalizeModal() {
 
   function updateConflicts() {
     const checked = modalState.filter((e) => e.checked);
-    const conflicts = findLockedOverlaps(checked);
+    const conflicts = findLockedOverlaps(checked.map((e) => ({
+      ...e,
+      activity: { ...e.activity, timing: { ...(e.activity.timing || {}), duration_minutes: minutesFromTime(e.endTime) - minutesFromTime(e.time) } }
+    })));
     const banner = document.getElementById('finalizeConflictBanner');
     const confirmBtn = document.getElementById('finalizeConfirmBtn');
     if (conflicts.length) {
