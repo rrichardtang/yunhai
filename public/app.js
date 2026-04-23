@@ -1434,7 +1434,8 @@ function normalizeChecklistItem(item = {}) {
     activityLocationLat: item.activityLocationLat ?? null,
     activityLocationLng: item.activityLocationLng ?? null,
     activityDate: String(item.activityDate || (base.dateTime ? base.dateTime.slice(0, 10) : '')).trim(),
-    activityTime: String(item.activityTime || (base.dateTime && base.dateTime.length > 10 ? base.dateTime.slice(11, 16) : '')).trim()
+    activityTime: String(item.activityTime || (base.dateTime && base.dateTime.length > 10 ? base.dateTime.slice(11, 16) : '')).trim(),
+    activityEndTime: String(item.activityEndTime || '').trim()
   };
 }
 
@@ -1526,6 +1527,7 @@ function formatChecklistDate(dateStr, timeStr, endTimeStr = '') {
 
 function checklistActivityEndTime(item) {
   if (!item.activityTime || !item.activityId) return '';
+  if (item.activityEndTime) return parseTimeTo24(item.activityEndTime);
   const activity = (state.activities || []).find((a) => a.id === item.activityId);
   if (!activity) return '';
   const durationMins = Math.max(30, actDurationHours(activity) * 60);
@@ -1978,6 +1980,8 @@ function renderChecklistItemExpanded(item) {
           <div class="cl-datetime-pair">
             <input type="date" data-cl="activityDate" value="${esc(item.activityDate)}" />
             <input type="time" data-cl="activityTime" value="${esc(item.activityTime)}" />
+            <span class="finalize-time-sep">–</span>
+            <input type="time" data-cl="activityEndTime" value="${esc(item.activityEndTime || checklistActivityEndTime(item))}" />
           </div>
         </label>
         <div></div>
@@ -2525,6 +2529,7 @@ function syncItemFromExpanded(el, id) {
     item.activityLocation = get('[data-cl="activityLocation"]');
     item.activityDate = get('[data-cl="activityDate"]');
     item.activityTime = get('[data-cl="activityTime"]');
+    item.activityEndTime = get('[data-cl="activityEndTime"]');
     if (!item.activityLocation) {
       item.activityLocationPlaceId = '';
       item.activityLocationLat = null;
@@ -5938,7 +5943,8 @@ function openFinalizeModal() {
       (c) => c.type === 'activity' && c.verified && String(c.activityId) === String(activity.id)
     );
     if (item?.activityDate && item?.activityTime) {
-      lockedSet.push({ activity, date: item.activityDate, time: parseTimeTo24(item.activityTime), sourceKind: 'verified', checked: true });
+      const endOverride = item.activityEndTime ? parseTimeTo24(item.activityEndTime) : '';
+      lockedSet.push({ activity, date: item.activityDate, time: parseTimeTo24(item.activityTime), endOverride, sourceKind: 'verified', checked: true });
     } else {
       const placement = state.placements[activity.id];
       const day = placement?.dayId ? state.days.find((d) => d.id === placement.dayId) : activeDays[0];
@@ -5947,6 +5953,7 @@ function openFinalizeModal() {
   }
 
   function deriveEndTime(entry) {
+    if (entry.endOverride) return entry.endOverride;
     const durMins = entry.activity.timing?.duration_minutes || actDurationHours(entry.activity) * 60 || 60;
     const totalMins = minutesFromTime(entry.time) + durMins;
     const h = Math.floor(totalMins / 60) % 24;
@@ -6069,6 +6076,7 @@ function openFinalizeModal() {
         if (item) {
           item.activityDate = entry.date;
           item.activityTime = entry.time;
+          item.activityEndTime = entry.endTime;
           syncChecklistDateTimeToPlacement(item);
         }
       }
@@ -6246,14 +6254,18 @@ async function autoArrangeActiveCity(opts = {}) {
   els.autoArrangeBtn.textContent = 'Arranging…';
 
   try {
-    const lockedActivities = lockedSet.map((entry) => ({
-      id: entry.activity.id,
-      date: entry.date,
-      time: entry.time,
-      duration_minutes: entry.activity.timing?.duration_minutes || actDurationHours(entry.activity) * 60 || 60,
-      category: entry.activity.category,
-      name: entry.activity.name
-    }));
+    const lockedActivities = lockedSet.map((entry) => {
+      const fallback = entry.activity.timing?.duration_minutes || actDurationHours(entry.activity) * 60 || 60;
+      const fromEnd = entry.endTime ? minutesFromTime(entry.endTime) - minutesFromTime(entry.time) : 0;
+      return {
+        id: entry.activity.id,
+        date: entry.date,
+        time: entry.time,
+        duration_minutes: fromEnd > 0 ? fromEnd : fallback,
+        category: entry.activity.category,
+        name: entry.activity.name
+      };
+    });
 
     const res = await apiFetch('/api/arrange', {
       method: 'POST',

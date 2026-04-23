@@ -1,12 +1,12 @@
 # Current State
 
-_Last updated: 2026-04-21 (session 19)_
+_Last updated: 2026-04-23 (session 20)_
 
 ## Objective
-Phase 3 (Finalize Modal + time locks) implemented on `feature/arrange-time-locks`. Ready for VPS deploy + smoke test.
+Phase 3 time locks deployed to staging and smoke-tested. Added checklist activity end-time field so user-locked intervals carry correct duration into the arrange prompt.
 
 ## Active Workstream
-`feature/arrange-time-locks` — all Phase 3 features complete, tests green. Pending push and deploy.
+`feature/arrange-time-locks` — Phase 3 live on staging. Checklist end-time input added; pending re-deploy and verification.
 
 ## Constraints
 - No database — flat JSON files
