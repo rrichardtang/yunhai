@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-23] Checklist activity end-time field
+
+- `public/app.js` — added `activityEndTime` to checklist activity schema (normalizer, save handler, edit form input next to start time)
+- `public/app.js` — `checklistActivityEndTime()`: prefers user-entered `activityEndTime` over derived duration
+- `public/app.js` — `openFinalizeModal()`: propagates checklist end-time override into modal row (`endOverride`), used by `deriveEndTime`
+- `public/app.js` — Finalize Confirm writes modal end-time back to the checklist item
+- `public/app.js` — `autoArrangeActiveCity`: `lockedActivities.duration_minutes` now derived from modal start/end instead of raw activity duration, so server `ALREADY OCCUPIED` block matches user intent
+
+---
+
 ## [2026-04-21] Phase 3: Finalize Modal + time locks
 
 - `public/app.js` — added `state.lastFinalizeLocks` field
