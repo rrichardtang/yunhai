@@ -1977,7 +1977,7 @@ function renderChecklistItemExpanded(item) {
       <div class="cl-form-row cl-form-row--2">
         <label class="cl-field">
           <span class="cl-field-label">Date &amp; time</span>
-          <div class="cl-datetime-pair">
+          <div class="cl-datetime-pair cl-datetime-pair--range">
             <input type="date" data-cl="activityDate" value="${esc(item.activityDate)}" />
             <input type="time" data-cl="activityTime" value="${esc(item.activityTime)}" />
             <span class="finalize-time-sep">–</span>
