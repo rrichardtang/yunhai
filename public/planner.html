@@ -8,21 +8,21 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css" />
-    <link rel="stylesheet" href="/confidence.css" />
+    <link rel="stylesheet" href="/tripHealth.css" />
     <style>
-      .topbar-actions .confidence-badge { border: 1px solid rgba(245,240,235,.2); border-radius: 999px; width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: rgba(245,240,235,.1); color: rgba(245,240,235,.7); }
-      .topbar-actions .confidence-badge i { font-size: 18px; }
-      .topbar-actions .confidence-badge.ready { color: #166534; border-color: #86efac; background: #dcfce7; }
-      .topbar-actions .confidence-badge.needs-review { color: #92400e; border-color: #fcd34d; background: #fef3c7; }
-      .topbar-actions .confidence-badge.conflicts-found { color: #991b1b; border-color: #fda4af; background: #fee2e2; }
-      .topbar-actions .confidence-badge.missing-details { color: #9f1239; border-color: #fda4af; background: #ffe4e6; }
+      .topbar-actions .trip-health-badge { border: 1px solid rgba(245,240,235,.2); border-radius: 999px; width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: rgba(245,240,235,.1); color: rgba(245,240,235,.7); }
+      .topbar-actions .trip-health-badge i { font-size: 18px; }
+      .topbar-actions .trip-health-badge.ready { color: #166534; border-color: #86efac; background: #dcfce7; }
+      .topbar-actions .trip-health-badge.needs-review { color: #92400e; border-color: #fcd34d; background: #fef3c7; }
+      .topbar-actions .trip-health-badge.conflicts-found { color: #991b1b; border-color: #fda4af; background: #fee2e2; }
+      .topbar-actions .trip-health-badge.missing-details { color: #9f1239; border-color: #fda4af; background: #ffe4e6; }
       .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
       .trip-health-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
-      .trip-health-summary-card, .confidence-issues-panel { border: 1px solid var(--secondary-light, #E2E8F0); border-radius: 16px; background: var(--base-light, #FAF8F5); padding: 14px; box-shadow: var(--shadow-sm, 0 1px 3px rgba(11,37,69,.06)); }
+      .trip-health-summary-card, .trip-health-issues-panel { border: 1px solid var(--secondary-light, #E2E8F0); border-radius: 16px; background: var(--base-light, #FAF8F5); padding: 14px; box-shadow: var(--shadow-sm, 0 1px 3px rgba(11,37,69,.06)); }
       .trip-health-metrics p { margin: 6px 0; }
-      .confidence-issue-card { border: 1px solid var(--secondary-light, #E2E8F0); border-radius: 14px; background: var(--base-light, #FAF8F5); padding: 12px; margin-bottom: 10px; box-shadow: var(--shadow-sm, 0 1px 3px rgba(11,37,69,.06)); }
-      .confidence-issue-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
-      .confidence-issue-card textarea { width: 100%; border: 1px solid var(--secondary, #C4CDD5); border-radius: 10px; padding: 8px 10px; background: var(--base-light, #FAF8F5); }
+      .trip-health-issue-card { border: 1px solid var(--secondary-light, #E2E8F0); border-radius: 14px; background: var(--base-light, #FAF8F5); padding: 12px; margin-bottom: 10px; box-shadow: var(--shadow-sm, 0 1px 3px rgba(11,37,69,.06)); }
+      .trip-health-issue-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+      .trip-health-issue-card textarea { width: 100%; border: 1px solid var(--secondary, #C4CDD5); border-radius: 10px; padding: 8px 10px; background: var(--base-light, #FAF8F5); }
       @media (max-width: 1100px) { .trip-health-summary { grid-template-columns: 1fr; } }
     </style>
   </head>
@@ -39,15 +39,15 @@
             <button id="planningModeBtn" class="link-btn mode-btn active" type="button">Planning</button>
             <button id="itineraryModeBtn" class="link-btn mode-btn" type="button">Itinerary</button>
           </div>
-          <button id="confidenceBadge" class="confidence-badge needs-review" type="button" aria-label="Open Trip Health" title="Trip Health">
+          <button id="tripHealthBadge" class="trip-health-badge needs-review" type="button" aria-label="Open Trip Health" title="Trip Health">
             <i class="ph-bold ph-heartbeat" aria-hidden="true"></i>
           </button>
-          <div id="confidencePopover" class="confidence-popover hidden">
-            <p id="confidencePopoverStatus"><strong>Needs review</strong></p>
-            <p id="confidencePopoverIssues">0 issues</p>
-            <p id="confidencePopoverTopIssue">No issues detected</p>
-            <p id="confidencePopoverProgress">0 of 0 items verified</p>
-            <button id="openConfidenceReviewBtn" class="primary" type="button">Open Trip Health</button>
+          <div id="tripHealthPopover" class="trip-health-popover hidden">
+            <p id="tripHealthPopoverStatus"><strong>Needs review</strong></p>
+            <p id="tripHealthPopoverIssues">0 issues</p>
+            <p id="tripHealthPopoverTopIssue">No issues detected</p>
+            <p id="tripHealthPopoverProgress">0 of 0 items verified</p>
+            <button id="openTripHealthReviewBtn" class="primary" type="button">Open Trip Health</button>
           </div>
           <button id="checklistBtn" class="link-btn" type="button" title="Booking Checklist"><i class="ph-bold ph-check-square" aria-hidden="true"></i> Checklist</button>
           <div id="profileMenu" class="profile-menu hidden">
@@ -216,11 +216,11 @@
         </section>
         <section id="tripHealthSection" class="trip-health-inline-panel">
           <div class="between"><h3>Trip Health</h3></div>
-          <div id="confidenceSummary" class="trip-health-summary"></div>
-          <section class="card-panel confidence-issues-panel">
+          <div id="tripHealthSummary" class="trip-health-summary"></div>
+          <section class="card-panel trip-health-issues-panel">
             <div class="between"><h3>Issue review</h3></div>
             <p class="muted-text">Review each flagged issue and choose an action: fix, verify, dismiss, or add context.</p>
-            <div id="confidenceIssues" class="confidence-issues-list"></div>
+            <div id="tripHealthIssues" class="trip-health-issues-list"></div>
           </section>
         </section>
         <div class="step-nav sticky-nav step-nav-split">
@@ -294,7 +294,7 @@
             <button id="checklistModalClose" class="icon-btn red" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
           </div>
         </div>
-        <div id="confidenceChecklist"></div>
+        <div id="bookingChecklist"></div>
       </div>
     </div>
 

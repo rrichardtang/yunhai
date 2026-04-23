@@ -23,7 +23,7 @@ npm test           # Run all tests (node --test src/*.test.js)
 
 To run a single test file:
 ```bash
-node --test src/confidenceCheck.test.js
+node --test src/tripHealth.test.js
 ```
 
 Local setup:
@@ -48,7 +48,7 @@ TravelPlannerAgent is a full-stack AI travel itinerary builder: an Express.js ba
 
 - **`server.js`** (1611 lines) — Express app, all route definitions, Clerk middleware, global LLM semaphore. The main entry point.
 - **`claude.js`** — `planCity()`: generates activities for one city using Claude Sonnet 4.6. Includes an opinionated SYSTEM_PROMPT with a decision framework (Fun Factor, Disappointment Risk, Cost, Flexibility, Engagement Type). JSON output parsing with retry logic.
-- **`confidenceCheck.js`** — `computeConfidence()`: validates trip consistency — detects overlapping dates/activities, missing times, missing bookings. Returns status (`Ready` / `Conflicts found` / `Needs booking`) + issue list + budget summary.
+- **`tripHealth.js`** — `computeTripHealth()`: validates trip consistency — detects overlapping dates/activities, missing times, missing bookings. Returns status (`Ready` / `Conflicts found` / `Needs booking`) + issue list + budget summary. Reads stored booking checklist from `itinerary.bookingChecklist`.
 - **`preferences.js`** — Per-user preference store. Three-tier: `profileInstruction` (AI summary), `preferences` (learned details, max 30), `constraints` (hard limits, max 20). File-backed at `/data/users/{userId}.json`.
 - **`itineraryStore.js`** — All itineraries in a single `/data/itineraries.json` keyed by userId. Max 50 per user. Atomic writes via temp-file pattern.
 - **`chat.js`** — In-memory chat sessions keyed by itinerary ID. History compacted when tokens exceed 8000. Sessions are lost on server restart.
@@ -97,7 +97,7 @@ Key variables: `ANTHROPIC_API_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`,
 
 ## Testing
 
-Uses Node.js built-in `node:test` — no Jest or external runner. Tests live alongside source as `src/*.test.js`. Coverage focuses on: Brave routing logic, confidence/overlap detection, and city name validation. LLM integration is not mocked in tests.
+Uses Node.js built-in `node:test` — no Jest or external runner. Tests live alongside source as `src/*.test.js`. Coverage focuses on: Brave routing logic, trip health/overlap detection, and city name validation. LLM integration is not mocked in tests.
 
 ## Engineering Practices
 

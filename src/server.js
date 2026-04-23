@@ -60,7 +60,7 @@ const {
   listItineraries,
   deleteItinerary,
   addParsedBookings,
-  updateItineraryConfidence
+  updateBookingChecklist
 } = require('./itineraryStore');
 const {
   getOrCreateForwardingAddress,
@@ -69,7 +69,7 @@ const {
   sendIngestConfirmation
 } = require('./emailForwarding');
 const { Resend } = require('resend');
-const { computeConfidence, normalizeChecklistItem } = require('./confidenceCheck');
+const { computeTripHealth, normalizeChecklistItem } = require('./tripHealth');
 const { getUserData, setUserData, getUserField, setUserField } = require('./userDataStore');
 const multer = require('multer');
 const {
@@ -565,15 +565,15 @@ function parseUserId(rawUserId) {
   return resolveUserId(rawUserId);
 }
 
-async function sendConfidenceSummaryEmail({ toEmail, tripName, confidence }) {
+async function sendTripHealthSummaryEmail({ toEmail, tripName, tripHealth }) {
   if (!toEmail || !process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) return false;
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const unresolved = (confidence?.issues || []).slice(0, 5).map((issue) => `- ${issue.message}`).join('\n');
+  const unresolved = (tripHealth?.issues || []).slice(0, 5).map((issue) => `- ${issue.message}`).join('\n');
   await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL,
     to: [toEmail],
-    subject: `TravelPlanner confidence summary: ${tripName || 'Your trip'}`,
-    text: `${confidence.status} (${confidence.issueCount} issues)\n\nTop issue: ${confidence.topIssue}\nChecklist: ${confidence.checklistProgress.verified}/${confidence.checklistProgress.total} verified\n\nUnresolved:\n${unresolved || '- None'}`
+    subject: `TravelPlanner trip health summary: ${tripName || 'Your trip'}`,
+    text: `${tripHealth.status} (${tripHealth.issueCount} issues)\n\nTop issue: ${tripHealth.topIssue}\nChecklist: ${tripHealth.checklistProgress.verified}/${tripHealth.checklistProgress.total} verified\n\nUnresolved:\n${unresolved || '- None'}`
   });
   return true;
 }
@@ -1540,36 +1540,36 @@ app.delete('/api/itinerary/:id', (req, res) => {
   return res.json({ ok: true });
 });
 
-app.get('/api/itinerary/:id/confidence', (req, res) => {
+app.get('/api/itinerary/:id/trip-health', (req, res) => {
   const userId = parseUserId(getAuthedUserId(req));
   const itinerary = getItineraryById(req.params.id, userId);
   if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
-  const confidence = computeConfidence(itinerary);
-  return res.json({ confidence });
+  const tripHealth = computeTripHealth(itinerary);
+  return res.json({ tripHealth });
 });
 
-app.put('/api/itinerary/:id/confidence', (req, res) => {
+app.put('/api/itinerary/:id/trip-health', (req, res) => {
   const userId = parseUserId(getAuthedUserId(req));
   const itinerary = getItineraryById(req.params.id, userId);
   if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
 
   const checklist = Array.isArray(req.body?.checklist)
     ? req.body.checklist.map(normalizeChecklistItem)
-    : (itinerary?.confidence?.checklist || []);
+    : (itinerary?.bookingChecklist?.checklist || []);
   const notificationPrefs = {
     emailSummary: Boolean(req.body?.notificationPrefs?.emailSummary),
     reminderBeforeDeparture: Boolean(req.body?.notificationPrefs?.reminderBeforeDeparture)
   };
   const issueMeta = req.body?.issueMeta && typeof req.body.issueMeta === 'object'
     ? req.body.issueMeta
-    : (itinerary?.confidence?.issueMeta || {});
+    : (itinerary?.bookingChecklist?.issueMeta || {});
 
-  const updated = updateItineraryConfidence(req.params.id, userId, { checklist, notificationPrefs, issueMeta });
-  const confidence = computeConfidence(updated || itinerary);
-  return res.json({ ok: true, confidence });
+  const updated = updateBookingChecklist(req.params.id, userId, { checklist, notificationPrefs, issueMeta });
+  const tripHealth = computeTripHealth(updated || itinerary);
+  return res.json({ ok: true, tripHealth });
 });
 
-app.post('/api/itinerary/:id/confidence/email-summary', async (req, res) => {
+app.post('/api/itinerary/:id/trip-health/email-summary', async (req, res) => {
   try {
     const userId = parseUserId(getAuthedUserId(req));
     const itinerary = getItineraryById(req.params.id, userId);
@@ -1579,11 +1579,11 @@ app.post('/api/itinerary/:id/confidence/email-summary', async (req, res) => {
     const toEmail = String(session?.email || session?.email_address || '').trim();
     if (!toEmail) return res.status(400).json({ error: 'No authenticated email found for this account' });
 
-    const confidence = computeConfidence(itinerary);
-    await sendConfidenceSummaryEmail({ toEmail, tripName: itinerary.tripName, confidence });
+    const tripHealth = computeTripHealth(itinerary);
+    await sendTripHealthSummaryEmail({ toEmail, tripName: itinerary.tripName, tripHealth });
     return res.json({ ok: true });
   } catch (error) {
-    return res.status(500).json({ error: error.message || 'Failed to send confidence summary email' });
+    return res.status(500).json({ error: error.message || 'Failed to send trip health summary email' });
   }
 });
 

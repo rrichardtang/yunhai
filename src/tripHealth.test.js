@@ -1,9 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { computeConfidence } = require('./confidenceCheck');
+const { computeTripHealth } = require('./tripHealth');
 
-test('computeConfidence flags overlapping activities and missing times', () => {
-  const result = computeConfidence({
+test('computeTripHealth flags overlapping activities and missing times', () => {
+  const result = computeTripHealth({
     days: [{
       date: '2026-06-01',
       city: 'Tokyo',
@@ -13,7 +13,7 @@ test('computeConfidence flags overlapping activities and missing times', () => {
         { name: 'C', duration_hours: 1 }
       ]
     }],
-    confidence: {
+    bookingChecklist: {
       checklist: [{ type: 'accommodation', city: 'Tokyo', dateTime: '2026-06-01T15:00:00', status: 'open', notes: 'Hotel' }]
     }
   });
@@ -24,15 +24,15 @@ test('computeConfidence flags overlapping activities and missing times', () => {
   assert.equal(result.checklistSummary.counts.open, 1);
 });
 
-test('computeConfidence returns Ready when checklist finalized and no issues', () => {
-  const result = computeConfidence({
+test('computeTripHealth returns Ready when checklist finalized and no issues', () => {
+  const result = computeTripHealth({
     cities: [{ name: 'Lisbon', startDate: '2026-07-01', endDate: '2026-07-03' }],
     days: [{
       date: '2026-07-01',
       city: 'Lisbon',
       activities: [{ name: 'Walk', time: '10:00', duration_hours: 2 }]
     }],
-    confidence: {
+    bookingChecklist: {
       checklist: [{ type: 'transportation', city: 'Lisbon', dateTime: '2026-07-01T09:00:00', status: 'finalized', notes: 'Flight' }]
     }
   });
@@ -43,14 +43,14 @@ test('computeConfidence returns Ready when checklist finalized and no issues', (
   assert.equal(result.checklistSummary.groupedChecklist[0].city, 'Lisbon');
 });
 
-test('computeConfidence returns empty checklist when no data provided', () => {
-  const result = computeConfidence({});
+test('computeTripHealth returns empty checklist when no data provided', () => {
+  const result = computeTripHealth({});
   assert.equal(result.checklist.length, 0);
 });
 
-test('computeConfidence migrates old checklist format', () => {
-  const result = computeConfidence({
-    confidence: {
+test('computeTripHealth migrates old checklist format', () => {
+  const result = computeTripHealth({
+    bookingChecklist: {
       checklist: [
         { type: 'flight', name: 'SFO to NRT', state: 'verified', dateTime: '2026-06-01', bookingReference: 'ABC123' },
         { type: 'hotel', name: 'Tokyo Hotel', state: 'needs_booking', dateTime: '2026-06-01' }

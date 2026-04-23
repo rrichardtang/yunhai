@@ -4,6 +4,21 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-23] Rename "confidence" → `bookingChecklist` + `tripHealth`
+
+- Renamed `src/confidenceCheck.js` → `src/tripHealth.js`; `computeConfidence()` → `computeTripHealth()`; `src/confidenceCheck.test.js` → `src/tripHealth.test.js`
+- Renamed `public/confidence.css` → `public/tripHealth.css`; CSS classes `.confidence-badge` → `.trip-health-badge`, `.confidence-popover` → `.trip-health-popover`, `.confidence-issue-card` → `.trip-health-issue-card`, `.confidence-issue-actions` → `.trip-health-issue-actions`
+- `src/itineraryStore.js`: `updateItineraryConfidence()` → `updateBookingChecklist()`; persisted field `itinerary.confidence` → `itinerary.bookingChecklist`
+- `src/server.js`: routes `/api/itinerary/:id/confidence` (GET/PUT) → `/api/itinerary/:id/trip-health`; `/confidence/email-summary` → `/trip-health/email-summary`; response key `{confidence}` → `{tripHealth}`; `sendConfidenceSummaryEmail()` → `sendTripHealthSummaryEmail()`
+- `public/planner.html`: DOM ids renamed (`confidenceBadge` → `tripHealthBadge`, `confidencePopover*` → `tripHealthPopover*`, `openConfidenceReviewBtn` → `openTripHealthReviewBtn`, `confidenceSummary` → `tripHealthSummary`, `confidenceIssues` → `tripHealthIssues`, `confidenceChecklist` → `bookingChecklist`)
+- `public/app.js`: state keys (`state.confidence` → `state.tripHealth`, `state.confidenceChecklist` → `state.bookingChecklist`, `state.confidenceNotificationPrefs` → `state.bookingChecklistNotificationPrefs`, `state.confidenceIssueMeta` → `state.bookingChecklistIssueMeta`, `state.confidenceIssueSignatures` → `state.tripHealthIssueSignatures`); functions `computeConfidenceLocal` → `computeTripHealthLocal`, `renderConfidence`/`renderConfidenceBadge` → `renderTripHealth`/`renderTripHealthBadge`; PUT/snapshot payload keys updated; deleted dead `#saveConfidenceBtn` listener (no matching DOM element)
+- `CLAUDE.md`, `PROJECT_NOTES/architecture.md`: updated to reference new module/route/field names
+- Per debug-mode policy, no migration shim; legacy `itinerary.confidence` records will silently lose their checklist on next save
+
+## [2026-04-23] Checklist persists via main snapshot save
+
+- `public/app.js` `saveSnapshot()`: PUT `/api/itinerary/:id` body now includes `bookingChecklist: { checklist, notificationPrefs, issueMeta }` so checklist edits persist through container restarts (no longer reliant on the dead `saveConfidenceBtn` handler)
+
 ## [2026-04-23] Persist arrange-step commutes across save/reload
 
 - `public/app.js` `saveSnapshot()`: PUT `/api/itinerary/:id` body now includes `commutes: state.commutes` so transit cards survive a server-side save

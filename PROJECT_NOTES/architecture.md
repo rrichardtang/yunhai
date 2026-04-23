@@ -43,12 +43,12 @@ Add an always-on trip reliability layer that continuously validates itinerary co
 - Complex scheduling engine for reminders
 
 ### Design
-- New shared confidence engine (`src/confidenceCheck.js`) computes issues, checklist progress, status, and booking-summary buckets driven by checklist state.
+- Shared trip-health engine (`src/tripHealth.js`, `computeTripHealth()`) computes issues, checklist progress, status, and booking-summary buckets driven by stored booking-checklist state.
 - Server endpoints:
-  - `GET /api/itinerary/:id/confidence`
-  - `PUT /api/itinerary/:id/confidence`
-  - `POST /api/itinerary/:id/confidence/email-summary`
-- `itineraryStore` persists confidence payload under itinerary records (`confidence.checklist`, `confidence.notificationPrefs`).
+  - `GET /api/itinerary/:id/trip-health`
+  - `PUT /api/itinerary/:id/trip-health`
+  - `POST /api/itinerary/:id/trip-health/email-summary`
+- `itineraryStore` persists the booking checklist under itinerary records (`bookingChecklist.checklist`, `bookingChecklist.notificationPrefs`, `bookingChecklist.issueMeta`). The trip-health report is derived on demand and never stored.
 - UI embeds confidence in two places:
   - Workflow Step 5: dedicated “Confidence Check Mode” page
   - Global topbar badge + popover available from any step
