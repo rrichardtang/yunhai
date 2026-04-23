@@ -74,7 +74,7 @@ function groupChecklistByCity(checklist = []) {
 }
 
 function ensureChecklist(itinerary = {}) {
-  const stored = itinerary?.confidence?.checklist;
+  const stored = itinerary?.bookingChecklist?.checklist;
   if (Array.isArray(stored) && stored.length) return stored.map(normalizeChecklistItem);
   return [];
 }
@@ -171,7 +171,7 @@ function deriveChecklistSummary(checklist = []) {
   };
 }
 
-function computeConfidence(itinerary = {}) {
+function computeTripHealth(itinerary = {}) {
   const checklist = ensureChecklist(itinerary);
   const issues = collectIssues(itinerary, checklist);
   const summary = deriveChecklistSummary(checklist);
@@ -192,8 +192,8 @@ function computeConfidence(itinerary = {}) {
     checklistProgress: { verified: summary.counts.finalized, total: checklist.length },
     checklistSummary: summary,
     notificationPrefs: {
-      emailSummary: Boolean(itinerary?.confidence?.notificationPrefs?.emailSummary),
-      reminderBeforeDeparture: Boolean(itinerary?.confidence?.notificationPrefs?.reminderBeforeDeparture)
+      emailSummary: Boolean(itinerary?.bookingChecklist?.notificationPrefs?.emailSummary),
+      reminderBeforeDeparture: Boolean(itinerary?.bookingChecklist?.notificationPrefs?.reminderBeforeDeparture)
     },
     generatedAt: new Date().toISOString()
   };
@@ -201,7 +201,7 @@ function computeConfidence(itinerary = {}) {
 
 module.exports = {
   CHECKLIST_TYPES,
-  computeConfidence,
+  computeTripHealth,
   ensureChecklist,
   normalizeChecklistItem
 };

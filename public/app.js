@@ -44,11 +44,11 @@ const state = {
   calendarMetadataMode: 'compact',
   googleCalendarConnected: false,
   mapOverlaySelectedActivityId: null,
-  confidence: null,
-  confidenceChecklist: [],
-  confidenceNotificationPrefs: { emailSummary: false, reminderBeforeDeparture: false },
-  confidenceIssueSignatures: [],
-  confidenceIssueMeta: {},
+  tripHealth: null,
+  bookingChecklist: [],
+  bookingChecklistNotificationPrefs: { emailSummary: false, reminderBeforeDeparture: false },
+  tripHealthIssueSignatures: [],
+  bookingChecklistIssueMeta: {},
   lastFinalizeLocks: {}
 };
 
@@ -174,17 +174,17 @@ const els = {
   chatMessages: document.getElementById('chatMessages'),
   chatInput: document.getElementById('chatInput'),
   chatSend: document.getElementById('chatSend'),
-  confidenceBadge: document.getElementById('confidenceBadge'),
-  confidencePopover: document.getElementById('confidencePopover'),
-  confidencePopoverStatus: document.getElementById('confidencePopoverStatus'),
-  confidencePopoverIssues: document.getElementById('confidencePopoverIssues'),
-  confidencePopoverTopIssue: document.getElementById('confidencePopoverTopIssue'),
-  confidencePopoverProgress: document.getElementById('confidencePopoverProgress'),
-  openConfidenceReviewBtn: document.getElementById('openConfidenceReviewBtn'),
-  confidenceSummary: document.getElementById('confidenceSummary'),
-  confidenceIssues: document.getElementById('confidenceIssues'),
+  tripHealthBadge: document.getElementById("tripHealthBadge"),
+  tripHealthPopover: document.getElementById("tripHealthPopover"),
+  tripHealthPopoverStatus: document.getElementById("tripHealthPopoverStatus"),
+  tripHealthPopoverIssues: document.getElementById("tripHealthPopoverIssues"),
+  tripHealthPopoverTopIssue: document.getElementById("tripHealthPopoverTopIssue"),
+  tripHealthPopoverProgress: document.getElementById("tripHealthPopoverProgress"),
+  openTripHealthReviewBtn: document.getElementById("openTripHealthReviewBtn"),
+  tripHealthSummary: document.getElementById("tripHealthSummary"),
+  tripHealthIssues: document.getElementById("tripHealthIssues"),
 
-  confidenceChecklist: document.getElementById('confidenceChecklist')
+  bookingChecklist: document.getElementById("bookingChecklist")
 };
 
 const SNAPSHOT_KEY = 'travelplanner_snapshot';
@@ -1317,7 +1317,7 @@ function setStep(n, { pushHistory = true } = {}) {
   }
 
   updateStepNavButtons();
-  renderConfidence();
+  renderTripHealth();
 }
 
 window.addEventListener('popstate', (e) => {
@@ -1576,7 +1576,7 @@ function collapsedRowText(item) {
 
 function buildChecklistFromState() {
   const activityIds = new Set((state.activities || []).map((a) => a.id));
-  const existing = (Array.isArray(state.confidenceChecklist) ? state.confidenceChecklist : [])
+  const existing = (Array.isArray(state.bookingChecklist) ? state.bookingChecklist : [])
     .map(normalizeChecklistItem)
     .filter((item) => item.type !== 'activity' || !item.activityId || activityIds.has(item.activityId));
 
@@ -1671,7 +1671,7 @@ function buildChecklistFromState() {
     }
   });
 
-  state.confidenceChecklist = items;
+  state.bookingChecklist = items;
   return items;
 }
 
@@ -1679,7 +1679,7 @@ function syncActivityNotesToChecklist(activityId, notes) {
   if (!activityId) return;
   const normalizedNotes = String(notes || '').trim();
   buildChecklistFromState();
-  const item = state.confidenceChecklist.find((x) => x.type === 'activity' && x.activityId === activityId);
+  const item = state.bookingChecklist.find((x) => x.type === 'activity' && x.activityId === activityId);
   if (!item) return;
   item.notes = normalizedNotes;
   item.updatedAt = new Date().toISOString();
@@ -1720,7 +1720,7 @@ function syncChecklistBookingRequirementToActivity(item = {}) {
   };
 }
 
-function computeConfidenceLocal() {
+function computeTripHealthLocal() {
   const checklist = buildChecklistFromState();
   const bookingRequired = checklist.filter((item) =>
     item.type === 'transportation' || item.type === 'accommodation' ||
@@ -1831,7 +1831,7 @@ function computeConfidenceLocal() {
   };
 
   const unresolvedIssues = issues.filter((issue) => {
-    const meta = state.confidenceIssueMeta[issue.message] || {};
+    const meta = state.bookingChecklistIssueMeta[issue.message] || {};
     return !['verified', 'dismissed'].includes(meta.action);
   });
 
@@ -2177,10 +2177,10 @@ function renderChecklistContainer(group, collapsedState) {
 }
 
 function renderChecklistModal() {
-  const el = els.confidenceChecklist;
+  const el = els.bookingChecklist;
   if (!el) return;
 
-  const checklist = state.confidenceChecklist || [];
+  const checklist = state.bookingChecklist || [];
   const groups = groupChecklist(checklist);
   const query = checklistSearch.query.toLowerCase().trim();
 
@@ -2259,7 +2259,7 @@ function bindChecklistEvents(el) {
       e.preventDefault();
       const id = li.dataset.clSearchId;
       checklistSearch.query = '';
-      const item = state.confidenceChecklist.find((x) => x.id === id);
+      const item = state.bookingChecklist.find((x) => x.id === id);
       if (item) item.expanded = true;
       renderChecklistModal();
       // Scroll and flash
@@ -2290,7 +2290,7 @@ function bindChecklistEvents(el) {
       const itemEl = row.closest('[data-cl-item]');
       if (!itemEl) return;
       const id = itemEl.dataset.clItem;
-      const item = state.confidenceChecklist.find((x) => x.id === id);
+      const item = state.bookingChecklist.find((x) => x.id === id);
       if (!item) return;
       item.expanded = !item.expanded;
       renderChecklistModal();
@@ -2303,13 +2303,13 @@ function bindChecklistEvents(el) {
       const itemEl = btn.closest('[data-cl-item]');
       if (!itemEl) return;
       const id = itemEl.dataset.clItem;
-      const item = state.confidenceChecklist.find((x) => x.id === id);
+      const item = state.bookingChecklist.find((x) => x.id === id);
       if (!item) return;
       item.verified = !item.verified;
       item.status = item.verified ? 'resolved' : 'open';
       item.updatedAt = new Date().toISOString();
       renderChecklistModal();
-      renderConfidenceBadge();
+      renderTripHealthBadge();
       updateFinalizeBtn();
     });
   });
@@ -2321,7 +2321,7 @@ function bindChecklistEvents(el) {
       if (!itemEl) return;
       const groupLabel = btn.closest('[data-cl-group]')?.dataset.clGroup || '';
       const id = itemEl.dataset.clItem;
-      const item = state.confidenceChecklist.find((x) => x.id === id);
+      const item = state.bookingChecklist.find((x) => x.id === id);
       if (!item || item.type !== 'activity') return;
       item.bookingNotRequired = !item.bookingNotRequired;
       if (item.bookingNotRequired) {
@@ -2339,11 +2339,11 @@ function bindChecklistEvents(el) {
       const itemEl = btn.closest('[data-cl-item]');
       if (!itemEl) return;
       const id = itemEl.dataset.clItem;
-      const deleted = state.confidenceChecklist.find((x) => x.id === id);
+      const deleted = state.bookingChecklist.find((x) => x.id === id);
       if (!deleted || deleted.type === 'activity') return;
-      state.confidenceChecklist = state.confidenceChecklist.filter((x) => x.id !== id);
+      state.bookingChecklist = state.bookingChecklist.filter((x) => x.id !== id);
       renderChecklistModal();
-      renderConfidenceBadge();
+      renderTripHealthBadge();
 
       // Undo toast
       const host = document.getElementById('toastHost');
@@ -2363,9 +2363,9 @@ function bindChecklistEvents(el) {
         toast.querySelector('.cl-undo-btn').addEventListener('click', () => {
           clearTimeout(timer);
           dismiss();
-          state.confidenceChecklist = [...state.confidenceChecklist, deleted];
+          state.bookingChecklist = [...state.bookingChecklist, deleted];
           renderChecklistModal();
-          renderConfidenceBadge();
+          renderTripHealthBadge();
         });
       }
     });
@@ -2392,7 +2392,7 @@ function bindChecklistEvents(el) {
       const itemEl = btn.closest('[data-cl-item]');
       if (!itemEl) return;
       const id = itemEl.dataset.clItem;
-      const item = state.confidenceChecklist.find((x) => x.id === id);
+      const item = state.bookingChecklist.find((x) => x.id === id);
       if (!item) return;
       item.isRoundTrip = btn.dataset.clToggle === 'round-trip';
       syncItemFromExpanded(el, id);
@@ -2414,9 +2414,9 @@ function bindChecklistEvents(el) {
         transportScope: type === 'transportation' ? 'experience' : undefined,
         expanded: true
       });
-      state.confidenceChecklist = [...(state.confidenceChecklist || []), newItem];
+      state.bookingChecklist = [...(state.bookingChecklist || []), newItem];
       renderChecklistModal();
-      renderConfidenceBadge();
+      renderTripHealthBadge();
       // Scroll to new item
       requestAnimationFrame(() => {
         const target = el.querySelector(`[data-cl-item="${CSS.escape(newItem.id)}"]`);
@@ -2446,7 +2446,7 @@ function bindChecklistEvents(el) {
         if (!input) return;
         attachPlaceAutocompleteElement(input, {
           onResolved: ({ formattedAddress, placeId, lat, lng }) => {
-            const item = state.confidenceChecklist.find((x) => x.id === id);
+            const item = state.bookingChecklist.find((x) => x.id === id);
             if (!item) return;
             item[valKey] = formattedAddress;
             item[placeKey] = placeId;
@@ -2455,14 +2455,14 @@ function bindChecklistEvents(el) {
             input.value = formattedAddress;
           },
           onInput: () => {
-            const item = state.confidenceChecklist.find((x) => x.id === id);
+            const item = state.bookingChecklist.find((x) => x.id === id);
             if (!item) return;
             item[placeKey] = '';
             item[latKey] = null;
             item[lngKey] = null;
           },
           onInvalid: () => {
-            const item = state.confidenceChecklist.find((x) => x.id === id);
+            const item = state.bookingChecklist.find((x) => x.id === id);
             if (!item) return;
             item[placeKey] = '';
             item[latKey] = null;
@@ -2475,7 +2475,7 @@ function bindChecklistEvents(el) {
 }
 
 function syncItemFromExpanded(el, id) {
-  const item = state.confidenceChecklist.find((x) => x.id === id);
+  const item = state.bookingChecklist.find((x) => x.id === id);
   if (!item) return;
   const itemEl = el.querySelector(`[data-cl-item="${CSS.escape(id)}"]`);
   if (!itemEl) return;
@@ -2534,7 +2534,7 @@ function syncItemFromExpanded(el, id) {
     }
   }
 
-  // Keep legacy fields in sync for confidence score
+  // Keep legacy fields in sync for trip health score
   item.dateTime = item.type === 'transportation' ? (item.departureDate ? item.departureDate + (item.departureTime ? 'T' + item.departureTime : '') : '')
     : item.type === 'accommodation' ? item.checkInDate
     : item.activityDate ? item.activityDate + (item.activityTime ? 'T' + item.activityTime : '') : '';
@@ -2547,63 +2547,63 @@ function syncItemFromExpanded(el, id) {
   syncChecklistBookingRequirementToActivity(item);
 }
 
-// ── renderConfidence (badge + trip health panels) ─────────────────────────
+// ── renderTripHealth (badge + trip health panels) ─────────────────────────
 
-function renderConfidenceBadge() {
+function renderTripHealthBadge() {
   const tripLoaded = Boolean(state.currentItineraryId || (state.activities && state.activities.length));
-  if (els.confidenceBadge) els.confidenceBadge.classList.toggle('hidden', !tripLoaded);
+  if (els.tripHealthBadge) els.tripHealthBadge.classList.toggle('hidden', !tripLoaded);
   if (!tripLoaded) return;
-  state.confidence = computeConfidenceLocal();
-  const statusClass = String(state.confidence.status || '').toLowerCase().replace(/\s+/g, '-');
-  if (els.confidenceBadge) {
-    els.confidenceBadge.className = `confidence-badge ${statusClass}`;
-    els.confidenceBadge.innerHTML = `<i class="ph-bold ph-heartbeat" aria-hidden="true"></i><span class="sr-only">Trip Health: ${esc(state.confidence.status)} · ${state.confidence.issueCount} issues</span>`;
+  state.tripHealth = computeTripHealthLocal();
+  const statusClass = String(state.tripHealth.status || '').toLowerCase().replace(/\s+/g, '-');
+  if (els.tripHealthBadge) {
+    els.tripHealthBadge.className = `trip-health-badge ${statusClass}`;
+    els.tripHealthBadge.innerHTML = `<i class="ph-bold ph-heartbeat" aria-hidden="true"></i><span class="sr-only">Trip Health: ${esc(state.tripHealth.status)} · ${state.tripHealth.issueCount} issues</span>`;
   }
-  if (els.confidencePopoverStatus) els.confidencePopoverStatus.innerHTML = `<strong>${esc(state.confidence.status)}</strong>`;
-  if (els.confidencePopoverIssues) els.confidencePopoverIssues.textContent = `${state.confidence.issueCount} issue${state.confidence.issueCount === 1 ? '' : 's'}`;
-  if (els.confidencePopoverTopIssue) els.confidencePopoverTopIssue.textContent = state.confidence.topIssue;
-  if (els.confidencePopoverProgress) els.confidencePopoverProgress.textContent = `${state.confidence.checklistProgress.verified} of ${state.confidence.checklistProgress.total} items verified`;
-  const signatures = state.confidence.unresolvedIssues.map((x) => x.message);
-  const newlyAdded = signatures.filter((x) => !(state.confidenceIssueSignatures || []).includes(x));
-  if (newlyAdded.length) showToast(`Confidence warning: ${newlyAdded[0]}`, 'error');
-  state.confidenceIssueSignatures = signatures;
+  if (els.tripHealthPopoverStatus) els.tripHealthPopoverStatus.innerHTML = `<strong>${esc(state.tripHealth.status)}</strong>`;
+  if (els.tripHealthPopoverIssues) els.tripHealthPopoverIssues.textContent = `${state.tripHealth.issueCount} issue${state.tripHealth.issueCount === 1 ? '' : 's'}`;
+  if (els.tripHealthPopoverTopIssue) els.tripHealthPopoverTopIssue.textContent = state.tripHealth.topIssue;
+  if (els.tripHealthPopoverProgress) els.tripHealthPopoverProgress.textContent = `${state.tripHealth.checklistProgress.verified} of ${state.tripHealth.checklistProgress.total} items verified`;
+  const signatures = state.tripHealth.unresolvedIssues.map((x) => x.message);
+  const newlyAdded = signatures.filter((x) => !(state.tripHealthIssueSignatures || []).includes(x));
+  if (newlyAdded.length) showToast(`Trip Health warning: ${newlyAdded[0]}`, 'error');
+  state.tripHealthIssueSignatures = signatures;
 }
 
-function renderConfidence() {
+function renderTripHealth() {
   const tripLoaded = Boolean(state.currentItineraryId || (state.activities && state.activities.length));
-  if (els.confidenceBadge) els.confidenceBadge.classList.toggle('hidden', !tripLoaded);
+  if (els.tripHealthBadge) els.tripHealthBadge.classList.toggle('hidden', !tripLoaded);
   if (!tripLoaded) {
-    if (els.confidenceSummary) els.confidenceSummary.innerHTML = '<p class="muted-text">Load or create a trip to open Trip Health.</p>';
-    if (els.confidenceIssues) els.confidenceIssues.innerHTML = '';
+    if (els.tripHealthSummary) els.tripHealthSummary.innerHTML = '<p class="muted-text">Load or create a trip to open Trip Health.</p>';
+    if (els.tripHealthIssues) els.tripHealthIssues.innerHTML = '';
     return;
   }
-  state.confidence = computeConfidenceLocal();
-  const statusClass = String(state.confidence.status || '').toLowerCase().replace(/\s+/g, '-');
-  if (els.confidenceBadge) {
-    els.confidenceBadge.className = `confidence-badge ${statusClass}`;
-    els.confidenceBadge.innerHTML = `<i class="ph-bold ph-heartbeat" aria-hidden="true"></i><span class="sr-only">Trip Health: ${esc(state.confidence.status)} · ${state.confidence.issueCount} issues</span>`;
+  state.tripHealth = computeTripHealthLocal();
+  const statusClass = String(state.tripHealth.status || '').toLowerCase().replace(/\s+/g, '-');
+  if (els.tripHealthBadge) {
+    els.tripHealthBadge.className = `trip-health-badge ${statusClass}`;
+    els.tripHealthBadge.innerHTML = `<i class="ph-bold ph-heartbeat" aria-hidden="true"></i><span class="sr-only">Trip Health: ${esc(state.tripHealth.status)} · ${state.tripHealth.issueCount} issues</span>`;
   }
-  if (els.confidencePopoverStatus) els.confidencePopoverStatus.innerHTML = `<strong>${esc(state.confidence.status)}</strong>`;
-  if (els.confidencePopoverIssues) els.confidencePopoverIssues.textContent = `${state.confidence.issueCount} issue${state.confidence.issueCount === 1 ? '' : 's'}`;
-  if (els.confidencePopoverTopIssue) els.confidencePopoverTopIssue.textContent = state.confidence.topIssue;
-  if (els.confidencePopoverProgress) els.confidencePopoverProgress.textContent = `${state.confidence.checklistProgress.verified} of ${state.confidence.checklistProgress.total} items verified`;
+  if (els.tripHealthPopoverStatus) els.tripHealthPopoverStatus.innerHTML = `<strong>${esc(state.tripHealth.status)}</strong>`;
+  if (els.tripHealthPopoverIssues) els.tripHealthPopoverIssues.textContent = `${state.tripHealth.issueCount} issue${state.tripHealth.issueCount === 1 ? '' : 's'}`;
+  if (els.tripHealthPopoverTopIssue) els.tripHealthPopoverTopIssue.textContent = state.tripHealth.topIssue;
+  if (els.tripHealthPopoverProgress) els.tripHealthPopoverProgress.textContent = `${state.tripHealth.checklistProgress.verified} of ${state.tripHealth.checklistProgress.total} items verified`;
 
-  if (els.confidenceSummary) {
-    const checklist = state.confidenceChecklist || [];
+  if (els.tripHealthSummary) {
+    const checklist = state.bookingChecklist || [];
     const verifiedCount = checklist.filter((item) => item.verified || item.status === 'resolved').length;
     const unresolvedBookings = checklist.length - verifiedCount;
     const totals = computeBudgetLensBreakdown();
     const totalBudget = Number(state.tripBudget) || 0;
     const delta = totalBudget > 0 ? totalBudget - totals.budgetLensTotal : null;
-    els.confidenceSummary.innerHTML = `
+    els.tripHealthSummary.innerHTML = `
       <section class="trip-health-summary-card">
         <h3>Health summary</h3>
         <div class="trip-health-metrics">
-          <p><strong>Status:</strong> ${esc(state.confidence.status)}</p>
-          <p><strong>Open issues:</strong> ${state.confidence.issueCount}</p>
+          <p><strong>Status:</strong> ${esc(state.tripHealth.status)}</p>
+          <p><strong>Open issues:</strong> ${state.tripHealth.issueCount}</p>
           <p><strong>Unresolved bookings:</strong> ${unresolvedBookings}</p>
           <p><strong>Verified items:</strong> ${verifiedCount}</p>
-          <p><strong>Biggest issue:</strong> ${esc(state.confidence.topIssue)}</p>
+          <p><strong>Biggest issue:</strong> ${esc(state.tripHealth.topIssue)}</p>
         </div>
       </section>
       <section class="trip-health-summary-card">
@@ -2619,14 +2619,14 @@ function renderConfidence() {
     `;
   }
 
-  if (els.confidenceIssues) {
-    const unresolved = state.confidence.unresolvedIssues || [];
-    els.confidenceIssues.innerHTML = unresolved.length
+  if (els.tripHealthIssues) {
+    const unresolved = state.tripHealth.unresolvedIssues || [];
+    els.tripHealthIssues.innerHTML = unresolved.length
       ? unresolved.map((issue) => {
-          const meta = state.confidenceIssueMeta[issue.message] || {};
-          return `<article class="confidence-issue-card" data-issue="${esc(issue.message)}">
+          const meta = state.bookingChecklistIssueMeta[issue.message] || {};
+          return `<article class="trip-health-issue-card" data-issue="${esc(issue.message)}">
             <p><strong>${esc(issue.message)}</strong></p>
-            <div class="confidence-issue-actions">
+            <div class="trip-health-issue-actions">
               <button type="button" class="secondary" data-issue-action="fix">Fix</button>
               <button type="button" class="secondary" data-issue-action="verify">Verify</button>
               <button type="button" class="secondary" data-issue-action="dismiss">Dismiss</button>
@@ -2636,11 +2636,11 @@ function renderConfidence() {
         }).join('')
       : '<p class="muted-text">No unresolved issues.</p>';
 
-    els.confidenceIssues.querySelectorAll('[data-issue]').forEach((node) => {
+    els.tripHealthIssues.querySelectorAll('[data-issue]').forEach((node) => {
       const key = node.getAttribute('data-issue');
       const setMeta = (patch = {}) => {
-        state.confidenceIssueMeta[key] = { ...(state.confidenceIssueMeta[key] || {}), ...patch };
-        renderConfidence();
+        state.bookingChecklistIssueMeta[key] = { ...(state.bookingChecklistIssueMeta[key] || {}), ...patch };
+        renderTripHealth();
       };
       node.querySelectorAll('[data-issue-action]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -2654,15 +2654,15 @@ function renderConfidence() {
         });
       });
       node.querySelector('[data-issue-note]')?.addEventListener('input', (e) => {
-        state.confidenceIssueMeta[key] = { ...(state.confidenceIssueMeta[key] || {}), note: e.target.value };
+        state.bookingChecklistIssueMeta[key] = { ...(state.bookingChecklistIssueMeta[key] || {}), note: e.target.value };
       });
     });
   }
 
-  const signatures = state.confidence.unresolvedIssues.map((x) => x.message);
-  const newlyAdded = signatures.filter((x) => !(state.confidenceIssueSignatures || []).includes(x));
-  if (newlyAdded.length) showToast(`Confidence warning: ${newlyAdded[0]}`, 'error');
-  state.confidenceIssueSignatures = signatures;
+  const signatures = state.tripHealth.unresolvedIssues.map((x) => x.message);
+  const newlyAdded = signatures.filter((x) => !(state.tripHealthIssueSignatures || []).includes(x));
+  if (newlyAdded.length) showToast(`Trip Health warning: ${newlyAdded[0]}`, 'error');
+  state.tripHealthIssueSignatures = signatures;
 }
 
 function setPlanningLoading(isLoading) {
@@ -5909,7 +5909,7 @@ function updateFinalizeBtn() {
     ? approved.filter((a) => cityMatches(a.city, activeCity))
     : approved;
   const approvedIds = new Set(approvedInCity.map((a) => String(a.id)));
-  const hasVerified = (state.confidenceChecklist || []).some(
+  const hasVerified = (state.bookingChecklist || []).some(
     (item) => item.type === 'activity' && item.verified && approvedIds.has(String(item.activityId))
   );
   const hasFixed = approvedInCity.some((a) => a.timing?.fixed?.date && a.timing?.fixed?.time);
@@ -5936,7 +5936,7 @@ function openFinalizeModal() {
       lockedSet.push({ activity, date: fixed.date, time: fixed.time, sourceKind: 'fixed', checked: true });
       continue;
     }
-    const item = (state.confidenceChecklist || []).find(
+    const item = (state.bookingChecklist || []).find(
       (c) => c.type === 'activity' && c.verified && String(c.activityId) === String(activity.id)
     );
     if (item?.activityDate && item?.activityTime) {
@@ -6067,7 +6067,7 @@ function openFinalizeModal() {
         };
         state.activities = state.activities.map((a) => (a.id === entry.activity.id ? entry.activity : a));
       } else if (entry.sourceKind === 'verified') {
-        const item = (state.confidenceChecklist || []).find(
+        const item = (state.bookingChecklist || []).find(
           (c) => c.type === 'activity' && String(c.activityId) === String(entry.activity.id)
         );
         if (item) {
@@ -6610,7 +6610,7 @@ function renderItinerary() {
   }).join('');
 
   renderItineraryMode();
-  renderConfidence();
+  renderTripHealth();
 }
 
 function formatTimeRangeLabel(startMinutes, endMinutes) {
@@ -6627,7 +6627,7 @@ function formatTimeRangeLabel(startMinutes, endMinutes) {
 }
 
 function getActivityReferenceNum(activityId) {
-  const items = Array.isArray(state.confidenceChecklist) ? state.confidenceChecklist : [];
+  const items = Array.isArray(state.bookingChecklist) ? state.bookingChecklist : [];
   const match = items.find((x) => x && x.type === 'activity' && x.activityId === activityId);
   return match ? String(match.referenceNum || '').trim() : '';
 }
@@ -7277,11 +7277,11 @@ async function loadItineraryById(id) {
     if (els.tripBudget && state.tripBudget != null) els.tripBudget.value = state.tripBudget;
     if (els.numTravelers) els.numTravelers.value = state.numTravelers;
     if (els.numChildren) els.numChildren.value = state.numChildren;
-    state.confidenceChecklist = Array.isArray(itinerary?.confidence?.checklist)
-      ? itinerary.confidence.checklist.map(normalizeChecklistItem)
+    state.bookingChecklist = Array.isArray(itinerary?.bookingChecklist?.checklist)
+      ? itinerary.bookingChecklist.checklist.map(normalizeChecklistItem)
       : [];
-    state.confidenceNotificationPrefs = itinerary?.confidence?.notificationPrefs || state.confidenceNotificationPrefs;
-    state.confidenceIssueMeta = itinerary?.confidence?.issueMeta || {};
+    state.bookingChecklistNotificationPrefs = itinerary?.bookingChecklist?.notificationPrefs || state.bookingChecklistNotificationPrefs;
+    state.bookingChecklistIssueMeta = itinerary?.bookingChecklist?.issueMeta || {};
     state.cities = Array.isArray(itinerary.cities)
       ? itinerary.cities.map(normalizeCityData)
       : state.cities;
@@ -7357,7 +7357,7 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
       const [from, to] = key.split('->');
       if (removedIds.has(from) || removedIds.has(to)) delete state.commutes[key];
     });
-    state.confidenceChecklist = (state.confidenceChecklist || [])
+    state.bookingChecklist = (state.bookingChecklist || [])
       .filter((item) => !(item.type === 'activity' && removedIds.has(item.activityId)));
   } else {
     state.activities = [];
@@ -7504,10 +7504,10 @@ async function generateItinerary() {
     activities: state.activities,
     placements: state.placements,
     reviewed: state.reviewed,
-    confidence: {
-      checklist: state.confidenceChecklist,
-      notificationPrefs: state.confidenceNotificationPrefs,
-      issueMeta: state.confidenceIssueMeta
+    bookingChecklist: {
+      checklist: state.bookingChecklist,
+      notificationPrefs: state.bookingChecklistNotificationPrefs,
+      issueMeta: state.bookingChecklistIssueMeta
     }
   };
   let res;
@@ -7928,9 +7928,9 @@ function saveSnapshot() {
     tripBudget: state.tripBudget,
     numTravelers: state.numTravelers,
     numChildren: state.numChildren,
-    confidenceChecklist: state.confidenceChecklist,
-    confidenceNotificationPrefs: state.confidenceNotificationPrefs,
-    confidenceIssueMeta: state.confidenceIssueMeta,
+    bookingChecklist: state.bookingChecklist,
+    bookingChecklistNotificationPrefs: state.bookingChecklistNotificationPrefs,
+    bookingChecklistIssueMeta: state.bookingChecklistIssueMeta,
     currentItineraryId: state.currentItineraryId || null
   };
   localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(payload));
@@ -7951,7 +7951,12 @@ function saveSnapshot() {
         placements: state.placements,
         commutes: state.commutes,
         reviewed: state.reviewed,
-        days: state.days
+        days: state.days,
+        bookingChecklist: {
+          checklist: state.bookingChecklist,
+          notificationPrefs: state.bookingChecklistNotificationPrefs,
+          issueMeta: state.bookingChecklistIssueMeta
+        }
       })
     }).catch(() => {});
   }
@@ -7976,10 +7981,10 @@ function resetToFresh() {
   state.chatHistory = [];
   state.chatLoading = false;
   state.reviewFilters = { search: '', city: '', verdict: '' };
-  state.confidenceChecklist = [];
-  state.confidence = null;
-  state.confidenceIssueSignatures = [];
-  state.confidenceIssueMeta = {};
+  state.bookingChecklist = [];
+  state.tripHealth = null;
+  state.tripHealthIssueSignatures = [];
+  state.bookingChecklistIssueMeta = {};
 
   els.tripName.value = '';
   if (els.reviewSearch) els.reviewSearch.value = '';
@@ -8024,11 +8029,11 @@ function hydrateFromSnapshot(snapshot) {
   state.tripBudget = snapshot.tripBudget ?? null;
   state.numTravelers = snapshot.numTravelers ?? 1;
   state.numChildren = snapshot.numChildren ?? 0;
-  state.confidenceChecklist = Array.isArray(snapshot.confidenceChecklist)
-    ? snapshot.confidenceChecklist.map(normalizeChecklistItem)
+  state.bookingChecklist = Array.isArray(snapshot.bookingChecklist)
+    ? snapshot.bookingChecklist.map(normalizeChecklistItem)
     : [];
-  state.confidenceNotificationPrefs = snapshot.confidenceNotificationPrefs || state.confidenceNotificationPrefs;
-  state.confidenceIssueMeta = snapshot.confidenceIssueMeta || {};
+  state.bookingChecklistNotificationPrefs = snapshot.bookingChecklistNotificationPrefs || state.bookingChecklistNotificationPrefs;
+  state.bookingChecklistIssueMeta = snapshot.bookingChecklistIssueMeta || {};
 
   els.tripName.value = state.tripName;
   if (els.tripBudget && state.tripBudget != null) els.tripBudget.value = state.tripBudget;
@@ -8428,20 +8433,6 @@ els.reviewVerdictFilter?.addEventListener('change', (e) => {
 els.approveVisibleBtn?.addEventListener('click', () => applyVerdictToVisibleActivities(true));
 
 document.querySelectorAll('.save-progress-btn').forEach((btn) => btn.addEventListener('click', saveSnapshot));
-document.getElementById('saveConfidenceBtn')?.addEventListener('click', async () => {
-  if (!state.currentItineraryId) { saveSnapshot(); return; }
-  try {
-    const res = await apiFetch(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/confidence`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ checklist: state.confidenceChecklist, notificationPrefs: state.confidenceNotificationPrefs, issueMeta: state.confidenceIssueMeta })
-    });
-    if (!res.ok) throw new Error('Save failed');
-    showToast('Saved!', 'success');
-  } catch {
-    showToast('Failed to save confidence data', 'error');
-  }
-});
 els.autoArrangeBtn?.addEventListener('click', autoArrangeActiveCity);
 els.finalizeArrangeBtn?.addEventListener('click', openFinalizeModal);
 els.downloadCalendarBtn?.addEventListener('click', () => {
@@ -8656,7 +8647,7 @@ els.profileAiSummary?.addEventListener('blur', () => {
 });
 
 els.deleteProfileBtn?.addEventListener('click', deleteActiveProfile);
-els.confidenceBadge?.addEventListener('click', () => els.confidencePopover?.classList.toggle('hidden'));
+els.tripHealthBadge?.addEventListener('click', () => els.tripHealthPopover?.classList.toggle('hidden'));
 document.getElementById('checklistBtn')?.addEventListener('click', openChecklistModal);
 document.getElementById('checklistModalClose')?.addEventListener('click', closeChecklistModal);
 document.getElementById('checklistModal')?.addEventListener('click', (e) => {
@@ -8668,8 +8659,8 @@ document.getElementById('addActivitySubmit')?.addEventListener('click', submitAd
 document.getElementById('addActivityModal')?.addEventListener('click', (e) => {
   if (e.target === document.getElementById('addActivityModal')) closeAddActivityModal();
 });
-els.openConfidenceReviewBtn?.addEventListener('click', () => {
-  els.confidencePopover?.classList.add('hidden');
+els.openTripHealthReviewBtn?.addEventListener('click', () => {
+  els.tripHealthPopover?.classList.add('hidden');
   setStep(4);
   requestAnimationFrame(() => {
     document.getElementById('tripHealthSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
