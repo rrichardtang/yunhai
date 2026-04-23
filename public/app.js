@@ -1974,18 +1974,15 @@ function renderChecklistItemExpanded(item) {
           <input type="text" data-cl="activityLocation" value="${esc(item.activityLocation)}" placeholder="Location (optional)" autocomplete="off" />
         </div>
       </label>
-      <div class="cl-form-row cl-form-row--2">
-        <label class="cl-field">
-          <span class="cl-field-label">Date &amp; time</span>
-          <div class="cl-datetime-pair cl-datetime-pair--range">
-            <input type="date" data-cl="activityDate" value="${esc(item.activityDate)}" />
-            <input type="time" data-cl="activityTime" value="${esc(item.activityTime)}" />
-            <span class="finalize-time-sep">–</span>
-            <input type="time" data-cl="activityEndTime" value="${esc(item.activityEndTime || checklistActivityEndTime(item))}" />
-          </div>
-        </label>
-        <div></div>
-      </div>
+      <label class="cl-field">
+        <span class="cl-field-label">Date &amp; time</span>
+        <div class="cl-datetime-pair cl-datetime-pair--range">
+          <input type="date" data-cl="activityDate" value="${esc(item.activityDate)}" />
+          <input type="time" data-cl="activityTime" value="${esc(item.activityTime)}" />
+          <span class="finalize-time-sep">–</span>
+          <input type="time" data-cl="activityEndTime" value="${esc(item.activityEndTime || checklistActivityEndTime(item))}" />
+        </div>
+      </label>
     `;
   })();
 
