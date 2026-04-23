@@ -7290,27 +7290,10 @@ async function loadItineraryById(id) {
       ? itinerary.days.map((day) => ({ id: day.id || `${day.city}-${day.date}`, city: day.city, date: day.date }))
       : [];
 
-    if (Array.isArray(itinerary.activities) && itinerary.activities.length) {
-      state.activities = itinerary.activities.map((a) => normalizeActivityMetadata(a));
-      state.reviewed = itinerary.reviewed || {};
-      state.placements = itinerary.placements || {};
-    } else {
-      const activities = [];
-      const reviewed = {};
-      const placements = {};
-      (itinerary.days || []).forEach((day) => {
-        (day.activities || []).forEach((activity) => {
-          const normalizedActivity = normalizeActivityMetadata(activity);
-          const idValue = normalizedActivity.id || uid();
-          activities.push({ ...normalizedActivity, id: idValue });
-          reviewed[idValue] = { approved: true, notes: activity.notes || '' };
-          placements[idValue] = { dayId: day.id || `${day.city}-${day.date}`, time: parseTimeTo24(activity.time || actPreferredTime(normalizedActivity) || typeToTime(activity.type)) };
-        });
-      });
-      state.activities = activities;
-      state.reviewed = reviewed;
-      state.placements = placements;
-    }
+    state.activities = (itinerary.activities || []).map((a) => normalizeActivityMetadata(a));
+    state.reviewed = itinerary.reviewed || {};
+    state.placements = itinerary.placements || {};
+    state.commutes = normalizeCommuteStateMap(itinerary.commutes || {});
     hydrateTravelIntoCities();
     renderCities();
     state.lastPlannedFingerprint = step1Fingerprint();
@@ -7966,6 +7949,7 @@ function saveSnapshot() {
         travels: state.travels,
         activities: state.activities,
         placements: state.placements,
+        commutes: state.commutes,
         reviewed: state.reviewed,
         days: state.days
       })

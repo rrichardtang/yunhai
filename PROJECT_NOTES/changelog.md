@@ -4,6 +4,11 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-23] Persist arrange-step commutes across save/reload
+
+- `public/app.js` `saveSnapshot()`: PUT `/api/itinerary/:id` body now includes `commutes: state.commutes` so transit cards survive a server-side save
+- `public/app.js` `loadItineraryById()`: hydrates `state.commutes` from `itinerary.commutes` via `normalizeCommuteStateMap`; removed legacy fallback that rebuilt `activities`/`reviewed`/`placements` from `itinerary.days[]` (debug-mode cleanup, no legacy itineraries to support)
+
 ## [2026-04-23] Checklist activity end-time field
 
 - `public/app.js` — added `activityEndTime` to checklist activity schema (normalizer, save handler, edit form input next to start time)
