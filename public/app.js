@@ -5970,44 +5970,38 @@ function openFinalizeModal() {
       const rowsHtml = entries.map((entry) => {
         const globalIdx = modalState.indexOf(entry);
         const checkedClass = entry.checked ? ' cl-item--checked' : '';
-        const checkboxInner = entry.checked ? '<i class="ph-bold ph-lock-key" aria-hidden="true"></i>' : '';
-        const checkboxClass = entry.checked ? 'cl-checkbox finalize-check finalize-check--locked checked' : 'cl-checkbox finalize-check';
-        const chevron = `<i class="ph-bold ${entry.expanded ? 'ph-caret-up' : 'ph-caret-down'} cl-item-chevron" aria-hidden="true"></i>`;
-        const sourceIcon = entry.sourceKind === 'verified'
-          ? '<span class="cl-item-meta"><i class="ph-bold ph-clipboard-text" aria-hidden="true"></i> from checklist</span>'
-          : '';
+        const meta = entry.sourceKind === 'verified' ? 'from checklist' : entry.sourceKind === 'fixed' ? 'fixed time' : '';
         const why = entry.activity.why_it_fits || '';
         const pitfall = entry.activity.pitfall || '';
         const notes = state.reviewed[entry.activity.id]?.notes || '';
-        const expandedHtml = entry.expanded ? `
-          <div class="cl-item-expanded-wrap finalize-expanded">
-            ${why ? `<p class="finalize-exp-line"><strong>Why it fits:</strong> ${esc(why)}</p>` : ''}
-            ${pitfall ? `<p class="finalize-exp-line"><strong>Pitfall:</strong> ${esc(pitfall)}</p>` : ''}
-            ${notes ? `<p class="finalize-exp-line"><strong>Notes:</strong> ${esc(notes)}</p>` : ''}
-          </div>` : '';
         return `
           <div class="cl-item${checkedClass} finalize-item" data-idx="${globalIdx}">
-            <div class="cl-item-collapsed" data-finalize-collapse-row>
-              <button type="button" class="${checkboxClass}" aria-label="Lock this activity" aria-pressed="${entry.checked}" data-finalize-check>
-                ${checkboxInner}
+            <div class="cl-item-collapsed" data-cl-collapse-row>
+              <button type="button" class="cl-checkbox ${entry.checked ? 'checked' : ''}" aria-label="Lock this activity" aria-pressed="${entry.checked}" data-finalize-check>
+                ${entry.checked ? '<i class="ph-bold ph-check" aria-hidden="true"></i>' : ''}
               </button>
               <div class="cl-item-text">
                 <span class="cl-item-name">${esc(entry.activity.name)}</span>
-                ${sourceIcon}
+                ${meta ? `<span class="cl-item-meta">${esc(meta)}</span>` : ''}
               </div>
               <input type="time" class="finalize-time finalize-time-start" value="${entry.time}" data-finalize-time="start" />
               <span class="finalize-time-sep">–</span>
               <input type="time" class="finalize-time finalize-time-end" value="${entry.endTime}" data-finalize-time="end" />
-              ${chevron}
+              <i class="ph-bold ${entry.expanded ? 'ph-caret-up' : 'ph-caret-down'} cl-item-chevron" aria-hidden="true"></i>
             </div>
-            ${expandedHtml}
+            ${entry.expanded ? `
+              <div class="cl-item-expanded-wrap finalize-expanded">
+                ${why ? `<p class="finalize-exp-line"><strong>Why it fits:</strong> ${esc(why)}</p>` : ''}
+                ${pitfall ? `<p class="finalize-exp-line"><strong>Pitfall:</strong> ${esc(pitfall)}</p>` : ''}
+                ${notes ? `<p class="finalize-exp-line"><strong>Notes:</strong> ${esc(notes)}</p>` : ''}
+              </div>` : ''}
           </div>`;
       }).join('');
       return `<div class="finalize-day-group"><div class="finalize-day-label">${esc(dateLabel)}</div>${rowsHtml}</div>`;
     }).join('');
 
     document.getElementById('finalizeRows').innerHTML = dayRows;
-    document.querySelectorAll('#finalizeModal [data-finalize-collapse-row]').forEach((row) => {
+    document.querySelectorAll('#finalizeModal [data-cl-collapse-row]').forEach((row) => {
       row.addEventListener('click', (e) => {
         if (e.target.closest('[data-finalize-check]') || e.target.closest('[data-finalize-time]')) return;
         const idx = Number(row.closest('.finalize-item').dataset.idx);
