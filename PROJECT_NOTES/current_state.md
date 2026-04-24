@@ -1,25 +1,24 @@
 # Current State
 
-_Last updated: 2026-04-23 (session 21)_
+_Last updated: 2026-04-24_
 
 ## Objective
-Codebase rename: "confidence" → split into `bookingChecklist` (stored user state) and `tripHealth` (derived report). Rationale: "confidence" was overloaded and inaccurate for a booking-readiness checklist.
+Execute the phased repo cleanup + modularization plan in `PROJECT_NOTES/cleanup_plan.md`. Phase 1 (low-risk dedup + safety net) is COMPLETE on `feature/repo-modularization`.
 
 ## Active Workstream
-`feature/arrange-time-locks` — also bundles the in-flight checklist-persistence fix (saveSnapshot now sends `bookingChecklist` to PUT `/api/itinerary/:id`).
+Paused at the Phase 1 → Phase 2 boundary for user review (per plan §Decisions #5: "Execute one phase at a time. Pause for user review at each phase boundary").
 
 ## Constraints
 - No database — flat JSON files
-- Debug mode: legacy itineraries with `itinerary.confidence` are NOT migrated. Old data will silently lose its checklist on next save.
-- Buffer tables duplicated in `src/` and `public/js/` — must stay in sync
-- `state.lastFinalizeLocks` is in-memory only (clears on page reload)
+- All `/api/*` route paths must remain stable through the cleanup
+- Server now exports app; `listen` guarded by `require.main === module`
+- Client-side shared modules live in `/shared/` and are served via `app.use('/shared', express.static(...))`
 
 ## Risks
-- Any production records with `itinerary.confidence` field will not be readable. Acceptable per debug-mode policy.
-- `state.lastFinalizeLocks` is ephemeral (acceptable per spec)
-- `/refine` still depends on `OPENAI_API_KEY`
+- Phase 2 will reorder middleware around the auth gate — smoke harness is the primary regression net
+- Frontend overlay wiring: `myTripsPanel` is now routed through overlayManager (per plan decision #3); user should smoke-test and revert if slide-out behavior regresses
 
 ## Next Actions
-- Commit bundled rename + checklist-persistence fix on `feature/arrange-time-locks`
-- Push to remote and deploy to VPS
-- Smoke test: load existing itinerary, edit checklist, save, restart container, reload — checklist should persist
+- User review of Phase 1 commits on `feature/repo-modularization`
+- Manual smoke: load planner, run through steps 1-5, open each of the 11 registered modals, confirm no scroll-lock or visibility regressions
+- On approval, begin Phase 2 (backend modularization)
