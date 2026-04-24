@@ -1,3 +1,5 @@
+const persist = window.TravelPlannerStatePersistence.createStatePersistence();
+
 const state = {
   step: 1,
   maxStep: 1,
@@ -242,18 +244,12 @@ let activityMapOverlayMarkers = [];
 const miniMapInstances = new Map();
 
 function loadGeocodeCache() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || '{}');
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
+  const parsed = persist.loadJson(GEO_CACHE_KEY, {});
+  return parsed && typeof parsed === 'object' ? parsed : {};
 }
 
 function persistGeocodeCache() {
-  try {
-    localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geocodeCache));
-  } catch {}
+  persist.saveJson(GEO_CACHE_KEY, geocodeCache);
 }
 
 function geocodeKey(value = '') {
@@ -370,25 +366,19 @@ function renderActivityCostCell(activity = {}, { userBudget = null } = {}) {
 }
 
 function loadPlacesCache() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PLACES_CACHE_KEY) || '{}');
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
+  const parsed = persist.loadJson(PLACES_CACHE_KEY, {});
+  return parsed && typeof parsed === 'object' ? parsed : {};
 }
 
 const placesCache = loadPlacesCache();
 
 function persistPlacesCache() {
-  try {
-    const keys = Object.keys(placesCache);
-    if (keys.length > PLACES_CACHE_MAX) {
-      const overflow = keys.length - PLACES_CACHE_MAX;
-      for (let i = 0; i < overflow; i += 1) delete placesCache[keys[i]];
-    }
-    localStorage.setItem(PLACES_CACHE_KEY, JSON.stringify(placesCache));
-  } catch {}
+  const keys = Object.keys(placesCache);
+  if (keys.length > PLACES_CACHE_MAX) {
+    const overflow = keys.length - PLACES_CACHE_MAX;
+    for (let i = 0; i < overflow; i += 1) delete placesCache[keys[i]];
+  }
+  persist.saveJson(PLACES_CACHE_KEY, placesCache);
 }
 
 function placesKey(q, city) {
@@ -1101,9 +1091,8 @@ async function syncFromServer() {
     }
 
     if (data.snapshot) {
-      const localSnap = localStorage.getItem(SNAPSHOT_KEY);
-      if (!localSnap) {
-        localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(data.snapshot));
+      if (!localStorage.getItem(SNAPSHOT_KEY)) {
+        persist.saveJson(SNAPSHOT_KEY, data.snapshot);
       }
     }
 
@@ -6818,11 +6807,7 @@ function getMinimalPayload() {
 }
 
 function getMinimalOfflineStore() {
-  try {
-    return JSON.parse(localStorage.getItem(MINIMAL_OFFLINE_KEY) || '{}');
-  } catch {
-    return {};
-  }
+  return persist.loadJson(MINIMAL_OFFLINE_KEY, {}) || {};
 }
 
 function saveMinimalOfflinePayload(payload) {
@@ -6834,7 +6819,7 @@ function saveMinimalOfflinePayload(payload) {
 
   const store = getMinimalOfflineStore();
   store[id] = payload;
-  localStorage.setItem(MINIMAL_OFFLINE_KEY, JSON.stringify(store));
+  persist.saveJson(MINIMAL_OFFLINE_KEY, store);
   showToast('Minimal itinerary saved for offline use.', 'success');
 }
 
@@ -7589,11 +7574,11 @@ function getTripContext() {
 }
 
 function loadChatSessionMap() {
-  try { return JSON.parse(localStorage.getItem('chat_sessions') || '{}'); } catch { return {}; }
+  return persist.loadJson('chat_sessions', {}) || {};
 }
 
 function saveChatSessionMap(map) {
-  localStorage.setItem('chat_sessions', JSON.stringify(map));
+  persist.saveJson('chat_sessions', map);
   syncToServer('chatSessions', map);
 }
 
@@ -7738,13 +7723,7 @@ function mountToastHost() {
 }
 
 function getSnapshot() {
-  try {
-    const raw = localStorage.getItem(SNAPSHOT_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  return persist.loadJson(SNAPSHOT_KEY, null);
 }
 
 function showRegenerateConfirmDialog() {
@@ -7907,7 +7886,7 @@ function step1Fingerprint() {
 }
 
 function clearSnapshot() {
-  localStorage.removeItem(SNAPSHOT_KEY);
+  persist.remove(SNAPSHOT_KEY);
   syncToServer('snapshot', null);
 }
 
@@ -7933,7 +7912,7 @@ function saveSnapshot() {
     bookingChecklistIssueMeta: state.bookingChecklistIssueMeta,
     currentItineraryId: state.currentItineraryId || null
   };
-  localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(payload));
+  persist.saveJson(SNAPSHOT_KEY, payload);
   syncToServer('snapshot', payload);
 
   if (state.currentItineraryId) {
