@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { isLegacyActivity, migrateActivity } = require('./activityMigration');
+const { isLegacyActivity, migrateActivity } = require('../shared/activityMigration');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'itineraries.json');
