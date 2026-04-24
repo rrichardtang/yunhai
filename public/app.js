@@ -1,4 +1,11 @@
 const persist = window.TravelPlannerStatePersistence.createStatePersistence();
+const overlayManager = window.TravelPlannerOverlayManager.createOverlayManager();
+
+['prefsModal', 'checklistModal', 'budgetOptOverlay', 'addActivityModal',
+ 'attachmentViewerModal', 'myTripsPanel',
+ 'planningOverlay', 'textareaExpandModal', 'confirmDialog']
+  .forEach((id) => overlayManager.register(id, () => document.getElementById(id)));
+overlayManager.register('activityMapOverlay', () => activityMapOverlay);
 
 const state = {
   step: 1,
@@ -1202,16 +1209,7 @@ let activeSavingToastId = null;
 let profileSnapshot = null;
 
 function refreshOverlayInterlocks() {
-  const hasBlockingOverlay = [
-    document.getElementById('planningOverlay'),
-    document.getElementById('prefsModal'),
-    document.getElementById('checklistModal'),
-    document.getElementById('textareaExpandModal'),
-    document.querySelector('.activity-map-overlay'),
-    document.getElementById('confirmDialog')
-  ].some((node) => node && !node.classList.contains('hidden'));
-
-  document.body.classList.toggle('overlay-active', hasBlockingOverlay);
+  overlayManager.refresh();
 }
 
 function refreshCityTimelineUI(row, city) {
@@ -3635,21 +3633,18 @@ async function openPreferencesModal() {
   }).catch(() => {});
 
   renderPreferencesModal();
-  els.prefsModal.classList.remove('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.open('prefsModal');
 }
 
 function closePreferencesModal() {
   renderPreferencesModal();
-  els.prefsModal.classList.add('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.close('prefsModal');
 }
 
 function openChecklistModal() {
   buildChecklistFromState();
-  document.getElementById('checklistModal').classList.remove('hidden');
+  overlayManager.open('checklistModal');
   renderChecklistModal();
-  refreshOverlayInterlocks();
 }
 
 function closeChecklistModal() {
@@ -3657,8 +3652,7 @@ function closeChecklistModal() {
     clearTimeout(checklistSearchRenderTimer);
     checklistSearchRenderTimer = null;
   }
-  document.getElementById('checklistModal').classList.add('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.close('checklistModal');
 }
 
 async function fetchStatus() {
@@ -3892,7 +3886,7 @@ function renderBudgetTracker() {
 function exitBudgetOptMode() {
   budgetOptState = null;
   const overlay = document.getElementById('budgetOptOverlay');
-  overlay.classList.add('hidden');
+  overlayManager.close('budgetOptOverlay');
   overlay.innerHTML = '';
   document.getElementById('budgetOptFooter')?.remove();
   document.body.classList.remove('budget-opt-active');
@@ -3933,7 +3927,7 @@ function enterBudgetOptMode() {
   budgetOptState = { lockedIds: new Set(approved.map((a) => a.id)), refinements: new Map(), choiceIsRefined: new Map(), inFlight: false };
   mountBudgetOptOverlay();
   renderBudgetOptCards(approved, 'lock');
-  document.getElementById('budgetOptOverlay').classList.remove('hidden');
+  overlayManager.open('budgetOptOverlay');
   document.body.classList.add('budget-opt-active');
 }
 
@@ -4685,8 +4679,7 @@ function mountActivityMapOverlay() {
 
 function closeActivityMapOverlay() {
   if (!activityMapOverlay) return;
-  activityMapOverlay.classList.add('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.close('activityMapOverlay');
 }
 
 function buildAddActivityCard() {
@@ -4714,12 +4707,12 @@ function openAddActivityModal() {
   document.getElementById('addActivityCostType').value = 'per_person';
   document.getElementById('addActivityWhy').value = '';
 
-  document.getElementById('addActivityModal').classList.remove('hidden');
+  overlayManager.open('addActivityModal');
   setTimeout(() => document.getElementById('addActivityName').focus(), 50);
 }
 
 function closeAddActivityModal() {
-  document.getElementById('addActivityModal').classList.add('hidden');
+  overlayManager.close('addActivityModal');
 }
 
 function submitAddActivity() {
@@ -4804,8 +4797,7 @@ async function openActivityMapOverlay(selectedActivityId = null) {
   if (!isGoogleMapsReady()) return;
   mountActivityMapOverlay();
   state.mapOverlaySelectedActivityId = selectedActivityId;
-  activityMapOverlay.classList.remove('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.open('activityMapOverlay');
 
   const mapCanvas = activityMapOverlay.querySelector('#activityMapCanvas');
   const activities = [...state.activities];
@@ -7112,7 +7104,7 @@ function openAttachmentViewer(activityId) {
     els.attachmentViewerTitle.textContent = `Attachments${activity?.name ? ` — ${activity.name}` : ''}`;
   }
   renderAttachmentViewerList(activityId, attachments);
-  els.attachmentViewerModal.classList.remove('hidden');
+  overlayManager.open('attachmentViewerModal');
 }
 
 function renderAttachmentViewerList(activityId, attachments) {
@@ -8061,12 +8053,12 @@ function renderMyTrips() {
   });
 
   if (!trips.length) {
-    els.myTripsPanel.classList.add('hidden');
+    overlayManager.close('myTripsPanel');
     resetToFresh();
     return;
   }
 
-  els.myTripsPanel.classList.remove('hidden');
+  overlayManager.open('myTripsPanel');
 
   els.myTripsList.innerHTML = trips.map((trip) => {
     if (trip.type === 'draft') {
@@ -8464,10 +8456,10 @@ els.attachmentFileInput?.addEventListener('change', () => {
 
 // Attachment viewer modal
 els.attachmentViewerClose?.addEventListener('click', () => {
-  els.attachmentViewerModal?.classList.add('hidden');
+  overlayManager.close('attachmentViewerModal');
 });
 els.attachmentViewerModal?.addEventListener('click', (e) => {
-  if (e.target === els.attachmentViewerModal) els.attachmentViewerModal.classList.add('hidden');
+  if (e.target === els.attachmentViewerModal) overlayManager.close('attachmentViewerModal');
 });
 els.attachmentViewerList?.addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-action="delete-attachment"]');
@@ -8535,8 +8527,7 @@ function openExpandModal(targetId, title) {
   expandTargetId = targetId;
   expandTitle.textContent = title;
   expandEditor.value = document.getElementById(targetId)?.value || '';
-  expandModal.classList.remove('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.open('textareaExpandModal');
   expandEditor.focus();
 }
 
@@ -8548,8 +8539,7 @@ function closeExpandModal(save) {
       target.dispatchEvent(new Event('input', { bubbles: true }));
     }
   }
-  expandModal.classList.add('hidden');
-  refreshOverlayInterlocks();
+  overlayManager.close('textareaExpandModal');
   expandTargetId = null;
 }
 

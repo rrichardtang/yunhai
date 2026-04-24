@@ -1234,6 +1234,7 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 /* ── Chat widget ── */
 #chatWidget { position: fixed; bottom: 24px; right: 24px; z-index: 1000; }
 
+body.overlay-active { overflow: hidden; }
 body.overlay-active .sticky-nav,
 body.overlay-active #chatWidget {
   opacity: 0;
