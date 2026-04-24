@@ -2,7 +2,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { getSummary } = require('./preferences');
 const { inferCategory, getCategoryDefaults } = require('./arrangeConfig');
 const { searchCityActivities, searchTopRestaurants } = require('./braveSearch');
-const { isLegacyActivity, migrateActivity, parseTimeString, parseDurationToMinutes, inferMealType } = require('./activityMigration');
+const { isLegacyActivity, migrateActivity, parseTimeString, parseDurationToMinutes, inferMealType } = require('../shared/activityMigration');
 
 const MODEL = 'claude-sonnet-4-6';
 
