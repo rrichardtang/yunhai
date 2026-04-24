@@ -41,6 +41,7 @@ const { planCity, normalizeActivity, SYSTEM_PROMPT: ACTIVITY_SYSTEM_PROMPT } = r
 const { fetchUnsplashImage } = require('./unsplash');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('./arrangeConfig');
 const { showUpEarlyMins } = require('../shared/arrangeArrivalBuffers');
+const { buildBookingLinks } = require('./services/bookingLinks');
 const {
   recordConstraint,
   recordPreference,
@@ -269,11 +270,7 @@ function extractTimeFromDateTime(value = '') {
   return match ? match[1] : '';
 }
 
-function pickFirstAccommodation(city = {}) {
-  return city?.accommodation?.address ? city.accommodation : null;
-}
-
-function pickLastAccommodation(city = {}) {
+function pickAccommodation(city = {}) {
   return city?.accommodation?.address ? city.accommodation : null;
 }
 
@@ -359,8 +356,8 @@ async function buildCityTravelTiming(cities = []) {
     const cityName = String(city?.name || '').trim();
     if (!cityName) continue;
 
-    const firstAccommodation = pickFirstAccommodation(city);
-    const lastAccommodation = pickLastAccommodation(city);
+    const firstAccommodation = pickAccommodation(city);
+    const lastAccommodation = pickAccommodation(city);
     const logistics = city?.logistics || {};
     const arrivalTime = logistics?.arrival?.time || logistics?.arrival?.customTime
       || extractTimeFromDateTime(city?.travelEntry?.dateTime)
@@ -424,7 +421,7 @@ async function buildCityTravelTiming(cities = []) {
 
     if (index > 0) {
       const previousCity = sortedCities[index - 1] || {};
-      const previousLastAccommodation = pickLastAccommodation(previousCity);
+      const previousLastAccommodation = pickAccommodation(previousCity);
       if (previousLastAccommodation && firstAccommodation) {
         const origin = resolveLocationQuery({
           lat: previousLastAccommodation.latitude,
@@ -959,17 +956,12 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
 
     if (updatedBookingType !== 'none') {
       const searchName = updates.venue_name || activity.venue_name || updatedName;
-      const q = encodeURIComponent(searchName);
-      const qCity = encodeURIComponent(`${searchName} ${updatedCity}`);
-      const date = activity.scheduled_date || '';
-      const newLinks = updatedBookingType === 'tour'
-        ? [
-            { site: 'GetYourGuide', url: `https://www.getyourguide.com/s/?q=${q}${date ? `&date_from=${date}` : ''}` },
-            { site: 'Viator', url: `https://www.viator.com/searchResults/all?text=${q}${date ? `&startDate=${date}` : ''}` }
-          ]
-        : updatedBookingType === 'attraction'
-          ? [{ site: 'Tickets', url: `https://www.google.com/search?q=${qCity}+tickets` }]
-          : [{ site: 'Google Maps', url: `https://www.google.com/maps/search/${qCity}` }];
+      const newLinks = buildBookingLinks({
+        bookingType: updatedBookingType,
+        name: searchName,
+        city: updatedCity,
+        date: activity.scheduled_date || ''
+      });
 
       if (isNewShape) {
         updates.booking = { ...(activity.booking || {}), type: updatedBookingType, links: newLinks };
@@ -1235,20 +1227,16 @@ app.post('/api/plan', async (req, res) => {
         // Enrich with booking links
         const cityStartDate = city.startDate || '';
         for (const a of activities) {
-          const searchName = a.venue_name || a.name;
-          const q = encodeURIComponent(searchName);
-          const qCity = encodeURIComponent(`${searchName} ${city.name}`);
           const bookingType = a.booking?.type ?? a.booking_type;
-          if (bookingType === 'tour') {
-            a.booking.links = [
-              { site: 'GetYourGuide', url: `https://www.getyourguide.com/s/?q=${q}&date_from=${cityStartDate}&adults=${resolvedTravelers}${resolvedChildren ? `&children=${resolvedChildren}` : ''}` },
-              { site: 'Viator', url: `https://www.viator.com/searchResults/all?text=${q}&startDate=${cityStartDate}&adults=${resolvedTravelers}${resolvedChildren ? `&children=${resolvedChildren}` : ''}` }
-            ];
-          } else if (bookingType === 'attraction') {
-            a.booking.links = [{ site: 'Tickets', url: `https://www.google.com/search?q=${qCity}+tickets` }];
-          } else if (bookingType === 'restaurant') {
-            a.booking.links = [{ site: 'Google Maps', url: `https://www.google.com/maps/search/${qCity}` }];
-          }
+          const links = buildBookingLinks({
+            bookingType,
+            name: a.venue_name || a.name,
+            city: city.name,
+            date: cityStartDate,
+            travelers: resolvedTravelers,
+            children: resolvedChildren
+          });
+          if (links.length && a.booking) a.booking.links = links;
         }
 
         sendEvent({ type: 'city', city: city.name, activities, travelTiming: timing });
