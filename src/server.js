@@ -18,7 +18,7 @@ const { acquire: acquireLlmSlot, release: releaseLlmSlot } = require('./middlewa
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
-const { clerkMiddleware, requireAuth } = require('@clerk/express');
+const { clerkMiddleware } = require('@clerk/express');
 const { planCity, normalizeActivity, SYSTEM_PROMPT: ACTIVITY_SYSTEM_PROMPT } = require('./claude');
 const { fetchUnsplashImage } = require('./unsplash');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('./arrangeConfig');
@@ -48,8 +48,7 @@ const {
   load: loadPreferences,
   save: savePreferences,
   getSummary: getPreferenceSummary,
-  reset: resetPreferences,
-  resolveUserId
+  reset: resetPreferences
 } = require('./preferences');
 const { getSession, setTripContext, addMessage, getHistory, compactHistory, clearSession, getCachedPrompt } = require('./chat');
 const { search, searchForChat, isConfigured: isBraveConfigured, shouldUseBrave } = require('./braveSearch');
@@ -115,21 +114,7 @@ app.get('/planner.html', (_req, res) => {
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/shared', express.static(path.join(__dirname, '..', 'shared')));
 
-function requireConfiguredAuth(req, res, next) {
-  if (!process.env.CLERK_SECRET_KEY || !process.env.CLERK_PUBLISHABLE_KEY) {
-    return res.status(503).json({ error: 'Clerk is not configured' });
-  }
-  return requireAuth()(req, res, next);
-}
-
-function getAuthedUserId(req) {
-  return String(req?.auth?.userId || '').trim() || null;
-}
-
-
-function parseUserId(rawUserId) {
-  return resolveUserId(rawUserId);
-}
+const { requireConfiguredAuth, getAuthedUserId, parseUserId } = require('./middleware/auth');
 
 async function sendTripHealthSummaryEmail({ toEmail, tripName, tripHealth }) {
   if (!toEmail || !process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) return false;
