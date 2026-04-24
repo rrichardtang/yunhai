@@ -4,6 +4,19 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-24] Phase 1 repo cleanup — dedup + safety net
+
+- Consolidated byte-equivalent client/server duplicates into `shared/`: `arrangeBuffers.js`, `arrangeArrivalBuffers.js`, `activityMigration.js` (6 files → 3; dual CJS/window exports). Server and `/shared/*` static route added. `planner.html` script srcs updated.
+- Wired `public/js/statePersistence.js`: 5 localStorage JSON load/save sites in `public/app.js` (geocode cache, places cache, minimal offline store, chat session map, snapshot) now route through `persist.loadJson` / `persist.saveJson`.
+- Wired `public/js/overlayManager.js`: registered 11 modals (prefsModal, checklistModal, budgetOptOverlay, addActivityModal, activityMapOverlay, attachmentViewerModal, textareaExpandModal, myTripsPanel, planningOverlay, confirmDialog); show/hide routed through `overlayManager.open/close`. `refreshOverlayInterlocks()` now delegates to `overlayManager.refresh()`. Added `body.overlay-active { overflow: hidden }` to `public/styles.css`.
+- Deleted unused `public/js/apiService.js` (`apiFetch` in app.js is canonical).
+- Server dedup: collapsed `pickFirstAccommodation` + `pickLastAccommodation` → `pickAccommodation`. Extracted booking-link URL builder to `src/services/bookingLinks.js` (used by `/api/activity/refine` and `/api/plan`).
+- Smoke harness: `src/server.smoke.test.js` covers all 42 `/api/*` routes (assert !== 404). Added `supertest` devDependency. `server.js` now exports app and guards `listen` behind `require.main === module`.
+- Fixed stale requires in `src/claude.js` and `src/itineraryStore.js` pointing at old `./activityMigration` path.
+- Tests: 82 passing.
+
+---
+
 ## [2026-04-23] Rename "confidence" → `bookingChecklist` + `tripHealth`
 
 - Renamed `src/confidenceCheck.js` → `src/tripHealth.js`; `computeConfidence()` → `computeTripHealth()`; `src/confidenceCheck.test.js` → `src/tripHealth.test.js`
