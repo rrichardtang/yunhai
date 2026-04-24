@@ -5,7 +5,6 @@ const overlayManager = window.TravelPlannerOverlayManager.createOverlayManager()
  'attachmentViewerModal', 'myTripsPanel',
  'planningOverlay', 'textareaExpandModal', 'confirmDialog']
   .forEach((id) => overlayManager.register(id, () => document.getElementById(id)));
-overlayManager.register('activityMapOverlay', () => activityMapOverlay);
 
 const state = {
   step: 1,
@@ -248,6 +247,7 @@ let geocodeQueue = Promise.resolve();
 let activityMapOverlay = null;
 let activityMapOverlayMap = null;
 let activityMapOverlayMarkers = [];
+overlayManager.register('activityMapOverlay', () => activityMapOverlay);
 const miniMapInstances = new Map();
 
 function loadGeocodeCache() {
