@@ -1,4 +1,3 @@
-/* Keep in sync with src/arrangeBuffers.js — see decisions.md */
 const ARRIVAL_BUFFER_MINS = {
   flight: { domestic: 70, international: 135 },
   train: 45,
@@ -26,3 +25,11 @@ function departureBufferMins(mode, international) {
   const v = DEPARTURE_BUFFER_MINS[mode] ?? DEPARTURE_BUFFER_MINS.other;
   return typeof v === 'number' ? v : (international ? v.international : v.domestic);
 }
+
+const _exports = {
+  ARRIVAL_BUFFER_MINS, DEPARTURE_BUFFER_MINS, TRANSIT_FALLBACK_MINS,
+  arrivalBufferMins, departureBufferMins
+};
+
+if (typeof module !== 'undefined' && module.exports) module.exports = _exports;
+else if (typeof window !== 'undefined') Object.assign(window, _exports);
