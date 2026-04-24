@@ -3,10 +3,12 @@
 _Last updated: 2026-04-24_
 
 ## Objective
-Execute the phased repo cleanup + modularization plan in `PROJECT_NOTES/cleanup_plan.md`. Phase 1 (low-risk dedup + safety net) is COMPLETE on `feature/repo-modularization`.
+Fix Phase 1 runtime errors found during testing: `_exports` redeclaration in shared scripts and `activityMapOverlay` temporal dead zone crash. Both fixed on the current feature branch.
 
 ## Active Workstream
-Paused at the Phase 1 → Phase 2 boundary for user review (per plan §Decisions #5: "Execute one phase at a time. Pause for user review at each phase boundary").
+Phase 1 smoke-testing. Two bugs fixed:
+1. `shared/arrangeBuffers.js` and `shared/arrangeArrivalBuffers.js` — both declared `const _exports` at top-level global script scope; collision when both `<script>` tags loaded. Wrapped each in an IIFE.
+2. `public/app.js` — `overlayManager.register('activityMapOverlay', ...)` was called at line 8 before `let activityMapOverlay` was declared at line 248 (temporal dead zone). Moved register call to immediately after the declaration.
 
 ## Constraints
 - No database — flat JSON files
@@ -15,10 +17,10 @@ Paused at the Phase 1 → Phase 2 boundary for user review (per plan §Decisions
 - Client-side shared modules live in `/shared/` and are served via `app.use('/shared', express.static(...))`
 
 ## Risks
+- Profile icon missing — likely collateral damage from the `_exports` crash halting app.js execution; should resolve with the fixes. If still missing after deploy, needs separate investigation.
 - Phase 2 will reorder middleware around the auth gate — smoke harness is the primary regression net
-- Frontend overlay wiring: `myTripsPanel` is now routed through overlayManager (per plan decision #3); user should smoke-test and revert if slide-out behavior regresses
 
 ## Next Actions
-- User review of Phase 1 commits on `feature/repo-modularization`
-- Manual smoke: load planner, run through steps 1-5, open each of the 11 registered modals, confirm no scroll-lock or visibility regressions
-- On approval, begin Phase 2 (backend modularization)
+- Deploy and verify: confirm no console errors, profile icon visible, all 11 overlays functional
+- If profile icon still missing after fixes, trace separately
+- On smoke pass, begin Phase 2 (backend modularization)

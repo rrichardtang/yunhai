@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-24] Fix Phase 1 runtime errors found during smoke testing
+
+- `shared/arrangeBuffers.js` + `shared/arrangeArrivalBuffers.js`: wrapped each file in an IIFE to prevent `const _exports` top-level collision when both are loaded as `<script>` tags on the same page
+- `public/app.js`: moved `overlayManager.register('activityMapOverlay', ...)` from line 8 (before the `let` declaration) to immediately after `let activityMapOverlay = null` at line 251, eliminating temporal dead zone ReferenceError
+
+---
+
 ## [2026-04-24] Phase 1 repo cleanup — dedup + safety net
 
 - Consolidated byte-equivalent client/server duplicates into `shared/`: `arrangeBuffers.js`, `arrangeArrivalBuffers.js`, `activityMigration.js` (6 files → 3; dual CJS/window exports). Server and `/shared/*` static route added. `planner.html` script srcs updated.
