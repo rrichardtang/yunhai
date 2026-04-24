@@ -2,16 +2,7 @@ require('dotenv').config();
 const fs = require('fs');
 const express = require('express');
 
-// Nominatim requires max 1 req/sec — serialize all geocode requests server-side
-let nominatimQueue = Promise.resolve();
-const nominatimFetch = (url) => {
-  nominatimQueue = nominatimQueue.then(async () => {
-    const r = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'TravelPlannerApp/1.0' } });
-    await new Promise((res) => setTimeout(res, 1100));
-    return r;
-  });
-  return nominatimQueue;
-};
+const { nominatimFetch } = require('./middleware/nominatim');
 
 const { acquire: acquireLlmSlot, release: releaseLlmSlot } = require('./middleware/llmSemaphore');
 
@@ -138,32 +129,7 @@ function extractText(content = []) {
     .trim();
 }
 
-app.get('/api/status', (_req, res) => {
-  res.json({
-    ok: true,
-    keys: {
-      anthropicConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
-      openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
-      unsplashConfigured: Boolean(process.env.UNSPLASH_ACCESS_KEY),
-      googleMapsConfigured: Boolean(process.env.GOOGLE_MAPS_API_KEY),
-      clerkConfigured: Boolean(process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY),
-      resendConfigured: Boolean(process.env.RESEND_API_KEY)
-    },
-    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
-  });
-});
-
-app.get('/api/auth/session', requireConfiguredAuth, (req, res) => {
-  const userId = getAuthedUserId(req);
-  const userEmail = String(req?.auth?.sessionClaims?.email || req?.auth?.sessionClaims?.email_address || '').trim();
-  const forwardingAddress = getOrCreateForwardingAddress(userId, userEmail);
-
-  return res.json({
-    userId,
-    forwardingAddress,
-    forwardingEnabled: Boolean(forwardingAddress)
-  });
-});
+require('./routes/status').register(app);
 
 app.post('/api/email/inbound', async (req, res) => {
   const expectedSecret = String(process.env.EMAIL_WEBHOOK_SECRET || '').trim();
@@ -222,19 +188,7 @@ app.post('/api/email/inbound', async (req, res) => {
   return res.json({ ok: true, parsed: attached.added, itineraryId: attached.itineraryId });
 });
 
-app.get('/api/geocode', async (req, res) => {
-  const { q } = req.query;
-  if (!q) return res.status(400).json({ error: 'Missing q parameter' });
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`;
-    const r = await nominatimFetch(url);
-    if (!r.ok) return res.status(r.status).json({ error: `Nominatim error ${r.status}` });
-    const data = await r.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+require('./routes/geocode').register(app);
 
 app.use('/api', requireConfiguredAuth);
 
