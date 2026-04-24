@@ -13,25 +13,7 @@ const nominatimFetch = (url) => {
   return nominatimQueue;
 };
 
-// Global semaphore: cap total in-flight Anthropic calls across all users
-const MAX_CONCURRENT_LLM_CALLS = 10;
-let activeLlmCalls = 0;
-const llmQueue = [];
-const acquireLlmSlot = () => new Promise((resolve) => {
-  const tryAcquire = () => {
-    if (activeLlmCalls < MAX_CONCURRENT_LLM_CALLS) {
-      activeLlmCalls++;
-      resolve();
-    } else {
-      llmQueue.push(tryAcquire);
-    }
-  };
-  tryAcquire();
-});
-const releaseLlmSlot = () => {
-  activeLlmCalls--;
-  if (llmQueue.length > 0) llmQueue.shift()();
-};
+const { acquire: acquireLlmSlot, release: releaseLlmSlot } = require('./middleware/llmSemaphore');
 
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
