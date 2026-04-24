@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { arrivalBufferMins, departureBufferMins } = require('./arrangeBuffers.js');
+const { arrivalBufferMins, departureBufferMins } = require('../shared/arrangeBuffers.js');
 
 test('arrivalBufferMins flight international', () => {
   assert.equal(arrivalBufferMins('flight', true), 135);

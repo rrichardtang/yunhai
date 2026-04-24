@@ -1,5 +1,4 @@
-/* global window */
-(function (exports) {
+(function (root) {
   const CATEGORY_MAP = {
     breakfast: 'food', lunch: 'food', dinner: 'food', food: 'food', restaurant: 'food',
     tour: 'tour', show: 'tour',
@@ -32,29 +31,43 @@
       const m = ampm[2] ? parseInt(ampm[2], 10) : 0;
       if (ampm[3] === 'pm' && h !== 12) h += 12;
       if (ampm[3] === 'am' && h === 12) h = 0;
-      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     }
     const h24 = s.match(/^(\d{1,2}):(\d{2})$/);
     if (h24) {
       const h = parseInt(h24[1], 10);
       const m = parseInt(h24[2], 10);
       if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
-        return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
       }
     }
     return null;
   }
 
-  function inferMealType(type, name) {
-    const t = String(type || '').toLowerCase();
+  function parseDurationToMinutes(hours) {
+    return Math.max(15, Math.round(Number(hours) * 60));
+  }
+
+  function inferMealType(raw) {
+    const t = String(raw.type || '').toLowerCase();
     if (MEAL_TYPES.has(t)) return t;
     if (FOOD_TYPES.has(t)) return null;
-    const n = String(name || '').toLowerCase();
-    if (n.includes('breakfast')) return 'breakfast';
-    if (n.includes('lunch')) return 'lunch';
-    if (n.includes('dinner')) return 'dinner';
-    if (n.includes('cafe') || n.includes('café') || n.includes('coffee')) return 'cafe';
+    const name = String(raw.name || '').toLowerCase();
+    if (name.includes('breakfast')) return 'breakfast';
+    if (name.includes('lunch')) return 'lunch';
+    if (name.includes('dinner')) return 'dinner';
+    if (name.includes('cafe') || name.includes('café') || name.includes('coffee')) return 'cafe';
     return null;
+  }
+
+  function normalizeCategory(legacyType) {
+    return CATEGORY_MAP[String(legacyType || '').toLowerCase()] || 'sightseeing';
+  }
+
+  function inferTags(legacyType) {
+    const key = String(legacyType || '').toLowerCase();
+    const tag = TAG_MAP[key];
+    return tag ? [tag] : [];
   }
 
   function isLegacyActivity(obj) {
@@ -65,9 +78,8 @@
     if (!isLegacyActivity(a)) return a;
 
     const legacyType = String(a.type || '').toLowerCase();
-    const category = CATEGORY_MAP[legacyType] || 'sightseeing';
-    const tagKey = TAG_MAP[legacyType];
-    const tags = tagKey ? [tagKey] : [];
+    const category = normalizeCategory(legacyType);
+    const tags = inferTags(legacyType);
 
     const rawSuggested = String(a.suggested_time || '').trim();
     const preferred_time = (rawSuggested && rawSuggested !== '10:00am')
@@ -76,12 +88,10 @@
 
     const durationHours = Number(a.duration_hours);
     const duration_minutes = Number.isFinite(durationHours) && durationHours > 0
-      ? Math.max(15, Math.round(durationHours * 60))
+      ? parseDurationToMinutes(durationHours)
       : 60;
 
     const venueName = a.venue_name || null;
-    const bookingType = ['tour', 'attraction', 'restaurant', 'none'].includes(a.booking_type)
-      ? a.booking_type : 'none';
 
     return {
       id: a.id,
@@ -98,7 +108,7 @@
 
       category,
       tags,
-      meal_type: inferMealType(legacyType, a.name),
+      meal_type: inferMealType(a),
 
       timing: {
         duration_minutes,
@@ -108,10 +118,13 @@
         must_happen_on_day: null
       },
 
-      experience: { intensity: 'medium', is_highlight: false },
+      experience: {
+        intensity: 'medium',
+        is_highlight: false
+      },
 
       booking: {
-        type: bookingType,
+        type: (['tour', 'attraction', 'restaurant', 'none'].includes(a.booking_type) ? a.booking_type : 'none'),
         links: Array.isArray(a.booking_links) ? a.booking_links : [],
         reference: null
       },
@@ -124,6 +137,7 @@
 
       verdict: a.verdict || 'Recommend',
       dedicated_time_block: Boolean(a.dedicated_time_block),
+
       why_it_fits: String(a.why_it_fits || '').trim(),
       pitfall: String(a.pitfall || '').trim(),
       booking_advice: String(a.booking_advice || '').trim(),
@@ -131,7 +145,8 @@
     };
   }
 
-  exports.isLegacyActivity = isLegacyActivity;
-  exports.migrateActivity = migrateActivity;
-  exports.parseTimeString = parseTimeString;
-})(typeof module !== 'undefined' ? module.exports : (window.ActivityMigration = {}));
+  const api = { isLegacyActivity, migrateActivity, parseTimeString, parseDurationToMinutes, inferMealType };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else if (root) root.ActivityMigration = api;
+})(typeof window !== 'undefined' ? window : null);

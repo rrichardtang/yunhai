@@ -1,6 +1,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { showUpEarlyMins } = require('./arrangeArrivalBuffers');
+const { showUpEarlyMins } = require('../shared/arrangeArrivalBuffers');
 
 describe('showUpEarlyMins', () => {
   it('returns 15 for tour', () => assert.equal(showUpEarlyMins('tour'), 15));

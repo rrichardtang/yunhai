@@ -40,7 +40,7 @@ const { clerkMiddleware, requireAuth } = require('@clerk/express');
 const { planCity, normalizeActivity, SYSTEM_PROMPT: ACTIVITY_SYSTEM_PROMPT } = require('./claude');
 const { fetchUnsplashImage } = require('./unsplash');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('./arrangeConfig');
-const { showUpEarlyMins } = require('./arrangeArrivalBuffers');
+const { showUpEarlyMins } = require('../shared/arrangeArrivalBuffers');
 const {
   recordConstraint,
   recordPreference,
@@ -112,6 +112,7 @@ app.get('/planner.html', (_req, res) => {
 });
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use('/shared', express.static(path.join(__dirname, '..', 'shared')));
 
 function requireConfiguredAuth(req, res, next) {
   if (!process.env.CLERK_SECRET_KEY || !process.env.CLERK_PUBLISHABLE_KEY) {
