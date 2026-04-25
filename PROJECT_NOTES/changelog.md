@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-25] Phase 3 frontend modularization — arrangeView extracted (final module)
+
+- `public/js/arrangeView.js`: new module (230 LOC). Holds pure helpers and constants for the arrange step: `DAY_START_HOUR/END/PX_PER_HOUR/GRID_HEIGHT`, `DEFAULT_ARRANGE_CATEGORY_CONFIG`, `COMMUTE_MODE_ORDER/LABEL`, `expandDays`, `daysMatchCities`, `getArrangeCategoryDefaults`, `inferActivityCategory`, `parseDurationHoursFromText`, `normalizeActivityMetadata`, `parseOpeningWindows`, `formatDuration`, `formatDurationHoursLong`, `formatTypeLabel`, `commutePairKey`, `resolveSelectedCommuteMode/Details`, `formatCommuteBadge`, `normalizeCommuteStateMap`, `timeFromY`, `yFromTime`, `rangesOverlap`, `citySlug`, `logistics*Id` builders.
+- `public/app.js`: 8208 → 8028 LOC. Removed those helpers; kept thin wrappers for `getArrangeCategoryDefaults` / `inferActivityCategory` / `normalizeActivityMetadata` that bind `state.arrangeConfig` and `actPreferredTime` / `actDurationHours`. All DOM-rendering, event-binding, and state-mutating functions (`renderArrange`, `makePlacedCard`, `bindPlacedCardInteractions`, `autoArrangeActiveCity`, `openFinalizeModal`, `getIncomingCommuteForActivity`, etc.) intentionally kept in `app.js` per the Phase 3 hard rule (extract only single-state-slice helpers).
+- `public/planner.html`: added `<script src="/js/arrangeView.js">` before `app.js`.
+- 82/82 tests pass.
+
+---
+
 ## [2026-04-25] Phase 2 backend modularization complete
 
 - `src/server.js`: 1837 → 51 lines. Now only Express setup, middleware mounts, route registrations, and `listen` guard.
