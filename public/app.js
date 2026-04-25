@@ -4416,119 +4416,34 @@ async function openActivityMapOverlay(selectedActivityId = null) {
   }
 }
 
-function expandDays(cities) {
-  const days = [];
-  cities.forEach((c) => {
-    const start = parseYmdAsLocal(c.startDate);
-    const end = parseYmdAsLocal(c.endDate);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return;
+// expandDays, daysMatchCities, DAY_START_HOUR/END/PX_PER_HOUR/GRID_HEIGHT,
+// DEFAULT_ARRANGE_CATEGORY_CONFIG, parseDurationHoursFromText, parseOpeningWindows,
+// formatDuration, commutePairKey provided by /js/arrangeView.js
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const iso = formatYmdLocal(d);
-      days.push({ id: `${c.name}-${iso}`, city: c.name, date: iso });
-    }
-  });
-  return days;
-}
-
-function daysMatchCities(days = [], cities = []) {
-  const expected = expandDays(cities).map((d) => d.id).sort();
-  const actual = (Array.isArray(days) ? days : []).map((d) => d?.id || `${d?.city}-${d?.date}`).sort();
-  if (expected.length !== actual.length) return false;
-  return expected.every((id, idx) => id === actual[idx]);
-}
-
-const DAY_START_HOUR = 6;
-const DAY_END_HOUR = 24;
-const PX_PER_HOUR = 60;
-const GRID_HEIGHT = (DAY_END_HOUR - DAY_START_HOUR) * PX_PER_HOUR;
-
-const DEFAULT_ARRANGE_CATEGORY_CONFIG = {
-  arrival: { durationHours: 1, openingHours: '00:00-23:59' },
-  departure: { durationHours: 1, openingHours: '00:00-23:59' },
-  museum: { durationHours: 2.5, openingHours: '10:00-18:00' },
-  gallery: { durationHours: 2, openingHours: '10:00-18:00' },
-  park: { durationHours: 1.5, openingHours: '07:00-19:00' },
-  neighborhood: { durationHours: 2, openingHours: '09:00-21:00' },
-  market: { durationHours: 1.5, openingHours: '09:00-17:00' },
-  breakfast: { durationHours: 1, openingHours: '07:30-10:30' },
-  lunch: { durationHours: 1.25, openingHours: '12:00-14:30' },
-  dinner: { durationHours: 1.75, openingHours: '18:30-22:30' },
-  show: { durationHours: 2, openingHours: '19:00-23:00' },
-  tour: { durationHours: 2.5, openingHours: '09:00-17:00' },
-  walk: { durationHours: 1.5, openingHours: '08:00-19:00' },
-  sunset: { durationHours: 1, openingHours: '17:30-20:30' },
-  default: { durationHours: 1.5, openingHours: '09:00-18:00' }
-};
+const _arrangeView_getDefaults = window.TravelPlannerArrangeView.getArrangeCategoryDefaults;
+const _arrangeView_inferCategory = window.TravelPlannerArrangeView.inferActivityCategory;
+const _arrangeView_normalizeMetadata = window.TravelPlannerArrangeView.normalizeActivityMetadata;
 
 function getArrangeCategoryDefaults(category = '') {
-  const merged = state.arrangeConfig || DEFAULT_ARRANGE_CATEGORY_CONFIG;
-  const key = String(category || '').trim().toLowerCase();
-  return merged[key] || merged.default || DEFAULT_ARRANGE_CATEGORY_CONFIG.default;
+  return _arrangeView_getDefaults(category, state.arrangeConfig);
 }
 
 function inferActivityCategory(activity = {}) {
-  const raw = String(activity.category || activity.type || '').trim().toLowerCase();
-  const text = `${activity.name || ''} ${activity.type || ''} ${actPreferredTime(activity) || ''}`;
-  if (raw && getArrangeCategoryDefaults(raw)) return raw;
-  if (/\b(arrival|arrive|check[- ]?in)\b/i.test(text)) return 'arrival';
-  if (/\b(depart|departure|check[- ]?out)\b/i.test(text)) return 'departure';
-  if (/\b(museum|exhibit)\b/i.test(text)) return 'museum';
-  if (/\b(park|garden)\b/i.test(text)) return 'park';
-  if (/\b(breakfast|brunch|cafe)\b/i.test(text)) return 'breakfast';
-  if (/\b(lunch)\b/i.test(text)) return 'lunch';
-  if (/\b(dinner|supper|restaurant)\b/i.test(text)) return 'dinner';
-  if (/\b(show|concert|theatre|theater)\b/i.test(text)) return 'show';
-  return raw || 'default';
-}
-
-function parseDurationHoursFromText(value = '') {
-  const text = String(value || '').trim().toLowerCase();
-  const match = text.match(/(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours|m|min|mins|minute|minutes)/i);
-  if (!match) return null;
-  const amount = Number(match[1]);
-  if (!Number.isFinite(amount) || amount <= 0) return null;
-  return /^m|min/i.test(match[2]) ? (amount / 60) : amount;
+  return _arrangeView_inferCategory(activity, {
+    config: state.arrangeConfig,
+    preferredTime: actPreferredTime(activity)
+  });
 }
 
 function normalizeActivityMetadata(activity = {}) {
-  const category = inferActivityCategory(activity);
-  const defaults = getArrangeCategoryDefaults(category);
-  const parsedDuration = parseDurationHoursFromText(activity.duration);
-  const _rawDurH = actDurationHours(activity, 0);
-  const durationHours = _rawDurH > 0 ? _rawDurH : (parsedDuration || defaults.durationHours || 1.5);
-  const FIXED_HOUR_CATEGORIES = new Set(['breakfast', 'lunch', 'dinner', 'nightlife', 'sunset']);
-  const openingHours = (FIXED_HOUR_CATEGORIES.has(category)
-    ? defaults.openingHours
-    : String(activity.opening_hours || activity.openingHours || defaults.openingHours || '').trim());
-  return {
-    ...activity,
-    category,
-    duration_hours: durationHours,
-    duration: String(activity.duration || `${durationHours} hours`).trim(),
-    opening_hours: openingHours
-  };
-}
-
-function parseOpeningWindows(openingHours = '') {
-  const text = String(openingHours || '').trim();
-  if (!text) return [[0, (24 * 60) - 1]];
-  return text.split(',').map((segment) => {
-    const match = segment.trim().match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)[\s-]+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
-    if (!match) return null;
-    return [minutesFromTime(parseTimeTo24(match[1])), minutesFromTime(parseTimeTo24(match[2]))];
-  }).filter((window) => Array.isArray(window) && window[1] > window[0]);
-}
-
-function formatDuration(hours = 1) {
-  return `${Number(hours || 1)}h`;
+  return _arrangeView_normalizeMetadata(activity, {
+    config: state.arrangeConfig,
+    preferredTime: actPreferredTime(activity),
+    durationHoursRaw: actDurationHours(activity, 0)
+  });
 }
 
 // parseTimeTo24, minutesFromTime, timeFromMinutes provided by /shared/timeHelpers.js
-
-function commutePairKey(fromId, toId) {
-  return `${fromId}->${toId}`;
-}
 
 function getIncomingCommuteForActivity(activityId) {
   const activity = state.activities.find((a) => a.id === activityId);
@@ -4547,80 +4462,8 @@ function getIncomingCommuteForActivity(activityId) {
   return state.commutes[commutePairKey(prev.id, activityId)] || null;
 }
 
-function normalizeCommuteStateMap(commuteMap = {}) {
-  const normalized = {};
-  Object.entries(commuteMap || {}).forEach(([key, commute]) => {
-    if (!commute || typeof commute !== 'object') return;
-
-    const modes = commute.modes && typeof commute.modes === 'object'
-      ? commute.modes
-      : {
-        transit: commute.mode === 'transit' ? { durationMinutes: commute.durationMinutes, modeIcon: commute.modeIcon || '🚇' } : { durationMinutes: null, modeIcon: '🚇' },
-        driving: commute.mode === 'driving' ? { durationMinutes: commute.durationMinutes, modeIcon: commute.modeIcon || '🚗' } : { durationMinutes: null, modeIcon: '🚗' },
-        walking: commute.mode === 'walking' ? { durationMinutes: commute.durationMinutes, modeIcon: commute.modeIcon || '🚶' } : { durationMinutes: null, modeIcon: '🚶' }
-      };
-
-    const selectedMode = resolveSelectedCommuteMode({ ...commute, modes });
-    const selected = modes[selectedMode] || {};
-
-    normalized[key] = {
-      ...commute,
-      modes,
-      selectedMode,
-      durationMinutes: Number.isFinite(Number(selected.durationMinutes)) ? Number(selected.durationMinutes) : null,
-      modeIcon: selected.modeIcon || '🚇'
-    };
-  });
-
-  return normalized;
-}
-
-const COMMUTE_MODE_ORDER = ['transit', 'driving', 'walking'];
-const COMMUTE_MODE_LABEL = {
-  transit: 'Transit',
-  driving: 'Driving',
-  walking: 'Walking'
-};
-
-function resolveSelectedCommuteMode(commute) {
-  if (!commute || typeof commute !== 'object') return null;
-  const selectedMode = commute.selectedMode && commute.modes?.[commute.selectedMode]
-    ? commute.selectedMode
-    : COMMUTE_MODE_ORDER.find((mode) => Number.isFinite(commute.modes?.[mode]?.durationMinutes));
-  return selectedMode || COMMUTE_MODE_ORDER[0];
-}
-
-function resolveSelectedCommuteDetails(commute) {
-  if (!commute) return null;
-  const selectedMode = resolveSelectedCommuteMode(commute);
-  const selected = commute.modes?.[selectedMode] || {};
-  const durationMinutes = Number.isFinite(Number(selected.durationMinutes)) ? Number(selected.durationMinutes) : null;
-  const modeIcon = selected.modeIcon || '🚇';
-  return { selectedMode, durationMinutes, modeIcon };
-}
-
-function formatCommuteBadge(commute) {
-  const selected = resolveSelectedCommuteDetails(commute);
-  if (!selected || !Number.isFinite(selected.durationMinutes)) return '';
-  return `${selected.modeIcon} ${selected.durationMinutes} min`;
-}
-
-function timeFromY(yPx = 0) {
-  const clamped = Math.max(0, Math.min(GRID_HEIGHT, yPx));
-  const minsFromStart = Math.round(clamped / 30) * 30;
-  const totalMins = (DAY_START_HOUR * 60) + minsFromStart;
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function yFromTime(time = '09:00') {
-  const mins = minutesFromTime(time);
-  const start = DAY_START_HOUR * 60;
-  const end = DAY_END_HOUR * 60;
-  const clamped = Math.max(start, Math.min(end, mins));
-  return ((clamped - start) / 60) * PX_PER_HOUR;
-}
+// normalizeCommuteStateMap, COMMUTE_MODE_ORDER/LABEL, resolveSelectedCommuteMode/Details,
+// formatCommuteBadge, timeFromY, yFromTime provided by /js/arrangeView.js
 
 function getArrangeCities() {
   const byCity = new Map();
@@ -4681,21 +4524,7 @@ function makeStagingCard(item) {
   `;
 }
 
-function formatTypeLabel(type = '') {
-  const normalized = String(type || '').trim().toLowerCase();
-  if (!normalized) return 'Activity';
-  return normalized
-    .split(/[\s_-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
-function formatDurationHoursLong(hours = 1) {
-  const value = Number(hours || 1);
-  const safe = Number.isFinite(value) ? value : 1;
-  return `${safe % 1 === 0 ? safe.toFixed(0) : safe.toFixed(1)} hours`;
-}
+// formatTypeLabel, formatDurationHoursLong provided by /js/arrangeView.js
 
 function makePlacedCard(item) {
   const { icon, colorClass } = getActivityStyle(item.type);
@@ -4831,14 +4660,7 @@ function getAccommodationLabel(cityName, date) {
   return short || raw;
 }
 
-function citySlug(cityName) {
-  return String(cityName || '').trim().toLowerCase().replace(/\s+/g, '-');
-}
-
-function logisticsArrivalId(cityName) { return `logistics-arrival-${citySlug(cityName)}`; }
-function logisticsDepartureId(cityName) { return `logistics-departure-${citySlug(cityName)}`; }
-function logisticsAccommodationArrivalId(cityName) { return `logistics-acc-arrival-${citySlug(cityName)}`; }
-function logisticsAccommodationDepartureId(cityName) { return `logistics-acc-departure-${citySlug(cityName)}`; }
+// citySlug, logistics*Id provided by /js/arrangeView.js
 
 function buildLogisticsPseudoActivities(cityObj, date, cityName) {
   if (!cityObj) return { arrival: null, departure: null };
@@ -4925,9 +4747,7 @@ function getPlacementTimeRange(activity, placementOverride = null) {
   };
 }
 
-function rangesOverlap(a, b) {
-  return a.startMinutes < b.endMinutes && b.startMinutes < a.endMinutes;
-}
+// rangesOverlap provided by /js/arrangeView.js
 
 function hasOverlapInDay(activityId, dayId, placementOverride = null) {
   const dropped = state.activities.find((a) => a.id === activityId);

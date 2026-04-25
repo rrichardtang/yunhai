@@ -3,20 +3,20 @@
 _Last updated: 2026-04-25_
 
 ## Objective
-Phase 2 (backend modularization) is COMPLETE on `feature/repo-modularization`. `src/server.js` reduced from 1837 → 51 lines. All routes split into `src/routes/*.js`, supporting logic into `src/services/*.js` and `src/middleware/*.js`. Time helpers consolidated into `shared/timeHelpers.js` (used by both server and browser).
+Phase 3 (frontend modularization) is COMPLETE on `feature/repo-modularization`. `public/app.js` reduced from 8738 → 8028 LOC across six extracted modules: `activityCard.js`, `bookingChecklist.js`, `cityPlanner.js`, `profileWizard.js`, `arrangeView.js`, plus the prior `overlayManager.js` / `statePersistence.js`. Pure helpers extracted; DOM-rendering and state-mutating orchestration intentionally kept in `app.js` to avoid coupling bleed.
 
 ## Active Workstream
-Paused at the Phase 2 → Phase 3 boundary for user review (per cleanup plan §Decisions #5).
+Paused for user smoke test of arrange step (drag/drop, commute pills, auto-arrange, finalize modal).
 
 ## Constraints
 - No database — flat JSON files
-- All `/api/*` route paths preserved exactly through Phase 2
-- Auth-gate ordering preserved: status, email/inbound, geocode mount BEFORE `app.use('/api', requireConfiguredAuth)`; everything else after
-- 82/82 tests passing after every commit
+- All `/api/*` route paths preserved
+- `tripHealthView.js` extraction skipped (not extracted in any prior session) — implementations remain in `app.js`. Optional follow-up.
+- 82/82 tests passing
 
 ## Risks
-- Phase 3 will split `public/app.js` (8700+ LOC) into feature modules — highest-risk phase due to state coupling and drag/drop event handlers
+- arrangeView extraction is helper-only; render/drag/drop logic still in `app.js`. Behavior should be identical, but smoke test recommended (drag activity onto day, change commute mode, run auto-arrange, open finalize modal).
 
 ## Next Actions
-- User review of Phase 2 commits + manual smoke (steps 1-5, chat, checklist, auto-arrange, calendar export, attachment upload)
-- On approval, begin Phase 3 (frontend modularization), starting with `public/js/activityCard.js`
+- User smoke test of Step 3 (Arrange).
+- Decide whether to also extract `tripHealthView.js` and Phase 3.4 secondary modules (`itineraryView.js`, `chatPanel.js`, `savedTrips.js`).
