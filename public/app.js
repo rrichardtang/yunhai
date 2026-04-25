@@ -196,18 +196,6 @@ function geocodeKey(value = '') {
   return String(value || '').trim().toLowerCase();
 }
 
-function getActivityLocationCandidates(activity = {}) {
-  const name = String(activity.name || '').trim();
-  const city = String(activity.city || '').trim();
-  const candidates = [
-    actAddress(activity),
-    activity.location?.name,
-    [name, city].filter(Boolean).join(', '),
-    city
-  ].map((x) => String(x || '').trim()).filter(Boolean);
-  return [...new Set(candidates)];
-}
-
 function geocodeQueryQueued(query) {
   const key = geocodeKey(query);
   if (geocodeCache[key]) return Promise.resolve(geocodeCache[key]);
@@ -473,10 +461,6 @@ async function loadGoogleMapsPlacesSDK(apiKey = '') {
   });
 
   return googleMapsSdkPromise;
-}
-
-function getAccommodationAutocompleteInput(row) {
-  return row?.querySelector('[data-accommodation-field="address"]') || null;
 }
 
 function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInput, locationBias }) {
@@ -2359,15 +2343,6 @@ function ensureFirstCityTravelEntry() {
   return firstCity.travelEntry;
 }
 
-function setTravelEntryTime(city, timeValue = '') {
-  if (!city || state.cities[0]?.id !== city.id) return;
-  const travelEntry = ensureFirstCityTravelEntry();
-  if (!travelEntry) return;
-  const safeTime = String(timeValue || '').match(/^\d{2}:\d{2}$/) ? String(timeValue) : '09:00';
-  travelEntry.dateTime = city.startDate ? `${city.startDate}T${safeTime}` : '';
-  syncLegacyTravelsFromCities();
-}
-
 function syncTravelDateTimes() {
   const firstCity = getPrimaryCity();
   if (!firstCity) {
@@ -2939,23 +2914,6 @@ function getProfilePayload() {
     ...(state.profile || defaultProfile()),
     aboutMe: aboutMeValue
   });
-}
-
-function switchActiveProfile(profileId) {
-  const store = state.profilesStore || loadProfiles();
-  if (!store.profiles.some((p) => p.id === profileId)) return;
-  state.profilesStore = saveProfiles({ ...store, activeId: profileId });
-  state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
-  renderPreferencesModal();
-}
-
-function createNewProfile() {
-  const store = state.profilesStore || loadProfiles();
-  if (store.profiles.length >= 3) {
-    showToast('You can create up to 3 profiles.', 'info');
-    return;
-  }
-  openProfileWizard(store);
 }
 
 function openProfileWizard(store, { forced = false } = {}) {
@@ -4122,16 +4080,6 @@ async function ensureMiniMapForCard(card, activity) {
   });
   new google.maps.marker.AdvancedMarkerElement({ map, position: center });
   miniMapInstances.set(key, map);
-}
-
-function makeMapLabel(activity, activities) {
-  const city = String(activity.city || '').trim();
-  const sameCity = activities.filter((a) => String(a.city || '').trim() === city);
-  const cityIndex = [...new Set(activities.map((a) => String(a.city || '').trim()))].filter(Boolean).indexOf(city) + 1;
-  const order = sameCity.findIndex((a) => a.id === activity.id) + 1;
-  if (cityIndex > 0 && order > 0) return `${cityIndex}.${order}`;
-  const globalOrder = activities.findIndex((a) => a.id === activity.id) + 1;
-  return String(globalOrder);
 }
 
 const CATEGORY_ICONS = {
@@ -6641,12 +6589,9 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
         .filter((a) => regenSet.has(a.city) && !lockedIds.has(a.id))
         .map((a) => a.id)
     );
-    console.log('[regen] regenSet:', [...regenSet], 'lockedIds:', [...lockedIds]);
-    console.log('[regen] activities before filter:', state.activities.map((a) => ({ id: a.id, city: a.city, name: a.name })));
     state.activities = state.activities.filter(
       (a) => !regenSet.has(a.city) || lockedIds.has(a.id)
     );
-    console.log('[regen] activities after filter:', state.activities.map((a) => ({ id: a.id, city: a.city, name: a.name })));
     removedIds.forEach((id) => {
       delete state.reviewed[id];
       delete state.placements[id];
@@ -6730,7 +6675,6 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
         };
       });
 
-      console.log('[regen] SSE city event:', evt.city, 'incoming:', cityActivities.length, 'cities in state.activities:', [...new Set(state.activities.map((a) => a.city))]);
       state.activities.push(...cityActivities);
       enrichActivities(cityActivities).then(() => { if (state.step === 2) renderActivities(); });
       setStep(2);
