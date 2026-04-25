@@ -186,26 +186,33 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
     const prefSummary = getPreferenceSummary(resolvedUserId);
     const systemPrompt = prefSummary ? `${ACTIVITY_SYSTEM_PROMPT}\n\n${prefSummary}` : ACTIVITY_SYSTEM_PROMPT;
 
+    const reasonText = String(reason || '').trim();
+    const notesText = String(notes || '').trim();
+    const activityType = String(activity.type || '').toLowerCase();
+    const isMeal = ['food', 'breakfast', 'lunch', 'dinner'].includes(activityType);
+    const braveQuery = reasonText
+      ? `${reasonText} ${activity.city}${isMeal ? ' restaurant' : ''}`.trim()
+      : `${activity.name} ${activity.city}`;
     const useBraveForEnrichment = isBraveConfigured() && shouldUseBrave('entity_enrichment', {
-      query: `${activity.name} ${activity.city}`,
+      query: braveQuery,
       needsLiveGrounding: true
     });
-    const braveResults = useBraveForEnrichment ? await search(`${activity.name} ${activity.city}`, { task: 'entity_enrichment' }) : [];
+    const braveResults = useBraveForEnrichment ? await search(braveQuery, { task: 'entity_enrichment' }) : [];
     const braveBlock = braveResults.length
-      ? `\nWeb research (use to ground the activity in a real venue or operator — find the closest real match to what the traveler described):\n${braveResults.map(r => `- ${r.title}: ${r.description}`).join('\n')}`
+      ? `\nWeb research (use to ground the replacement in a real venue — pick from these results when they match what the traveler asked for):\n${braveResults.map(r => `- ${r.title}: ${r.description}`).join('\n')}`
       : '';
 
     try {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-      const contextClause = reason ? `\nTraveler's note: "${reason}"` : '';
-      const notesClause = notes ? `\nSaved notes: "${notes}"` : '';
-      const mealReminderClause = ['food', 'breakfast', 'lunch', 'dinner'].includes(String(activity.type || '').toLowerCase())
+      const contextClause = reasonText ? `\nReason for declining: "${reasonText}"` : '';
+      const notesClause = notesText ? `\nAdditional saved notes: "${notesText}"` : '';
+      const mealReminderClause = isMeal
         ? '\nThis is a meal activity — name a specific restaurant and include 1–2 must-order dishes in why_it_fits.'
         : '';
-      const userContent = `The traveler wants "${activity.name}" in ${activity.city}.${contextClause}${notesClause}${mealReminderClause}${braveBlock}
+      const userContent = `The traveler DECLINED "${activity.name}" in ${activity.city} and wants a different ${activityType || 'activity'}.${contextClause}${notesClause}${mealReminderClause}${braveBlock}
 
-Find the best real-world match — use the web research to ground it in an actual venue or operator, and fill in pricing, booking info, duration, and other details. If the traveler's note asks for something different, find that instead.
+Find a DIFFERENT real-world venue — NOT "${activity.name}". The replacement must directly address the reason for declining (e.g. if the reason mentions a neighborhood, the replacement must be in that neighborhood; if it mentions a cuisine or price level, match that). Use the web research to ground it in an actual venue, and fill in pricing, booking info, duration, and other details.
 
 Also extract any learnable preferences or constraints from the traveler's note. Omit if one-off or situational (e.g. "already did this", "too expensive this trip"). Preferences are specific, reusable details (e.g. "gets seasick easily"). Constraints are hard limits (e.g. "no early mornings").
 
