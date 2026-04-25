@@ -2,7 +2,7 @@ const persist = window.TravelPlannerStatePersistence.createStatePersistence();
 const overlayManager = window.TravelPlannerOverlayManager.createOverlayManager();
 
 ['prefsModal', 'checklistModal', 'budgetOptOverlay', 'addActivityModal',
- 'attachmentViewerModal', 'myTripsPanel',
+ 'attachmentViewerModal',
  'planningOverlay', 'textareaExpandModal', 'confirmDialog']
   .forEach((id) => overlayManager.register(id, () => document.getElementById(id)));
 
@@ -8023,12 +8023,12 @@ function renderMyTrips() {
   });
 
   if (!trips.length) {
-    overlayManager.close('myTripsPanel');
+    els.myTripsPanel.classList.add('hidden');
     resetToFresh();
     return;
   }
 
-  overlayManager.open('myTripsPanel');
+  els.myTripsPanel.classList.remove('hidden');
 
   els.myTripsList.innerHTML = trips.map((trip) => {
     if (trip.type === 'draft') {
