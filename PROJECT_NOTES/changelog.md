@@ -4,6 +4,17 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-25] Phase 2 backend modularization complete
+
+- `src/server.js`: 1837 → 51 lines. Now only Express setup, middleware mounts, route registrations, and `listen` guard.
+- Services extracted (`src/services/*`): `calendarIcs.js`, `imageQuery.js`, `profilePrompt.js`, `chatPrompt.js`, `distanceMatrix.js`, `arrangePrompt.js`, `tripHealthEmail.js` (plus pre-existing `bookingLinks.js`).
+- Middleware extracted (`src/middleware/*`): `auth.js`, `llmSemaphore.js`, `nominatim.js`, `attachmentUpload.js`.
+- Routes extracted (`src/routes/*`): `status.js`, `email.js`, `geocode.js`, `attachments.js`, `activities.js` (plan/activity/arrange/places), `image.js`, `commute.js`, `preferences.js` (preferences/userdata/profile/enrich), `chat.js`, `itinerary.js`, `calendar.js`. Each exports `register(app)`.
+- `shared/timeHelpers.js`: new dual-export module (CJS + browser global) for `parseTimeTo24`, `minutesFromTime`, `timeFromMinutes`, `extractTimeFromDateTime`. Replaces the duplicated copies in `public/app.js` and `src/services/distanceMatrix.js`. Wired into `planner.html` ahead of `app.js`.
+- All 82 tests pass; server boots clean after each commit; route ordering around the auth gate preserved.
+
+---
+
 ## [2026-04-24] Fix Phase 1 runtime errors found during smoke testing
 
 - `shared/arrangeBuffers.js` + `shared/arrangeArrivalBuffers.js`: wrapped each file in an IIFE to prevent `const _exports` top-level collision when both are loaded as `<script>` tags on the same page

@@ -1,26 +1,22 @@
 # Current State
 
-_Last updated: 2026-04-24_
+_Last updated: 2026-04-25_
 
 ## Objective
-Fix Phase 1 runtime errors found during testing: `_exports` redeclaration in shared scripts and `activityMapOverlay` temporal dead zone crash. Both fixed on the current feature branch.
+Phase 2 (backend modularization) is COMPLETE on `feature/repo-modularization`. `src/server.js` reduced from 1837 → 51 lines. All routes split into `src/routes/*.js`, supporting logic into `src/services/*.js` and `src/middleware/*.js`. Time helpers consolidated into `shared/timeHelpers.js` (used by both server and browser).
 
 ## Active Workstream
-Phase 1 smoke-testing. Two bugs fixed:
-1. `shared/arrangeBuffers.js` and `shared/arrangeArrivalBuffers.js` — both declared `const _exports` at top-level global script scope; collision when both `<script>` tags loaded. Wrapped each in an IIFE.
-2. `public/app.js` — `overlayManager.register('activityMapOverlay', ...)` was called at line 8 before `let activityMapOverlay` was declared at line 248 (temporal dead zone). Moved register call to immediately after the declaration.
+Paused at the Phase 2 → Phase 3 boundary for user review (per cleanup plan §Decisions #5).
 
 ## Constraints
 - No database — flat JSON files
-- All `/api/*` route paths must remain stable through the cleanup
-- Server now exports app; `listen` guarded by `require.main === module`
-- Client-side shared modules live in `/shared/` and are served via `app.use('/shared', express.static(...))`
+- All `/api/*` route paths preserved exactly through Phase 2
+- Auth-gate ordering preserved: status, email/inbound, geocode mount BEFORE `app.use('/api', requireConfiguredAuth)`; everything else after
+- 82/82 tests passing after every commit
 
 ## Risks
-- Profile icon missing — likely collateral damage from the `_exports` crash halting app.js execution; should resolve with the fixes. If still missing after deploy, needs separate investigation.
-- Phase 2 will reorder middleware around the auth gate — smoke harness is the primary regression net
+- Phase 3 will split `public/app.js` (8700+ LOC) into feature modules — highest-risk phase due to state coupling and drag/drop event handlers
 
 ## Next Actions
-- Deploy and verify: confirm no console errors, profile icon visible, all 11 overlays functional
-- If profile icon still missing after fixes, trace separately
-- On smoke pass, begin Phase 2 (backend modularization)
+- User review of Phase 2 commits + manual smoke (steps 1-5, chat, checklist, auto-arrange, calendar export, attachment upload)
+- On approval, begin Phase 3 (frontend modularization), starting with `public/js/activityCard.js`
