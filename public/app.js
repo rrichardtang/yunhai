@@ -2798,13 +2798,8 @@ function addCityRow(city = { id: uid(), name: '', startDate: '', endDate: '', le
 }
 
 
-function extractTimeFromDateTime(dateTime = '') {
-  const text = String(dateTime || '');
-  if (!text.includes('T')) return '';
-  const [, timePart] = text.split('T');
-  const match = String(timePart || '').match(/^(\d{2}:\d{2})/);
-  return match ? match[1] : '';
-}
+// extractTimeFromDateTime, parseTimeTo24, minutesFromTime, timeFromMinutes
+// are loaded from /shared/timeHelpers.js via planner.html
 
 function getPrimaryCity() {
   return state.cities[0] || null;
@@ -4998,32 +4993,7 @@ function formatDuration(hours = 1) {
   return `${Number(hours || 1)}h`;
 }
 
-function parseTimeTo24(raw = '') {
-  if (!raw) return '09:00';
-  const t = raw.trim().toLowerCase();
-  const m = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
-  if (!m) return '09:00';
-  let h = Number(m[1]);
-  const min = Number(m[2] || '0');
-  const ap = m[3];
-  if (ap === 'pm' && h < 12) h += 12;
-  if (ap === 'am' && h === 12) h = 0;
-  h = Math.max(0, Math.min(23, h));
-  const mm = String(Math.max(0, Math.min(59, min))).padStart(2, '0');
-  return `${String(h).padStart(2, '0')}:${mm}`;
-}
-
-function minutesFromTime(time = '09:00') {
-  const [h, m] = String(time).split(':').map((n) => Number(n || 0));
-  return (h * 60) + m;
-}
-
-function timeFromMinutes(totalMinutes = 0) {
-  const clamped = Math.max(0, Math.min((24 * 60) - 1, Number(totalMinutes || 0)));
-  const h = Math.floor(clamped / 60);
-  const m = clamped % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
+// parseTimeTo24, minutesFromTime, timeFromMinutes provided by /shared/timeHelpers.js
 
 function commutePairKey(fromId, toId) {
   return `${fromId}->${toId}`;

@@ -4,6 +4,15 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-04-25] Consolidated time helpers into shared/timeHelpers.js
+
+**Decision:** Both client (`public/app.js`) and server (`src/services/distanceMatrix.js`) now import `parseTimeTo24`, `minutesFromTime`, `timeFromMinutes`, `extractTimeFromDateTime` from `shared/timeHelpers.js`. The server-side function name `parseMinutesFromTime` is preserved at the call site via a local rename (`{ minutesFromTime: parseMinutesFromTime }`).
+**Reasoning:** Eliminate the silent client/server divergence the plan flagged. Client-side `minutesFromTime` previously had no input validation (NaN propagated); server-side `parseMinutesFromTime` defaulted to `9 * 60` on bad input. Adopted server semantics as canonical because they're stricter and the only test coverage relies on them.
+**Alternatives rejected:** (a) Keep two copies, document drift in `decisions.md` only — rejected because the next bug here would still be silent. (b) Pull `parseTimeString` from `shared/activityMigration.js` into the same file — deferred; that helper has different semantics (returns `null` on empty input, not a default) and only one caller, so consolidation adds no value.
+**Tradeoffs:** Client now requires `shared/timeHelpers.js` to load before `app.js` (added the script tag in `planner.html`, ahead of `activityMigration.js` which doesn't depend on it). Any caller passing literal numbers as time strings will now hit the strict validator and get `9 * 60` back instead of NaN; this is the intended behavior.
+
+---
+
 ## [2026-04-20] Duplicate buffer tables in src/ and public/js/
 
 **Decision:** Buffer values are defined twice — `src/arrangeBuffers.js` (CommonJS for server-side tests) and `public/js/arrangeBuffers.js` (plain script for the browser). No build step, no shared module system.
