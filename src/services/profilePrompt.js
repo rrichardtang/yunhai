@@ -9,7 +9,7 @@ function sliderInterestLabel(value) {
 
 function formatProfileForEnrichment(profile = {}) {
   const answers = profile?.answers && typeof profile.answers === 'object' ? profile.answers : {};
-  const questionMap = [
+  const sliderQuestions = [
     ['museumPerson', 'Museum person'],
     ['foodTravel', 'Travels for food'],
     ['livePerformances', 'Live performances'],
@@ -17,11 +17,22 @@ function formatProfileForEnrichment(profile = {}) {
     ['nightlifeBars', 'Nightlife and bars'],
     ['structuredTours', 'Structured tours']
   ];
+  const textQuestions = [
+    ['dayStructure', 'Day structure'],
+    ['dietaryRestrictions', 'Dietary restrictions'],
+    ['mobilityConsiderations', 'Mobility considerations'],
+    ['budgetStyle', 'Budget style'],
+    ['travelCompanions', 'Travel companions']
+  ];
   const paceLabels = { 1: 'Very relaxed', 2: 'Easy-going', 3: 'Moderate', 4: 'Active', 5: 'Non-stop' };
 
-  const lines = questionMap.map(([key, label]) => `- ${label}: ${sliderInterestLabel(answers[key])}`);
+  const lines = sliderQuestions.map(([key, label]) => `- ${label}: ${sliderInterestLabel(answers[key])}`);
   const paceValue = Math.max(1, Math.min(5, Math.round(Number(answers.pace) || 3)));
   lines.push(`- Trip pace: ${paceLabels[paceValue]}`);
+  for (const [key, label] of textQuestions) {
+    const value = String(answers[key] || '').trim();
+    if (value) lines.push(`- ${label}: ${value}`);
+  }
   const aboutMe = String(profile?.aboutMe || '').trim() || '(none provided)';
   return `${lines.join('\n')}\n- About me: ${aboutMe}`;
 }
