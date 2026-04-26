@@ -1080,7 +1080,11 @@ function buildChecklistFromState() {
   const activityIds = new Set((state.activities || []).map((a) => a.id));
   const existing = (Array.isArray(state.bookingChecklist) ? state.bookingChecklist : [])
     .map(normalizeChecklistItem)
-    .filter((item) => item.type !== 'activity' || !item.activityId || activityIds.has(item.activityId));
+    .filter((item) => {
+      if (item.type !== 'activity' || !item.activityId) return true;
+      if (!activityIds.has(item.activityId)) return false;
+      return state.reviewed[item.activityId]?.approved !== false;
+    });
 
   // Key by type + primary location + primary date to avoid duplicates
   const keyOf = (item) => {
@@ -5483,6 +5487,15 @@ async function autoArrangeActiveCity(opts = {}) {
     state.placements[a.id] = { ...(state.placements[a.id] || {}), dayId: null, time: null };
   });
 
+  // Clear stale placements for declined / unreviewed activities in this city
+  state.activities.forEach((a) => {
+    if (!cityMatches(a.city, activeCity)) return;
+    if (state.reviewed[a.id]?.approved === true) return;
+    if (state.placements[a.id]?.dayId) {
+      state.placements[a.id] = { dayId: null, time: null };
+    }
+  });
+
   // If all activities are locked, skip the LLM call and apply locks directly
   if (finalize && flexible.length === 0) {
     const dateToDay = Object.fromEntries(activeDays.map((d) => [d.date, d]));
@@ -5566,6 +5579,18 @@ async function autoArrangeActiveCity(opts = {}) {
       const a = flexible.find((x) => x.id === u.id);
       return a ? `${a.name}: unplaced — ${u.reason}` : null;
     }).filter(Boolean);
+
+    // Validate flexible placements: drop any that overlap a lock or fall outside the day window
+    const lockedIds = new Set(lockedSet.map((e) => String(e.activity.id)));
+    flexible.forEach((a) => {
+      if (lockedIds.has(String(a.id))) return;
+      const placement = state.placements[a.id];
+      if (!placement?.dayId) return;
+      if (hasOverlapInDay(a.id, placement.dayId, placement)) {
+        state.placements[a.id] = { dayId: null, time: null };
+        state.arrangeDiagnostics[activeCity].push(`${a.name}: unplaced — overlapped a locked activity or fell outside the day window`);
+      }
+    });
   } catch (e) {
     showToast(e?.message || 'Failed to arrange activities.', 'error');
   } finally {
