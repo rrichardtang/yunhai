@@ -1,6 +1,40 @@
 const { getCommuteBetweenActivities } = require('../services/distanceMatrix');
 
 function register(app) {
+  app.post('/api/commute-matrix', async (req, res) => {
+    try {
+      const activities = Array.isArray(req.body?.activities) ? req.body.activities : [];
+      const matrix = {};
+      if (activities.length < 2) return res.json({ matrix });
+
+      const pairs = [];
+      for (let i = 0; i < activities.length; i += 1) {
+        for (let j = 0; j < activities.length; j += 1) {
+          if (i === j) continue;
+          pairs.push([activities[i], activities[j]]);
+        }
+      }
+
+      const CONCURRENCY = 6;
+      for (let i = 0; i < pairs.length; i += CONCURRENCY) {
+        const slice = pairs.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(slice.map(async ([from, to]) => {
+          const commute = await getCommuteBetweenActivities(from, to);
+          return { fromId: from.id, toId: to.id, minutes: commute.durationMinutes };
+        }));
+        for (const r of results) {
+          if (!Number.isFinite(r.minutes)) continue;
+          if (!matrix[r.fromId]) matrix[r.fromId] = {};
+          matrix[r.fromId][r.toId] = r.minutes;
+        }
+      }
+
+      return res.json({ matrix });
+    } catch {
+      return res.json({ matrix: {} });
+    }
+  });
+
   app.post('/api/commute', async (req, res) => {
     try {
       const activities = Array.isArray(req.body?.activities) ? req.body.activities : [];

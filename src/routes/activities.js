@@ -16,7 +16,9 @@ const {
 const { search, isConfigured: isBraveConfigured, shouldUseBrave } = require('../braveSearch');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('../arrangeConfig');
 const { buildBookingLinks } = require('../services/bookingLinks');
-const { buildArrangePrompt } = require('../services/arrangePrompt');
+const { buildHybridArrangePrompt, buildRepairPrompt } = require('../services/arrangePromptHybrid');
+const { assignTimes } = require('../arrangeTimeAssigner');
+const { validate: validateArrangement } = require('../arrangeValidator');
 const { buildCityTravelTiming } = require('../services/distanceMatrix');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
@@ -257,44 +259,105 @@ Return ONLY valid JSON (no markdown fences):
       return res.status(503).json({ error: 'Anthropic API key not configured' });
     }
 
-    const { days, activities, lockedActivities, profile, budget, numTravelers, numChildren, approvedCostTotal } = req.body || {};
+    const { days, activities, lockedActivities, commuteMatrix, profile, numTravelers, numChildren } = req.body || {};
     if (!Array.isArray(days) || !Array.isArray(activities)) {
       return res.status(400).json({ error: 'days and activities are required arrays' });
     }
     const resolvedLocked = Array.isArray(lockedActivities) ? lockedActivities : [];
+    const lockedIdSet = new Set(resolvedLocked.map((l) => String(l.id)));
+    const flexible = activities.filter((a) => !lockedIdSet.has(String(a.id)));
+
+    if (flexible.length === 0) {
+      return res.json({ placements: {}, unplaced: [], diagnostics: [] });
+    }
+
     const userId = parseUserId(getAuthedUserId(req));
     const prefSummary = getPreferenceSummary(userId);
+    const activitiesById = Object.fromEntries(flexible.map((a) => [String(a.id), a]));
+    const matrix = commuteMatrix && typeof commuteMatrix === 'object' ? commuteMatrix : {};
 
-    const prompt = buildArrangePrompt({
-      days,
-      activities,
-      lockedActivities: resolvedLocked,
-      profile,
-      prefSummary,
-      budget,
-      numTravelers,
-      numChildren,
-      approvedCostTotal
-    });
-
-    try {
+    async function callClaudeForJson(prompt) {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const response = await anthropic.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 2048,
         messages: [{ role: 'user', content: prompt }]
       });
-
       const raw = extractText(response.content);
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return res.status(500).json({ error: 'Failed to parse arrangement' });
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('Failed to parse arrangement JSON');
+      return JSON.parse(match[0]);
+    }
 
-      const result = JSON.parse(jsonMatch[0]);
-      const lockedIdSet = new Set(resolvedLocked.map((l) => String(l.id)));
-      for (const id of lockedIdSet) {
-        if (result.placements && result.placements[id]) delete result.placements[id];
+    function sanitizeDayPlans(parsed) {
+      const dayPlans = Array.isArray(parsed?.day_plans) ? parsed.day_plans : [];
+      const seen = new Set();
+      const cleaned = dayPlans.map((p) => {
+        const ids = Array.isArray(p?.ordered_ids) ? p.ordered_ids : [];
+        const ordered = [];
+        for (const rawId of ids) {
+          const id = String(rawId);
+          if (lockedIdSet.has(id)) continue;
+          if (!activitiesById[id]) continue;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          ordered.push(id);
+        }
+        return { date: p?.date, ordered_ids: ordered };
+      });
+      const unplaced = Array.isArray(parsed?.unplaced) ? parsed.unplaced.filter((u) => activitiesById[String(u?.id)]) : [];
+      return { dayPlans: cleaned, unplaced, seen };
+    }
+
+    try {
+      const prompt = buildHybridArrangePrompt({
+        days,
+        flexible,
+        locked: resolvedLocked,
+        profile,
+        prefSummary,
+        numTravelers,
+        numChildren
+      });
+      const parsed = await callClaudeForJson(prompt);
+      const { dayPlans, unplaced: llmUnplaced } = sanitizeDayPlans(parsed);
+
+      const ctx = { days, activitiesById, lockedActivities: resolvedLocked, commuteMatrix: matrix };
+      let assigned = assignTimes({ ...ctx, dayPlans });
+      let v = validateArrangement({
+        placements: assigned.placements,
+        lockedActivities: resolvedLocked,
+        days,
+        activitiesById
+      });
+
+      if (!v.ok) {
+        try {
+          const repairPrompt = buildRepairPrompt({ dayPlans, issues: v.issues });
+          const repaired = await callClaudeForJson(repairPrompt);
+          const { dayPlans: repairedPlans, unplaced: repairedUnplaced } = sanitizeDayPlans(repaired);
+          const reAssigned = assignTimes({ ...ctx, dayPlans: repairedPlans });
+          const v2 = validateArrangement({
+            placements: reAssigned.placements,
+            lockedActivities: resolvedLocked,
+            days,
+            activitiesById
+          });
+          assigned = {
+            placements: reAssigned.placements,
+            unplaced: [...reAssigned.unplaced, ...repairedUnplaced]
+          };
+          v = v2;
+        } catch (repairErr) {
+          console.warn('[arrange] repair pass failed:', repairErr.message);
+        }
       }
-      return res.json(result);
+
+      return res.json({
+        placements: assigned.placements,
+        unplaced: [...assigned.unplaced, ...llmUnplaced],
+        diagnostics: v.ok ? [] : v.issues.map((i) => i.message)
+      });
     } catch (error) {
       return res.status(500).json({ error: error.message || 'Failed to arrange activities' });
     }

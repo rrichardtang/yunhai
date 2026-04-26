@@ -4,6 +4,18 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-26] Phase 4 — Hybrid arrange scheduler
+
+- New: `src/arrangeConstants.js` (MIN_BUFFER_BETWEEN, DEFAULT_COMMUTE_MIN, MEAL_BANDS).
+- New: `src/arrangeTimeAssigner.js` — deterministic time assignment from per-day `ordered_ids`. Handles opening hours, meal bands, locked occupied intervals, commute matrix lookups, day window bounds.
+- New: `src/arrangeValidator.js` — validates overlaps, lock overlaps, day window, meal cap (≤1 per breakfast/lunch/dinner), non-meal category cap (≤2).
+- New: `src/services/arrangePromptHybrid.js` — `buildHybridArrangePrompt` (ordered_ids only, no times) + `buildRepairPrompt`.
+- New: `POST /api/commute-matrix` in `src/routes/commute.js` — N×N matrix using existing `getCommuteBetweenActivities`, batched concurrency 6.
+- Rewrote `POST /api/arrange` in `src/routes/activities.js` to hybrid flow: build prompt → Claude → sanitize → assignTimes → validate → single repair pass on failure → respond with `{placements, unplaced, diagnostics}`.
+- Client (`public/app.js`): `autoArrangeActiveCity` now POSTs to `/api/commute-matrix` first, includes the matrix in the `/api/arrange` body, and surfaces `diagnostics` alongside `unplaced`.
+- Tests: `arrangeTimeAssigner.test.js` (12 cases), `arrangeValidator.test.js` (6 cases). 99/99 pass.
+- CLAUDE.md updated: trust-the-LLM-for-scheduling decision replaced with hybrid-scheduling description.
+
 ## [2026-04-25] Fix six booking-checklist and arrange-step bugs
 
 - **Location revert**: `buildChecklistFromState` was unconditionally overwriting `activityLocation` with the derived value on every rebuild. Fixed with `items[idx].activityLocation || item.activityLocation` to preserve user edits.

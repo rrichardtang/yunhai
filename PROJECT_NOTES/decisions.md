@@ -143,3 +143,20 @@ Append-only. Records permanent architectural and design decisions.
 **Reasoning:** "Confidence" was overloaded — it described both the user's booking-readiness checklist AND the system's derived health report. Two unrelated objects with different shapes shared one name, which made the codebase confusing (e.g. `state.confidence` was the report; `state.confidenceChecklist` was the user's data). The new names accurately describe each concept and match the existing UI step "Trip Health".
 **Alternatives rejected:** Keep one name and disambiguate by prefix only — rejected because the two objects have different lifecycles (stored vs. derived) and conflating them invited the original confusion. Migration shim — rejected per debug-mode policy (no production data to preserve).
 **Tradeoffs:** Any in-the-wild itinerary records with the old `itinerary.confidence` field will silently lose their checklist on next save. Acceptable per debug-mode policy. CSS file rename means any cached browser stylesheet may 404 once until next deploy.
+
+## [2026-04-26] Hybrid scheduling: LLM orders, code assigns times
+
+**Decision:** `/api/arrange` uses a two-stage pipeline. Claude returns `{day_plans:[{date, ordered_ids}], unplaced}` with NO times. `src/arrangeTimeAssigner.js` walks each day's ordered list and assigns concrete times deterministically using opening hours, meal bands, locked occupied intervals, day windows, and a commute matrix. `src/arrangeValidator.js` then checks overlaps, caps, and window bounds. On failure, a single repair prompt asks Claude to reorder; second result is returned regardless with diagnostics.
+
+**Reasoning:** Previous "trust the LLM for scheduling" approach produced category-clustering bugs (multiple lunches, three museums in a row), overlaps when locks were dense, and window-overflow when the model misjudged duration. Splitting concerns lets the LLM focus on what it's good at (semantic ordering, geography clustering, day flow) and gives deterministic guarantees on what it's bad at (arithmetic, time bounds).
+
+**Alternatives rejected:**
+- Pure rule-based scheduler: loses LLM's clustering/flow intelligence.
+- Multi-attempt LLM loop with no deterministic floor: expensive, still non-deterministic, doesn't actually fix the cap violations.
+- Add post-LLM mutation (shift activities to fix overlaps): hides the underlying bug and produces unpredictable results.
+
+**Tradeoffs:**
+- Two LLM round-trips on validation failure (cost + latency).
+- Meal type is inferred from `inferCategory` regex, not an explicit field — fragile if naming conventions drift.
+- Commute matrix call adds N×N Distance Matrix queries per arrange; capped at concurrency 6 to limit Google API burst.
+- Old `src/services/arrangePrompt.js` no longer used — kept as artifact until cutover smoke test passes.
