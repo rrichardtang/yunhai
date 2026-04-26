@@ -13,8 +13,10 @@ function activityLine(a) {
   const loc = isNew ? a.location?.address : a.start_location;
   const bookingType = isNew ? (a.booking?.type || 'none') : (a.booking_type || 'none');
   const earlyMins = showUpEarlyMins(bookingType);
+  const intensity = isNew ? a.experience?.intensity : a.intensity;
 
   const parts = [`id:${id}`, `"${name}"`, cat, `${dur}min`];
+  if (intensity) parts.push(`intensity:${intensity}`);
   if (hours) parts.push(`hours:${hours}`);
   if (preferred) parts.push(`preferred:${preferred}`);
   if (loc) parts.push(`at:${loc}`);
@@ -98,6 +100,8 @@ H5. If an activity cannot fit any day without breaking a hard constraint, put it
 SOFT CONSTRAINTS (optimize; relax only if a hard constraint forces it):
 S1. Cluster by geography — group nearby activities on the same day.
 S2. Alternate intensity — avoid two long/heavy activities back-to-back; interleave with lighter ones.
+    When intensity is provided, never schedule two consecutive 'high' activities; pair a 'high' with
+    a neighboring 'low' or 'medium' when possible.
 S3. Day flow: breakfast first if present; dinner last if present; lunch around midday;
     major highlights in the late morning or early afternoon.
 S4. Honor pace preference: ${paceDesc}.

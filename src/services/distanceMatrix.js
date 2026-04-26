@@ -1,3 +1,5 @@
+const commuteCache = require('./commuteCache');
+
 const DISTANCE_MATRIX_BASE_URL = 'https://maps.googleapis.com/maps/api/distancematrix/json';
 const COMMUTE_MODE_ICON = {
   transit: '🚇',
@@ -242,6 +244,9 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) return null;
 
+  const cached = commuteCache.get(origin, destination, mode);
+  if (cached != null) return cached;
+
   const params = new URLSearchParams({
     origins: origin,
     destinations: destination,
@@ -264,7 +269,9 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
   const durationSeconds = Number(element?.duration?.value || 0);
   if (!durationSeconds) return null;
 
-  return Math.max(1, Math.round(durationSeconds / 60));
+  const minutes = Math.max(1, Math.round(durationSeconds / 60));
+  commuteCache.set(origin, destination, mode, minutes);
+  return minutes;
 }
 
 async function getCommuteBetweenActivities(fromActivity, toActivity) {
