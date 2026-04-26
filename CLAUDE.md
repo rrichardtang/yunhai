@@ -82,7 +82,7 @@ All persistence is flat JSON files — no database:
 ## Key Architectural Decisions
 
 - **Flat JSON only**: No database. Atomic writes with temp-file pattern. Sufficient to ~100 concurrent users; beyond that needs Redis + job queue.
-- **Trust the LLM for scheduling**: Auto-arrange passes commute times and activity constraints to Claude and uses its output directly — no hardcoded post-processing.
+- **Hybrid scheduling for auto-arrange**: `/api/arrange` splits into LLM-driven ordering and deterministic time assignment. Claude returns per-day `ordered_ids` only; `src/arrangeTimeAssigner.js` computes concrete times using opening hours, commute matrix, day windows, and meal bands; `src/arrangeValidator.js` verifies overlaps, caps, and window bounds. A single repair prompt runs if validation fails, then the result is returned regardless with diagnostics. Locked activities bypass the LLM entirely and are merged client-side.
 - **Minimal frontend split**: Only boundary concerns (overlayManager, apiService, statePersistence) were extracted from `app.js`. Keep the rest in the monolith.
 - **Per-trip chat sessions**: Chat context is keyed by itinerary ID so state doesn't bleed between trips.
 - **AI summary regeneration**: Only regenerate `profileInstruction` on profile answer/aboutMe changes — not on manual edits to the summary textarea.

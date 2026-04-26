@@ -5557,6 +5557,23 @@ async function autoArrangeActiveCity(opts = {}) {
       };
     });
 
+    let commuteMatrix = {};
+    if (flexible.length >= 2) {
+      try {
+        const matrixRes = await apiFetch('/api/commute-matrix', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activities: flexible })
+        });
+        if (matrixRes.ok) {
+          const data = await matrixRes.json();
+          commuteMatrix = data?.matrix || {};
+        }
+      } catch {
+        commuteMatrix = {};
+      }
+    }
+
     const res = await apiFetch('/api/arrange', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5567,17 +5584,16 @@ async function autoArrangeActiveCity(opts = {}) {
           return notes ? { ...a, user_notes: notes } : a;
         }),
         lockedActivities,
+        commuteMatrix,
         userId: ensureUserId(),
         profile: getProfilePayload(),
-        budget: state.tripBudget,
         numTravelers: state.numTravelers,
-        numChildren: state.numChildren,
-        approvedCostTotal: computeApprovedCost(allApprovedInCity)
+        numChildren: state.numChildren
       })
     });
 
     if (!res.ok) throw new Error('Arrange request failed');
-    const { placements, unplaced = [] } = await res.json();
+    const { placements, unplaced = [], diagnostics = [] } = await res.json();
 
     const dateToDay = Object.fromEntries(activeDays.map((d) => [d.date, d]));
     for (const [id, placement] of Object.entries(placements || {})) {
@@ -5605,10 +5621,13 @@ async function autoArrangeActiveCity(opts = {}) {
       if (day) state.placements[entry.activity.id] = { dayId: day.id, time: entry.time };
     }
 
-    state.arrangeDiagnostics[activeCity] = unplaced.map((u) => {
-      const a = flexible.find((x) => x.id === u.id);
-      return a ? `${a.name}: unplaced — ${u.reason}` : null;
-    }).filter(Boolean);
+    state.arrangeDiagnostics[activeCity] = [
+      ...unplaced.map((u) => {
+        const a = flexible.find((x) => x.id === u.id);
+        return a ? `${a.name}: unplaced — ${u.reason}` : null;
+      }).filter(Boolean),
+      ...diagnostics
+    ];
 
     // Validate flexible placements: drop any that overlap a lock or fall outside the day window
     const lockedIds = new Set(lockedSet.map((e) => String(e.activity.id)));
