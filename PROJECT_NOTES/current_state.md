@@ -3,15 +3,15 @@
 _Last updated: 2026-04-25_
 
 ## Objective
-Phase 3 (frontend modularization) is COMPLETE on `feature/repo-modularization`. `public/app.js` reduced from 8738 → 8028 LOC across six extracted modules: `activityCard.js`, `bookingChecklist.js`, `cityPlanner.js`, `profileWizard.js`, `arrangeView.js`, plus the prior `overlayManager.js` / `statePersistence.js`. Pure helpers extracted; DOM-rendering and state-mutating orchestration intentionally kept in `app.js` to avoid coupling bleed.
+Phase 3 (frontend modularization) is COMPLETE on `feature/repo-modularization`. All six modules extracted. Six booking-checklist and arrange-step bugs fixed this session.
 
 ## Active Workstream
-Paused for user smoke test of arrange step (drag/drop, commute pills, auto-arrange, finalize modal).
+Pending user smoke test of Step 3 (Arrange): drag/drop, commute pills, auto-arrange, finalize modal.
 
 ## Constraints
 - No database — flat JSON files
 - All `/api/*` route paths preserved
-- `tripHealthView.js` extraction skipped (not extracted in any prior session) — implementations remain in `app.js`. Optional follow-up.
+- `tripHealthView.js` extraction skipped — implementations remain in `app.js`. Optional follow-up.
 - 82/82 tests passing
 
 ## Risks

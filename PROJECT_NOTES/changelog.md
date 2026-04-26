@@ -4,6 +4,18 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-25] Fix six booking-checklist and arrange-step bugs
+
+- **Location revert**: `buildChecklistFromState` was unconditionally overwriting `activityLocation` with the derived value on every rebuild. Fixed with `items[idx].activityLocation || item.activityLocation` to preserve user edits.
+- **Price not saving**: Same root cause — `budgetUsd` was overwritten on every rebuild. Fixed with `items[idx].budgetUsd ?? activityEstimatedCost` so user-entered prices survive rebuilds.
+- **Declined items in checklist**: `buildChecklistFromState` included all approved activities but never filtered out ones subsequently declined. Fixed by adding `.filter` that removes items where `state.reviewed[id]?.approved === false`; `renderArrange` also clears `state.placements[id]` immediately on decline.
+- **Finalize overlap**: After lock override pass, LLM could still place flexible activities overlapping locked ones. Fixed by running `hasOverlapInDay` on each flexible placement after locks are applied and bumping conflicting ones.
+- **Cross-city placement (Granada in Seville)**: `renderArrange` matched `placement.dayId === d.id` without a city check, allowing an activity assigned to Granada to render in Seville's column. Fixed with `cityMatches(a.city, d.city)` guard; `autoArrangeActiveCity` also sweeps and clears cross-city placements on entry.
+- **City date order**: Booking checklist groups and the Review step city-filter dropdown were sorted alphabetically. Both now use `state.cities` index order (trip date order).
+- Files: `public/app.js`
+
+---
+
 ## [2026-04-25] Phase 3 frontend modularization — arrangeView extracted (final module)
 
 - `public/js/arrangeView.js`: new module (230 LOC). Holds pure helpers and constants for the arrange step: `DAY_START_HOUR/END/PX_PER_HOUR/GRID_HEIGHT`, `DEFAULT_ARRANGE_CATEGORY_CONFIG`, `COMMUTE_MODE_ORDER/LABEL`, `expandDays`, `daysMatchCities`, `getArrangeCategoryDefaults`, `inferActivityCategory`, `parseDurationHoursFromText`, `normalizeActivityMetadata`, `parseOpeningWindows`, `formatDuration`, `formatDurationHoursLong`, `formatTypeLabel`, `commutePairKey`, `resolveSelectedCommuteMode/Details`, `formatCommuteBadge`, `normalizeCommuteStateMap`, `timeFromY`, `yFromTime`, `rangesOverlap`, `citySlug`, `logistics*Id` builders.
