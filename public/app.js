@@ -1131,7 +1131,7 @@ function buildChecklistFromState() {
         activityLocation: items[idx].activityLocation || item.activityLocation,
         activityDate: item.activityDate,
         activityTime: item.activityTime,
-        budgetUsd: activityEstimatedCost,
+        budgetUsd: items[idx].budgetUsd ?? activityEstimatedCost,
         notes
       });
       existingKeys.add(keyOf(items[idx]));
