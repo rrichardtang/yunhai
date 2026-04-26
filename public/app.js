@@ -6049,6 +6049,7 @@ function getItineraryRows() {
       const notes = String(state.reviewed[activity.id]?.notes || '').trim();
       const referenceNum = getActivityReferenceNum(activity.id);
 
+      const priceTier = Number.isInteger(activity.price_tier) ? activity.price_tier : null;
       return {
         id: activity.id,
         date: day.date,
@@ -6060,6 +6061,7 @@ function getItineraryRows() {
         notes,
         referenceNum,
         navigateHref,
+        priceTier,
         fileCount: getItemAttachments(activity.id).length
       };
     })
@@ -6292,7 +6294,7 @@ function renderItineraryItemCard(row) {
         <h3 class="itinerary-title">${esc(row.title)}</h3>
         <time class="itinerary-time">${esc(row.timeLabel || '')}</time>
       </header>
-      ${row.location ? `<div class="itinerary-subtitle">${esc(row.location)}</div>` : ''}
+      ${row.location || row.priceTier ? `<div class="itinerary-subtitle">${esc(row.location || '')}${row.priceTier ? `${row.location ? ' · ' : ''}<span class="itinerary-price-tier">${'$'.repeat(row.priceTier)}</span>` : ''}</div>` : ''}
       ${row.notes ? `<p class="itinerary-notes">${esc(row.notes)}</p>` : ''}
       <div class="itinerary-reference${hasRef ? ' has-value' : ''}">
         <i class="ph-bold ph-ticket" aria-hidden="true"></i>

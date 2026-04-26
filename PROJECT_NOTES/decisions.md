@@ -4,6 +4,22 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-04-27] Validator enforces physics only, not taste
+
+**Decision:** The arrange validator (`src/arrangeValidator.js`) checks only mechanical/structural rules: overlap with buffer, lock overlap, day-window, opening hours. Removed `meal_cap` (≤1 of each meal type) and `category_cap` (≤2 of any non-meal category) — those are judgment calls, not physical constraints.
+**Reasoning:** The hybrid arrange split (LLM picks order, JS picks times) was severing the LLM's ability to act on semantic intent like "sunset drinks" or "no two food events back-to-back." Pulling the LLM back into time-selection meant the validator's job needed to shrink to match. Modern Sonnet won't schedule three museums in a row; rules-as-validator was scaffolding for a problem that no longer exists. Each rule we remove from the validator is a rule the user no longer has to fight when their intent doesn't fit the rule (e.g. a planned tapas + dinner pairing is now allowed; the LLM can use judgment).
+**Alternatives rejected:** (a) Keep the caps as soft warnings — rejected, would still surface as `diagnostics` and confuse users. (b) Move caps into the prompt as guidance — also rejected; they were not adding value at the prompt layer either, since Sonnet already paces well.
+**Tradeoffs:** If we ever swap to a weaker/cheaper model, the safety net for "3 museums in a row" outputs is gone — would need to be added back as prompt guidance, not as validator rules. Accepted.
+
+## [2026-04-27] Restaurant price tiers come from Google Places, not LLM cost guesses
+
+**Decision:** `price_tier` (1–4 → `$`–`$$$$`) is sourced from Google Places API Text Search `priceLevel` field, cached in `data/places-cache.json` keyed by `name|city`. Enrichment runs once per food activity inside `planCity`.
+**Reasoning:** Cost-bucket thresholds derived from `estimated_cost_usd` (itself an LLM guess) compound error. Places `priceLevel` is grounded ground truth and uses the same `GOOGLE_MAPS_API_KEY` already configured for Distance Matrix — no new credential, no new vendor. Caching keeps marginal cost near zero ($0.32 per ~10 unique restaurants, then free on re-plans).
+**Alternatives rejected:** (a) Threshold-derive from `estimated_cost_usd` — rejected because it inherits the LLM's cost guess and would feel inconsistent (Casa Lucio bucketed by an LLM number rather than what diners actually pay). (b) Have Claude emit `price_tier` directly — rejected because it's another LLM-judgment field that would drift across plans for the same restaurant.
+**Tradeoffs:** Generic activity names ("Tapas Crawl", "Street food walk") won't match a real Place and silently render without a tier. Acceptable — empty subtitle suffix is better than a wrong $$$.
+
+---
+
 ## [2026-04-25] Consolidated time helpers into shared/timeHelpers.js
 
 **Decision:** Both client (`public/app.js`) and server (`src/services/distanceMatrix.js`) now import `parseTimeTo24`, `minutesFromTime`, `timeFromMinutes`, `extractTimeFromDateTime` from `shared/timeHelpers.js`. The server-side function name `parseMinutesFromTime` is preserved at the call site via a local rename (`{ minutesFromTime: parseMinutesFromTime }`).

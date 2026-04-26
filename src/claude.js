@@ -2,6 +2,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { getSummary } = require('./preferences');
 const { inferCategory, getCategoryDefaults } = require('./arrangeConfig');
 const { searchCityActivities, searchTopRestaurants } = require('./braveSearch');
+const { enrichWithPriceLevel } = require('./services/placesEnrich');
 const { isLegacyActivity, migrateActivity, parseTimeString, parseDurationToMinutes, inferMealType } = require('../shared/activityMigration');
 
 const MODEL = 'claude-sonnet-4-6';
@@ -350,6 +351,19 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   const pace = Math.max(1, Math.min(5, Math.round(Number(profile?.answers?.pace) || 3)));
   const paceLabels = { 1: 'very relaxed', 2: 'easy-going', 3: 'moderate', 4: 'active', 5: 'non-stop' };
   const paceDesc = paceLabels[pace];
+  const nonMealPerDayByPace = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6 };
+  const nonMealPerDay = nonMealPerDayByPace[pace];
+
+  const tripDays = (() => {
+    if (!startDate || !endDate) return 1;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diff = Math.round((end - start) / 86400000) + 1;
+    return Number.isFinite(diff) && diff > 0 ? diff : 1;
+  })();
+  const minNonMeal = nonMealPerDay * tripDays;
+  const minMeals = 3 * tripDays;
+  const minTotal = minNonMeal + minMeals;
 
   const [webResearch, restaurantResearch] = await Promise.all([
     searchCityActivities(name),
@@ -375,7 +389,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
       }\n\nNew activities must: (1) not overlap with the above time blocks, (2) not duplicate any of the above venues, cuisines, or experience types, (3) complement the locked set rather than replace it.`
     : '';
 
-  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace. Generate a number of activities proportional to the length of stay and their pace preference — fewer for relaxed travelers, more for active ones. Use accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Respect the computed time windows exactly on arrival/departure/transfer days. Be concise.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}\n\nReturn JSON only.`;
+  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace.\n\nMANDATORY ACTIVITY COUNT — this is a hard floor, not a target. Generate AT LEAST ${minTotal} activities total for this ${tripDays}-day stay: ${minNonMeal} non-meal activities (${nonMealPerDay} per day) PLUS ${minMeals} meals (1 breakfast + 1 lunch + 1 dinner per day). Meals count as activities and MUST be included as separate items with named restaurants. Skip meals whose natural time falls outside the day's available window (e.g. no breakfast on a 3pm arrival, no dinner on a 10am departure) — each skipped meal reduces the floor by 1. You may exceed the floor; you may NOT go below it otherwise. Arrival/departure days still need their meals; only reduce non-meal activities on those days if travel timing makes it impossible to fit ${nonMealPerDay}. Use accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Respect the computed time windows exactly on arrival/departure/transfer days. Be concise.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}\n\nReturn JSON only.`;
 
   const learnedSummary = getSummary(userId);
   const effectiveSystemPrompt = learnedSummary
@@ -384,7 +398,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
 
   const res = await client.messages.create({
     model: MODEL,
-    max_tokens: 16384,
+    max_tokens: 32768,
     system: effectiveSystemPrompt,
     messages: [{ role: 'user', content: prompt }]
   });
@@ -399,7 +413,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     console.error(`Raw response (last 500 chars): ${response.slice(-500)}`);
     const retry = await client.messages.create({
       model: MODEL,
-      max_tokens: 16384,
+      max_tokens: 32768,
       system: effectiveSystemPrompt,
       messages: [{ role: 'user', content: prompt + '\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.' }]
     });
@@ -412,7 +426,9 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     throw new Error(`Claude returned invalid JSON for ${name}.`);
   }
 
-  return parsed.map((item) => normalizeActivity(item, name));
+  const normalized = parsed.map((item) => normalizeActivity(item, name));
+  await enrichWithPriceLevel(normalized, name);
+  return normalized;
 }
 
 module.exports = { planCity, normalizeActivity, normalizeLegacyActivity, blankActivity, SYSTEM_PROMPT };
