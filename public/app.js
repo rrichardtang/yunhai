@@ -1128,7 +1128,7 @@ function buildChecklistFromState() {
         activityId: a.id,
         bookingNotRequired: items[idx].bookingNotRequired ?? Boolean(state.reviewed[a.id]?.bookingNotRequired),
         name: item.name,
-        activityLocation: item.activityLocation,
+        activityLocation: items[idx].activityLocation || item.activityLocation,
         activityDate: item.activityDate,
         activityTime: item.activityTime,
         budgetUsd: activityEstimatedCost,
