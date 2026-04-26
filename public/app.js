@@ -1008,8 +1008,12 @@ function groupChecklist(items = []) {
     if (!city) return;
     cityGroups.push({ label: city, items: [...cityItems].sort(sortChecklistByDateAsc), planned: plannedNames.has(city) });
   });
+  const cityOrder = new Map((state.cities || []).map((c, i) => [String(c.name || '').trim(), i]));
   cityGroups.sort((a, b) => {
     if (a.planned !== b.planned) return a.planned ? -1 : 1;
+    const oa = cityOrder.has(a.label) ? cityOrder.get(a.label) : Number.MAX_SAFE_INTEGER;
+    const ob = cityOrder.has(b.label) ? cityOrder.get(b.label) : Number.MAX_SAFE_INTEGER;
+    if (oa !== ob) return oa - ob;
     return a.label.localeCompare(b.label);
   });
 
@@ -3222,7 +3226,10 @@ function updateReviewNav() {
 function populateReviewCityFilter() {
   if (!els.reviewCityFilter) return;
   const current = state.reviewFilters.city;
-  const cities = [...new Set(state.activities.map((a) => String(a.city || '').trim()).filter(Boolean))].sort();
+  const present = new Set(state.activities.map((a) => String(a.city || '').trim()).filter(Boolean));
+  const ordered = (state.cities || []).map((c) => String(c.name || '').trim()).filter((n) => n && present.has(n));
+  const extras = [...present].filter((n) => !ordered.includes(n)).sort();
+  const cities = [...ordered, ...extras];
   els.reviewCityFilter.innerHTML = ['<option value="">All cities</option>', ...cities.map((city) => `<option value="${esc(city)}">${esc(city)}</option>`)].join('');
   els.reviewCityFilter.value = current;
 }
@@ -3847,6 +3854,9 @@ function renderActivities() {
       const current = state.reviewed[a.id]?.approved;
       const nextApproved = current === false ? null : false;
       state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: nextApproved };
+      if (nextApproved === false && state.placements[a.id]?.dayId) {
+        state.placements[a.id] = { dayId: null, time: null };
+      }
       syncVerdictClasses(card, nextApproved);
       renderBudgetTracker();
     });
@@ -4831,7 +4841,7 @@ function renderArrange() {
     const schedule = document.getElementById(`schedule-${d.id}`);
     if (!schedule) return;
     const items = approved
-      .filter((a) => state.placements[a.id]?.dayId === d.id)
+      .filter((a) => state.placements[a.id]?.dayId === d.id && cityMatches(a.city, d.city))
       .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
 
     const cityObj = state.cities.find((c) => cityMatches(c.name, d.city));
@@ -5485,6 +5495,17 @@ async function autoArrangeActiveCity(opts = {}) {
   allApprovedInCity.forEach((a) => {
     state.activities = state.activities.map((current) => (current.id === a.id ? a : current));
     state.placements[a.id] = { ...(state.placements[a.id] || {}), dayId: null, time: null };
+  });
+
+  // Clear cross-city placements: an activity placed on a day whose city doesn't match
+  const dayCityById = new Map(state.days.map((d) => [d.id, d.city]));
+  state.activities.forEach((a) => {
+    const dayId = state.placements[a.id]?.dayId;
+    if (!dayId) return;
+    const dayCity = dayCityById.get(dayId);
+    if (dayCity && !cityMatches(a.city, dayCity)) {
+      state.placements[a.id] = { dayId: null, time: null };
+    }
   });
 
   // Clear stale placements for declined / unreviewed activities in this city
