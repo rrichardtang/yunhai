@@ -16,9 +16,10 @@ const {
 const { search, isConfigured: isBraveConfigured, shouldUseBrave } = require('../braveSearch');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('../arrangeConfig');
 const { buildBookingLinks } = require('../services/bookingLinks');
-const { buildHybridArrangePrompt, buildRepairPrompt } = require('../services/arrangePromptHybrid');
+const { buildDirectArrangePrompt, buildRepairPrompt } = require('../services/arrangePromptDirect');
 const { assignTimes } = require('../arrangeTimeAssigner');
 const { validate: validateArrangement } = require('../arrangeValidator');
+const { minutesFromTime } = require('../../shared/timeHelpers');
 const { buildCityTravelTiming } = require('../services/distanceMatrix');
 const arrangeTelemetry = require('../services/arrangeTelemetry');
 
@@ -290,24 +291,36 @@ Return ONLY valid JSON (no markdown fences):
       return JSON.parse(match[0]);
     }
 
-    function sanitizeDayPlans(parsed) {
-      const dayPlans = Array.isArray(parsed?.day_plans) ? parsed.day_plans : [];
-      const seen = new Set();
-      const cleaned = dayPlans.map((p) => {
-        const ids = Array.isArray(p?.ordered_ids) ? p.ordered_ids : [];
-        const ordered = [];
-        for (const rawId of ids) {
-          const id = String(rawId);
-          if (lockedIdSet.has(id)) continue;
-          if (!activitiesById[id]) continue;
-          if (seen.has(id)) continue;
-          seen.add(id);
-          ordered.push(id);
-        }
-        return { date: p?.date, ordered_ids: ordered };
-      });
-      const unplaced = Array.isArray(parsed?.unplaced) ? parsed.unplaced.filter((u) => activitiesById[String(u?.id)]) : [];
-      return { dayPlans: cleaned, unplaced, seen };
+    function sanitizePlacements(parsed) {
+      const rawPlacements = parsed?.placements && typeof parsed.placements === 'object' ? parsed.placements : {};
+      const placements = {};
+      for (const [rawId, val] of Object.entries(rawPlacements)) {
+        const id = String(rawId);
+        if (lockedIdSet.has(id)) continue;
+        if (!activitiesById[id]) continue;
+        if (!val || typeof val !== 'object') continue;
+        const date = String(val.date || '');
+        const time = String(val.time || '');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+        if (!/^\d{1,2}:\d{2}$/.test(time)) continue;
+        placements[id] = { date, time };
+      }
+      const unplaced = Array.isArray(parsed?.unplaced)
+        ? parsed.unplaced.filter((u) => activitiesById[String(u?.id)]).map((u) => ({ id: String(u.id), reason: String(u.reason || '') }))
+        : [];
+      return { placements, unplaced };
+    }
+
+    function derivePlansFromPlacements(placements) {
+      const byDate = {};
+      for (const [id, p] of Object.entries(placements)) {
+        if (!byDate[p.date]) byDate[p.date] = [];
+        byDate[p.date].push({ id, startMin: minutesFromTime(p.time) });
+      }
+      return Object.entries(byDate).map(([date, items]) => ({
+        date,
+        ordered_ids: items.sort((a, b) => a.startMin - b.startMin).map((x) => x.id)
+      }));
     }
 
     const cityName = days[0]?.city || '';
@@ -315,53 +328,54 @@ Return ONLY valid JSON (no markdown fences):
     let firstPassIssues = [];
     let repairUsed = false;
     let secondPassValid = false;
+    let fallbackUsed = false;
 
     try {
-      const prompt = buildHybridArrangePrompt({
+      const prompt = buildDirectArrangePrompt({
         days,
         flexible,
         locked: resolvedLocked,
         profile,
         prefSummary,
         numTravelers,
-        numChildren
+        numChildren,
+        cityName
       });
       const parsed = await callClaudeForJson(prompt);
-      const { dayPlans, unplaced: llmUnplaced } = sanitizeDayPlans(parsed);
+      let { placements, unplaced } = sanitizePlacements(parsed);
 
       const ctx = { days, activitiesById, lockedActivities: resolvedLocked, commuteMatrix: matrix };
-      let assigned = assignTimes({ ...ctx, dayPlans });
-      let v = validateArrangement({
-        placements: assigned.placements,
-        lockedActivities: resolvedLocked,
-        days,
-        activitiesById
-      });
+      let v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
       firstPassValid = v.ok;
       firstPassIssues = v.issues || [];
 
       if (!v.ok) {
         repairUsed = true;
         try {
-          const repairPrompt = buildRepairPrompt({ dayPlans, issues: v.issues });
+          const repairPrompt = buildRepairPrompt({ placements, issues: v.issues, activitiesById });
           const repaired = await callClaudeForJson(repairPrompt);
-          const { dayPlans: repairedPlans, unplaced: repairedUnplaced } = sanitizeDayPlans(repaired);
-          const reAssigned = assignTimes({ ...ctx, dayPlans: repairedPlans });
-          const v2 = validateArrangement({
-            placements: reAssigned.placements,
-            lockedActivities: resolvedLocked,
-            days,
-            activitiesById
-          });
-          assigned = {
-            placements: reAssigned.placements,
-            unplaced: [...reAssigned.unplaced, ...repairedUnplaced]
-          };
-          v = v2;
-          secondPassValid = v2.ok;
+          const repairedSan = sanitizePlacements(repaired);
+          placements = repairedSan.placements;
+          unplaced = [...unplaced, ...repairedSan.unplaced];
+          v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
+          secondPassValid = v.ok;
         } catch (repairErr) {
           console.warn('[arrange] repair pass failed:', repairErr.message);
         }
+      }
+
+      if (!v.ok) {
+        fallbackUsed = true;
+        const brokenDates = new Set(v.issues.map((i) => i.day).filter(Boolean));
+        const fallbackDays = days.filter((d) => brokenDates.has(d.date));
+        const fallbackPlans = derivePlansFromPlacements(placements).filter((p) => brokenDates.has(p.date));
+        for (const id of Object.keys(placements)) {
+          if (brokenDates.has(placements[id].date)) delete placements[id];
+        }
+        const fallback = assignTimes({ ...ctx, days: fallbackDays, dayPlans: fallbackPlans });
+        Object.assign(placements, fallback.placements);
+        unplaced = [...unplaced, ...fallback.unplaced];
+        v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
       }
 
       arrangeTelemetry.logRun({
@@ -371,13 +385,14 @@ Return ONLY valid JSON (no markdown fences):
         issues: firstPassIssues,
         repairUsed,
         secondPassValid,
+        fallbackUsed,
         flexibleCount: flexible.length,
         lockedCount: resolvedLocked.length
       });
 
       return res.json({
-        placements: assigned.placements,
-        unplaced: [...assigned.unplaced, ...llmUnplaced],
+        placements,
+        unplaced,
         diagnostics: v.ok ? [] : v.issues.map((i) => i.message)
       });
     } catch (error) {
