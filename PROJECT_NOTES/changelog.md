@@ -4,6 +4,14 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-26] Phase 5 — Arrange polish
+
+- §1 Intensity alternation: `src/services/arrangePromptHybrid.js` now emits `intensity:<low|medium|high>` per activity and S2 prohibits two consecutive `high`-intensity activities. Soft constraint, no validator change.
+- §2 Repair-pass telemetry: new `src/services/arrangeTelemetry.js` (`logRun`, `readRecent`, `summarize`); `/api/arrange` appends per-call entries to `logs/arrange.jsonl` (`firstPassValid`, `issues`, `repairUsed`, `secondPassValid`, counts). New `GET /api/admin/arrange-stats` gated by `ADMIN_TOKEN` env + `x-admin-token` header (404 when env unset).
+- §3 Distance Matrix caching: new `src/services/commuteCache.js` — file-backed cache at `data/commute-cache.json`, keyed by `(origin|destination|mode)`, 30-day TTL, debounced flush. `fetchDistanceMatrixDuration` checks the cache before calling Google and writes back on success.
+- §4 Unplaced recovery UI: `state.arrangeUnplaced[city]` holds structured `{id, name, reason}` items. `renderArrangeDiagnostics` (in `public/app.js`) renders an "Unplaced (N)" chip in the arrange header; clicking opens a panel; clicking an item scrolls the matching staging card into view and flashes it. CSS in `public/styles.css`.
+- `.gitignore`: added `logs/`.
+
 ## [2026-04-26] Phase 4 — Hybrid arrange scheduler
 
 - New: `src/arrangeConstants.js` (MIN_BUFFER_BETWEEN, DEFAULT_COMMUTE_MIN, MEAL_BANDS).

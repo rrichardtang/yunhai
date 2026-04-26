@@ -3,22 +3,24 @@
 _Last updated: 2026-04-26_
 
 ## Objective
-Phase 4 (hybrid arrange scheduler) implemented on `feature/arrange-hybrid-scheduler`. LLM returns per-day ordered lists; server assigns times deterministically; validator catches overlaps/caps/window violations; one repair pass on failure.
+Phase 5 (arrange polish) implemented on `feature/arrange-polish`: intensity alternation prompt rule, repair-pass telemetry + admin stats endpoint, Distance Matrix file-backed cache, unplaced-activity recovery chip/panel UI.
 
 ## Active Workstream
-Pending user smoke test of new auto-arrange flow: drag flexible activities, hit Auto Arrange, verify times look sensible, check that meal/category caps and locked-activity buffers work.
+Pending user smoke test of Phase 5 changes:
+- Run auto-arrange on a multi-activity city and confirm that `data/commute-cache.json` is created and a re-run is noticeably faster.
+- Trigger an unplaceable scenario (e.g. too many of one category) and verify the "Unplaced (N)" chip appears, opens to a panel, and clicking an item scrolls + flashes the staging card.
+- Verify `logs/arrange.jsonl` accrues per-call entries; if `ADMIN_TOKEN` is set, `GET /api/admin/arrange-stats?token=...` returns a summary.
 
 ## Constraints
-- No database — flat JSON files
-- All `/api/*` route paths preserved (`/api/arrange` request shape extended with `commuteMatrix`, response adds `diagnostics`)
-- 99/99 tests passing (added 19 new for assigner + validator)
+- No database — flat JSON files (cache uses same pattern)
+- All `/api/*` route paths preserved; arrange request/response shape unchanged
+- 99/99 tests passing
 
 ## Risks
-- Hybrid prompt is a wholesale rewrite of arrange — Claude may produce orderings the assigner cannot fully time. Repair pass should catch most; remaining issues surface as `diagnostics` to the client.
-- `/api/commute-matrix` does N×N pairs serially in batches of 6 — could be slow for ≥10 flexible activities. Cache may be needed if real-world latency hurts.
-- Old `src/services/arrangePrompt.js` still exists but is no longer imported. Safe to delete after smoke test passes.
+- Commute cache is keyed by the resolved origin/destination string (coords or text). If activity location text changes, the old key becomes orphaned but TTL-expires harmlessly.
+- Telemetry log grows unbounded — `readRecent` reads the whole file. Acceptable for low traffic; rotate if it grows >5MB.
 
 ## Next Actions
-- User smoke test of auto-arrange.
-- If green, delete unused `arrangePrompt.js` and merge to main.
-- Phase 5 (intensity alternation, `must_happen_on_day`) per `arrange_phase5_*.md` if it exists.
+- User smoke test of Phase 5.
+- If green, merge `feature/arrange-polish` to main.
+- Phase 4 cleanup item still open: delete unused `src/services/arrangePrompt.js` after Phase 4 smoke test confirmation.
