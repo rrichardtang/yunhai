@@ -4798,9 +4798,14 @@ function bindCommuteInteractions() {
 }
 
 let _arrangeSortables = [];
+let _sortableDragging = false;
 function renderArrange() {
-  _arrangeSortables.forEach((s) => { try { s.destroy(); } catch {} });
-  _arrangeSortables = [];
+  _arrangeSortables.forEach((s) => {
+    try {
+      if (_sortableDragging) { s.option('disabled', true); } else { s.destroy(); }
+    } catch {}
+  });
+  if (!_sortableDragging) _arrangeSortables = [];
 
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
   const cityGroups = getArrangeCities();
@@ -4912,11 +4917,13 @@ function renderArrange() {
     sort: false,
     animation: 120,
     onStart: (evt) => {
+      _sortableDragging = true;
       const id = evt.item?.dataset.id;
       if (!id) return;
       evt.item.dataset.dragActivityId = id;
       evt.item.dataset.prevPlacement = JSON.stringify(state.placements[id] || { dayId: null, time: null });
-    }
+    },
+    onEnd: () => { _sortableDragging = false; }
   }));
 
   document.querySelectorAll('.day-schedule').forEach((zone) => {
@@ -4925,12 +4932,14 @@ function renderArrange() {
       sort: false,
       animation: 120,
       onStart: (evt) => {
+        _sortableDragging = true;
         const id = evt.item?.dataset.id;
         if (!id) return;
         evt.item.dataset.dragActivityId = id;
         evt.item.dataset.prevPlacement = JSON.stringify(state.placements[id] || { dayId: null, time: null });
       },
       onEnd: (evt) => {
+        _sortableDragging = false;
         if (evt.item) {
           if (Sortable?.utils?.deselect) Sortable.utils.deselect(evt.item);
           evt.item.style.transform = '';
