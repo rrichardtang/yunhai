@@ -20,6 +20,7 @@ const { buildHybridArrangePrompt, buildRepairPrompt } = require('../services/arr
 const { assignTimes } = require('../arrangeTimeAssigner');
 const { validate: validateArrangement } = require('../arrangeValidator');
 const { buildCityTravelTiming } = require('../services/distanceMatrix');
+const arrangeTelemetry = require('../services/arrangeTelemetry');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
 
@@ -309,6 +310,12 @@ Return ONLY valid JSON (no markdown fences):
       return { dayPlans: cleaned, unplaced, seen };
     }
 
+    const cityName = days[0]?.city || '';
+    let firstPassValid = false;
+    let firstPassIssues = [];
+    let repairUsed = false;
+    let secondPassValid = false;
+
     try {
       const prompt = buildHybridArrangePrompt({
         days,
@@ -330,8 +337,11 @@ Return ONLY valid JSON (no markdown fences):
         days,
         activitiesById
       });
+      firstPassValid = v.ok;
+      firstPassIssues = v.issues || [];
 
       if (!v.ok) {
+        repairUsed = true;
         try {
           const repairPrompt = buildRepairPrompt({ dayPlans, issues: v.issues });
           const repaired = await callClaudeForJson(repairPrompt);
@@ -348,10 +358,22 @@ Return ONLY valid JSON (no markdown fences):
             unplaced: [...reAssigned.unplaced, ...repairedUnplaced]
           };
           v = v2;
+          secondPassValid = v2.ok;
         } catch (repairErr) {
           console.warn('[arrange] repair pass failed:', repairErr.message);
         }
       }
+
+      arrangeTelemetry.logRun({
+        userId,
+        cityName,
+        firstPassValid,
+        issues: firstPassIssues,
+        repairUsed,
+        secondPassValid,
+        flexibleCount: flexible.length,
+        lockedCount: resolvedLocked.length
+      });
 
       return res.json({
         placements: assigned.placements,
@@ -359,8 +381,30 @@ Return ONLY valid JSON (no markdown fences):
         diagnostics: v.ok ? [] : v.issues.map((i) => i.message)
       });
     } catch (error) {
+      arrangeTelemetry.logRun({
+        userId,
+        cityName,
+        firstPassValid,
+        issues: firstPassIssues,
+        repairUsed,
+        secondPassValid,
+        flexibleCount: flexible.length,
+        lockedCount: resolvedLocked.length,
+        error: error.message
+      });
       return res.status(500).json({ error: error.message || 'Failed to arrange activities' });
     }
+  });
+
+  app.get('/api/admin/arrange-stats', async (req, res) => {
+    const adminToken = process.env.ADMIN_TOKEN;
+    if (!adminToken) return res.status(404).json({ error: 'not_found' });
+    const provided = req.get('x-admin-token') || req.query.token;
+    if (provided !== adminToken) return res.status(403).json({ error: 'forbidden' });
+
+    const limit = Math.max(1, Math.min(1000, Number(req.query.limit) || 100));
+    const runs = await arrangeTelemetry.readRecent(limit);
+    return res.json({ summary: arrangeTelemetry.summarize(runs), runs });
   });
 
   app.post('/api/plan', async (req, res) => {
