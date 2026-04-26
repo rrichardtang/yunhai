@@ -4,6 +4,23 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-27] Restaurant price tiers + pace-driven activity-count floor
+
+- New `src/services/placesCache.js` — file-backed cache at `data/places-cache.json`, 90-day TTL, debounced flush. Mirrors `commuteCache.js`.
+- New `src/services/placesEnrich.js` — `enrichWithPriceLevel(activities, cityName)` calls Google Places Text Search with FieldMask `places.priceLevel,places.displayName`, maps `PRICE_LEVEL_INEXPENSIVE`–`VERY_EXPENSIVE` → `price_tier` 1–4 on food activities (breakfast/lunch/dinner/restaurant/food/cafe/nightlife). Cached + parallelized; failures swallowed.
+- `src/claude.js`: `planCity` calls `enrichWithPriceLevel` after normalization. `max_tokens` bumped 16384 → 32768 to fit larger trips.
+- `src/claude.js` prompt: replaced vague "proportional to length of stay" line with a hard floor — ≥(`nonMealPerDay × tripDays + 3 × tripDays`) activities, where `nonMealPerDay` is `{1:2, 2:3, 3:4, 4:5, 5:6}` keyed off pace 1–5. Meals counted as activities; partial-day meal-skip allowed when natural meal time falls outside the day's window.
+- `public/app.js`: itinerary row builder passes `priceTier` through; card subtitle now renders `address · $$$` when present.
+- New test `src/services/placesEnrich.test.js` (3 cases: food detection, non-food rejection, price-level map). Lives in nested dir; not picked up by current `npm test` glob.
+
+## [2026-04-26] Undo arrange hybrid — LLM picks times, validator is physics-only
+
+- New `src/services/arrangePromptDirect.js` — replaces `arrangePromptHybrid.js`. LLM now outputs `{placements: {<id>: {date, time}}}` directly with full judgment over timing; the rule list (H1–H5, S1–S5) is gone. Semantic intent (sunset, nightcap, meal customs) is named as a consideration, not a rule.
+- `src/arrangeValidator.js` stripped to physics: overlap, lock_overlap, day window, opening hours. Removed: `meal_cap` and `category_cap` (those were taste, not physics).
+- `src/routes/activities.js` `/api/arrange`: three-tier flow — LLM proposes times → validate → one repair pass on physics violations → deterministic `assignTimes` only on still-broken days as a fallback floor. `arrangeTimeAssigner` retained for the fallback path.
+- Deleted `src/services/arrangePromptHybrid.js`.
+- Tests updated: removed two cap-violation assertions, added an `opening_hours` assertion, added a negative test confirming meal caps are no longer enforced. 99/99 pass.
+
 ## [2026-04-26] Phase 5 — Arrange polish
 
 - §1 Intensity alternation: `src/services/arrangePromptHybrid.js` now emits `intensity:<low|medium|high>` per activity and S2 prohibits two consecutive `high`-intensity activities. Soft constraint, no validator change.
