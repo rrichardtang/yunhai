@@ -44,14 +44,26 @@ const CATEGORY_HINTS = [
 
 function inferCategory(activity = {}) {
   const rawCategory = String(activity.category || activity.type || '').trim().toLowerCase();
-  if (rawCategory && DEFAULT_ACTIVITY_CATEGORY_CONFIG[rawCategory]) return rawCategory;
+  if (rawCategory) return rawCategory;
 
   const haystack = `${activity.name || ''} ${activity.type || ''} ${activity.suggested_time || ''}`;
   const hint = CATEGORY_HINTS.find((entry) => entry.pattern.test(haystack));
   if (hint) return hint.category;
 
-  if (rawCategory) return rawCategory;
   return 'default';
+}
+
+const PACE_LABELS = {
+  1: 'very relaxed',
+  2: 'easy-going',
+  3: 'moderate',
+  4: 'active',
+  5: 'non-stop'
+};
+
+function paceDescFromValue(n) {
+  const v = Math.max(1, Math.min(5, Math.round(Number(n) || 3)));
+  return { value: v, desc: PACE_LABELS[v] };
 }
 
 function getCategoryDefaults(category = '') {
@@ -63,5 +75,7 @@ module.exports = {
   DEFAULT_ACTIVITY_CATEGORY_CONFIG,
   CATEGORY_HINTS,
   inferCategory,
-  getCategoryDefaults
+  getCategoryDefaults,
+  PACE_LABELS,
+  paceDescFromValue
 };

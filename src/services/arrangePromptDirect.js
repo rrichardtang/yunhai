@@ -1,5 +1,6 @@
 const { showUpEarlyMins } = require('../../shared/arrangeArrivalBuffers');
 const { minutesFromTime, timeFromMinutes } = require('../../shared/timeHelpers');
+const { paceDescFromValue } = require('../arrangeConfig');
 
 function activityLine(a) {
   const isNew = a.timing !== undefined;
@@ -55,9 +56,7 @@ function buildDirectArrangePrompt({
   const daysText = days.map((d) => dayLine(d, locksByDate[d.date] || [])).join('\n');
   const activitiesText = flexible.map(activityLine).join('\n');
 
-  const paceValue = Math.max(1, Math.min(5, Math.round(Number(profile?.answers?.pace) || 3)));
-  const paceLabels = { 1: 'very relaxed', 2: 'easy-going', 3: 'moderate', 4: 'active', 5: 'non-stop' };
-  const paceDesc = paceLabels[paceValue];
+  const { desc: paceDesc } = paceDescFromValue(profile?.answers?.pace);
 
   const travelerBlock = `${numTravelers || 1} adult(s)${numChildren ? `, ${numChildren} child(ren)` : ''}`;
   const profileBlock = prefSummary ? `\nTRAVELER PROFILE:\n${prefSummary}\n` : '';

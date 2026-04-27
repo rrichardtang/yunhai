@@ -1,9 +1,56 @@
 const { MIN_BUFFER_BETWEEN } = require('./arrangeConstants');
-const { effectiveDayStart, effectiveDayEnd, getDuration, parseOpeningHours } = require('./arrangeTimeAssigner');
 const { minutesFromTime } = require('../shared/timeHelpers');
+
+function getDuration(activity) {
+  if (activity?.timing?.duration_minutes != null) return Number(activity.timing.duration_minutes) || 60;
+  if (activity?.duration_hours != null) return Math.round(Number(activity.duration_hours) * 60) || 60;
+  return 60;
+}
 
 function getOpeningHoursRaw(activity) {
   return activity?.timing?.opening_hours || activity?.opening_hours || '';
+}
+
+function toMin(h, m, ap) {
+  let hour = Number(h) || 0;
+  const min = Number(m) || 0;
+  if (ap) {
+    const lower = ap.toLowerCase();
+    if (lower === 'pm' && hour < 12) hour += 12;
+    if (lower === 'am' && hour === 12) hour = 0;
+  }
+  return hour * 60 + min;
+}
+
+function parseOpeningHours(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return [[0, 1440]];
+  const ranges = [];
+  for (const part of text.split(/[,;]/)) {
+    const m = part.trim().match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*[-–]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+    if (!m) continue;
+    const start = toMin(m[1], m[2], m[3]);
+    let end = toMin(m[4], m[5], m[6]);
+    if (end <= start) end = 1440;
+    ranges.push([start, end]);
+  }
+  return ranges.length ? ranges.sort((a, b) => a[0] - b[0]) : [[0, 1440]];
+}
+
+function effectiveDayStart(day) {
+  const winStart = minutesFromTime(day.windowStart || '00:00');
+  const arrival = day.arrivalAvailableMin != null
+    ? Number(day.arrivalAvailableMin)
+    : (day.arrivalAvailableTime ? minutesFromTime(day.arrivalAvailableTime) : 0);
+  return Math.max(winStart, arrival);
+}
+
+function effectiveDayEnd(day) {
+  const winEnd = day.windowEnd ? minutesFromTime(day.windowEnd) : 1440;
+  const departure = day.departureMustLeaveMin != null
+    ? Number(day.departureMustLeaveMin)
+    : (day.departureMustLeaveTime ? minutesFromTime(day.departureMustLeaveTime) : 1440);
+  return Math.min(winEnd, departure);
 }
 
 function buildEntry(id, placement, activity) {
@@ -100,4 +147,4 @@ function validate({ placements, lockedActivities = [], days, activitiesById }) {
   return { ok: issues.length === 0, issues };
 }
 
-module.exports = { validate, overlapsWithBuffer };
+module.exports = { validate, overlapsWithBuffer, parseOpeningHours, getDuration, effectiveDayStart, effectiveDayEnd };

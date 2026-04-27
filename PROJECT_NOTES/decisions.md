@@ -4,6 +4,22 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-04-27] No deterministic time-assignment fallback; broken activities go to `unplaced`
+
+**Decision:** Deleted `src/arrangeTimeAssigner.js` entirely. `/api/arrange` is now a two-tier flow: LLM proposes times → validator → optional repair pass. If repair still fails physics validation, the offending placements are moved to `unplaced` with reason `physics_unresolved` for the user to fix manually in the UI. There is no third-tier deterministic placement.
+**Reasoning:** The fallback was scaffolding from when the LLM was order-only and JS owned time-picking. Once Sonnet 4.6 was given direct timing, the fallback ran rarely and, when it did run, applied stale rules (notably `MEAL_BANDS` forcing American meal customs onto Spain/Japan/etc.) that conflicted with the LLM's better judgment. Surfacing physics-unresolvable activities to the user is more honest and avoids silent wrong placements; the existing `unplaced` chip/panel UI already handles them.
+**Alternatives rejected:** (a) Keep the fallback but strip `MEAL_BANDS` — rejected as half-measure; the rest of the assigner (earliest-slot greedy, opening-hours-only logic) was also worse than the LLM's reasoning. (b) Add a third repair pass before falling back — rejected; if two LLM passes can't resolve physics, a third unlikely will, and "unplaced" is a clear signal for manual intervention.
+**Tradeoffs:** Trips that previously got force-placed by the fallback may now show items in the unplaced panel. Acceptable — better visibility than silent bad placement. Validator still imports the four time helpers (`effectiveDayStart`, `effectiveDayEnd`, `getDuration`, `parseOpeningHours`); they were inlined into the validator since it became their only caller.
+
+## [2026-04-27] Removed `MEAL_BANDS` — global meal-time intersection was wrong by design
+
+**Decision:** Removed `MEAL_BANDS` from `src/arrangeConstants.js`. Meal times are now a function of opening hours and LLM judgment only, with no hard-coded breakfast/lunch/dinner windows.
+**Reasoning:** `MEAL_BANDS` defined breakfast as 7–9am, lunch 11:30am–1:30pm, dinner 6–8:30pm and intersected these with opening hours in the assigner — which would force a Madrid restaurant open until midnight to serve dinner by 8:30. Sonnet 4.6 knows local meal customs (Spanish dinner 9:30pm, Japanese fish-market breakfast 6am, Mediterranean lunch 2pm) far better than a hard-coded American-default table. Validator already enforces opening hours, which is the only physical constraint that matters.
+**Alternatives rejected:** (a) Make `MEAL_BANDS` city-aware via a lookup table — rejected as the wrong axis; meal customs vary by venue and season as much as by city, and the LLM already integrates these. (b) Pass `MEAL_BANDS` as soft hint in the prompt — rejected; the prompt already says "use what you know about local meal customs," adding a default table would push back against that.
+**Tradeoffs:** None observed. The single remaining caller (`arrangeTimeAssigner.js`) was deleted in the same sweep, so removal was safe.
+
+---
+
 ## [2026-04-27] Validator enforces physics only, not taste
 
 **Decision:** The arrange validator (`src/arrangeValidator.js`) checks only mechanical/structural rules: overlap with buffer, lock overlap, day-window, opening hours. Removed `meal_cap` (≤1 of each meal type) and `category_cap` (≤2 of any non-meal category) — those are judgment calls, not physical constraints.

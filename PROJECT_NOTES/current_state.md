@@ -3,25 +3,25 @@
 _Last updated: 2026-04-27_
 
 ## Objective
-On `feature/arrange-polish`: post-hybrid refactor (LLM picks times, validator is physics-only) is in. Today's work added Google Places price-tier enrichment for restaurants and a hard floor on activity counts driven by pace.
+On `feature/arrange-polish`: deterministic surface in arrange/activity-generation has been pruned to physics-only. The validator is the only deterministic gate; broken-day activities surface as `unplaced` for manual fix instead of being auto-placed by stale rules.
 
 ## Active Workstream
 Pending user smoke test:
-- Re-plan a trip with food activities; confirm `data/places-cache.json` is created and `$`–`$$$$` symbols render under restaurant names in the itinerary card.
-- Re-plan a 6-day "active" trip; confirm Claude returns ≥48 activities (5 non-meal × 6 + 3 meals × 6) and that meals on arrival/departure days are skipped when their natural time falls outside the window.
-- Confirm `/api/arrange` still works end-to-end with the LLM-picks-times flow.
+- Re-plan a Madrid (or similar non-American meal-custom city) trip; confirm the LLM picks dinner times that match local custom (e.g. 21:00–22:30 in Spain) rather than being forced into 18:30–22:30.
+- Force a validator failure (e.g. craft two 8pm dinners on the same day, manually). Verify validator catches it, repair pass tries to fix, and on persistent failure the broken activities show in the `unplaced` panel rather than being auto-assigned by a fallback.
+- Confirm `data/places-cache.json` populates with `$`–`$$$$` symbols rendering on food cards.
 
 ## Constraints
-- No database — flat JSON files; new `places-cache.json` follows the `commute-cache.json` pattern.
-- Same `GOOGLE_MAPS_API_KEY` powers Distance Matrix and Places Text Search; one extra call per food activity on cache miss.
-- 99/99 npm-test suite still passes; new placesEnrich tests live in `src/services/` (not picked up by current `src/*.test.js` glob — separate cleanup).
+- No database — flat JSON files.
+- Same `GOOGLE_MAPS_API_KEY` powers Distance Matrix and Places Text Search.
+- 88/88 npm-test suite passes (down from 99 — 11 assigner tests deleted).
 
 ## Risks
-- Places Text Search match quality depends on activity name + city — generic names ("Tapas Crawl") won't match a real place; activity just renders without a tier (acceptable).
-- Hard count floor is enforced by prompt only. Claude may still undershoot on weird trip shapes; no deterministic backstop.
-- Meal-skip rule for partial days is one sentence in the prompt — if Claude generates 7am breakfast on a 3pm arrival, we'll need to pre-compute per-day meal availability in JS.
+- Removing the deterministic fallback means a small fraction of trips may surface activities as `unplaced` that previously got auto-placed (possibly badly). The UI handles unplaced via the existing chip/panel.
+- `inferCategory` now trusts arbitrary LLM-provided category strings. Downstream consumers were checked: `placesEnrich.js` (Set membership — unknown categories silently skip enrichment, fine) and `arrangeValidator.js` (no longer reads category at all after the meal_cap/category_cap removal).
+- 20-min `MIN_BUFFER_BETWEEN` retained — back-to-back same-venue activities may still flag as overlap. Acceptable for now.
 
 ## Next Actions
-- User smoke test of price tiers and activity-count floor.
-- Decide whether existing itineraries need a one-shot enrichment job to backfill price tiers (currently they only appear on freshly planned trips).
-- Phase 4 cleanup item still open: delete unused `src/services/arrangePrompt.js`.
+- User smoke test of the pruned arrange flow.
+- Phase 4 cleanup item still open: delete unused `src/services/arrangePrompt.js` (dead code; no importers).
+- Decide whether existing itineraries need a one-shot enrichment job to backfill price tiers.
