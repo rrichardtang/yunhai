@@ -1,6 +1,6 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { getSummary } = require('./preferences');
-const { inferCategory, getCategoryDefaults } = require('./arrangeConfig');
+const { inferCategory, getCategoryDefaults, paceDescFromValue } = require('./arrangeConfig');
 const { searchCityActivities, searchTopRestaurants } = require('./braveSearch');
 const { enrichWithPriceLevel } = require('./services/placesEnrich');
 const { isLegacyActivity, migrateActivity, parseTimeString, parseDurationToMinutes, inferMealType } = require('../shared/activityMigration');
@@ -348,9 +348,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     travelTiming?.interCitySummary || ''
   ].filter(Boolean).join('\n') || 'No computed transfer-time constraints available.';
 
-  const pace = Math.max(1, Math.min(5, Math.round(Number(profile?.answers?.pace) || 3)));
-  const paceLabels = { 1: 'very relaxed', 2: 'easy-going', 3: 'moderate', 4: 'active', 5: 'non-stop' };
-  const paceDesc = paceLabels[pace];
+  const { value: pace, desc: paceDesc } = paceDescFromValue(profile?.answers?.pace);
   const nonMealPerDayByPace = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6 };
   const nonMealPerDay = nonMealPerDayByPace[pace];
 

@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-27] Strip remaining deterministic scaffolding from arrange
+
+- Deleted `src/arrangeTimeAssigner.js` (~170 lines) and `src/arrangeTimeAssigner.test.js`. The third-tier deterministic fallback in `/api/arrange` is gone — when LLM + repair both fail validation, broken activities now go to `unplaced` with reason `physics_unresolved` instead of being auto-placed by stale rules.
+- `src/arrangeConstants.js`: removed `MEAL_BANDS` (was forcing American meal customs globally via opening-hours intersection). Kept `MIN_BUFFER_BETWEEN: 20` and `DEFAULT_COMMUTE_MIN: 20`.
+- `src/arrangeValidator.js`: inlined `effectiveDayStart`, `effectiveDayEnd`, `getDuration`, `parseOpeningHours` (previously imported from the deleted assigner). Validator is now fully self-contained.
+- `src/arrangeConfig.js`: `inferCategory` now trusts a non-empty LLM-provided `category` directly instead of gating it on the `DEFAULT_ACTIVITY_CATEGORY_CONFIG` keyset. Added `PACE_LABELS` + `paceDescFromValue` exports.
+- `src/claude.js` and `src/services/arrangePromptDirect.js` both now import `paceDescFromValue` instead of redefining the same `paceLabels` dict.
+- `src/routes/activities.js`: removed `assignTimes` import, the `derivePlansFromPlacements` helper, the `fallbackUsed` telemetry flag, and the unused `minutesFromTime` import.
+- 88/88 tests pass (-11 from assigner removal).
+
 ## [2026-04-27] Restaurant price tiers + pace-driven activity-count floor
 
 - New `src/services/placesCache.js` — file-backed cache at `data/places-cache.json`, 90-day TTL, debounced flush. Mirrors `commuteCache.js`.

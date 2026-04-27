@@ -17,9 +17,7 @@ const { search, isConfigured: isBraveConfigured, shouldUseBrave } = require('../
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('../arrangeConfig');
 const { buildBookingLinks } = require('../services/bookingLinks');
 const { buildDirectArrangePrompt, buildRepairPrompt } = require('../services/arrangePromptDirect');
-const { assignTimes } = require('../arrangeTimeAssigner');
 const { validate: validateArrangement } = require('../arrangeValidator');
-const { minutesFromTime } = require('../../shared/timeHelpers');
 const { buildCityTravelTiming } = require('../services/distanceMatrix');
 const arrangeTelemetry = require('../services/arrangeTelemetry');
 
@@ -311,24 +309,11 @@ Return ONLY valid JSON (no markdown fences):
       return { placements, unplaced };
     }
 
-    function derivePlansFromPlacements(placements) {
-      const byDate = {};
-      for (const [id, p] of Object.entries(placements)) {
-        if (!byDate[p.date]) byDate[p.date] = [];
-        byDate[p.date].push({ id, startMin: minutesFromTime(p.time) });
-      }
-      return Object.entries(byDate).map(([date, items]) => ({
-        date,
-        ordered_ids: items.sort((a, b) => a.startMin - b.startMin).map((x) => x.id)
-      }));
-    }
-
     const cityName = days[0]?.city || '';
     let firstPassValid = false;
     let firstPassIssues = [];
     let repairUsed = false;
     let secondPassValid = false;
-    let fallbackUsed = false;
 
     try {
       const prompt = buildDirectArrangePrompt({
@@ -344,7 +329,6 @@ Return ONLY valid JSON (no markdown fences):
       const parsed = await callClaudeForJson(prompt);
       let { placements, unplaced } = sanitizePlacements(parsed);
 
-      const ctx = { days, activitiesById, lockedActivities: resolvedLocked, commuteMatrix: matrix };
       let v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
       firstPassValid = v.ok;
       firstPassIssues = v.issues || [];
@@ -365,16 +349,13 @@ Return ONLY valid JSON (no markdown fences):
       }
 
       if (!v.ok) {
-        fallbackUsed = true;
-        const brokenDates = new Set(v.issues.map((i) => i.day).filter(Boolean));
-        const fallbackDays = days.filter((d) => brokenDates.has(d.date));
-        const fallbackPlans = derivePlansFromPlacements(placements).filter((p) => brokenDates.has(p.date));
-        for (const id of Object.keys(placements)) {
-          if (brokenDates.has(placements[id].date)) delete placements[id];
+        const brokenIds = new Set(v.issues.flatMap((i) => i.ids || (i.id ? [i.id] : [])));
+        for (const id of brokenIds) {
+          if (placements[id]) {
+            unplaced.push({ id, reason: 'physics_unresolved' });
+            delete placements[id];
+          }
         }
-        const fallback = assignTimes({ ...ctx, days: fallbackDays, dayPlans: fallbackPlans });
-        Object.assign(placements, fallback.placements);
-        unplaced = [...unplaced, ...fallback.unplaced];
         v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
       }
 
@@ -385,7 +366,6 @@ Return ONLY valid JSON (no markdown fences):
         issues: firstPassIssues,
         repairUsed,
         secondPassValid,
-        fallbackUsed,
         flexibleCount: flexible.length,
         lockedCount: resolvedLocked.length
       });
