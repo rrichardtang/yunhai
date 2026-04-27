@@ -9,8 +9,9 @@ async function search(query, { count = 5, freshness, task = 'general' } = {}) {
   }));
 }
 
-async function searchCityActivities(cityName, { count = 5 } = {}) {
-  const retrieval = await retrieve(`best things to do in ${cityName} 2026`, {
+async function searchCityActivities(cityName, { count = 5, year } = {}) {
+  const y = Number.isInteger(year) ? year : new Date().getFullYear();
+  const retrieval = await retrieve(`best things to do in ${cityName} ${y}`, {
     count,
     task: 'planning',
     freshness: 'year'
@@ -25,8 +26,9 @@ async function searchForChat(query, { count = 5 } = {}) {
   return buildPromptFragment(retrieval, { title: 'Web Search Results', maxItems: count });
 }
 
-async function searchTopRestaurants(cityName, { count = 7 } = {}) {
-  const retrieval = await retrieve(`best restaurants in ${cityName} 2026 must order dishes`, {
+async function searchTopRestaurants(cityName, { count = 7, year } = {}) {
+  const y = Number.isInteger(year) ? year : new Date().getFullYear();
+  const retrieval = await retrieve(`best restaurants in ${cityName} ${y} must order dishes`, {
     count,
     task: 'planning',
     freshness: 'year'

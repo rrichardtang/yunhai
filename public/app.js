@@ -5146,6 +5146,19 @@ async function updateCommutesForCityDays(dayIds = []) {
   }
 }
 
+const UNPLACED_REASON_LABELS = {
+  physics_unresolved: "Couldn't fit into the day without conflicts",
+  no_time_remaining: 'No time remaining in the day window',
+  outside_opening_hours: 'Outside the venue opening hours',
+  outside_window: 'Outside the day window'
+};
+
+function friendlyUnplacedReason(raw) {
+  const key = String(raw || '').trim().toLowerCase().replace(/\s+/g, '_');
+  if (UNPLACED_REASON_LABELS[key]) return UNPLACED_REASON_LABELS[key];
+  return raw || 'no reason given';
+}
+
 function renderArrangeDiagnostics() {
   if (!els.arrangeDiagnostics) return;
   const activeCity = state.arrangeCity;
@@ -5165,7 +5178,7 @@ function renderArrangeDiagnostics() {
           <li>
             <button type="button" class="unplaced-item" data-unplaced-id="${esc(u.id)}">
               <span class="unplaced-item-name">${esc(u.name)}</span>
-              <span class="unplaced-item-reason">${esc(u.reason || 'no reason given')}</span>
+              <span class="unplaced-item-reason">${esc(friendlyUnplacedReason(u.reason))}</span>
             </button>
           </li>`).join('')}</ul>
       </div>`;

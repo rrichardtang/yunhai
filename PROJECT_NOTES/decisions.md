@@ -4,6 +4,28 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-04-28] Google Places is the source of truth for opening hours; LLM string is fallback only
+
+**Decision:** Widened the existing Places Text Search FieldMask to include `regularOpeningHours` and `location` alongside `priceLevel`. When Places returns hours, we overwrite the LLM-emitted `opening_hours` string in both `activity.timing.opening_hours` and the legacy top-level `activity.opening_hours`. When Places returns no hours, the LLM string is preserved untouched. Applies to a new `VENUE_CATEGORIES` set: food categories ∪ `museum, gallery, landmark, market, show, shopping, spa, sports, cultural`. Tours, walks, parks, sunsets, neighborhoods skip Places lookup entirely (open-air or composite venues).
+
+**Reasoning:** The arrange validator's opening-hours gate ([src/arrangeValidator.js:132](src/arrangeValidator.js#L132)) was the highest-leverage hallucination foot-gun in the system: if Claude's `opening_hours` string was wrong, a perfectly-fine schedule would fail validation and the activity would bounce to `unplaced`. We were already paying for a Places call per food activity for `priceLevel`; adding the hours field to the same FieldMask is a free upgrade in terms of round-trips and stays inside the same Text Search Advanced SKU tier (no billing change). LLM hours can drift weekly; Places hours are first-party current data.
+
+**Alternatives rejected:** (a) Switch to Place Details endpoint for the second call — rejected; doubles the round-trip count for no quality gain. (b) Expand to all activity categories including tours/walks — rejected; tours don't typically have a Places entry of their own (they inherit from the venue), and matching on a tour name would mis-resolve to a random business. (c) Model day-of-week closures (museum closed Mondays) — deferred. The current `parseOpeningHours` reads a single weekly-union string; a Monday placement could pass even if the museum is closed Mondays. Acknowledged as a Wave 2+ improvement.
+
+**Tradeoffs:** Day-of-week closure modeling deferred. The cache value shape changed from `{priceTier}` to `{priceTier, openingHours, location}` — old cached entries continue to work (we read keys defensively) and refresh organically as the 90-day TTL expires. A `[places-hours-delta]` console log fires whenever LLM and Places hours disagree; this is intentionally chatty in the first weeks for observability and can be downgraded later.
+
+## [2026-04-28] Same-venue activity pairs bypass the 20-min walk buffer
+
+**Decision:** `MIN_BUFFER_BETWEEN` (20 minutes between activities) is now skipped when two activities share a venue. Detection uses lat/lng (4-decimal precision, ~10 m), with `venue_name` and address as fallbacks for activities that haven't been geocoded yet at planning time. Implemented in `bufferBetween()` in `src/arrangeValidator.js`.
+
+**Reasoning:** The 20-minute buffer represents walk time between separate locations. When the user (or the LLM) intentionally schedules two activities at the same venue — e.g., dinner then drinks at the bar across the street, or a wine tasting followed by dinner at the same restaurant — the buffer was firing and triggering false-positive overlap failures, pushing legitimate placements into `unplaced`. The buffer was modeling something real; we just had no concept of "no transit needed" in the data model.
+
+**Alternatives rejected:** (a) Reduce the global buffer to 10 minutes — rejected; legitimate cross-city walks really do need ~20. (b) Make the buffer LLM-supplied per-pair — rejected; gives the model another arithmetic surface to get wrong, when the venue match is mechanically obvious. (c) Drop the buffer entirely — rejected; same reason as (a).
+
+**Tradeoffs:** The lat/lng path requires venues to be geocoded; at `planCity` time they aren't yet (lat/lng are populated later by `/api/places/resolve`). The fallback to `venue_name` lowercase exact-match handles the common case. Activities with neither populated coordinates nor a venue_name will continue to use the 20-min buffer (safe default).
+
+---
+
 ## [2026-04-27] No deterministic time-assignment fallback; broken activities go to `unplaced`
 
 **Decision:** Deleted `src/arrangeTimeAssigner.js` entirely. `/api/arrange` is now a two-tier flow: LLM proposes times → validator → optional repair pass. If repair still fails physics validation, the offending placements are moved to `unplaced` with reason `physics_unresolved` for the user to fix manually in the UI. There is no third-tier deterministic placement.
