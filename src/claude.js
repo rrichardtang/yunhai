@@ -2,7 +2,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { getSummary } = require('./preferences');
 const { inferCategory, getCategoryDefaults, paceDescFromValue } = require('./arrangeConfig');
 const { searchCityActivities, searchTopRestaurants } = require('./braveSearch');
-const { enrichWithPriceLevel } = require('./services/placesEnrich');
+const { enrichWithPlaceDetails } = require('./services/placesEnrich');
 const { isLegacyActivity, migrateActivity, parseTimeString, parseDurationToMinutes, inferMealType } = require('../shared/activityMigration');
 
 const MODEL = 'claude-sonnet-4-6';
@@ -363,9 +363,16 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   const minMeals = 3 * tripDays;
   const minTotal = minNonMeal + minMeals;
 
+  const tripYear = (() => {
+    if (startDate) {
+      const y = new Date(startDate).getFullYear();
+      if (Number.isFinite(y) && y >= 2000) return y;
+    }
+    return new Date().getFullYear();
+  })();
   const [webResearch, restaurantResearch] = await Promise.all([
-    searchCityActivities(name),
-    searchTopRestaurants(name)
+    searchCityActivities(name, { year: tripYear }),
+    searchTopRestaurants(name, { year: tripYear })
   ]);
   const webBlock = webResearch
     ? `\n\nWeb research (use as supplementary inspiration, not a strict list):\n${webResearch}`
@@ -425,7 +432,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   }
 
   const normalized = parsed.map((item) => normalizeActivity(item, name));
-  await enrichWithPriceLevel(normalized, name);
+  await enrichWithPlaceDetails(normalized, name);
   return normalized;
 }
 

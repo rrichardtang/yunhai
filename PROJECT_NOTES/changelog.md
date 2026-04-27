@@ -4,6 +4,17 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-04-28] Wave 1: ground opening hours, fix same-venue buffer, parameterize Brave year
+
+- `src/services/placesEnrich.js`: rewritten. New `enrichWithPlaceDetails` (price-tier alias kept for bw-compat) widens the Google Places call to fetch `priceLevel + regularOpeningHours + location` in one round-trip. New `VENUE_CATEGORIES` set extends beyond food to include `museum, gallery, landmark, market, show, shopping, spa, sports, cultural`. Tours/walks/parks/sunsets skipped — they inherit from venues or are open-air. `formatOpeningHoursFromPlaces` converts Places `periods[]` to the `"HH:MM-HH:MM,HH:MM-HH:MM"` string the validator already parses (dedupes across days, clamps overnight close to 23:59). LLM-vs-Places hour mismatches logged as `[places-hours-delta]`.
+- `src/services/placesCache.js`: cache value shape widened from `{priceTier}` to `{priceTier, openingHours, location}`. 90-day TTL unchanged.
+- `src/services/placesEnrich.test.js`: rewritten — 10 cases covering food/non-food/venue detection plus four Places-period formatting cases.
+- `src/arrangeValidator.js`: `overlapsWithBuffer` now takes an explicit buffer argument; new `venueKey()` (lat/lng → venue_name → address fallback) + `bufferBetween()` returns 0 for same-venue pairs and `MIN_BUFFER_BETWEEN` otherwise. Two new validator tests assert same-venue passes and different-venue still fails.
+- `src/braveSearch.js`: `searchCityActivities` and `searchTopRestaurants` accept `{ year }`; default to `new Date().getFullYear()`. `src/claude.js` derives `tripYear` from `city.startDate` and threads it through.
+- Deleted `src/services/arrangePrompt.js` (dead code, no importers — confirmed via grep).
+- `public/app.js`: new `friendlyUnplacedReason()` mapping (`physics_unresolved` → "Couldn't fit into the day without conflicts", plus three other known reasons; unknown reasons pass through).
+- 90/90 tests pass (was 88/88, +2 same-venue validator tests).
+
 ## [2026-04-27] Strip remaining deterministic scaffolding from arrange
 
 - Deleted `src/arrangeTimeAssigner.js` (~170 lines) and `src/arrangeTimeAssigner.test.js`. The third-tier deterministic fallback in `/api/arrange` is gone — when LLM + repair both fail validation, broken activities now go to `unplaced` with reason `physics_unresolved` instead of being auto-placed by stale rules.

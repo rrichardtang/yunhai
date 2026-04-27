@@ -67,6 +67,31 @@ test('detects opening hours violation', () => {
   assert.ok(v.issues.some((i) => i.type === 'opening_hours'));
 });
 
+test('same-venue activities skip the 20-min walk buffer', () => {
+  const a = { id: 'a', name: 'Tapas at Bar X', timing: { duration_minutes: 60 }, venue_name: 'Bar X' };
+  const b = { id: 'b', name: 'Drinks at Bar X', timing: { duration_minutes: 60 }, venue_name: 'Bar X' };
+  const v = validate({
+    placements: { a: { date: '2026-05-03', time: '12:00' }, b: { date: '2026-05-03', time: '13:00' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { a, b }
+  });
+  assert.equal(v.ok, true);
+});
+
+test('different venues still enforce the buffer', () => {
+  const a = { id: 'a', name: 'A', timing: { duration_minutes: 60 }, venue_name: 'Cafe Alpha' };
+  const b = { id: 'b', name: 'B', timing: { duration_minutes: 60 }, venue_name: 'Cafe Beta' };
+  const v = validate({
+    placements: { a: { date: '2026-05-03', time: '12:00' }, b: { date: '2026-05-03', time: '13:00' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { a, b }
+  });
+  assert.equal(v.ok, false);
+  assert.equal(v.issues[0].type, 'overlap');
+});
+
 test('does not enforce meal caps (judgment, not physics)', () => {
   const l1 = mkAct('l1', { duration: 60, category: 'lunch' });
   const l2 = mkAct('l2', { duration: 60, category: 'lunch' });

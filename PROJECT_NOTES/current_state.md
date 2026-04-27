@@ -1,27 +1,26 @@
 # Current State
 
-_Last updated: 2026-04-27_
+_Last updated: 2026-04-28_
 
 ## Objective
-On `feature/arrange-polish`: deterministic surface in arrange/activity-generation has been pruned to physics-only. The validator is the only deterministic gate; broken-day activities surface as `unplaced` for manual fix instead of being auto-placed by stale rules.
+Wave 1 of the activity-recommendation / auto-arrange / Brave-grounding audit is complete on `feature/arrange-polish`. Live opening hours from Google Places now backfill the LLM's hallucinated strings on concrete-venue categories; same-venue activity buffer is no longer triggered for back-to-back stops at one location; Brave query year is dynamic; dead `arrangePrompt.js` removed; unplaced reasons rendered with friendly labels.
 
 ## Active Workstream
-Pending user smoke test:
-- Re-plan a Madrid (or similar non-American meal-custom city) trip; confirm the LLM picks dinner times that match local custom (e.g. 21:00–22:30 in Spain) rather than being forced into 18:30–22:30.
-- Force a validator failure (e.g. craft two 8pm dinners on the same day, manually). Verify validator catches it, repair pass tries to fix, and on persistent failure the broken activities show in the `unplaced` panel rather than being auto-assigned by a fallback.
-- Confirm `data/places-cache.json` populates with `$`–`$$$$` symbols rendering on food cards.
+Pending user smoke test of Wave 1:
+- Plan Madrid (concrete-venue meal-custom test) and Tokyo (high-density opening-hours test). Confirm `data/places-cache.json` populates with `openingHours` strings on museums + restaurants and that `[places-hours-delta]` lines surface in server logs when LLM and Places hours disagree.
+- Re-run a trip with two activities at the same venue (e.g., dinner + bar at the same restaurant complex). Confirm validator does not flag it as overlap.
+- Verify a force-failure case still surfaces in the Unplaced panel with the friendlier "Couldn't fit into the day without conflicts" label.
 
 ## Constraints
 - No database — flat JSON files.
-- Same `GOOGLE_MAPS_API_KEY` powers Distance Matrix and Places Text Search.
-- 88/88 npm-test suite passes (down from 99 — 11 assigner tests deleted).
+- Same `GOOGLE_MAPS_API_KEY` powers Distance Matrix and Places Text Search; FieldMask widened to include `regularOpeningHours,location` (no new credential).
+- 90/90 npm-test suite passes (88 → 90 with two new same-venue validator tests; placesEnrich test rewritten to 10 cases).
 
 ## Risks
-- Removing the deterministic fallback means a small fraction of trips may surface activities as `unplaced` that previously got auto-placed (possibly badly). The UI handles unplaced via the existing chip/panel.
-- `inferCategory` now trusts arbitrary LLM-provided category strings. Downstream consumers were checked: `placesEnrich.js` (Set membership — unknown categories silently skip enrichment, fine) and `arrangeValidator.js` (no longer reads category at all after the meal_cap/category_cap removal).
-- 20-min `MIN_BUFFER_BETWEEN` retained — back-to-back same-venue activities may still flag as overlap. Acceptable for now.
+- Places hours conversion does a union of weekday windows; day-of-week closures (e.g. museum closed Mondays) are NOT modeled — the validator may pass a Monday placement that Places marks closed. Acceptable for Wave 1; deferred to follow-up.
+- Same-venue short-circuit relies on `venue_name` / address fallback when lat/lng are null at planning time. Activities without populated `venue_name` (generic "free time", "neighborhood walk") will not match on the lat/lng path and won't trigger the short-circuit — they'll continue to use the 20-min buffer, which is the safe default.
 
 ## Next Actions
-- User smoke test of the pruned arrange flow.
-- Phase 4 cleanup item still open: delete unused `src/services/arrangePrompt.js` (dead code; no importers).
-- Decide whether existing itineraries need a one-shot enrichment job to backfill price tiers.
+- User smoke test of Wave 1 changes.
+- On approval, proceed to Wave 2: commute-matrix injection into arrange prompt (top-K >25min pairs), Brave cache → 24h file-backed, tighten activity Brave grounding to mirror the restaurant "pick from this list" framing.
+- Wave 3 (later): contract test for `/api/arrange` that skips when `ANTHROPIC_API_KEY` is unset.
