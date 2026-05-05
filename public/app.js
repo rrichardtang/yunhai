@@ -4239,6 +4239,7 @@ function renderActivities() {
             <h3>${esc(a.name)}</h3>
             <p><strong>City:</strong> ${esc(a.city || '')}</p>
             <p><strong>Why it fits:</strong> ${esc(a.why_it_fits || '')}</p>
+            ${a.insider_tip ? `<p><strong>Local tip:</strong> ${esc(a.insider_tip)}</p>` : ''}
             <p><strong>Pitfall:</strong> ${esc(a.pitfall || '')}</p>
             <p><strong>Booking advice:</strong> ${esc(a.booking_advice || '')}</p>
             <div class="actions">

@@ -127,6 +127,7 @@
       why_it_fits: String(a.why_it_fits || '').trim(),
       pitfall: String(a.pitfall || '').trim(),
       booking_advice: String(a.booking_advice || '').trim(),
+      insider_tip: a.insider_tip == null ? null : String(a.insider_tip).trim() || null,
       smarter_alternative: a.smarter_alternative == null ? null : String(a.smarter_alternative).trim()
     };
   }

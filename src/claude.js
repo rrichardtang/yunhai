@@ -31,6 +31,8 @@ Evaluate every activity across five dimensions before recommending it:
 
 When in doubt between two activities, recommend the one that better fits the traveler's stated preferences.
 
+For every recommended activity, channel what someone who has visited ten times knows: the arrival window that beats crowds, the exact vantage or seat, what to skip or order, and any prep detail most visitors miss — capture this as insider_tip.
+
 ---
 
 ## Output Format
@@ -45,6 +47,7 @@ Return a JSON array of activity objects. Each object must have these fields:
 - why_it_fits (string, 1-2 sentences)
 - pitfall (string, 1 sentence)
 - booking_advice (string, 1 sentence)
+- insider_tip (string or null) — Write as if a friend who knows this place intimately is whispering advice before you go: what they'd tell someone they love to make sure they don't just see it, but actually experience it the right way. One sentence: the optimal arrival window, the best physical position, what to skip or specifically request, or a preparation detail most people miss. Null only if no meaningful timing or positioning advantage exists.
 - smarter_alternative (string or null)
 - verdict (string: "Recommend" / "Recommend with caveats" / "Skip")
 - dedicated_time_block (boolean — true if this requires 2+ hours of committed time)
@@ -223,6 +226,7 @@ function blankActivity(overrides = {}) {
     why_it_fits: '',
     pitfall: '',
     booking_advice: '',
+    insider_tip: null,
     smarter_alternative: null,
     ...overrides
   };
@@ -303,6 +307,7 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
     why_it_fits: String(raw.why_it_fits || '').trim(),
     pitfall: String(raw.pitfall || '').trim(),
     booking_advice: String(raw.booking_advice || '').trim(),
+    insider_tip: raw.insider_tip == null ? null : String(raw.insider_tip).trim() || null,
     smarter_alternative: raw.smarter_alternative == null ? null : String(raw.smarter_alternative).trim()
   };
 }
