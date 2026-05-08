@@ -39,7 +39,8 @@ const CATEGORY_HINTS = [
   { pattern: /\b(show|concert|theatre|theater|performance)\b/i, category: 'show' },
   { pattern: /\b(tour|day trip|excursion)\b/i, category: 'tour' },
   { pattern: /\b(walk|hike|stroll)\b/i, category: 'walk' },
-  { pattern: /\b(sunset)\b/i, category: 'sunset' }
+  { pattern: /\b(sunset)\b/i, category: 'sunset' },
+  { pattern: /\b(shop|shopping|boutique|department store|mall|outlet)\b/i, category: 'shopping' }
 ];
 
 function inferCategory(activity = {}) {

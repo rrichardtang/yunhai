@@ -4,6 +4,21 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-08] Insider tips field + shopping vertical
+
+- `src/claude.js`: added `insider_tips` field to SYSTEM_PROMPT schema (1-2 sentences, null when no real tip — "never fabricate"). Added MANDATORY shopping rule (specific store/district/market, tax-free refund + price-vs-home-country guidance for shopping activities). Added `shopping` to allowed type list. `normalizeActivity` and `blankActivity` pass `insider_tips` through. `planCity` now fires `searchInsiderTips` always and `searchShoppingDistricts` conditionally on `profile.answers.shoppingPerson >= 3`; injects `insiderBlock` and `shoppingBlock` (with computed shopping-activity floor of 1-3 across the stay) into the user prompt.
+- `src/braveSearch.js`: new `searchInsiderTips(cityName, {year})` and `searchShoppingDistricts(cityName, interests, {year})` — query templates target locals-only travel tips and category-specific shopping respectively.
+- `shared/activityMigration.js`: `insider_tips` propagated through legacy migration path.
+- `src/arrangeConfig.js`: added `shopping` CATEGORY_HINT regex (shop|shopping|boutique|department store|mall|outlet).
+- `public/js/arrangeView.js`: added `shopping: { durationHours: 1.5, openingHours: '10:00-21:00' }` to DEFAULT_ARRANGE_CATEGORY_CONFIG.
+- `public/js/profileWizard.js`: added `shoppingPerson` (1-5 dot scale, 7th interest slider) and `shoppingInterests` (text, "fragrance, fashion, vinyl…") to PROFILE_QUESTIONS.
+- `src/services/profilePrompt.js`: extended `formatProfileForEnrichment` to include shopping slider + interests so the AI summary regenerates with shopping context.
+- `public/app.js`: activity card and expand modal render `insider_tips` with 💡 icon ("Insider tip:" prefix). Finalize modal expanded row shows it too. Review-step search now indexes the field.
+- `public/styles.css`: `.activity-insider-tip` accent style (light yellow background, gold left-border, lightbulb icon).
+- 90/90 tests still passing.
+
+---
+
 ## [2026-04-28] Wave 1: ground opening hours, fix same-venue buffer, parameterize Brave year
 
 - `src/services/placesEnrich.js`: rewritten. New `enrichWithPlaceDetails` (price-tier alias kept for bw-compat) widens the Google Places call to fetch `priceLevel + regularOpeningHours + location` in one round-trip. New `VENUE_CATEGORIES` set extends beyond food to include `museum, gallery, landmark, market, show, shopping, spa, sports, cultural`. Tours/walks/parks/sunsets skipped — they inherit from venues or are open-air. `formatOpeningHoursFromPlaces` converts Places `periods[]` to the `"HH:MM-HH:MM,HH:MM-HH:MM"` string the validator already parses (dedupes across days, clamps overnight close to 23:59). LLM-vs-Places hour mismatches logged as `[places-hours-delta]`.

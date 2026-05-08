@@ -4,6 +4,22 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-08] `insider_tips` is a separate field, not appended to `why_it_fits`
+
+**Decision:** Added `insider_tips` as a distinct optional string on the activity schema rather than extending `why_it_fits` or `pitfall`. Rendered with a 💡 accent so users can visually triage it as "extra credit knowledge."
+**Reasoning:** `why_it_fits` is the sales pitch ("why this matches you"); `pitfall` is "what to avoid." Insider tips are operational knowledge — peak crowding, best arrival time, neighborhood quirks, destination pricing arbitrage. Mixing these dilutes all three. Keeping them split also lets the LLM rule say "return null when you have no factual tip" without contaminating the always-required pitch copy.
+**Alternatives rejected:** (1) Extending `why_it_fits` — would force the LLM to either always include a tip or include hedged filler; rejected. (2) Storing tips in `state.reviewed[id].notes` — that's user-authored space, not LLM output; rejected.
+**Tradeoffs:** One extra schema field that legacy itineraries won't have (renders cleanly as nothing). Brave quota cost: one additional always-on `searchInsiderTips` call per planned city.
+
+## [2026-05-08] Shopping is a first-class interest, not a tag on existing categories
+
+**Decision:** Added `shoppingPerson` (1-5 slider) + `shoppingInterests` (freeform text) to the profile wizard, a dedicated `shopping` activity type, and a conditional Brave query (`searchShoppingDistricts`) that fires only when `shoppingPerson >= 3`. Shopping activities require specific stores/districts, tax-free refund + price-comparison guidance in `insider_tips`, and `booking_type: "none"`.
+**Reasoning:** Real-trip feedback showed travelers wandering Madrid without recommendations because no profile signal captured shopping interest. The existing 6 sliders covered cultural/food/outdoor/nightlife — retail was invisible to the planner. A dedicated slider + freeform anchor lets the LLM generate category-specific picks (Druni/Primor for fragrance, Zara for US-vs-EU pricing arbitrage, Salamanca for luxury) instead of generic "shopping in city center."
+**Alternatives rejected:** (1) Putting "shopping" inside `aboutMe` text — too unstructured for the LLM to weight reliably across cities. (2) Inferring shopping from `budgetStyle` text — silent and inconsistent. (3) Always firing the Brave shopping query — wastes the 2000/month quota for travelers who don't shop; rejected in favor of the `>= 3` gate.
+**Tradeoffs:** New profile field requires existing users to re-run wizard for ideal results; default value of 3 means existing users start receiving low-volume shopping recs (acceptable since the floor scales to trip length).
+
+---
+
 ## [2026-04-28] Google Places is the source of truth for opening hours; LLM string is fallback only
 
 **Decision:** Widened the existing Places Text Search FieldMask to include `regularOpeningHours` and `location` alongside `priceLevel`. When Places returns hours, we overwrite the LLM-emitted `opening_hours` string in both `activity.timing.opening_hours` and the legacy top-level `activity.opening_hours`. When Places returns no hours, the LLM string is preserved untouched. Applies to a new `VENUE_CATEGORIES` set: food categories ∪ `museum, gallery, landmark, market, show, shopping, spa, sports, cultural`. Tours, walks, parks, sunsets, neighborhoods skip Places lookup entirely (open-air or composite venues).

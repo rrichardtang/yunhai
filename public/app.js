@@ -3243,7 +3243,7 @@ function getFilteredReviewActivities() {
 
   return state.activities.filter((a) => {
     const review = state.reviewed[a.id] || { approved: null };
-    const text = [a.name, a.city, a.type, a.why_it_fits, a.pitfall, a.booking_advice].join(' ').toLowerCase();
+    const text = [a.name, a.city, a.type, a.why_it_fits, a.pitfall, a.booking_advice, a.insider_tips].join(' ').toLowerCase();
 
     if (search && !text.includes(search)) return false;
     if (city && String(a.city || '').trim().toLowerCase() !== city) return false;
@@ -3535,6 +3535,7 @@ function openOptCardExpand(act, label) {
       <p><strong>Why it fits:</strong> ${esc(act.why_it_fits || '')}</p>
       ${act.pitfall ? `<p><strong>Pitfall:</strong> ${esc(act.pitfall)}</p>` : ''}
       ${act.booking_advice ? `<p><strong>Booking advice:</strong> ${esc(act.booking_advice)}</p>` : ''}
+      ${act.insider_tips ? `<p class="activity-insider-tip"><i class="ph-bold ph-lightbulb" aria-hidden="true"></i> <strong>Insider tip:</strong> ${esc(act.insider_tips)}</p>` : ''}
     </div>`;
 
   overlay.appendChild(closeBtn);
@@ -3783,6 +3784,7 @@ function renderActivities() {
             <p><strong>Why it fits:</strong> ${esc(a.why_it_fits || '')}</p>
             <p><strong>Pitfall:</strong> ${esc(a.pitfall || '')}</p>
             <p><strong>Booking advice:</strong> ${esc(a.booking_advice || '')}</p>
+            ${a.insider_tips ? `<p class="activity-insider-tip"><i class="ph-bold ph-lightbulb" aria-hidden="true"></i> <strong>Insider tip:</strong> ${esc(a.insider_tips)}</p>` : ''}
             <div class="actions">
               <button class="${approveBtnClass}"><i class="ph-bold ph-check-circle" aria-hidden="true"></i> Approve</button>
               <button class="${declineBtnClass}"><i class="ph-bold ph-x-circle" aria-hidden="true"></i> Decline</button>
@@ -5303,6 +5305,7 @@ function openFinalizeModal() {
         const meta = entry.sourceKind === 'verified' ? 'from checklist' : entry.sourceKind === 'fixed' ? 'fixed time' : '';
         const why = entry.activity.why_it_fits || '';
         const pitfall = entry.activity.pitfall || '';
+        const insiderTips = entry.activity.insider_tips || '';
         const notes = state.reviewed[entry.activity.id]?.notes || '';
         return `
           <div class="cl-item${checkedClass} finalize-item" data-idx="${globalIdx}">
@@ -5323,6 +5326,7 @@ function openFinalizeModal() {
               <div class="cl-item-expanded-wrap finalize-expanded">
                 ${why ? `<p class="finalize-exp-line"><strong>Why it fits:</strong> ${esc(why)}</p>` : ''}
                 ${pitfall ? `<p class="finalize-exp-line"><strong>Pitfall:</strong> ${esc(pitfall)}</p>` : ''}
+                ${insiderTips ? `<p class="finalize-exp-line activity-insider-tip"><i class="ph-bold ph-lightbulb" aria-hidden="true"></i> <strong>Insider tip:</strong> ${esc(insiderTips)}</p>` : ''}
                 ${notes ? `<p class="finalize-exp-line"><strong>Notes:</strong> ${esc(notes)}</p>` : ''}
               </div>` : ''}
           </div>`;
