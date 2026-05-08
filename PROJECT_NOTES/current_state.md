@@ -1,26 +1,25 @@
 # Current State
 
-_Last updated: 2026-04-28_
+_Last updated: 2026-05-08_
 
 ## Objective
-Wave 1 of the activity-recommendation / auto-arrange / Brave-grounding audit is complete on `feature/arrange-polish`. Live opening hours from Google Places now backfill the LLM's hallucinated strings on concrete-venue categories; same-venue activity buffer is no longer triggered for back-to-back stops at one location; Brave query year is dynamic; dead `arrangePrompt.js` removed; unplaced reasons rendered with friendly labels.
+Two trip-feedback gaps from a recent Spain trip are addressed on `feature/insider-tips-shopping`: (1) every recommended activity now ships with an optional `insider_tips` field grounded in fresh Brave search; (2) shopping is a real interest vertical with profile slider + freeform, dedicated activity type, and conditional Brave shopping-research grounding.
 
 ## Active Workstream
-Pending user smoke test of Wave 1:
-- Plan Madrid (concrete-venue meal-custom test) and Tokyo (high-density opening-hours test). Confirm `data/places-cache.json` populates with `openingHours` strings on museums + restaurants and that `[places-hours-delta]` lines surface in server logs when LLM and Places hours disagree.
-- Re-run a trip with two activities at the same venue (e.g., dinner + bar at the same restaurant complex). Confirm validator does not flag it as overlap.
-- Verify a force-failure case still surfaces in the Unplaced panel with the friendlier "Couldn't fit into the day without conflicts" label.
+Pending user smoke test:
+- Plan a Granada/Madrid trip with shopping interest set to 5 and `shoppingInterests = "fragrance, fashion"`. Confirm 1-3 shopping activities appear with specific stores (Druni, Primor, Zara, Salamanca district) each carrying actionable insider_tips (tax-free refund, US-vs-EU pricing).
+- Confirm sunset/viewpoint activities (e.g. San Nicolás Mirador) ship with insider_tips covering peak crowding window and best arrival time.
+- Verify `insider_tips: null` activities render cleanly (no empty 💡 row).
 
 ## Constraints
 - No database — flat JSON files.
-- Same `GOOGLE_MAPS_API_KEY` powers Distance Matrix and Places Text Search; FieldMask widened to include `regularOpeningHours,location` (no new credential).
-- 90/90 npm-test suite passes (88 → 90 with two new same-venue validator tests; placesEnrich test rewritten to 10 cases).
+- Brave free-tier quota (2000/month) — added 1 always-on call (`searchInsiderTips`) and 1 conditional call (`searchShoppingDistricts` only when `shoppingPerson >= 3`) per planned city.
+- 90/90 tests still green; no test changes required since fields are additive.
 
 ## Risks
-- Places hours conversion does a union of weekday windows; day-of-week closures (e.g. museum closed Mondays) are NOT modeled — the validator may pass a Monday placement that Places marks closed. Acceptable for Wave 1; deferred to follow-up.
-- Same-venue short-circuit relies on `venue_name` / address fallback when lat/lng are null at planning time. Activities without populated `venue_name` (generic "free time", "neighborhood walk") will not match on the lat/lng path and won't trigger the short-circuit — they'll continue to use the 20-min buffer, which is the safe default.
+- LLM may still produce generic "arrive early" insider_tips despite the "return null when you have nothing factual" rule. If smoke test surfaces this, tighten the system prompt rule with explicit negative examples.
+- Existing user profiles will default `shoppingPerson` to 3 (PROFILE_DEFAULT) on next normalize — that's >= 3, so they'll start getting shopping recs without re-running the wizard. Acceptable since the floor is small (1 activity for a short trip) and shopping interests text will be empty (so the Brave query falls back to generic "shopping districts").
 
 ## Next Actions
-- User smoke test of Wave 1 changes.
-- On approval, proceed to Wave 2: commute-matrix injection into arrange prompt (top-K >25min pairs), Brave cache → 24h file-backed, tighten activity Brave grounding to mirror the restaurant "pick from this list" framing.
-- Wave 3 (later): contract test for `/api/arrange` that skips when `ANTHROPIC_API_KEY` is unset.
+- User smoke test of insider tips + shopping flow.
+- On approval, push branch and decide whether to backfill insider_tips on existing saved itineraries via `/api/activity/refine` or leave them empty until next plan.

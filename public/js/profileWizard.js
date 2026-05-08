@@ -6,12 +6,14 @@
     { key: 'outdoorNature', label: 'Do you enjoy outdoor / nature activities?', summary: 'Outdoor / nature activities' },
     { key: 'nightlifeBars', label: 'Are you into nightlife and bars?', summary: 'Nightlife and bars' },
     { key: 'structuredTours', label: 'Do you like guided tours?', summary: 'Structured tours' },
+    { key: 'shoppingPerson', label: 'Do you enjoy shopping while traveling?', summary: 'Shopping' },
     { key: 'pace', label: 'How packed do you like your days?', summary: 'Trip pace' },
     { key: 'dayStructure', label: 'How do you like your days structured?', summary: 'Day structure', type: 'text', placeholder: 'e.g. I like to start early and wrap up by 9pm' },
     { key: 'dietaryRestrictions', label: 'Do you have any dietary restrictions or food preferences?', summary: 'Dietary restrictions', type: 'text', placeholder: 'e.g. I\'m vegetarian and avoid shellfish' },
     { key: 'mobilityConsiderations', label: 'Any mobility or physical considerations we should know about?', summary: 'Mobility', type: 'text', placeholder: 'e.g. I avoid lots of walking or stairs' },
     { key: 'budgetStyle', label: 'How would you describe your spending style while traveling?', summary: 'Budget style', type: 'text', placeholder: 'e.g. I prefer mid-range, splurge on food but save on activities' },
-    { key: 'travelCompanions', label: 'Who are you typically traveling with?', summary: 'Travel companions', type: 'text', placeholder: 'e.g. My partner and two kids aged 8 and 11' }
+    { key: 'travelCompanions', label: 'Who are you typically traveling with?', summary: 'Travel companions', type: 'text', placeholder: 'e.g. My partner and two kids aged 8 and 11' },
+    { key: 'shoppingInterests', label: 'What do you like to shop for while traveling?', summary: 'Shopping interests', type: 'text', placeholder: 'e.g. fragrance, fashion, vinyl, vintage, food souvenirs' }
   ];
   const PROFILE_MIN = 1;
   const PROFILE_MAX = 5;
