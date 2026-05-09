@@ -360,9 +360,9 @@ Return ONLY valid JSON (no markdown fences):
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const stream = anthropic.messages.stream({
         model: 'claude-sonnet-4-6',
-        max_tokens: 16384,
-        system: 'You output strict JSON only. No preamble, no explanation, no markdown fences. Begin your response with { and end with }.',
-        messages: [{ role: 'user', content: prompt }]
+        max_tokens: 32768,
+        system: 'You are a JSON-only API endpoint. Do NOT think out loud, narrate your process, list constraints, or write any preamble. Your ENTIRE response must be a single JSON object beginning with { and ending with }. The very first character you emit must be {. Internal reasoning must happen silently before you start emitting tokens.',
+        messages: [{ role: 'user', content: prompt + '\n\nRespond with the JSON object only. The first character of your response must be {. No preamble, no analysis, no constraint listing — just the JSON.' }]
       });
       const final = await stream.finalMessage();
       const raw = extractText(final.content);
