@@ -358,15 +358,17 @@ Return ONLY valid JSON (no markdown fences):
 
     async function callClaudeForJson(prompt) {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const response = await anthropic.messages.create({
+      const stream = anthropic.messages.stream({
         model: 'claude-sonnet-4-6',
-        max_tokens: 2048,
+        max_tokens: 8192,
         messages: [{ role: 'user', content: prompt }]
       });
-      const raw = extractText(response.content);
+      const final = await stream.finalMessage();
+      const raw = extractText(final.content);
       const parsed = tryParseJsonObject(raw);
       if (!parsed) {
-        console.error('arrange JSON parse failed; raw response (first 800 chars):', raw.slice(0, 800));
+        console.error(`arrange JSON parse failed (stop_reason=${final.stop_reason}, length=${raw.length})`);
+        console.error('arrange raw response (first 800 chars):', raw.slice(0, 800));
         console.error('arrange raw response (last 400 chars):', raw.slice(-400));
         throw new Error('Failed to parse arrangement JSON');
       }
