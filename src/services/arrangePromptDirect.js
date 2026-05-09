@@ -68,12 +68,11 @@ PRIMARY DIRECTIVE: Place EVERY flexible activity. The traveler approved all of t
 HARD CONSTRAINTS (the only valid reasons to leave something unplaced):
 1. The activity's opening_hours do not intersect any day window across the whole trip
 2. Placing it would require overlapping a LOCKED activity
-3. There is genuinely no remaining time slot of its duration on any day window after every other placement is made — this is rare; if you find yourself reaching for it, look harder for a fit
+3. There is no remaining time slot of its duration on any day window — only after attempting placement on every day
 
 NOT VALID REASONS to leave something unplaced:
 - "redundant with another activity" — the traveler chose both, place both
 - "all slots are claimed" — claim slots aggressively, that's the job
-- "would require backtracking" — geographic optimization is a soft preference, not a constraint
 - "pacing redundancy" — pace is a soft preference, not a constraint
 
 SOFT PREFERENCES (use to choose between valid placements, never to reject):
@@ -84,9 +83,8 @@ SOFT PREFERENCES (use to choose between valid placements, never to reject):
 
 PLACEMENT STRATEGY:
 - Days have ~12-16 hours of window. Multiple activities per day is expected and encouraged.
-- Meals (breakfast/lunch/dinner) anchor the day; non-meal activities fit between them.
-- A day with 6-8 activities is normal for a packed pace; 4-5 for relaxed.
-- If you have more activities than seem to fit, increase density before reaching for unplaced.
+- Lunch and dinner anchor the day; non-meal activities fit between them.
+- A typical full day has 4–8 activities depending on pace.
 
 DAYS:
 ${daysText}

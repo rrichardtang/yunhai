@@ -4,6 +4,22 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-08] Right-size activity counts + prompt audit (planning + arrange)
+
+Generation prompt was telling Claude to produce a hard floor of ~72 activities for a 9-day trip with no upper bound, causing the arrange step to receive an over-stuffed payload it couldn't schedule. Prompt also carried legacy noise (5-axis Decision Framework table, redundant `verdict` field, `start_location`/`end_location` for stationary venues, `duration` string + `duration_hours` number for the same data, `dedicated_time_block` derivable from duration) that confuses Sonnet and competes with profile/grounding signal.
+
+- `src/claude.js` SYSTEM_PROMPT — dropped the Decision Framework table; replaced with one-sentence "fit-to-person beats fit-to-tourist-list" + "skip prestige picks when likely to feel flat." Dropped `verdict`, `start_location`, `end_location`, `duration` (string), and `dedicated_time_block` from the schema. Dropped `breakfast` from the type enum (lunch + dinner only). Schema is now ~1/3 shorter.
+- `src/claude.js` planCity user prompt — `minMeals` now `2 * tripDays` instead of `3 * tripDays`. Added `maxTotal = round(minTotal * 1.15)` ceiling. Replaced the run-on MANDATORY ACTIVITY COUNT block with a 3-line ACTIVITY COUNT directive: target + range + meal-drop rule for arrival/departure days. Updated restaurantBlock + lockedBlock to drop breakfast and overspecified ordering rules. Reworked shoppingBlock: shopping activities now count *within* the non-meal target, not on top of it.
+- `src/claude.js` `normalizeActivity` — `dedicated_time_block` derived from `durationHours >= 2`. Dropped `verdict` field. Address fallback chain widened to `start_location || location?.address || venue_name`.
+- `shared/activityMigration.js` — same `dedicated_time_block` derivation; dropped `verdict`.
+- `src/services/arrangePromptDirect.js` — softened "look harder for a fit" overcorrection (was calibrated for the over-stuffed case). Replaced explicit "6-8/4-5" density numbers with "4–8 depending on pace" — let Sonnet derive from the pace label two lines above. Removed "increase density before reaching for unplaced" (no longer needed). Removed "would require backtracking" from NOT VALID REASONS (it's already covered as a SOFT PREFERENCE).
+- `src/services/calendarIcs.js`, `src/calendarSync.js` — calendar event location now reads `location.address || venue_name` first, falls back to legacy `start_location/end_location` for old itineraries.
+- `public/app.js` — removed the LLM-verdict badge from activity card render and the Verdict / Start / End rows from placed-card tooltips. The user-state "verdict" filter (approved/declined/unreviewed) is unaffected — different concept.
+- For a 9-day pace-4 trip: floor was 72, now 63 (45 non-meal + 18 meals); ceiling 72.
+- 90/90 tests still passing.
+
+---
+
 ## [2026-05-08] Insider tips field + shopping vertical
 
 - `src/claude.js`: added `insider_tips` field to SYSTEM_PROMPT schema (1-2 sentences, null when no real tip — "never fabricate"). Added MANDATORY shopping rule (specific store/district/market, tax-free refund + price-vs-home-country guidance for shopping activities). Added `shopping` to allowed type list. `normalizeActivity` and `blankActivity` pass `insider_tips` through. `planCity` now fires `searchInsiderTips` always and `searchShoppingDistricts` conditionally on `profile.answers.shoppingPerson >= 3`; injects `insiderBlock` and `shoppingBlock` (with computed shopping-activity floor of 1-3 across the stay) into the user prompt.

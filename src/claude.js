@@ -8,62 +8,29 @@ const { isLegacyActivity, migrateActivity, parseTimeString, parseDurationToMinut
 const MODEL = 'claude-sonnet-4-6';
 
 const SYSTEM_PROMPT = `## Role
-You are a blunt, opinionated travel planning agent. Your job is to design itineraries tailored to the specific traveler's preferences and profile. You are not a generalist — you filter everything through what this specific user actually enjoys. Be concise. At most 3 sentences per activity. Use provided accommodation and trip entry context to shape recommendation timing and geography.
-
----
-
-
-## Decision Framework
-
-Evaluate every activity across five dimensions before recommending it:
-
-| Dimension | What to assess |
-|---|---|
-| **Fun Factor** | Will it hold attention? Is there energy, novelty, or interactivity? |
-| **Disappointment Risk** | Could it feel repetitive, flat, overly ceremonial, or staged? |
-| **Cost vs. Payoff** | Is the price justified for what this traveler actually experiences? |
-| **Planning Flexibility** | Can it be booked last-minute or adjusted around weather/schedule? |
-| **Engagement Type** | Is it interactive, sensory, visceral, or purely observational? |
-
-**Default recommendation rule:**
-- Recommend if: Fun Factor is HIGH or MEDIUM and Disappointment Risk is LOW or MEDIUM
-- Flag with warning if: Disappointment Risk is HIGH but the traveler may still want it
-- Do not recommend if: Fun Factor is LOW, regardless of cultural or historical prestige
-
-When in doubt between two activities, recommend the one that better fits the traveler's stated preferences.
-
----
+You are a blunt, opinionated travel planning agent. Design itineraries tailored to this specific traveler's preferences and profile. Filter everything through what they actually enjoy — fit-to-person beats fit-to-tourist-list. Skip prestige picks (museums, ceremonies, big-name attractions) when they're likely to feel flat for this person, regardless of cultural or historical reputation. Be concise: at most 3 sentences per activity.
 
 ## Output Format
 
 Return a JSON array of activity objects. Each object must have these fields:
 - name (string)
-- type (string: show / tour / food / sports / cultural / walk / sunset / neighborhood / breakfast / lunch / dinner / shopping)
+- type (string: show / tour / food / sports / cultural / walk / sunset / neighborhood / lunch / dinner / shopping)
 - city (string)
 - venue_name (string or null) — the specific place as it appears on Google Maps (e.g. \`Casa Lucio, Madrid\`, \`Colosseum, Rome\`). For meals, this MUST be the restaurant name + city. For generic activities (free time, walks, sunsets, neighborhoods), set to null.
-- start_location (string)
-- end_location (string)
 - why_it_fits (string, 1-2 sentences)
 - pitfall (string, 1 sentence)
 - booking_advice (string, 1 sentence)
 - insider_tips (string or null, 1-2 sentences) — local knowledge a tourist would not know: peak-crowding window, best arrival time, common tourist mistake, neighborhood quirk, "if you do X also do Y" pairing, or destination-specific value/pricing tip (e.g. tax-free refund eligibility, brands cheaper here than at home). If you have no specific, factual tip, return null — never fabricate a generic "arrive early" platitude.
 - smarter_alternative (string or null)
-- verdict (string: "Recommend" / "Recommend with caveats" / "Skip")
-- dedicated_time_block (boolean — true if this requires 2+ hours of committed time)
 - suggested_time (string — e.g. "9:00am", "2:00pm", "sunset")
 - duration_hours (number)
-- duration (string, e.g. "2 hours")
 - category (string, e.g. museum / restaurant / park)
 - opening_hours (string, e.g. "10:00-18:00" or "12:00-14:30,19:00-22:00")
 - estimated_cost_usd (number — estimated cost in USD. Overestimate rather than underestimate. Scale to the city's cost of living. Return 0 for free activities like walks, parks, sunsets.)
 - cost_type (string: "per_person" or "per_group" — per_person: any activity where each person pays individually (museum entry, meal, theme park ticket, boat tour ticket, cooking class). per_group: a single price covers the whole group regardless of headcount (private airport transfer, car rental, private guided tour hired for the group, apartment/villa rental). When in doubt, use per_person.)
-- booking_type (string: "tour" / "attraction" / "restaurant" / "none" — tour: guided or operator-led experiences booked through tour platforms, e.g. "Guided Walking Tour of Alhambra", "Pub Crawl", "Cooking Class with Local Chef". attraction: standalone venues with their own ticketing website, e.g. "teamLab Borderless", "Colosseum", "Disneyland", "Sagrada Familia". restaurant: a specific named restaurant, e.g. "Sukiyabashi Jiro", "Café Central". none: generic or free activities, e.g. "Morning walk", "Sunset at the beach" — NEVER use "none" for food/breakfast/lunch/dinner activities.)
+- booking_type (string: "tour" / "attraction" / "restaurant" / "none" — tour: guided or operator-led experiences booked through tour platforms, e.g. "Guided Walking Tour of Alhambra", "Pub Crawl", "Cooking Class with Local Chef". attraction: standalone venues with their own ticketing website, e.g. "teamLab Borderless", "Colosseum", "Disneyland", "Sagrada Familia". restaurant: a specific named restaurant, e.g. "Sukiyabashi Jiro", "Café Central". none: generic or free activities, e.g. "Morning walk", "Sunset at the beach" — NEVER use "none" for food/lunch/dinner activities.)
 
-MANDATORY RULE — meals: Every activity with type food, breakfast, lunch, or dinner MUST name a specific restaurant (not a cuisine, neighborhood, or meal type). The name field must be the restaurant's name, e.g. "Ichiran Ramen Shinjuku", not "Ramen lunch in Shinjuku". The why_it_fits field must mention 1–2 must-order dishes at that restaurant.
-
-MANDATORY RULE — shopping: If the traveler's profile indicates shopping interest (>= 3) and shoppingInterests are listed, generate shopping activities anchored on their stated interests. Each shopping activity MUST: (1) name a specific store, district, or market — never "go shopping in {city}"; (2) set type to "shopping" and booking_type to "none"; (3) include insider_tips covering tax-free refund eligibility for non-EU travelers (where applicable), price comparison vs the traveler's home country if obvious (e.g. Zara, Mango, Massimo Dutti are notably cheaper in Spain than in the US), and the best neighborhood for the category (e.g. Salamanca for luxury, Malasaña for vintage, Druni / Primor for fragrance & beauty deals).
-
-For each activity, provide realistic start and end locations based on the activity description and the city. Use recognizable landmarks, neighborhoods, or points of interest.
+MANDATORY RULE — meals: Every activity with type food, lunch, or dinner MUST name a specific restaurant (not a cuisine, neighborhood, or meal type). The name field must be the restaurant's name, e.g. "Ichiran Ramen Shinjuku", not "Ramen lunch in Shinjuku". The why_it_fits field must mention 1–2 must-order dishes at that restaurant.
 
 Example object:
 {
@@ -71,8 +38,6 @@ Example object:
   "type": "walk",
   "city": "Lisbon",
   "venue_name": null,
-  "start_location": "Alfama neighborhood, Lisbon",
-  "end_location": "Miradouro da Graça, Lisbon",
   "why_it_fits": "..."
 }
 
@@ -222,7 +187,6 @@ function blankActivity(overrides = {}) {
 
     cost: { estimated_usd: null, type: 'per_person' },
 
-    verdict: 'Recommend',
     dedicated_time_block: false,
     why_it_fits: '',
     pitfall: '',
@@ -235,10 +199,6 @@ function blankActivity(overrides = {}) {
 
 function normalizeActivity(raw = {}, fallbackCity = '') {
   if (!isLegacyActivity(raw)) return raw;
-
-  const verdictRaw = String(raw.verdict || '').trim();
-  const verdict = ['Recommend', 'Recommend with caveats', 'Skip'].includes(verdictRaw)
-    ? verdictRaw : 'Recommend';
 
   const normalizedCategory = inferCategory(raw);
   const defaults = getCategoryDefaults(normalizedCategory);
@@ -264,6 +224,8 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
     return 'none';
   })();
 
+  const address = String(raw.start_location || raw.location?.address || venue_name || '').trim();
+
   return {
     id: raw.id,
     name,
@@ -272,7 +234,7 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
 
     location: {
       name: venue_name || name,
-      address: String(raw.start_location || '').trim(),
+      address,
       lat: null,
       lng: null
     },
@@ -303,8 +265,7 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
       type: raw.cost_type === 'per_group' ? 'per_group' : 'per_person'
     },
 
-    verdict,
-    dedicated_time_block: Boolean(raw.dedicated_time_block),
+    dedicated_time_block: durationHours >= 2,
     why_it_fits: String(raw.why_it_fits || '').trim(),
     pitfall: String(raw.pitfall || '').trim(),
     booking_advice: String(raw.booking_advice || '').trim(),
@@ -365,8 +326,9 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     return Number.isFinite(diff) && diff > 0 ? diff : 1;
   })();
   const minNonMeal = nonMealPerDay * tripDays;
-  const minMeals = 3 * tripDays;
+  const minMeals = 2 * tripDays;
   const minTotal = minNonMeal + minMeals;
+  const maxTotal = Math.round(minTotal * 1.15);
 
   const tripYear = (() => {
     if (startDate) {
@@ -390,7 +352,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     ? `\n\nWeb research (use as supplementary inspiration, not a strict list):\n${webResearch}`
     : '';
   const restaurantBlock = restaurantResearch
-    ? `\n\nTop restaurant research — for every food/breakfast/lunch/dinner activity, pick a specific named restaurant from this list. Choose the one that best fits the day's geographic area relative to the accommodation. Include 1–2 must-order dishes in why_it_fits:\n${restaurantResearch}`
+    ? `\n\nTop restaurant research — for every food/lunch/dinner activity, pick a specific named restaurant from this list. Choose the one that best fits the day's geographic area relative to the accommodation. Include 1–2 must-order dishes in why_it_fits:\n${restaurantResearch}`
     : '';
   const insiderBlock = insiderResearch
     ? `\n\nLocal knowledge / insider notes — use these to populate the insider_tips field with specific, factual tips (peak crowding, best arrival time, common tourist mistakes, neighborhood quirks). Do not copy phrases verbatim; synthesize:\n${insiderResearch}`
@@ -398,23 +360,23 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   const shoppingPerDay = { 3: 0.33, 4: 0.5, 5: 0.75 };
   const shoppingTarget = shoppingActive ? Math.max(1, Math.round((shoppingPerDay[shoppingPerson] || 0.5) * tripDays)) : 0;
   const shoppingBlock = shoppingActive
-    ? `\n\nShopping — this traveler shops while traveling (interest level ${shoppingPerson}/5)${shoppingInterests ? `, specifically interested in: ${shoppingInterests}` : ''}. Generate at least ${shoppingTarget} shopping activit${shoppingTarget === 1 ? 'y' : 'ies'} across this stay, anchored on their stated interests. Each must name a specific store, district, or market — see the MANDATORY shopping rule. ${shoppingResearch ? `\n\nShopping research:\n${shoppingResearch}` : ''}`
+    ? `\n\nSHOPPING (traveler interest ${shoppingPerson}/5${shoppingInterests ? `, focus: ${shoppingInterests}` : ''})\nInclude ${shoppingTarget} shopping activit${shoppingTarget === 1 ? 'y' : 'ies'} across the stay (counted within the non-meal target above, not in addition). Each must name a specific store/district/market — never "go shopping in ${name}". Set type to "shopping" and booking_type to "none". insider_tips should cover tax-free refund eligibility for non-EU travelers (where applicable), price-vs-home-country deltas if obvious (e.g. Zara cheaper in Spain than US), and the best neighborhood for the category.${shoppingResearch ? `\n\nShopping research:\n${shoppingResearch}` : ''}`
     : '';
 
   const travelersDesc = numChildren > 0 ? `${numTravelers} adult${numTravelers > 1 ? 's' : ''} and ${numChildren} child${numChildren > 1 ? 'ren' : ''}` : `${numTravelers} adult${numTravelers > 1 ? 's' : ''}`;
   const budgetBlock = budget && numCities
-    ? `\nBudget context: The traveler has a total trip budget of $${budget} for ${travelersDesc} across ${numCities} cit${numCities > 1 ? 'ies' : 'y'} (~$${Math.round(budget / numCities)} per city). Children's tickets/meals are typically ~60% of adult price. Be budget-conscious — prefer good-value activities and flag expensive options with a caveat in the verdict.`
+    ? `\nBudget context: The traveler has a total trip budget of $${budget} for ${travelersDesc} across ${numCities} cit${numCities > 1 ? 'ies' : 'y'} (~$${Math.round(budget / numCities)} per city). Children's tickets/meals are typically ~60% of adult price. Be budget-conscious — prefer good-value activities.`
     : '';
 
   const lockedBlock = Array.isArray(lockedActivities) && lockedActivities.length
-    ? `\n\nAlready locked activities — DO NOT re-suggest or generate similar alternatives for these (same name, same venue, same cuisine type, or same attraction type at the same location):\n${
+    ? `\n\nAlready locked activities — do not duplicate venues, cuisines, or experience types from this set:\n${
         lockedActivities.map((a) =>
-          `- "${a.name}" | type: ${a.type || ''} | category: ${a.category || ''} | location: ${a.start_location || ''} | time: ${a.suggested_time || 'flexible'}, ~${a.duration_hours || 1}h`
+          `- "${a.name}" | type: ${a.type || ''} | category: ${a.category || ''}`
         ).join('\n')
-      }\n\nNew activities must: (1) not overlap with the above time blocks, (2) not duplicate any of the above venues, cuisines, or experience types, (3) complement the locked set rather than replace it.`
+      }`
     : '';
 
-  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace.\n\nMANDATORY ACTIVITY COUNT — this is a hard floor, not a target. Generate AT LEAST ${minTotal} activities total for this ${tripDays}-day stay: ${minNonMeal} non-meal activities (${nonMealPerDay} per day) PLUS ${minMeals} meals (1 breakfast + 1 lunch + 1 dinner per day). Meals count as activities and MUST be included as separate items with named restaurants. Skip meals whose natural time falls outside the day's available window (e.g. no breakfast on a 3pm arrival, no dinner on a 10am departure) — each skipped meal reduces the floor by 1. You may exceed the floor; you may NOT go below it otherwise. Arrival/departure days still need their meals; only reduce non-meal activities on those days if travel timing makes it impossible to fit ${nonMealPerDay}. Use accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Respect the computed time windows exactly on arrival/departure/transfer days. Be concise.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}${insiderBlock}${shoppingBlock}\n\nReturn JSON only.`;
+  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace.\n\nACTIVITY COUNT\nGenerate ${minTotal} activities (${minTotal}–${maxTotal} acceptable). Composition: ${minNonMeal} non-meal (${nonMealPerDay}/day) + ${minMeals} meals (1 lunch + 1 dinner per full day). On arrival/departure days, drop a meal whose natural time falls outside the available window (e.g. drop lunch on a 3pm arrival, drop dinner on an 11am departure) — each dropped meal reduces the count by 1. Use accommodation and travel timing to shape sequencing — lighter arrivals/departures, first/last activities near accommodation or transport hubs.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}${insiderBlock}${shoppingBlock}\n\nReturn JSON only.`;
 
   const learnedSummary = getSummary(userId);
   const effectiveSystemPrompt = learnedSummary

@@ -4,6 +4,29 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-08] Drop breakfast from generated meal slots; lunch + dinner only
+
+**Decision:** The activity-generation prompt now generates 2 meals per full day (lunch + dinner) instead of 3. The `breakfast` value is removed from the activity `type` enum. Activity-level breakfast picks (specific named cafés) can still appear if Sonnet judges them high-signal, but they come back as `food` type rather than mandated.
+**Reasoning:** Breakfast is usually low-effort: hotel buffet, café next door, or skipped. Forcing the LLM to name a specific 7:30am restaurant every day produced low-signal recommendations and ate one of the day's meal slots that the user rarely used meaningfully. Lunch and dinner are the meals worth curating.
+**Alternatives rejected:** (1) Keep 3 meals but soften breakfast wording — still produces forced low-signal picks. (2) Make breakfast optional via a profile question — adds a knob nobody will tune.
+**Tradeoffs:** Old itineraries with `type: "breakfast"` activities still render correctly (the type tag is descriptive only, and arrange-step CATEGORY_HINTS still maps "breakfast" to its 07:30-10:30 window). New plans will not include breakfast unless Sonnet decides one is genuinely worth recommending.
+
+## [2026-05-08] Activity count is a target with a ceiling, not an unbounded floor
+
+**Decision:** Generation prompt now specifies `target` activities with a `minTotal–maxTotal` acceptable range, where `maxTotal = round(minTotal * 1.15)`. Old prompt only set a hard floor with explicit "you may exceed."
+**Reasoning:** Without an upper bound the LLM produces ~50% more activities than fit, the user reviews a maximalist set, and the arrange step receives a payload that physically can't schedule. A 15% ceiling buffer leaves room for review-step decline churn without overproducing.
+**Alternatives rejected:** (1) Server-side trim post-generation — generation cost is sunk, and trimming hides regressions. (2) Same floor, no ceiling — the original behavior, which produced this bug.
+**Tradeoffs:** Power-user pace-5 trips may feel slightly less stuffed. Acceptable; user can manually add via the "+ Add Activity" card in review if they want more.
+
+## [2026-05-08] Strip `verdict` / `start_location` / `end_location` / `duration` (string) / `dedicated_time_block` from the LLM schema
+
+**Decision:** All five fields removed from the activity-generation schema. `verdict` is gone entirely; `dedicated_time_block` is derived server-side from `durationHours >= 2`; `start_location`/`end_location` are dropped (activities are points, not routes); `duration` (string) is dropped (`duration_hours` is the only source of truth, frontend formats display strings).
+**Reasoning:** Sonnet is good at synthesis when given clean primitives; it gets worse when asked to track 3+ overlapping rule systems. The Decision Framework rule says "do not recommend if Fun Factor is LOW," but the schema asked for `verdict: "Skip"` — the model has to satisfy two contradictory framings. `start_location` + `end_location` for a museum makes the model invent routes for stationary venues. `duration_hours` + `duration` is the same data twice, and the string is regex-parsed back to the number downstream.
+**Alternatives rejected:** Keeping fields "for backwards compat" — legacy itineraries already have them, and `normalizeActivity`'s read-side fallbacks still handle old data; the LLM just stops producing them.
+**Tradeoffs:** Frontend code that rendered the verdict badge is removed (different from the user's approve/decline state, which is unaffected). Calendar exports now prefer `location.address` and fall back to old fields for legacy itineraries.
+
+---
+
 ## [2026-05-08] `insider_tips` is a separate field, not appended to `why_it_fits`
 
 **Decision:** Added `insider_tips` as a distinct optional string on the activity schema rather than extending `why_it_fits` or `pitfall`. Rendered with a 💡 accent so users can visually triage it as "extra credit knowledge."
