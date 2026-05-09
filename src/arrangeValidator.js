@@ -1,4 +1,3 @@
-const { MIN_BUFFER_BETWEEN } = require('./arrangeConstants');
 const { minutesFromTime } = require('../shared/timeHelpers');
 
 function getDuration(activity) {
@@ -59,30 +58,12 @@ function buildEntry(id, placement, activity) {
   return { id, date: placement.date, startMin, endMin: startMin + duration, activity };
 }
 
-function overlapsWithBuffer(a, b, buffer = MIN_BUFFER_BETWEEN) {
-  return a.startMin < b.endMin + buffer && b.startMin < a.endMin + buffer;
+function overlaps(a, b) {
+  return a.startMin < b.endMin && b.startMin < a.endMin;
 }
 
-function venueKey(activity) {
-  const lat = activity?.location?.lat;
-  const lng = activity?.location?.lng;
-  if (Number.isFinite(lat) && Number.isFinite(lng)) {
-    return `${lat.toFixed(4)},${lng.toFixed(4)}`;
-  }
-  const venue = String(activity?.venue_name || '').trim().toLowerCase();
-  if (venue) return `v:${venue}`;
-  const addr = String(activity?.location?.address || '').trim().toLowerCase();
-  return addr ? `a:${addr}` : '';
-}
-
-function bufferBetween(a, b) {
-  const ka = venueKey(a.activity);
-  const kb = venueKey(b.activity);
-  return ka && ka === kb ? 0 : MIN_BUFFER_BETWEEN;
-}
-
-function withinAnyWindow(startMin, endMin, windows) {
-  return windows.some(([s, e]) => startMin >= s && endMin <= e);
+function startsWithinAnyWindow(startMin, windows) {
+  return windows.some(([s, e]) => startMin >= s && startMin < e);
 }
 
 function validate({ placements, lockedActivities = [], days, activitiesById }) {
@@ -102,7 +83,7 @@ function validate({ placements, lockedActivities = [], days, activitiesById }) {
 
     for (let i = 0; i < entries.length; i += 1) {
       for (let j = i + 1; j < entries.length; j += 1) {
-        if (overlapsWithBuffer(entries[i], entries[j], bufferBetween(entries[i], entries[j]))) {
+        if (overlaps(entries[i], entries[j])) {
           issues.push({
             type: 'overlap',
             day: date,
@@ -121,7 +102,7 @@ function validate({ placements, lockedActivities = [], days, activitiesById }) {
       });
     for (const e of entries) {
       for (const l of lockEntries) {
-        if (overlapsWithBuffer(e, l)) {
+        if (overlaps(e, l)) {
           issues.push({
             type: 'lock_overlap',
             day: date,
@@ -151,7 +132,7 @@ function validate({ placements, lockedActivities = [], days, activitiesById }) {
       const raw = getOpeningHoursRaw(e.activity);
       if (!raw) continue;
       const windows = parseOpeningHours(raw);
-      if (!withinAnyWindow(e.startMin, e.endMin, windows)) {
+      if (!startsWithinAnyWindow(e.startMin, windows)) {
         issues.push({
           type: 'opening_hours',
           day: date,
@@ -165,4 +146,4 @@ function validate({ placements, lockedActivities = [], days, activitiesById }) {
   return { ok: issues.length === 0, issues };
 }
 
-module.exports = { validate, overlapsWithBuffer, parseOpeningHours, getDuration, effectiveDayStart, effectiveDayEnd };
+module.exports = { validate, overlaps, parseOpeningHours, getDuration, effectiveDayStart, effectiveDayEnd };

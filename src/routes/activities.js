@@ -18,6 +18,7 @@ const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('../arrangeConfig');
 const { buildBookingLinks } = require('../services/bookingLinks');
 const { buildDirectArrangePrompt, buildRepairPrompt } = require('../services/arrangePromptDirect');
 const { validate: validateArrangement } = require('../arrangeValidator');
+const { minutesFromTime } = require('../../shared/timeHelpers');
 const { buildCityTravelTiming } = require('../services/distanceMatrix');
 const arrangeTelemetry = require('../services/arrangeTelemetry');
 
@@ -418,7 +419,8 @@ Return ONLY valid JSON (no markdown fences):
         prefSummary,
         numTravelers,
         numChildren,
-        cityName
+        cityName,
+        commuteMatrix: matrix
       });
       const parsed = await callClaudeForJson(prompt);
       let { placements, unplaced } = sanitizePlacements(parsed);
@@ -443,8 +445,18 @@ Return ONLY valid JSON (no markdown fences):
       }
 
       if (!v.ok) {
-        const brokenIds = new Set(v.issues.flatMap((i) => i.ids || (i.id ? [i.id] : [])));
-        for (const id of brokenIds) {
+        const toDrop = new Set();
+        for (const issue of v.issues) {
+          if (issue.type === 'overlap' && Array.isArray(issue.ids) && issue.ids.length === 2) {
+            const [idA, idB] = issue.ids;
+            const aStart = minutesFromTime(placements[idA]?.time || '00:00');
+            const bStart = minutesFromTime(placements[idB]?.time || '00:00');
+            toDrop.add(aStart <= bStart ? idB : idA);
+          } else if (issue.id) {
+            toDrop.add(issue.id);
+          }
+        }
+        for (const id of toDrop) {
           if (placements[id]) {
             unplaced.push({ id, reason: 'physics_unresolved' });
             delete placements[id];

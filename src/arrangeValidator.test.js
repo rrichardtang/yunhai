@@ -55,7 +55,7 @@ test('detects window violation', () => {
   assert.ok(v.issues.some((i) => i.type === 'window'));
 });
 
-test('detects opening hours violation', () => {
+test('flags opening_hours when activity starts before venue opens', () => {
   const a = { id: 'a', name: 'a', timing: { duration_minutes: 60, opening_hours: '14:00-18:00' } };
   const v = validate({
     placements: { a: { date: '2026-05-03', time: '10:00' } },
@@ -67,9 +67,22 @@ test('detects opening hours violation', () => {
   assert.ok(v.issues.some((i) => i.type === 'opening_hours'));
 });
 
-test('same-venue activities skip the 20-min walk buffer', () => {
-  const a = { id: 'a', name: 'Tapas at Bar X', timing: { duration_minutes: 60 }, venue_name: 'Bar X' };
-  const b = { id: 'b', name: 'Drinks at Bar X', timing: { duration_minutes: 60 }, venue_name: 'Bar X' };
+test('opening_hours allows activity that extends past listed close (start-within-window)', () => {
+  // Restaurant lists 11:00-15:00. Lunch at 14:30 for 1h ends at 15:30 — fine, kitchens often serve seated diners past close.
+  const a = { id: 'a', name: 'a', timing: { duration_minutes: 60, opening_hours: '11:00-15:00' } };
+  const v = validate({
+    placements: { a: { date: '2026-05-03', time: '14:30' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { a }
+  });
+  assert.equal(v.ok, true);
+});
+
+test('back-to-back activities at different venues pass (LLM owns transit budgeting)', () => {
+  const a = { id: 'a', name: 'A', timing: { duration_minutes: 60 }, venue_name: 'Cafe Alpha' };
+  const b = { id: 'b', name: 'B', timing: { duration_minutes: 60 }, venue_name: 'Cafe Beta' };
+  // a ends at 13:00, b starts at 13:00 — zero gap. Validator no longer enforces a buffer.
   const v = validate({
     placements: { a: { date: '2026-05-03', time: '12:00' }, b: { date: '2026-05-03', time: '13:00' } },
     lockedActivities: [],
@@ -79,9 +92,10 @@ test('same-venue activities skip the 20-min walk buffer', () => {
   assert.equal(v.ok, true);
 });
 
-test('different venues still enforce the buffer', () => {
-  const a = { id: 'a', name: 'A', timing: { duration_minutes: 60 }, venue_name: 'Cafe Alpha' };
+test('actual time overlap (no buffer added) is still flagged', () => {
+  const a = { id: 'a', name: 'A', timing: { duration_minutes: 90 }, venue_name: 'Cafe Alpha' };
   const b = { id: 'b', name: 'B', timing: { duration_minutes: 60 }, venue_name: 'Cafe Beta' };
+  // a runs 12:00-13:30, b runs 13:00-14:00 — real overlap.
   const v = validate({
     placements: { a: { date: '2026-05-03', time: '12:00' }, b: { date: '2026-05-03', time: '13:00' } },
     lockedActivities: [],
