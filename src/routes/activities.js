@@ -52,6 +52,83 @@ function extractText(content = []) {
     .trim();
 }
 
+function stripCodeFences(raw = '') {
+  let cleaned = String(raw || '').trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  }
+  return cleaned.trim();
+}
+
+function extractLikelyJsonObject(raw = '') {
+  const text = String(raw || '');
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) { escaped = false; continue; }
+      if (ch === '\\') { escaped = true; continue; }
+      if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === '{') depth += 1;
+    if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+function repairTruncatedJson(raw = '') {
+  let text = String(raw || '').trim();
+  text = text.replace(/,\s*$/, '');
+  text = text.replace(/,?\s*"[^"]*"\s*:\s*(?:"[^"]*)?$/, '');
+  const opens = [];
+  let inStr = false, esc = false;
+  for (const ch of text) {
+    if (inStr) { if (esc) { esc = false; } else if (ch === '\\') { esc = true; } else if (ch === '"') { inStr = false; } continue; }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === '{' || ch === '[') opens.push(ch);
+    if (ch === '}' || ch === ']') opens.pop();
+  }
+  while (opens.length) {
+    const open = opens.pop();
+    text += open === '{' ? '}' : ']';
+  }
+  return text;
+}
+
+function tryParseJsonObject(raw = '') {
+  const stripped = stripCodeFences(raw);
+  const attempts = [stripped];
+  const extracted = extractLikelyJsonObject(stripped);
+  if (extracted && extracted !== stripped) attempts.push(extracted);
+  const relaxed = extracted
+    ? extracted.replace(/,\s*([}\]])/g, '$1').replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+    : null;
+  if (relaxed && !attempts.includes(relaxed)) attempts.push(relaxed);
+  const repaired = repairTruncatedJson(extracted || stripped);
+  if (!attempts.includes(repaired)) attempts.push(repaired);
+
+  for (const candidate of attempts) {
+    try {
+      const obj = JSON.parse(candidate);
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj;
+    } catch {
+      // try next strategy
+    }
+  }
+  return null;
+}
+
 function register(app) {
   app.get('/api/places/resolve', async (req, res) => {
     const q = String(req.query.q || '').trim();
@@ -232,9 +309,12 @@ Return ONLY valid JSON (no markdown fences):
         messages: [{ role: 'user', content: userContent }]
       });
 
-      const raw = extractText(response.content).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-      const parsed = JSON.parse(raw);
-
+      const raw = extractText(response.content);
+      const parsed = tryParseJsonObject(raw);
+      if (!parsed) {
+        console.error('activity/replace JSON parse failed; raw response (first 800 chars):', raw.slice(0, 800));
+        return res.status(500).json({ error: 'Failed to parse replacement JSON' });
+      }
       if (!parsed.activity || typeof parsed.activity !== 'object') {
         return res.status(500).json({ error: 'LLM returned unexpected shape' });
       }
@@ -284,9 +364,13 @@ Return ONLY valid JSON (no markdown fences):
         messages: [{ role: 'user', content: prompt }]
       });
       const raw = extractText(response.content);
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('Failed to parse arrangement JSON');
-      return JSON.parse(match[0]);
+      const parsed = tryParseJsonObject(raw);
+      if (!parsed) {
+        console.error('arrange JSON parse failed; raw response (first 800 chars):', raw.slice(0, 800));
+        console.error('arrange raw response (last 400 chars):', raw.slice(-400));
+        throw new Error('Failed to parse arrangement JSON');
+      }
+      return parsed;
     }
 
     function sanitizePlacements(parsed) {
