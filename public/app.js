@@ -3758,7 +3758,6 @@ function renderActivities() {
     const approveBtnClass = `primary approve btn-approve ${isApproved ? 'active' : ''} ${isDeclined ? 'inactive' : ''}`.trim();
     const declineBtnClass = `secondary decline btn-decline ${isDeclined ? 'active' : ''} ${isApproved ? 'inactive' : ''}`.trim();
     const cardStateClass = isApproved ? 'approved' : isDeclined ? 'declined' : '';
-    const verdictClass = `verdict-${(a.verdict || '').replace(/\s+/g, '-')}`;
     const isFlipped = Boolean(state.reviewCardFlips[a.id]);
     const card = document.createElement('article');
     card.className = `card activity-card card-reveal ${cardStateClass} ${isFlipped ? 'is-flipped' : ''}`.trim();
@@ -3774,7 +3773,6 @@ function renderActivities() {
             <div class="activity-card-head-actions">
               <div>
                 ${a.type ? `<span class="badge">${esc(a.type)}</span>` : ''}
-                <span class="badge ${verdictClass}">${esc(a.verdict || 'N/A')}</span>
                 <span data-price-badges="${esc(a.id)}">${headerPriceBadgeHtml(a)}</span>
                 ${googleMapsLinkHtml(a)}
               </div>
@@ -4519,7 +4517,6 @@ function makePlacedCard(item) {
                 data-tooltip-type-icon="${esc(icon)}"
                 data-tooltip-type="${esc(typeLabel)}"
                 data-tooltip-duration="${esc(durationLabel)}"
-                data-tooltip-verdict="${esc(item.verdict || 'N/A')}"
                 data-tooltip-why="${esc(item.why_it_fits || '')}"
                 data-tooltip-start-location="${esc(actAddress(item))}"
               >
@@ -5760,9 +5757,7 @@ function showPlacedTooltip(anchorEl) {
     <div class="placed-tooltip-title">${anchorEl.dataset.tooltipName || ''}</div>
     <div class="placed-tooltip-row"><strong>Type:</strong> ${anchorEl.dataset.tooltipTypeIcon || ''} ${anchorEl.dataset.tooltipType || ''}</div>
     <div class="placed-tooltip-row"><strong>Duration:</strong> ${anchorEl.dataset.tooltipDuration || ''}</div>
-    <div class="placed-tooltip-row"><strong>Verdict:</strong> ${anchorEl.dataset.tooltipVerdict || 'N/A'}</div>
-    <div class="placed-tooltip-row"><strong>Start:</strong> ${anchorEl.dataset.tooltipStartLocation || '—'}</div>
-    <div class="placed-tooltip-row"><strong>End:</strong> ${anchorEl.dataset.tooltipEndLocation || '—'}</div>
+    <div class="placed-tooltip-row"><strong>Location:</strong> ${anchorEl.dataset.tooltipStartLocation || '—'}</div>
     <div class="placed-tooltip-row"><strong>Why it fits:</strong> ${anchorEl.dataset.tooltipWhy || ''}</div>
   `;
   layer.classList.add('visible');

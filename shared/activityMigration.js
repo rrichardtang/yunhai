@@ -135,8 +135,7 @@
         type: a.cost_type === 'per_group' ? 'per_group' : 'per_person'
       },
 
-      verdict: a.verdict || 'Recommend',
-      dedicated_time_block: Boolean(a.dedicated_time_block),
+      dedicated_time_block: durationHours >= 2,
 
       why_it_fits: String(a.why_it_fits || '').trim(),
       pitfall: String(a.pitfall || '').trim(),
