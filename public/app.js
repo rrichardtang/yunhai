@@ -5629,7 +5629,8 @@ async function autoArrangeActiveCity(opts = {}) {
       }
     }
 
-    const res = await apiFetch('/api/arrange', {
+    const arrangeUrl = '/api/arrange' + (location.search.includes('debug=1') ? '?debug=1' : '');
+    const res = await apiFetch(arrangeUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

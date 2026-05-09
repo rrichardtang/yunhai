@@ -371,7 +371,14 @@ Return ONLY valid JSON (no markdown fences):
         console.error(`arrange JSON parse failed (stop_reason=${final.stop_reason}, length=${raw.length})`);
         console.error('arrange raw response (first 800 chars):', raw.slice(0, 800));
         console.error('arrange raw response (last 400 chars):', raw.slice(-400));
-        throw new Error('Failed to parse arrangement JSON');
+        const err = new Error('Failed to parse arrangement JSON');
+        err.diagnostic = {
+          stop_reason: final.stop_reason,
+          length: raw.length,
+          head: raw.slice(0, 800),
+          tail: raw.slice(-400)
+        };
+        throw err;
       }
       return parsed;
     }
@@ -474,7 +481,10 @@ Return ONLY valid JSON (no markdown fences):
         lockedCount: resolvedLocked.length,
         error: error.message
       });
-      return res.status(500).json({ error: error.message || 'Failed to arrange activities' });
+      const debugMode = process.env.ARRANGE_DEBUG === '1' || req.query.debug === '1';
+      const body = { error: error.message || 'Failed to arrange activities' };
+      if (debugMode && error.diagnostic) body.diagnostic = error.diagnostic;
+      return res.status(500).json(body);
     }
   });
 
