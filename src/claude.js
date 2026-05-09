@@ -421,29 +421,27 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     ? `${SYSTEM_PROMPT}\n\n${learnedSummary}`
     : SYSTEM_PROMPT;
 
-  const res = await client.messages.create({
-    model: MODEL,
-    max_tokens: 32768,
-    system: effectiveSystemPrompt,
-    messages: [{ role: 'user', content: prompt }]
-  });
-
-  const response = extractTextBlock(res.content);
-  console.log(`planCity(${name}): stop_reason=${res.stop_reason}, response_length=${response.length}`);
-  let parsed = tryParseJsonArray(response);
-
-  if (!parsed) {
-    console.error(`JSON parse failed for ${name} (stop_reason=${res.stop_reason}), retrying...`);
-    console.error(`Raw response (first 500 chars): ${response.slice(0, 500)}`);
-    console.error(`Raw response (last 500 chars): ${response.slice(-500)}`);
-    const retry = await client.messages.create({
+  async function streamMessage(userContent) {
+    const stream = client.messages.stream({
       model: MODEL,
       max_tokens: 32768,
       system: effectiveSystemPrompt,
-      messages: [{ role: 'user', content: prompt + '\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.' }]
+      messages: [{ role: 'user', content: userContent }]
     });
-    const retryResponse = extractTextBlock(retry.content);
-    parsed = tryParseJsonArray(retryResponse);
+    const final = await stream.finalMessage();
+    return { text: extractTextBlock(final.content), stop_reason: final.stop_reason };
+  }
+
+  const { text: response, stop_reason } = await streamMessage(prompt);
+  console.log(`planCity(${name}): stop_reason=${stop_reason}, response_length=${response.length}`);
+  let parsed = tryParseJsonArray(response);
+
+  if (!parsed) {
+    console.error(`JSON parse failed for ${name} (stop_reason=${stop_reason}), retrying...`);
+    console.error(`Raw response (first 500 chars): ${response.slice(0, 500)}`);
+    console.error(`Raw response (last 500 chars): ${response.slice(-500)}`);
+    const retry = await streamMessage(prompt + '\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.');
+    parsed = tryParseJsonArray(retry.text);
   }
 
   if (!parsed) {
