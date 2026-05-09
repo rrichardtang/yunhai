@@ -36,6 +36,34 @@ function dayLine(day, locks) {
   return line;
 }
 
+function buildCommuteBlock(commuteMatrix, flexible, locked) {
+  if (!commuteMatrix || typeof commuteMatrix !== 'object') return '';
+  const nameById = new Map();
+  for (const a of flexible) nameById.set(String(a.id), String(a.name || a.id));
+  for (const l of locked) nameById.set(String(l.id), String(l.name || l.id));
+
+  const seen = new Set();
+  const pairs = [];
+  for (const [fromId, row] of Object.entries(commuteMatrix)) {
+    if (!row || typeof row !== 'object') continue;
+    for (const [toId, minutesRaw] of Object.entries(row)) {
+      const minutes = Number(minutesRaw);
+      if (!Number.isFinite(minutes) || minutes < 15) continue;
+      const fromName = nameById.get(String(fromId));
+      const toName = nameById.get(String(toId));
+      if (!fromName || !toName) continue;
+      const key = [fromId, toId].sort().join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pairs.push({ fromName, toName, minutes });
+    }
+  }
+  if (!pairs.length) return '';
+  pairs.sort((a, b) => b.minutes - a.minutes);
+  const lines = pairs.slice(0, 30).map((p) => `- "${p.fromName}" ↔ "${p.toName}": ${p.minutes} min`);
+  return `\n\nCOMMUTE TIMES (real Google Maps durations between activity venues; minutes via fastest mode). Use these as ground truth — when scheduling two of these venues on the same day, the gap between their start times must accommodate the previous activity's duration PLUS this commute. Pairs not listed are walking distance and need no special planning:\n${lines.join('\n')}`;
+}
+
 function buildDirectArrangePrompt({
   days,
   flexible,
@@ -44,7 +72,8 @@ function buildDirectArrangePrompt({
   prefSummary = '',
   numTravelers,
   numChildren,
-  cityName = ''
+  cityName = '',
+  commuteMatrix = null
 }) {
   const locksByDate = {};
   for (const l of locked) {
@@ -55,6 +84,7 @@ function buildDirectArrangePrompt({
 
   const daysText = days.map((d) => dayLine(d, locksByDate[d.date] || [])).join('\n');
   const activitiesText = flexible.map(activityLine).join('\n');
+  const commuteText = buildCommuteBlock(commuteMatrix, flexible, locked);
 
   const { desc: paceDesc } = paceDescFromValue(profile?.answers?.pace);
 
@@ -90,7 +120,7 @@ DAYS:
 ${daysText}
 
 ACTIVITIES TO SCHEDULE:
-${activitiesText}
+${activitiesText}${commuteText}
 
 TRAVELERS: ${travelerBlock}
 PACE: ${paceDesc}${profileBlock}
