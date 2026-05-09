@@ -63,11 +63,30 @@ function buildDirectArrangePrompt({
 
   return `You are scheduling a trip${cityName ? ` in ${cityName}` : ''}. Build a day-by-day schedule with concrete start times.
 
-You have full judgment over ordering and timing. Use what you know:
-- Local sunset, meal customs, and crowd patterns for the destination and season
-- Semantic intent in activity names and USER NOTES — "sunset drinks" means near dusk, "nightcap" means after dinner, "morning hike" means early
-- Reasonable pacing — don't stack two food events back-to-back, don't put high-intensity activities in a row, leave breathing room
-- Opening hours, locked anchors, and day windows are constraints you must respect
+PRIMARY DIRECTIVE: Place EVERY flexible activity. The traveler approved all of these — they want them in the schedule. Your default action is "place it." Only put an activity in unplaced when you cannot physically fit it given the hard constraints below.
+
+HARD CONSTRAINTS (the only valid reasons to leave something unplaced):
+1. The activity's opening_hours do not intersect any day window across the whole trip
+2. Placing it would require overlapping a LOCKED activity
+3. There is genuinely no remaining time slot of its duration on any day window after every other placement is made — this is rare; if you find yourself reaching for it, look harder for a fit
+
+NOT VALID REASONS to leave something unplaced:
+- "redundant with another activity" — the traveler chose both, place both
+- "all slots are claimed" — claim slots aggressively, that's the job
+- "would require backtracking" — geographic optimization is a soft preference, not a constraint
+- "pacing redundancy" — pace is a soft preference, not a constraint
+
+SOFT PREFERENCES (use to choose between valid placements, never to reject):
+- Local meal customs, sunset timing, crowd patterns
+- Semantic intent in names and USER NOTES — "sunset drinks" → near dusk, "morning hike" → early
+- Reasonable pacing — don't stack two food events back-to-back when a non-food alternative fits
+- Geographic clustering when the routing is obvious
+
+PLACEMENT STRATEGY:
+- Days have ~12-16 hours of window. Multiple activities per day is expected and encouraged.
+- Meals (breakfast/lunch/dinner) anchor the day; non-meal activities fit between them.
+- A day with 6-8 activities is normal for a packed pace; 4-5 for relaxed.
+- If you have more activities than seem to fit, increase density before reaching for unplaced.
 
 DAYS:
 ${daysText}
@@ -81,7 +100,7 @@ PACE: ${paceDesc}${profileBlock}
 OUTPUT — strict JSON only:
 {
   "placements": { "<id>": { "date": "YYYY-MM-DD", "time": "HH:MM" } },
-  "unplaced": [ { "id": "<id>", "reason": "..." } ]
+  "unplaced": [ { "id": "<id>", "reason": "<one of: opening_hours_no_fit | locked_conflict | no_time_slot_remaining>" } ]
 }
 
 Every flexible activity must appear in either placements or unplaced — never both, never neither.
