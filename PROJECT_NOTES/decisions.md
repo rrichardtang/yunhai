@@ -4,6 +4,28 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-09] Commute matrix goes into the arrange prompt; no hardcoded buffer in the validator
+
+**Decision:** The `/api/arrange` route now passes the precomputed Distance Matrix (already shipped from the frontend in the request body) into `buildDirectArrangePrompt`, which renders the top 30 non-trivial pairs (≥15 min, fastest mode) into a `COMMUTE TIMES` block. The validator's `MIN_BUFFER_BETWEEN: 20` constant is deleted; overlap detection is true time overlap with no padding. The cleanup loop drops only the later-starting activity in an overlapping pair, not both.
+
+**Reasoning:** Sonnet was being asked to "leave reasonable transit time" via implicit prompt framing while the actual computed Google Maps numbers were thrown away — and the validator then punished dense placements with a 20-min buffer Sonnet didn't know existed. Two layers fighting the same problem with worse information than we already had on hand. With real numbers in the prompt, Sonnet schedules with knowledge; the validator only catches genuine physics violations (true overlap, lock conflict, day window, opening hours start). This is consistent with the 2026-04-27 reversion of the hybrid scheduler — the LLM owns scheduling, the system gives it good data and only flags the actually impossible.
+
+**Alternatives rejected:** (a) Add a "leave reasonable transit time" line to the prompt — vague, would not produce different behavior, contradicts the product ethos of avoiding hardcoded heuristics. (b) Bring back the hybrid scheduler with `arrangeTimeAssigner.js` — already rejected on 2026-04-27 for severing semantic intent (`sunset drinks`, local meal customs). (c) City-aware default buffers — real Distance Matrix data > any hand-rolled table. (d) Keep `MIN_BUFFER_BETWEEN` lower (e.g. 5 min) — still hardcoded heuristic, just smaller.
+
+**Tradeoffs:** Slight increase in prompt size (top 30 commute pairs ~1-2 KB on a 9-day trip). The matrix isn't free to compute (Distance Matrix API costs), but it was already being computed and shipped — pure plumbing fix, no new costs. If `/api/commute-matrix` returns empty (Maps API down or unconfigured), the prompt simply omits the COMMUTE TIMES block; Sonnet falls back to address-only reasoning, same as before this change.
+
+## [2026-05-09] Opening-hours check: "start within" instead of "fit entirely"
+
+**Decision:** `arrangeValidator` now checks that an activity's start time is within an opening window (`startMin >= s && startMin < e`), not that the entire activity fits inside the window (`startMin >= s && endMin <= e`). A 1-hour lunch starting at 14:30 at a restaurant listed `11:00-15:00` now passes; one starting at 10:00 still fails.
+
+**Reasoning:** LLM-emitted opening hours are lower bounds. Restaurants seat patrons up to close (kitchens stop new orders, but seated diners finish). Museums don't kick visitors out at the dot. The "fit entirely" check was producing false-positive `physics_unresolved` rejections on legitimate edge-of-window placements. Starting position is the real physical constraint — if you arrive at a closed venue, it's closed; if you arrive while it's open, you'll be served.
+
+**Alternatives rejected:** (a) Pad the window by N minutes ("treat 15:00 close as 15:30") — another hardcoded heuristic that varies by venue type. (b) Require LLM to emit closing-time-buffered hours — unreliable, depends on Sonnet getting the buffer guessing right. (c) Keep "fit entirely" — produces user-visible bug (pin café placement at 17:30 with 16:00 listed close fails); the resulting unplaced rate isn't worth the marginal correctness gain.
+
+**Tradeoffs:** A venue that closes at 21:00 will accept a placement at 20:55 even if the activity duration is 90 min (theoretical end 22:25). Acceptable — most venues close because they stop accepting new arrivals, not because they evict existing patrons. If this surfaces as a real-world bug (e.g. user reports being turned away because they arrived too close to close), revisit.
+
+---
+
 ## [2026-05-08] Drop breakfast from generated meal slots; lunch + dinner only
 
 **Decision:** The activity-generation prompt now generates 2 meals per full day (lunch + dinner) instead of 3. The `breakfast` value is removed from the activity `type` enum. Activity-level breakfast picks (specific named cafés) can still appear if Sonnet judges them high-signal, but they come back as `food` type rather than mandated.

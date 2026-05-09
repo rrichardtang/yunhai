@@ -4,6 +4,18 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-09] Arrange: feed commute matrix into prompt; relax validator
+
+Auto-arrange was returning ~50 of 60 activities as `physics_unresolved` because (1) Sonnet was scheduling without real transit data — the commute matrix was being computed via `/api/commute-matrix`, shipped in the request body, then discarded in `src/routes/activities.js` instead of passed to the prompt builder; (2) the validator added a hardcoded 20-min `MIN_BUFFER_BETWEEN` to every overlap check, fighting dense placements Sonnet (correctly) produced; (3) the cleanup loop dropped both sides of every overlap pair, doubling the unplaced count.
+
+- `src/services/arrangePromptDirect.js`: new `buildCommuteBlock` renders the top 30 pairs with shortest-mode duration ≥15 min into a `COMMUTE TIMES` block, sorted by duration descending. The prompt now tells Sonnet to use these as ground truth and treat unlisted pairs as walking distance.
+- `src/routes/activities.js`: pass `matrix` to `buildDirectArrangePrompt` (was previously assigned to a local and ignored). Rewrote the validator-cleanup loop: for each overlap pair, drop only the later-starting one (earlier placements anchor day structure) instead of dropping both.
+- `src/arrangeConstants.js`: dropped `MIN_BUFFER_BETWEEN: 20` — kept `DEFAULT_COMMUTE_MIN: 20` (used elsewhere as Distance Matrix fallback).
+- `src/arrangeValidator.js`: `overlapsWithBuffer` → `overlaps` (true overlap, no buffer). Removed `bufferBetween` and `venueKey` (same-venue special case is no longer needed). `withinAnyWindow` → `startsWithinAnyWindow` — opening hours check is now "start within window" rather than "fit entirely"; venues seat patrons past listed close.
+- `src/arrangeValidator.test.js`: updated assertions for the new contract. Two new tests pin the start-within-window behavior and the no-buffer back-to-back-allowed behavior. 91/91 tests passing (was 90).
+
+---
+
 ## [2026-05-08] Right-size activity counts + prompt audit (planning + arrange)
 
 Generation prompt was telling Claude to produce a hard floor of ~72 activities for a 9-day trip with no upper bound, causing the arrange step to receive an over-stuffed payload it couldn't schedule. Prompt also carried legacy noise (5-axis Decision Framework table, redundant `verdict` field, `start_location`/`end_location` for stationary venues, `duration` string + `duration_hours` number for the same data, `dedicated_time_block` derivable from duration) that confuses Sonnet and competes with profile/grounding signal.
