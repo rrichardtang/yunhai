@@ -1,25 +1,25 @@
 # Current State
 
-_Last updated: 2026-05-08_
+_Last updated: 2026-05-09_
 
 ## Objective
-Right-size activity generation count and audit both the generation and arrange prompts. Generation now targets ~63 activities for a 9-day pace-4 trip (was 72 floor with no ceiling) with lunch + dinner as the only generated meals. Both prompts stripped of legacy noise (Decision Framework table, `verdict`/`start_location`/`end_location`/`duration` string/`dedicated_time_block` fields, "look harder for a fit" overcorrection).
+Auto-arrange now passes the precomputed Distance Matrix into the prompt and the validator no longer enforces a hardcoded 20-min buffer. Sonnet schedules with real transit numbers; the validator only flags genuine physics violations. The cleanup logic drops one side of each overlap pair instead of both.
 
 ## Active Workstream
-Pending user smoke test on a fresh trip:
-- Plan 9-day Tokyo, pace=4, shopping=4. Expect activity count in 60–75 range, no `type: "breakfast"` items, shopping activities counted within (not on top of) the non-meal target.
-- Auto-arrange the result. Expect placements non-empty, >85% of activities placed, unplaced reasons constrained to the closed enum.
-- Visual check: activity cards no longer show LLM verdict badge; placed-card tooltip drops Verdict/Start/End rows.
+Pending user smoke test on the same Tokyo trip that previously produced ~50 unplaced items:
+- Confirm placements count rises from ~10 to ~55+.
+- Confirm the prompt sent to Sonnet contains a COMMUTE TIMES block with real minute counts.
+- Confirm any remaining unplaced items carry their original Sonnet-emitted reasons (`opening_hours_no_fit` / `locked_conflict` / `no_time_slot_remaining`), not the generic `physics_unresolved` fallback.
 
 ## Constraints
 - No database — flat JSON files.
-- Brave free-tier quota; no new always-on calls in this wave.
-- 90/90 tests still green; no test changes required (counts are config values, not asserted).
+- Distance Matrix API: no new costs (matrix was already being computed and shipped, just discarded).
+- 91/91 tests passing.
 
 ## Risks
-- Sonnet may occasionally still emit `start_location`/`end_location`/`verdict` from prompt-cache momentum on cached system prompts. The read-side `normalizeActivity` tolerates them gracefully but they'll be dropped in the v2 normalized output.
-- Calendar export for old itineraries now reads `location.address || venue_name` first; if those are empty (very old data), still falls through to legacy fields.
+- If `/api/commute-matrix` returns an empty matrix (Google Maps API down or unconfigured), the COMMUTE TIMES block is omitted and Sonnet falls back to address-only reasoning. Acceptable — same behavior as before this change.
+- The cleanup loop's "drop later-starting" heuristic in overlap pairs may occasionally drop a higher-value activity. Long-term we may want priority scoring; for now, earlier placements anchor day structure and dropping the later one preserves that anchor.
 
 ## Next Actions
-- User smoke test of the slimmer plan + arrange flow.
-- On approval, commit and push.
+- User smoke test of arrange flow on a multi-day trip.
+- If unplaced count is still high with non-`physics_unresolved` reasons, inspect what Sonnet is emitting via `?debug=1` and the response payload.
