@@ -362,13 +362,10 @@ Return ONLY valid JSON (no markdown fences):
         model: 'claude-sonnet-4-6',
         max_tokens: 16384,
         system: 'You output strict JSON only. No preamble, no explanation, no markdown fences. Begin your response with { and end with }.',
-        messages: [
-          { role: 'user', content: prompt },
-          { role: 'assistant', content: '{' }
-        ]
+        messages: [{ role: 'user', content: prompt }]
       });
       const final = await stream.finalMessage();
-      const raw = '{' + extractText(final.content);
+      const raw = extractText(final.content);
       const parsed = tryParseJsonObject(raw);
       if (!parsed) {
         console.error(`arrange JSON parse failed (stop_reason=${final.stop_reason}, length=${raw.length})`);
