@@ -60,8 +60,8 @@ function buildCommuteBlock(commuteMatrix, flexible, locked) {
   }
   if (!pairs.length) return '';
   pairs.sort((a, b) => b.minutes - a.minutes);
-  const lines = pairs.slice(0, 30).map((p) => `- "${p.fromName}" ↔ "${p.toName}": ${p.minutes} min`);
-  return `\n\nCOMMUTE TIMES (real Google Maps durations between activity venues; minutes via fastest mode). Use these as ground truth — when scheduling two of these venues on the same day, the gap between their start times must accommodate the previous activity's duration PLUS this commute. Pairs not listed are walking distance and need no special planning:\n${lines.join('\n')}`;
+  const lines = pairs.map((p) => `- "${p.fromName}" ↔ "${p.toName}": ${p.minutes} min`);
+  return `\n\nCOMMUTE TIMES (real Google Maps durations between activity venues; minutes via fastest mode). Use these as ground truth — when scheduling two of these venues on the same day, the gap between their start times must accommodate the previous activity's duration PLUS this commute. Pairs not listed are walking distance (under 15 min) and need no special planning:\n${lines.join('\n')}`;
 }
 
 function buildDirectArrangePrompt({
@@ -115,6 +115,8 @@ PLACEMENT STRATEGY:
 - Days have ~12-16 hours of window. Multiple activities per day is expected and encouraged.
 - Lunch and dinner anchor the day; non-meal activities fit between them.
 - A typical full day has 4–8 activities depending on pace.
+- AT MOST 1 lunch and 1 dinner per day. If the user approved several lunch/dinner candidates, pick the best fit for that day's geography and pace; move the rest to unplaced with reason "no_time_slot_remaining". Do not stack multiple lunches or multiple dinners on the same day.
+- Distribute activities evenly across days. A day with 0–2 activities while another has 8+ is poor balance — move overflow to the lighter day before pushing anything to unplaced.
 
 DAYS:
 ${daysText}

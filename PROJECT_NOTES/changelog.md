@@ -4,6 +4,18 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-10] Arrange: fix Distance Matrix v2 read; lift commute cap; meal/balance nudges; restaurant generation cap
+
+User report: "289 min walk between @cosme and Omotesando Hills" (they're on the same street), 4 lunches scheduled back-to-back, one day nearly empty while 20 unplaced, too many food activities overall.
+
+- `src/services/distanceMatrix.js`: `resolveCommuteQuery` now reads `activity.location.lat/lng/address` (v2 schema) and falls back to `venue_name + city` before reaching the legacy `start_location`/`end_location` path or the `name + city` last-resort query. Yesterday's removal of `start_location`/`end_location` from the LLM schema left this resolver flying blind on every v2 activity, which is why the @cosme query resolved to garbage geocodes producing the 289-min phantom walks.
+- `src/services/arrangePromptDirect.js`: `buildCommuteBlock` no longer caps at top 30 pairs — emits ALL pairs ≥15 min. With ~60 activities, the 30-pair cap was hiding ~95% of long commute pairs from Sonnet, which then defaulted to "walking distance" and stacked geographically distant lunches.
+- `src/services/arrangePromptDirect.js` PLACEMENT STRATEGY: added `AT MOST 1 lunch and 1 dinner per day` rule with explicit instruction to move excess meal candidates to unplaced rather than stack. Added `Distribute activities evenly across days` directive — flags the 0–2 vs 8+ imbalance and tells Sonnet to rebalance before reaching for unplaced.
+- `src/claude.js`: ACTIVITY COUNT block now says EXACTLY `${minMeals}` meals — no additional food/restaurant activities beyond the meal count. Restaurant block reinforces this: pick `${minMeals}` named restaurants, one per meal slot, do not generate extras. Source of "too many food activities" was Sonnet treating the restaurant research as a list to extract from rather than a list to pick from.
+- 91/91 tests passing.
+
+---
+
 ## [2026-05-09] Arrange: feed commute matrix into prompt; relax validator
 
 Auto-arrange was returning ~50 of 60 activities as `physics_unresolved` because (1) Sonnet was scheduling without real transit data — the commute matrix was being computed via `/api/commute-matrix`, shipped in the request body, then discarded in `src/routes/activities.js` instead of passed to the prompt builder; (2) the validator added a hardcoded 20-min `MIN_BUFFER_BETWEEN` to every overlap check, fighting dense placements Sonnet (correctly) produced; (3) the cleanup loop dropped both sides of every overlap pair, doubling the unplaced count.
