@@ -1,25 +1,27 @@
 # Current State
 
-_Last updated: 2026-05-09_
+_Last updated: 2026-05-10_
 
 ## Objective
-Auto-arrange now passes the precomputed Distance Matrix into the prompt and the validator no longer enforces a hardcoded 20-min buffer. Sonnet schedules with real transit numbers; the validator only flags genuine physics violations. The cleanup logic drops one side of each overlap pair instead of both.
+Auto-arrange Distance Matrix usage cut by ~5.7× via single-mode-with-fallback + symmetric pair dedup. Hard 2000-pair circuit breaker prevents another runaway request day. The user must still set Console-side quota caps and budget alarms — code can't enforce those.
 
 ## Active Workstream
-Pending user smoke test on the same Tokyo trip that previously produced ~50 unplaced items:
-- Confirm placements count rises from ~10 to ~55+.
-- Confirm the prompt sent to Sonnet contains a COMMUTE TIMES block with real minute counts.
-- Confirm any remaining unplaced items carry their original Sonnet-emitted reasons (`opening_hours_no_fit` / `locked_conflict` / `no_time_slot_remaining`), not the generic `physics_unresolved` fallback.
+Pending user-side operational steps in Google Cloud Console:
+1. Distance Matrix API → Quotas → set Elements/day to ~5000 (hard stop; requests beyond return 429 instead of charging).
+2. Billing → Budgets & alerts → $20/month threshold with 50/90/100% email alerts.
+
+Also pending: smoke test of the slimmer matrix on the same 60-activity Tokyo trip. Expected first-run Distance Matrix calls ≤1900; second run on same trip ~0 (cache hits).
 
 ## Constraints
-- No database — flat JSON files.
-- Distance Matrix API: no new costs (matrix was already being computed and shipped, just discarded).
+- Distance Matrix free tier exhausted; per-call billing is now active. Code cap (`MAX_PAIRS_PER_REQUEST = 2000`) is the inner ring; Console quota cap is the outer ring.
 - 91/91 tests passing.
 
 ## Risks
-- If `/api/commute-matrix` returns an empty matrix (Google Maps API down or unconfigured), the COMMUTE TIMES block is omitted and Sonnet falls back to address-only reasoning. Acceptable — same behavior as before this change.
-- The cleanup loop's "drop later-starting" heuristic in overlap pairs may occasionally drop a higher-value activity. Long-term we may want priority scoring; for now, earlier placements anchor day structure and dropping the later one preserves that anchor.
+- Per-leg `/api/commute` endpoint still uses 3-mode call; UI commute pills could rack up calls if a user opens many trips. Lower volume than the matrix endpoint but worth watching.
+- If transit returns no result for many pairs in a low-coverage city, the driving fallback fires and undoes some of the savings. Average-case still 1× per pair; worst case 2×.
+- Single-mode means Sonnet may get transit time when driving would have been faster (suburban late-night). Buffer over-allocation is benign; revisit if schedule quality drops.
 
 ## Next Actions
-- User smoke test of arrange flow on a multi-day trip.
-- If unplaced count is still high with non-`physics_unresolved` reasons, inspect what Sonnet is emitting via `?debug=1` and the response payload.
+- Set Console quota cap and budget alarm.
+- Smoke test arrange on Tokyo trip; confirm call count ≤1900 on first run.
+- Long-term consideration: activity-ID-based memoization layer if cache hit rate observed to be low.

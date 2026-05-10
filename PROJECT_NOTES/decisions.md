@@ -4,6 +4,16 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-10] Matrix endpoint uses single-mode (transit-with-driving-fallback); per-leg UI endpoint keeps 3 modes
+
+**Decision:** `/api/commute-matrix` now calls Distance Matrix once per pair (mode=transit), falling back to driving only when transit returns no result. Single-direction queries with both-direction storage in the matrix. Hard cap of 2000 pairs per request (circuit breaker). The `/api/commute` per-leg endpoint that powers the UI mode-pill dropdowns keeps the existing 3-mode `getCommuteBetweenActivities` because the UI needs all three.
+
+**Reasoning:** The matrix endpoint exists to feed Sonnet a single number per pair ("fastest mode minutes") for scheduling purposes. The previous 3-mode implementation paid 3× cost for a value the caller discarded the mode breakdown of. For dense cities (Tokyo, NYC, Madrid, Paris) transit is almost always fastest, so a single transit query is correct in the average case; driving fallback covers Google's transit-data gaps and late-night service. Symmetric query dedup (A→B and B→A) takes another 2× off because for trip-planning purposes the asymmetry from one-way streets is irrelevant — Sonnet just needs to know "leave 35 min between these venues."
+
+**Alternatives rejected:** (a) Always-transit (no driving fallback) — pairs in transit-data gaps would silently render as no-commute, and Sonnet would treat them as walking distance. (b) Cache layer keyed by activity ID — `commuteCache` already memoizes by geocode-string (origin|destination|mode); after yesterday's v2 location.lat/lng resolver fix, the same activity produces the same coord-string query, so the existing layer already does the right thing. Add an ID layer only if observed cache hit rate is low. (c) Caller-side decision (let `/api/commute-matrix` request a `single_mode` flag) — increases API surface for no real benefit; the matrix endpoint will always want a single number.
+
+**Tradeoffs:** For pairs where driving is actually fastest (suburban trips, late nights), the matrix gets transit time which is typically 10–20% slower. Acceptable — Sonnet uses these for "leave at least N minutes between venues," and a 15% over-buffer is benign vs. a 200% under-buffer. If observed schedule quality drops, revisit.
+
 ## [2026-05-09] Commute matrix goes into the arrange prompt; no hardcoded buffer in the validator
 
 **Decision:** The `/api/arrange` route now passes the precomputed Distance Matrix (already shipped from the frontend in the request body) into `buildDirectArrangePrompt`, which renders the top 30 non-trivial pairs (≥15 min, fastest mode) into a `COMMUTE TIMES` block. The validator's `MIN_BUFFER_BETWEEN: 20` constant is deleted; overlap detection is true time overlap with no padding. The cleanup loop drops only the later-starting activity in an overlapping pair, not both.

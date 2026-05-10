@@ -286,6 +286,18 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
   return minutes;
 }
 
+async function getFastestCommuteMinutes(fromActivity, toActivity) {
+  const origin = resolveCommuteQuery(fromActivity, 'end_location');
+  const destination = resolveCommuteQuery(toActivity, 'start_location');
+  if (!origin || !destination) return null;
+
+  let minutes = await fetchDistanceMatrixDuration({ origin, destination, mode: 'transit' });
+  if (minutes == null) {
+    minutes = await fetchDistanceMatrixDuration({ origin, destination, mode: 'driving' });
+  }
+  return minutes;
+}
+
 async function getCommuteBetweenActivities(fromActivity, toActivity) {
   const origin = resolveCommuteQuery(fromActivity, 'end_location');
   const destination = resolveCommuteQuery(toActivity, 'start_location');
@@ -364,5 +376,6 @@ module.exports = {
   isUsableLocation,
   resolveCommuteQuery,
   fetchDistanceMatrixDuration,
-  getCommuteBetweenActivities
+  getCommuteBetweenActivities,
+  getFastestCommuteMinutes
 };
