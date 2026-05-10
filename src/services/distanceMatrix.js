@@ -230,10 +230,22 @@ function isUsableLocation(value = '') {
 }
 
 function resolveCommuteQuery(activity = {}, locationField) {
+  const v2Coords = formatLatLng(activity?.location?.lat, activity?.location?.lng);
+  if (v2Coords) return v2Coords;
+
   const preferredCoords = locationField === 'end_location'
     ? formatLatLng(activity.end_latitude, activity.end_longitude)
     : formatLatLng(activity.start_latitude, activity.start_longitude);
   if (preferredCoords) return preferredCoords;
+
+  const v2Address = String(activity?.location?.address || '').trim();
+  if (isUsableLocation(v2Address)) return v2Address;
+
+  const v2VenueName = String(activity?.venue_name || '').trim();
+  if (isUsableLocation(v2VenueName)) {
+    const city = String(activity?.city || '').trim();
+    return city ? `${v2VenueName}, ${city}` : v2VenueName;
+  }
 
   const location = activity?.[locationField];
   if (isUsableLocation(location)) return String(location).trim();
