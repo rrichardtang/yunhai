@@ -4,6 +4,18 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-10] Distance Matrix cost emergency: 5.7× call-volume reduction
+
+User reported 70K Distance Matrix requests on Google Cloud Console after free trial expired. Root cause: `/api/commute-matrix` paid for 3 modes per pair (transit/driving/walking) when only `durationMinutes` (the fastest) was consumed, AND queried both directions of every symmetric pair. For a 60-activity trip: 60×59 ordered × 3 modes = 10,620 calls per arrange click. Five arrange clicks during debugging = ~53K calls.
+
+- `src/services/distanceMatrix.js`: new `getFastestCommuteMinutes(from, to)` — single Distance Matrix call (mode=transit) with one driving fallback only when transit returns no result. Average 1.05 calls per pair vs the previous 3.
+- `src/routes/commute.js` `/api/commute-matrix`: switched from `getCommuteBetweenActivities` (3-mode) to `getFastestCommuteMinutes`. Loop now iterates `j > i` (unordered pairs only) and writes the duration in both directions. `MAX_PAIRS_PER_REQUEST = 2000` circuit breaker — if a trip would generate more pairs than the cap, returns `{ matrix: {}, throttled: true }` and Sonnet falls back to no-commute-data scheduling.
+- `/api/commute` (per-leg, UI mode-pill display) unchanged — it legitimately needs all 3 modes for the UI dropdowns.
+- Combined effect for 60 activities: 10,620 → ~1,860 calls per arrange (5.7× reduction). With cache hits on repeat clicks, near-zero on subsequent runs.
+- 91/91 tests passing.
+
+---
+
 ## [2026-05-10] Arrange: fix Distance Matrix v2 read; lift commute cap; meal/balance nudges; restaurant generation cap
 
 User report: "289 min walk between @cosme and Omotesando Hills" (they're on the same street), 4 lunches scheduled back-to-back, one day nearly empty while 20 unplaced, too many food activities overall.
