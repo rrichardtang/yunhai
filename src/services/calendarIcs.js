@@ -52,7 +52,7 @@ function buildItineraryIcs(itinerary = {}, { metadataMode = 'compact' } = {}) {
       const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
 
       const summary = activity?.name || 'Travel activity';
-      const location = [activity?.start_location, activity?.end_location].filter(Boolean).join(' → ') || day?.city || '';
+      const location = activity?.location?.address || activity?.venue_name || [activity?.start_location, activity?.end_location].filter(Boolean).join(' → ') || day?.city || '';
       const description = metadataMode === 'full' ? [
         `Type: ${activity?.type || 'activity'}`,
         activity?.why_it_fits ? `Why: ${activity.why_it_fits}` : '',

@@ -2,8 +2,8 @@ const fs = require('fs');
 const path = require('path');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
-const CACHE_PATH = path.join(DATA_DIR, 'commute-cache.json');
-const TTL_MS = 365 * 24 * 60 * 60 * 1000;
+const CACHE_PATH = path.join(DATA_DIR, 'places-cache.json');
+const TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const FLUSH_DEBOUNCE_MS = 2000;
 
 let cache = null;
@@ -13,11 +13,7 @@ let dirty = false;
 function load() {
   if (cache) return cache;
   try {
-    if (fs.existsSync(CACHE_PATH)) {
-      cache = JSON.parse(fs.readFileSync(CACHE_PATH, 'utf8')) || {};
-    } else {
-      cache = {};
-    }
+    cache = fs.existsSync(CACHE_PATH) ? (JSON.parse(fs.readFileSync(CACHE_PATH, 'utf8')) || {}) : {};
   } catch {
     cache = {};
   }
@@ -35,29 +31,26 @@ function scheduleFlush() {
       if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
       fs.writeFileSync(CACHE_PATH, JSON.stringify(cache));
     } catch {
-      // best-effort cache; swallow
+      // best-effort cache
     }
   }, FLUSH_DEBOUNCE_MS);
 }
 
-function key(origin, destination, mode) {
-  return `${origin}|${destination}|${mode}`;
+function key(name, city) {
+  return `${String(name || '').trim().toLowerCase()}|${String(city || '').trim().toLowerCase()}`;
 }
 
-function get(origin, destination, mode) {
-  if (!origin || !destination || !mode) return null;
+function get(name, city) {
   const store = load();
-  const entry = store[key(origin, destination, mode)];
+  const entry = store[key(name, city)];
   if (!entry) return null;
   if (Date.now() - entry.ts > TTL_MS) return null;
-  return Number.isFinite(entry.minutes) ? entry.minutes : null;
+  return entry;
 }
 
-function set(origin, destination, mode, minutes) {
-  if (!origin || !destination || !mode) return;
-  if (!Number.isFinite(minutes)) return;
+function set(name, city, value) {
   const store = load();
-  store[key(origin, destination, mode)] = { minutes, ts: Date.now() };
+  store[key(name, city)] = { ...value, ts: Date.now() };
   scheduleFlush();
 }
 

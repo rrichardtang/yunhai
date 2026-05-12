@@ -4,6 +4,124 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-12] Distance Matrix cost: second wave (~10× further reduction) + per-leg pills back live
+
+Layered four optimizations on top of the 2026-05-10 single-mode/dedup work. Expected 60-activity Tokyo trip: ~$9 → ~$2 first arrange, ~$0 on repeats.
+
+- `src/services/distanceMatrix.js`: added `haversineKm`, `getActivityCoords`, `isWalkingDistancePair`, `WALKING_DISTANCE_KM = 1.5`. `getFastestCommuteMinutes` returns `null` for sub-1.5 km pairs before any API call. `getCommuteBetweenActivities` short-circuits sub-1.5 km pairs with a synthetic walking response carrying `isWalkingDistance: true` — no 3-mode Promise.all fires.
+- `src/routes/commute.js` `/api/commute-matrix`: refactored to two-phase clustering. `clusterByProximity` greedy first-fit by 2 km centroid distance. All intra-cluster pairs compute exact data; each inter-cluster pair fires one Distance Matrix call (using first member as representative) and fans the minute count out to every member-pair. Circuit breaker now wraps combined intra+inter pair count.
+- `src/routes/commute.js` `/api/commute` (per-leg): passes `isWalkingDistance` through to the frontend.
+- `src/services/commuteCache.js`: `TTL_MS` 30 days → 365 days.
+- `public/js/arrangeView.js` `formatCommuteBadge`: renders `🚶 walk` for `isWalkingDistance: true`. Per-leg pills remain live during drafting.
+- 91/91 tests passing.
+
+---
+
+## [2026-05-10] Distance Matrix cost emergency: 5.7× call-volume reduction
+
+User reported 70K Distance Matrix requests on Google Cloud Console after free trial expired. Root cause: `/api/commute-matrix` paid for 3 modes per pair (transit/driving/walking) when only `durationMinutes` (the fastest) was consumed, AND queried both directions of every symmetric pair. For a 60-activity trip: 60×59 ordered × 3 modes = 10,620 calls per arrange click. Five arrange clicks during debugging = ~53K calls.
+
+- `src/services/distanceMatrix.js`: new `getFastestCommuteMinutes(from, to)` — single Distance Matrix call (mode=transit) with one driving fallback only when transit returns no result. Average 1.05 calls per pair vs the previous 3.
+- `src/routes/commute.js` `/api/commute-matrix`: switched from `getCommuteBetweenActivities` (3-mode) to `getFastestCommuteMinutes`. Loop now iterates `j > i` (unordered pairs only) and writes the duration in both directions. `MAX_PAIRS_PER_REQUEST = 2000` circuit breaker — if a trip would generate more pairs than the cap, returns `{ matrix: {}, throttled: true }` and Sonnet falls back to no-commute-data scheduling.
+- `/api/commute` (per-leg, UI mode-pill display) unchanged — it legitimately needs all 3 modes for the UI dropdowns.
+- Combined effect for 60 activities: 10,620 → ~1,860 calls per arrange (5.7× reduction). With cache hits on repeat clicks, near-zero on subsequent runs.
+- 91/91 tests passing.
+
+---
+
+## [2026-05-10] Arrange: fix Distance Matrix v2 read; lift commute cap; meal/balance nudges; restaurant generation cap
+
+User report: "289 min walk between @cosme and Omotesando Hills" (they're on the same street), 4 lunches scheduled back-to-back, one day nearly empty while 20 unplaced, too many food activities overall.
+
+- `src/services/distanceMatrix.js`: `resolveCommuteQuery` now reads `activity.location.lat/lng/address` (v2 schema) and falls back to `venue_name + city` before reaching the legacy `start_location`/`end_location` path or the `name + city` last-resort query. Yesterday's removal of `start_location`/`end_location` from the LLM schema left this resolver flying blind on every v2 activity, which is why the @cosme query resolved to garbage geocodes producing the 289-min phantom walks.
+- `src/services/arrangePromptDirect.js`: `buildCommuteBlock` no longer caps at top 30 pairs — emits ALL pairs ≥15 min. With ~60 activities, the 30-pair cap was hiding ~95% of long commute pairs from Sonnet, which then defaulted to "walking distance" and stacked geographically distant lunches.
+- `src/services/arrangePromptDirect.js` PLACEMENT STRATEGY: added `AT MOST 1 lunch and 1 dinner per day` rule with explicit instruction to move excess meal candidates to unplaced rather than stack. Added `Distribute activities evenly across days` directive — flags the 0–2 vs 8+ imbalance and tells Sonnet to rebalance before reaching for unplaced.
+- `src/claude.js`: ACTIVITY COUNT block now says EXACTLY `${minMeals}` meals — no additional food/restaurant activities beyond the meal count. Restaurant block reinforces this: pick `${minMeals}` named restaurants, one per meal slot, do not generate extras. Source of "too many food activities" was Sonnet treating the restaurant research as a list to extract from rather than a list to pick from.
+- 91/91 tests passing.
+
+---
+
+## [2026-05-09] Arrange: feed commute matrix into prompt; relax validator
+
+Auto-arrange was returning ~50 of 60 activities as `physics_unresolved` because (1) Sonnet was scheduling without real transit data — the commute matrix was being computed via `/api/commute-matrix`, shipped in the request body, then discarded in `src/routes/activities.js` instead of passed to the prompt builder; (2) the validator added a hardcoded 20-min `MIN_BUFFER_BETWEEN` to every overlap check, fighting dense placements Sonnet (correctly) produced; (3) the cleanup loop dropped both sides of every overlap pair, doubling the unplaced count.
+
+- `src/services/arrangePromptDirect.js`: new `buildCommuteBlock` renders the top 30 pairs with shortest-mode duration ≥15 min into a `COMMUTE TIMES` block, sorted by duration descending. The prompt now tells Sonnet to use these as ground truth and treat unlisted pairs as walking distance.
+- `src/routes/activities.js`: pass `matrix` to `buildDirectArrangePrompt` (was previously assigned to a local and ignored). Rewrote the validator-cleanup loop: for each overlap pair, drop only the later-starting one (earlier placements anchor day structure) instead of dropping both.
+- `src/arrangeConstants.js`: dropped `MIN_BUFFER_BETWEEN: 20` — kept `DEFAULT_COMMUTE_MIN: 20` (used elsewhere as Distance Matrix fallback).
+- `src/arrangeValidator.js`: `overlapsWithBuffer` → `overlaps` (true overlap, no buffer). Removed `bufferBetween` and `venueKey` (same-venue special case is no longer needed). `withinAnyWindow` → `startsWithinAnyWindow` — opening hours check is now "start within window" rather than "fit entirely"; venues seat patrons past listed close.
+- `src/arrangeValidator.test.js`: updated assertions for the new contract. Two new tests pin the start-within-window behavior and the no-buffer back-to-back-allowed behavior. 91/91 tests passing (was 90).
+
+---
+
+## [2026-05-08] Right-size activity counts + prompt audit (planning + arrange)
+
+Generation prompt was telling Claude to produce a hard floor of ~72 activities for a 9-day trip with no upper bound, causing the arrange step to receive an over-stuffed payload it couldn't schedule. Prompt also carried legacy noise (5-axis Decision Framework table, redundant `verdict` field, `start_location`/`end_location` for stationary venues, `duration` string + `duration_hours` number for the same data, `dedicated_time_block` derivable from duration) that confuses Sonnet and competes with profile/grounding signal.
+
+- `src/claude.js` SYSTEM_PROMPT — dropped the Decision Framework table; replaced with one-sentence "fit-to-person beats fit-to-tourist-list" + "skip prestige picks when likely to feel flat." Dropped `verdict`, `start_location`, `end_location`, `duration` (string), and `dedicated_time_block` from the schema. Dropped `breakfast` from the type enum (lunch + dinner only). Schema is now ~1/3 shorter.
+- `src/claude.js` planCity user prompt — `minMeals` now `2 * tripDays` instead of `3 * tripDays`. Added `maxTotal = round(minTotal * 1.15)` ceiling. Replaced the run-on MANDATORY ACTIVITY COUNT block with a 3-line ACTIVITY COUNT directive: target + range + meal-drop rule for arrival/departure days. Updated restaurantBlock + lockedBlock to drop breakfast and overspecified ordering rules. Reworked shoppingBlock: shopping activities now count *within* the non-meal target, not on top of it.
+- `src/claude.js` `normalizeActivity` — `dedicated_time_block` derived from `durationHours >= 2`. Dropped `verdict` field. Address fallback chain widened to `start_location || location?.address || venue_name`.
+- `shared/activityMigration.js` — same `dedicated_time_block` derivation; dropped `verdict`.
+- `src/services/arrangePromptDirect.js` — softened "look harder for a fit" overcorrection (was calibrated for the over-stuffed case). Replaced explicit "6-8/4-5" density numbers with "4–8 depending on pace" — let Sonnet derive from the pace label two lines above. Removed "increase density before reaching for unplaced" (no longer needed). Removed "would require backtracking" from NOT VALID REASONS (it's already covered as a SOFT PREFERENCE).
+- `src/services/calendarIcs.js`, `src/calendarSync.js` — calendar event location now reads `location.address || venue_name` first, falls back to legacy `start_location/end_location` for old itineraries.
+- `public/app.js` — removed the LLM-verdict badge from activity card render and the Verdict / Start / End rows from placed-card tooltips. The user-state "verdict" filter (approved/declined/unreviewed) is unaffected — different concept.
+- For a 9-day pace-4 trip: floor was 72, now 63 (45 non-meal + 18 meals); ceiling 72.
+- 90/90 tests still passing.
+
+---
+
+## [2026-05-08] Insider tips field + shopping vertical
+
+- `src/claude.js`: added `insider_tips` field to SYSTEM_PROMPT schema (1-2 sentences, null when no real tip — "never fabricate"). Added MANDATORY shopping rule (specific store/district/market, tax-free refund + price-vs-home-country guidance for shopping activities). Added `shopping` to allowed type list. `normalizeActivity` and `blankActivity` pass `insider_tips` through. `planCity` now fires `searchInsiderTips` always and `searchShoppingDistricts` conditionally on `profile.answers.shoppingPerson >= 3`; injects `insiderBlock` and `shoppingBlock` (with computed shopping-activity floor of 1-3 across the stay) into the user prompt.
+- `src/braveSearch.js`: new `searchInsiderTips(cityName, {year})` and `searchShoppingDistricts(cityName, interests, {year})` — query templates target locals-only travel tips and category-specific shopping respectively.
+- `shared/activityMigration.js`: `insider_tips` propagated through legacy migration path.
+- `src/arrangeConfig.js`: added `shopping` CATEGORY_HINT regex (shop|shopping|boutique|department store|mall|outlet).
+- `public/js/arrangeView.js`: added `shopping: { durationHours: 1.5, openingHours: '10:00-21:00' }` to DEFAULT_ARRANGE_CATEGORY_CONFIG.
+- `public/js/profileWizard.js`: added `shoppingPerson` (1-5 dot scale, 7th interest slider) and `shoppingInterests` (text, "fragrance, fashion, vinyl…") to PROFILE_QUESTIONS.
+- `src/services/profilePrompt.js`: extended `formatProfileForEnrichment` to include shopping slider + interests so the AI summary regenerates with shopping context.
+- `public/app.js`: activity card and expand modal render `insider_tips` with 💡 icon ("Insider tip:" prefix). Finalize modal expanded row shows it too. Review-step search now indexes the field.
+- `public/styles.css`: `.activity-insider-tip` accent style (light yellow background, gold left-border, lightbulb icon).
+- 90/90 tests still passing.
+
+---
+
+## [2026-04-28] Wave 1: ground opening hours, fix same-venue buffer, parameterize Brave year
+
+- `src/services/placesEnrich.js`: rewritten. New `enrichWithPlaceDetails` (price-tier alias kept for bw-compat) widens the Google Places call to fetch `priceLevel + regularOpeningHours + location` in one round-trip. New `VENUE_CATEGORIES` set extends beyond food to include `museum, gallery, landmark, market, show, shopping, spa, sports, cultural`. Tours/walks/parks/sunsets skipped — they inherit from venues or are open-air. `formatOpeningHoursFromPlaces` converts Places `periods[]` to the `"HH:MM-HH:MM,HH:MM-HH:MM"` string the validator already parses (dedupes across days, clamps overnight close to 23:59). LLM-vs-Places hour mismatches logged as `[places-hours-delta]`.
+- `src/services/placesCache.js`: cache value shape widened from `{priceTier}` to `{priceTier, openingHours, location}`. 90-day TTL unchanged.
+- `src/services/placesEnrich.test.js`: rewritten — 10 cases covering food/non-food/venue detection plus four Places-period formatting cases.
+- `src/arrangeValidator.js`: `overlapsWithBuffer` now takes an explicit buffer argument; new `venueKey()` (lat/lng → venue_name → address fallback) + `bufferBetween()` returns 0 for same-venue pairs and `MIN_BUFFER_BETWEEN` otherwise. Two new validator tests assert same-venue passes and different-venue still fails.
+- `src/braveSearch.js`: `searchCityActivities` and `searchTopRestaurants` accept `{ year }`; default to `new Date().getFullYear()`. `src/claude.js` derives `tripYear` from `city.startDate` and threads it through.
+- Deleted `src/services/arrangePrompt.js` (dead code, no importers — confirmed via grep).
+- `public/app.js`: new `friendlyUnplacedReason()` mapping (`physics_unresolved` → "Couldn't fit into the day without conflicts", plus three other known reasons; unknown reasons pass through).
+- 90/90 tests pass (was 88/88, +2 same-venue validator tests).
+
+## [2026-04-27] Strip remaining deterministic scaffolding from arrange
+
+- Deleted `src/arrangeTimeAssigner.js` (~170 lines) and `src/arrangeTimeAssigner.test.js`. The third-tier deterministic fallback in `/api/arrange` is gone — when LLM + repair both fail validation, broken activities now go to `unplaced` with reason `physics_unresolved` instead of being auto-placed by stale rules.
+- `src/arrangeConstants.js`: removed `MEAL_BANDS` (was forcing American meal customs globally via opening-hours intersection). Kept `MIN_BUFFER_BETWEEN: 20` and `DEFAULT_COMMUTE_MIN: 20`.
+- `src/arrangeValidator.js`: inlined `effectiveDayStart`, `effectiveDayEnd`, `getDuration`, `parseOpeningHours` (previously imported from the deleted assigner). Validator is now fully self-contained.
+- `src/arrangeConfig.js`: `inferCategory` now trusts a non-empty LLM-provided `category` directly instead of gating it on the `DEFAULT_ACTIVITY_CATEGORY_CONFIG` keyset. Added `PACE_LABELS` + `paceDescFromValue` exports.
+- `src/claude.js` and `src/services/arrangePromptDirect.js` both now import `paceDescFromValue` instead of redefining the same `paceLabels` dict.
+- `src/routes/activities.js`: removed `assignTimes` import, the `derivePlansFromPlacements` helper, the `fallbackUsed` telemetry flag, and the unused `minutesFromTime` import.
+- 88/88 tests pass (-11 from assigner removal).
+
+## [2026-04-27] Restaurant price tiers + pace-driven activity-count floor
+
+- New `src/services/placesCache.js` — file-backed cache at `data/places-cache.json`, 90-day TTL, debounced flush. Mirrors `commuteCache.js`.
+- New `src/services/placesEnrich.js` — `enrichWithPriceLevel(activities, cityName)` calls Google Places Text Search with FieldMask `places.priceLevel,places.displayName`, maps `PRICE_LEVEL_INEXPENSIVE`–`VERY_EXPENSIVE` → `price_tier` 1–4 on food activities (breakfast/lunch/dinner/restaurant/food/cafe/nightlife). Cached + parallelized; failures swallowed.
+- `src/claude.js`: `planCity` calls `enrichWithPriceLevel` after normalization. `max_tokens` bumped 16384 → 32768 to fit larger trips.
+- `src/claude.js` prompt: replaced vague "proportional to length of stay" line with a hard floor — ≥(`nonMealPerDay × tripDays + 3 × tripDays`) activities, where `nonMealPerDay` is `{1:2, 2:3, 3:4, 4:5, 5:6}` keyed off pace 1–5. Meals counted as activities; partial-day meal-skip allowed when natural meal time falls outside the day's window.
+- `public/app.js`: itinerary row builder passes `priceTier` through; card subtitle now renders `address · $$$` when present.
+- New test `src/services/placesEnrich.test.js` (3 cases: food detection, non-food rejection, price-level map). Lives in nested dir; not picked up by current `npm test` glob.
+
+## [2026-04-26] Undo arrange hybrid — LLM picks times, validator is physics-only
+
+- New `src/services/arrangePromptDirect.js` — replaces `arrangePromptHybrid.js`. LLM now outputs `{placements: {<id>: {date, time}}}` directly with full judgment over timing; the rule list (H1–H5, S1–S5) is gone. Semantic intent (sunset, nightcap, meal customs) is named as a consideration, not a rule.
+- `src/arrangeValidator.js` stripped to physics: overlap, lock_overlap, day window, opening hours. Removed: `meal_cap` and `category_cap` (those were taste, not physics).
+- `src/routes/activities.js` `/api/arrange`: three-tier flow — LLM proposes times → validate → one repair pass on physics violations → deterministic `assignTimes` only on still-broken days as a fallback floor. `arrangeTimeAssigner` retained for the fallback path.
+- Deleted `src/services/arrangePromptHybrid.js`.
+- Tests updated: removed two cap-violation assertions, added an `opening_hours` assertion, added a negative test confirming meal caps are no longer enforced. 99/99 pass.
+
 ## [2026-04-26] Phase 5 — Arrange polish
 
 - §1 Intensity alternation: `src/services/arrangePromptHybrid.js` now emits `intensity:<low|medium|high>` per activity and S2 prohibits two consecutive `high`-intensity activities. Soft constraint, no validator change.

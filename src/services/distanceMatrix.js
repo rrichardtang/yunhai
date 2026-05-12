@@ -27,6 +27,34 @@ function buildDistanceMatrixQuery(activity = {}) {
   return [activity.name, activity.city].filter(Boolean).join(', ').trim();
 }
 
+const WALKING_DISTANCE_KM = 1.5;
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function getActivityCoords(activity) {
+  const lat = Number(activity?.location?.lat);
+  const lng = Number(activity?.location?.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  const sLat = Number(activity?.start_latitude);
+  const sLng = Number(activity?.start_longitude);
+  if (Number.isFinite(sLat) && Number.isFinite(sLng)) return { lat: sLat, lng: sLng };
+  return null;
+}
+
+function isWalkingDistancePair(fromActivity, toActivity) {
+  const a = getActivityCoords(fromActivity);
+  const b = getActivityCoords(toActivity);
+  if (!a || !b) return false;
+  return haversineKm(a.lat, a.lng, b.lat, b.lng) < WALKING_DISTANCE_KM;
+}
+
 function formatLatLng(lat, lng) {
   const latitude = Number(lat);
   const longitude = Number(lng);
@@ -230,10 +258,22 @@ function isUsableLocation(value = '') {
 }
 
 function resolveCommuteQuery(activity = {}, locationField) {
+  const v2Coords = formatLatLng(activity?.location?.lat, activity?.location?.lng);
+  if (v2Coords) return v2Coords;
+
   const preferredCoords = locationField === 'end_location'
     ? formatLatLng(activity.end_latitude, activity.end_longitude)
     : formatLatLng(activity.start_latitude, activity.start_longitude);
   if (preferredCoords) return preferredCoords;
+
+  const v2Address = String(activity?.location?.address || '').trim();
+  if (isUsableLocation(v2Address)) return v2Address;
+
+  const v2VenueName = String(activity?.venue_name || '').trim();
+  if (isUsableLocation(v2VenueName)) {
+    const city = String(activity?.city || '').trim();
+    return city ? `${v2VenueName}, ${city}` : v2VenueName;
+  }
 
   const location = activity?.[locationField];
   if (isUsableLocation(location)) return String(location).trim();
@@ -253,24 +293,53 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
     mode,
     key: apiKey
   });
+  if (mode === 'transit' || mode === 'driving') {
+    params.set('departure_time', 'now');
+  }
 
   const response = await fetch(`${DISTANCE_MATRIX_BASE_URL}?${params.toString()}`);
-  if (!response.ok) return null;
+  if (!response.ok) {
+    if (mode === 'transit') console.warn(`[dm-transit] HTTP ${response.status} for ${origin} -> ${destination}`);
+    return null;
+  }
 
   const data = await response.json();
-  if (data?.status !== 'OK' || !Array.isArray(data?.rows) || !data.rows.length) return null;
+  if (data?.status !== 'OK' || !Array.isArray(data?.rows) || !data.rows.length) {
+    if (mode === 'transit') console.warn(`[dm-transit] top-status=${data?.status} msg=${data?.error_message || ''} for ${origin} -> ${destination}`);
+    return null;
+  }
 
   const element = Array.isArray(data.rows[0]?.elements) && data.rows[0].elements.length
     ? data.rows[0].elements[0]
     : null;
 
-  if (!element || element.status !== 'OK') return null;
+  if (!element || element.status !== 'OK') {
+    if (mode === 'transit') console.warn(`[dm-transit] element-status=${element?.status} for ${origin} -> ${destination}`);
+    return null;
+  }
 
   const durationSeconds = Number(element?.duration?.value || 0);
-  if (!durationSeconds) return null;
+  if (!durationSeconds) {
+    if (mode === 'transit') console.warn(`[dm-transit] no duration for ${origin} -> ${destination}`);
+    return null;
+  }
 
   const minutes = Math.max(1, Math.round(durationSeconds / 60));
   commuteCache.set(origin, destination, mode, minutes);
+  return minutes;
+}
+
+async function getFastestCommuteMinutes(fromActivity, toActivity) {
+  if (isWalkingDistancePair(fromActivity, toActivity)) return null;
+
+  const origin = resolveCommuteQuery(fromActivity, 'end_location');
+  const destination = resolveCommuteQuery(toActivity, 'start_location');
+  if (!origin || !destination) return null;
+
+  let minutes = await fetchDistanceMatrixDuration({ origin, destination, mode: 'transit' });
+  if (minutes == null) {
+    minutes = await fetchDistanceMatrixDuration({ origin, destination, mode: 'driving' });
+  }
   return minutes;
 }
 
@@ -290,6 +359,20 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
       selectedMode: 'transit',
       durationMinutes: null,
       modeIcon: COMMUTE_MODE_ICON.transit
+    };
+  }
+
+  if (isWalkingDistancePair(fromActivity, toActivity)) {
+    return {
+      modes: {
+        transit: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.transit },
+        driving: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.driving },
+        walking: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.walking, isWalkingDistance: true }
+      },
+      selectedMode: 'walking',
+      durationMinutes: null,
+      modeIcon: COMMUTE_MODE_ICON.walking,
+      isWalkingDistance: true
     };
   }
 
@@ -352,5 +435,10 @@ module.exports = {
   isUsableLocation,
   resolveCommuteQuery,
   fetchDistanceMatrixDuration,
-  getCommuteBetweenActivities
+  getCommuteBetweenActivities,
+  getFastestCommuteMinutes,
+  haversineKm,
+  getActivityCoords,
+  isWalkingDistancePair,
+  WALKING_DISTANCE_KM
 };
