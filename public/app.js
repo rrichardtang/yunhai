@@ -2057,6 +2057,18 @@ function syncItemFromExpanded(el, id) {
   syncChecklistNotesToActivity(item);
   syncChecklistDateTimeToPlacement(item);
   syncChecklistBookingRequirementToActivity(item);
+
+  renderBudgetTracker();
+  scheduleChecklistAutosave();
+}
+
+let checklistAutosaveTimer = null;
+function scheduleChecklistAutosave() {
+  if (checklistAutosaveTimer) clearTimeout(checklistAutosaveTimer);
+  checklistAutosaveTimer = setTimeout(() => {
+    checklistAutosaveTimer = null;
+    saveSnapshot({ silent: true });
+  }, 600);
 }
 
 // ── renderTripHealth (badge + trip health panels) ─────────────────────────
@@ -3145,6 +3157,11 @@ function closeChecklistModal() {
   if (checklistSearchRenderTimer) {
     clearTimeout(checklistSearchRenderTimer);
     checklistSearchRenderTimer = null;
+  }
+  if (checklistAutosaveTimer) {
+    clearTimeout(checklistAutosaveTimer);
+    checklistAutosaveTimer = null;
+    saveSnapshot({ silent: true });
   }
   overlayManager.close('checklistModal');
 }
@@ -7284,7 +7301,7 @@ function clearSnapshot() {
   syncToServer('snapshot', null);
 }
 
-function saveSnapshot() {
+function saveSnapshot({ silent = false } = {}) {
   syncTripMetaFromInputs();
 
   const payload = {
@@ -7334,7 +7351,7 @@ function saveSnapshot() {
     }).catch(() => {});
   }
 
-  showToast('Saved!', 'success');
+  if (!silent) showToast('Saved!', 'success');
 }
 
 function resetToFresh() {
