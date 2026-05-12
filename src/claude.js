@@ -1,6 +1,6 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { getSummary } = require('./preferences');
-const { inferCategory, getCategoryDefaults, paceDescFromValue } = require('./arrangeConfig');
+const { inferCategory, getCategoryDefaults, paceDescFromValue, LEGACY_MEAL_TYPES, canonicalizeMealCategory } = require('./arrangeConfig');
 const { searchCityActivities, searchTopRestaurants, searchInsiderTips, searchShoppingDistricts } = require('./braveSearch');
 const { enrichWithPlaceDetails } = require('./services/placesEnrich');
 const { isLegacyActivity, migrateActivity, parseTimeString, parseDurationToMinutes, inferMealType } = require('../shared/activityMigration');
@@ -14,7 +14,7 @@ You are a blunt, opinionated travel planning agent. Design itineraries tailored 
 
 Return a JSON array of activity objects. Each object must have these fields:
 - name (string)
-- type (string: show / tour / food / sports / cultural / walk / sunset / neighborhood / lunch / dinner / shopping)
+- type (string: show / tour / meal / sports / cultural / walk / sunset / neighborhood / shopping) — use "meal" for any restaurant or food activity. Do NOT use "lunch", "dinner", "breakfast", "food", or "restaurant" as type values.
 - city (string)
 - venue_name (string or null) — the specific place as it appears on Google Maps (e.g. \`Casa Lucio, Madrid\`, \`Colosseum, Rome\`). For meals, this MUST be the restaurant name + city. For generic activities (free time, walks, sunsets, neighborhoods), set to null.
 - why_it_fits (string, 1-2 sentences)
@@ -25,12 +25,12 @@ Return a JSON array of activity objects. Each object must have these fields:
 - suggested_time (string — e.g. "9:00am", "2:00pm", "sunset")
 - duration_hours (number)
 - category (string, e.g. museum / restaurant / park)
-- opening_hours (string, e.g. "10:00-18:00" or "12:00-14:30,19:00-22:00")
+- opening_hours (string, e.g. "10:00-18:00" or "12:00-14:30,19:00-22:00") — MANDATORY for type "meal". Use the restaurant's actual hours from the restaurant research provided. Format: "HH:MM-HH:MM" or "HH:MM-HH:MM,HH:MM-HH:MM" for split-shift venues. If actual hours are not in the research, OMIT the restaurant from your output rather than guessing.
 - estimated_cost_usd (number — estimated cost in USD. Overestimate rather than underestimate. Scale to the city's cost of living. Return 0 for free activities like walks, parks, sunsets.)
 - cost_type (string: "per_person" or "per_group" — per_person: any activity where each person pays individually (museum entry, meal, theme park ticket, boat tour ticket, cooking class). per_group: a single price covers the whole group regardless of headcount (private airport transfer, car rental, private guided tour hired for the group, apartment/villa rental). When in doubt, use per_person.)
-- booking_type (string: "tour" / "attraction" / "restaurant" / "none" — tour: guided or operator-led experiences booked through tour platforms, e.g. "Guided Walking Tour of Alhambra", "Pub Crawl", "Cooking Class with Local Chef". attraction: standalone venues with their own ticketing website, e.g. "teamLab Borderless", "Colosseum", "Disneyland", "Sagrada Familia". restaurant: a specific named restaurant, e.g. "Sukiyabashi Jiro", "Café Central". none: generic or free activities, e.g. "Morning walk", "Sunset at the beach" — NEVER use "none" for food/lunch/dinner activities.)
+- booking_type (string: "tour" / "attraction" / "restaurant" / "none" — tour: guided or operator-led experiences booked through tour platforms, e.g. "Guided Walking Tour of Alhambra", "Pub Crawl", "Cooking Class with Local Chef". attraction: standalone venues with their own ticketing website, e.g. "teamLab Borderless", "Colosseum", "Disneyland", "Sagrada Familia". restaurant: a specific named restaurant, e.g. "Sukiyabashi Jiro", "Café Central". none: generic or free activities, e.g. "Morning walk", "Sunset at the beach" — NEVER use "none" for type "meal" activities.)
 
-MANDATORY RULE — meals: Every activity with type food, lunch, or dinner MUST name a specific restaurant (not a cuisine, neighborhood, or meal type). The name field must be the restaurant's name, e.g. "Ichiran Ramen Shinjuku", not "Ramen lunch in Shinjuku". The why_it_fits field must mention 1–2 must-order dishes at that restaurant.
+MANDATORY RULE — meals: Every activity with type "meal" MUST name a specific restaurant (not a cuisine, neighborhood, or meal slot). The name field MUST be the restaurant's name as-is (e.g. "Ichiran Ramen Shinjuku", "Sukiyabashi Jiro"). DO NOT prefix the name with "Lunch at" / "Dinner at" / "Breakfast at" / "Brunch at" — the arrange step decides which slot each meal fills based on opening_hours, not the name. The why_it_fits field must mention 1–2 must-order dishes at that restaurant.
 
 Example object:
 {
@@ -205,12 +205,18 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
   const duration = Number(raw.duration_hours);
   const durationHours = Number.isFinite(duration) && duration > 0 ? duration : defaults.durationHours;
 
-  const name = String(raw.name || 'Untitled activity').trim();
-  const type = String(raw.type || 'tour').trim().toLowerCase();
+  const rawType = String(raw.type || 'tour').trim().toLowerCase();
+  const isMealType = LEGACY_MEAL_TYPES.includes(rawType) || rawType === 'meal';
+  const type = isMealType ? 'meal' : rawType;
+
+  const rawName = String(raw.name || 'Untitled activity').trim();
+  const name = isMealType
+    ? rawName.replace(/^(?:lunch|dinner|breakfast|brunch|supper)\s+at\s+/i, '').trim() || rawName
+    : rawName;
+
   const city = String(raw.city || fallbackCity).trim();
   const rawVenue = raw.venue_name == null ? '' : String(raw.venue_name).trim();
-  const mealTypes = ['food', 'breakfast', 'lunch', 'dinner', 'restaurant'];
-  const venue_name = rawVenue || (mealTypes.includes(type) && name ? `${name}, ${city}` : null);
+  const venue_name = rawVenue || (isMealType && name ? `${name}, ${city}` : null);
 
   const rawSuggested = String(raw.suggested_time || '').trim();
   const preferred_time = (rawSuggested && rawSuggested !== '10:00am')
@@ -220,7 +226,7 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
     if (['tour', 'attraction', 'restaurant', 'none'].includes(raw.booking_type)) return raw.booking_type;
     if (type === 'tour' || type === 'show') return 'tour';
     if (['cultural', 'sports'].includes(type)) return 'attraction';
-    if (['food', 'breakfast', 'lunch', 'dinner'].includes(type)) return 'restaurant';
+    if (type === 'meal') return 'restaurant';
     return 'none';
   })();
 
@@ -245,7 +251,9 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
 
     timing: {
       duration_minutes: parseDurationToMinutes(durationHours),
-      opening_hours: String(raw.opening_hours || defaults.openingHours || '').trim(),
+      opening_hours: isMealType
+        ? String(raw.opening_hours || '').trim()
+        : String(raw.opening_hours || defaults.openingHours || '').trim(),
       preferred_time,
       fixed: null,
       must_happen_on_day: null
@@ -352,7 +360,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     ? `\n\nWeb research (use as supplementary inspiration, not a strict list):\n${webResearch}`
     : '';
   const restaurantBlock = restaurantResearch
-    ? `\n\nTop restaurant research — pick named restaurants from this list to fill the ${minMeals} meal slots above (one per slot). Do NOT generate additional food/restaurant activities beyond the meal target — each slot is one restaurant. Choose ones that fit the day's geographic area relative to the accommodation. Include 1–2 must-order dishes in why_it_fits:\n${restaurantResearch}`
+    ? `\n\nTop restaurant research — output AT MOST ${minMeals} meal-type activities total across the stay, picked from this list. Each meal MUST include the restaurant's actual opening_hours from the research (if hours aren't listed, omit that restaurant). Use neutral names — the restaurant name itself, no "Lunch at" / "Dinner at" prefix. Choose options that fit the day's geographic area relative to the accommodation. The arrange step decides which slot (lunch vs dinner) each meal fills based on opening_hours. Include 1–2 must-order dishes in why_it_fits:\n${restaurantResearch}`
     : '';
   const insiderBlock = insiderResearch
     ? `\n\nLocal knowledge / insider notes — use these to populate the insider_tips field with specific, factual tips (peak crowding, best arrival time, common tourist mistakes, neighborhood quirks). Do not copy phrases verbatim; synthesize:\n${insiderResearch}`
@@ -376,7 +384,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
       }`
     : '';
 
-  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace.\n\nACTIVITY COUNT\nGenerate ${minTotal} activities (${minTotal}–${maxTotal} acceptable). Composition: ${minNonMeal} non-meal (${nonMealPerDay}/day) + EXACTLY ${minMeals} meals (1 lunch + 1 dinner per full day, no more). Do not generate additional food/restaurant activities beyond the meal count — if you have many strong restaurant candidates, pick the ${minMeals} best and skip the rest. On arrival/departure days, drop a meal whose natural time falls outside the available window (e.g. drop lunch on a 3pm arrival, drop dinner on an 11am departure) — each dropped meal reduces the count by 1. Use accommodation and travel timing to shape sequencing — lighter arrivals/departures, first/last activities near accommodation or transport hubs.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}${insiderBlock}${shoppingBlock}\n\nReturn JSON only.`;
+  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace.\n\nACTIVITY COUNT\nGenerate ${minTotal} activities (${minTotal}–${maxTotal} acceptable). Composition: ${minNonMeal} non-meal (${nonMealPerDay}/day) + AT MOST ${minMeals} meal-type activities total. Slot assignment (lunch vs dinner) is decided downstream by the arrange step — do not pre-assign by name. Names must be the restaurant name as-is, no "Lunch at" / "Dinner at" prefix. If you have more strong restaurant candidates than slots, pick the best ${minMeals} and skip the rest. On arrival/departure days, drop a meal whose natural time falls outside the available window (e.g. drop lunch on a 3pm arrival, drop dinner on an 11am departure) — each dropped meal reduces the count by 1. Use accommodation and travel timing to shape sequencing — lighter arrivals/departures, first/last activities near accommodation or transport hubs.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}${insiderBlock}${shoppingBlock}\n\nReturn JSON only.`;
 
   const learnedSummary = getSummary(userId);
   const effectiveSystemPrompt = learnedSummary
@@ -412,8 +420,61 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   }
 
   const normalized = parsed.map((item) => normalizeActivity(item, name));
-  await enrichWithPlaceDetails(normalized, name);
-  return normalized;
+  const filtered = applyMealPoolCap(normalized, { city: name, minMeals });
+  await enrichWithPlaceDetails(filtered, name);
+  return filtered;
+}
+
+function isMealNormalized(activity) {
+  return String(activity?.category || '').toLowerCase() === 'meal';
+}
+
+function mealQualityScore(activity) {
+  let score = 0;
+  if (activity?.insider_tips) score += 2;
+  const why = String(activity?.why_it_fits || '');
+  if (/\b(must[- ]?order|signature|famous for|known for|order the)\b/i.test(why)) score += 2;
+  if (why.length > 80) score += 1;
+  return score;
+}
+
+function applyMealPoolCap(activities, { city, minMeals }) {
+  const meals = [];
+  const nonMeals = [];
+  for (const a of activities) {
+    if (isMealNormalized(a)) meals.push(a);
+    else nonMeals.push(a);
+  }
+
+  const kept = [];
+  const droppedNoHours = [];
+  for (const m of meals) {
+    if (m.timing?.opening_hours) kept.push(m);
+    else droppedNoHours.push(m);
+  }
+
+  let droppedOverage = [];
+  let finalMeals = kept;
+  if (kept.length > minMeals) {
+    const ranked = [...kept]
+      .map((m, idx) => ({ m, idx, score: mealQualityScore(m) }))
+      .sort((a, b) => (b.score - a.score) || (a.idx - b.idx));
+    finalMeals = ranked.slice(0, minMeals).map((entry) => entry.m);
+    droppedOverage = ranked.slice(minMeals).map((entry) => entry.m);
+  }
+
+  if (droppedNoHours.length || droppedOverage.length) {
+    console.warn('[plan] meal pool trim', {
+      city,
+      generated: meals.length,
+      kept: finalMeals.length,
+      cap: minMeals,
+      dropped_no_hours: droppedNoHours.map((m) => m.name),
+      dropped_overage: droppedOverage.map((m) => m.name)
+    });
+  }
+
+  return [...nonMeals, ...finalMeals];
 }
 
 module.exports = { planCity, normalizeActivity, normalizeLegacyActivity, blankActivity, SYSTEM_PROMPT };

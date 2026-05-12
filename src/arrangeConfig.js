@@ -7,11 +7,7 @@ const DEFAULT_ACTIVITY_CATEGORY_CONFIG = {
   park: { durationHours: 1.5, openingHours: '07:00-19:00' },
   neighborhood: { durationHours: 2, openingHours: '09:00-21:00' },
   market: { durationHours: 1.5, openingHours: '09:00-17:00' },
-  food: { durationHours: 1.5, openingHours: '12:00-22:00' },
-  restaurant: { durationHours: 1.75, openingHours: '12:00-14:30,19:00-22:00' },
-  breakfast: { durationHours: 1, openingHours: '07:30-10:30' },
-  lunch: { durationHours: 1.25, openingHours: '12:00-14:30' },
-  dinner: { durationHours: 1.75, openingHours: '18:30-22:30' },
+  meal: { durationHours: 1.5, openingHours: '' },
   nightlife: { durationHours: 2, openingHours: '20:00-23:59' },
   show: { durationHours: 2, openingHours: '19:00-23:00' },
   tour: { durationHours: 2.5, openingHours: '09:00-17:00' },
@@ -24,6 +20,8 @@ const DEFAULT_ACTIVITY_CATEGORY_CONFIG = {
   default: { durationHours: 1.5, openingHours: '09:00-18:00' }
 };
 
+const LEGACY_MEAL_TYPES = ['food', 'restaurant', 'breakfast', 'lunch', 'dinner', 'supper', 'dining', 'brunch'];
+
 const CATEGORY_HINTS = [
   { pattern: /\b(arrival|arrive|check[- ]?in)\b/i, category: 'arrival' },
   { pattern: /\b(depart|departure|check[- ]?out|airport transfer)\b/i, category: 'departure' },
@@ -32,9 +30,7 @@ const CATEGORY_HINTS = [
   { pattern: /\b(park|garden)\b/i, category: 'park' },
   { pattern: /\b(neighborhood|district|quarter)\b/i, category: 'neighborhood' },
   { pattern: /\b(market|bazaar|souq)\b/i, category: 'market' },
-  { pattern: /\b(breakfast|brunch|cafe)\b/i, category: 'breakfast' },
-  { pattern: /\b(lunch)\b/i, category: 'lunch' },
-  { pattern: /\b(dinner|supper)\b/i, category: 'dinner' },
+  { pattern: /\b(breakfast|brunch|cafe|lunch|dinner|supper)\b/i, category: 'meal' },
   { pattern: /\b(bar|cocktail|nightlife|club)\b/i, category: 'nightlife' },
   { pattern: /\b(show|concert|theatre|theater|performance)\b/i, category: 'show' },
   { pattern: /\b(tour|day trip|excursion)\b/i, category: 'tour' },
@@ -43,9 +39,14 @@ const CATEGORY_HINTS = [
   { pattern: /\b(shop|shopping|boutique|department store|mall|outlet)\b/i, category: 'shopping' }
 ];
 
+function canonicalizeMealCategory(raw) {
+  if (!raw) return raw;
+  return LEGACY_MEAL_TYPES.includes(raw) ? 'meal' : raw;
+}
+
 function inferCategory(activity = {}) {
   const rawCategory = String(activity.category || activity.type || '').trim().toLowerCase();
-  if (rawCategory) return rawCategory;
+  if (rawCategory) return canonicalizeMealCategory(rawCategory);
 
   const haystack = `${activity.name || ''} ${activity.type || ''} ${activity.suggested_time || ''}`;
   const hint = CATEGORY_HINTS.find((entry) => entry.pattern.test(haystack));
@@ -53,6 +54,16 @@ function inferCategory(activity = {}) {
 
   return 'default';
 }
+
+function isMealActivity(activity = {}) {
+  const type = String(activity.type || '').trim().toLowerCase();
+  if (type === 'meal') return true;
+  if (LEGACY_MEAL_TYPES.includes(type)) return true;
+  return inferCategory(activity) === 'meal';
+}
+
+const LUNCH_WINDOW = [11 * 60, 14 * 60 + 30];
+const DINNER_WINDOW = [17 * 60, 22 * 60];
 
 const PACE_LABELS = {
   1: 'very relaxed',
@@ -69,13 +80,19 @@ function paceDescFromValue(n) {
 
 function getCategoryDefaults(category = '') {
   const normalized = String(category || '').trim().toLowerCase();
-  return DEFAULT_ACTIVITY_CATEGORY_CONFIG[normalized] || DEFAULT_ACTIVITY_CATEGORY_CONFIG.default;
+  const canonical = canonicalizeMealCategory(normalized);
+  return DEFAULT_ACTIVITY_CATEGORY_CONFIG[canonical] || DEFAULT_ACTIVITY_CATEGORY_CONFIG.default;
 }
 
 module.exports = {
   DEFAULT_ACTIVITY_CATEGORY_CONFIG,
   CATEGORY_HINTS,
+  LEGACY_MEAL_TYPES,
+  LUNCH_WINDOW,
+  DINNER_WINDOW,
   inferCategory,
+  isMealActivity,
+  canonicalizeMealCategory,
   getCategoryDefaults,
   PACE_LABELS,
   paceDescFromValue

@@ -269,7 +269,7 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
     const reasonText = String(reason || '').trim();
     const notesText = String(notes || '').trim();
     const activityType = String(activity.type || '').toLowerCase();
-    const isMeal = ['food', 'breakfast', 'lunch', 'dinner'].includes(activityType);
+    const isMeal = activityType === 'meal' || ['food', 'breakfast', 'lunch', 'dinner', 'restaurant'].includes(activityType);
     const braveQuery = reasonText
       ? `${reasonText} ${activity.city}${isMeal ? ' restaurant' : ''}`.trim()
       : `${activity.name} ${activity.city}`;

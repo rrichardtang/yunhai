@@ -1,4 +1,5 @@
 const { minutesFromTime } = require('../shared/timeHelpers');
+const { isMealActivity, LUNCH_WINDOW, DINNER_WINDOW } = require('./arrangeConfig');
 
 function getDuration(activity) {
   if (activity?.timing?.duration_minutes != null) return Number(activity.timing.duration_minutes) || 60;
@@ -138,6 +139,32 @@ function validate({ placements, lockedActivities = [], days, activitiesById }) {
           day: date,
           id: e.id,
           message: `${e.id} ("${e.activity.name}") scheduled outside opening hours (${raw}) on ${date}`
+        });
+      }
+    }
+
+    const slotsUsed = { lunch: [], dinner: [] };
+    for (const e of entries) {
+      if (!isMealActivity(e.activity)) continue;
+      const inLunch = e.startMin >= LUNCH_WINDOW[0] && e.startMin < LUNCH_WINDOW[1];
+      const inDinner = e.startMin >= DINNER_WINDOW[0] && e.startMin < DINNER_WINDOW[1];
+      const slot = inDinner ? 'dinner' : inLunch ? 'lunch' : null;
+      if (!slot) {
+        issues.push({
+          type: 'meal_outside_windows',
+          day: date,
+          id: e.id,
+          message: `${e.id} ("${e.activity.name}") meal scheduled outside lunch (11:00-14:30) or dinner (17:00-22:00) windows on ${date}`
+        });
+        continue;
+      }
+      slotsUsed[slot].push(e.id);
+      if (slotsUsed[slot].length > 1) {
+        issues.push({
+          type: 'duplicate_meal_slot',
+          day: date,
+          id: e.id,
+          message: `${e.id} ("${e.activity.name}") is a second ${slot} on ${date}`
         });
       }
     }
