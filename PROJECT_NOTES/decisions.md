@@ -4,6 +4,147 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-12] Distance Matrix: Haversine pre-filter + cluster-centroid pairs over Mapbox migration or Finalize-deferral
+
+**Decision:** Keep Google Distance Matrix and feed Sonnet real commute data at arrange time, but cut call volume via (1) Haversine pre-filter at 1.5 km (sub-threshold pairs skipped — prompt already ignores <15-min walking pairs), (2) greedy 2 km clustering with single inter-cluster representative pair fanned out to all member-pairs, (3) cache TTL 30d → 365d, (4) per-leg UI pills stay live during drafting now that arrange cost is bounded.
+
+**Reasoning:** Sonnet's schedule quality degrades noticeably without grounded commute data — it falls back to vibes about venue geography. Earlier proposal to defer all Distance Matrix until Finalize was rejected for this reason. The cost problem is fixable by computing fewer pairs, not by removing data from the prompt.
+
+**Alternatives rejected:**
+- **Mapbox Matrix API**: no public transit data, which is the dominant mode in Tokyo/most cities the user plans for.
+- **Defer Distance Matrix until Finalize**: degrades arrange quality.
+- **K-means clustering**: greedy first-fit is simpler and the optimality gap is irrelevant at this scale.
+- **Per-leg pills only after Finalize**: with the matrix cost cut ~10×, per-leg pills become affordable (~$0.50 per session) and are a real UX win during iteration.
+
+**Tradeoffs:** Inter-cluster pairs receive a centroid-derived estimate, not exact venue-to-venue time — e.g. all Asakusa↔Shibuya pairs share one number. Sonnet doesn't know which numbers are exact vs approximate, which is the right design. Greedy clustering is order-dependent; produces slightly suboptimal partitions in pathological cases but cost stays bounded.
+
+---
+
+## [2026-05-10] Matrix endpoint uses single-mode (transit-with-driving-fallback); per-leg UI endpoint keeps 3 modes
+
+**Decision:** `/api/commute-matrix` now calls Distance Matrix once per pair (mode=transit), falling back to driving only when transit returns no result. Single-direction queries with both-direction storage in the matrix. Hard cap of 2000 pairs per request (circuit breaker). The `/api/commute` per-leg endpoint that powers the UI mode-pill dropdowns keeps the existing 3-mode `getCommuteBetweenActivities` because the UI needs all three.
+
+**Reasoning:** The matrix endpoint exists to feed Sonnet a single number per pair ("fastest mode minutes") for scheduling purposes. The previous 3-mode implementation paid 3× cost for a value the caller discarded the mode breakdown of. For dense cities (Tokyo, NYC, Madrid, Paris) transit is almost always fastest, so a single transit query is correct in the average case; driving fallback covers Google's transit-data gaps and late-night service. Symmetric query dedup (A→B and B→A) takes another 2× off because for trip-planning purposes the asymmetry from one-way streets is irrelevant — Sonnet just needs to know "leave 35 min between these venues."
+
+**Alternatives rejected:** (a) Always-transit (no driving fallback) — pairs in transit-data gaps would silently render as no-commute, and Sonnet would treat them as walking distance. (b) Cache layer keyed by activity ID — `commuteCache` already memoizes by geocode-string (origin|destination|mode); after yesterday's v2 location.lat/lng resolver fix, the same activity produces the same coord-string query, so the existing layer already does the right thing. Add an ID layer only if observed cache hit rate is low. (c) Caller-side decision (let `/api/commute-matrix` request a `single_mode` flag) — increases API surface for no real benefit; the matrix endpoint will always want a single number.
+
+**Tradeoffs:** For pairs where driving is actually fastest (suburban trips, late nights), the matrix gets transit time which is typically 10–20% slower. Acceptable — Sonnet uses these for "leave at least N minutes between venues," and a 15% over-buffer is benign vs. a 200% under-buffer. If observed schedule quality drops, revisit.
+
+## [2026-05-09] Commute matrix goes into the arrange prompt; no hardcoded buffer in the validator
+
+**Decision:** The `/api/arrange` route now passes the precomputed Distance Matrix (already shipped from the frontend in the request body) into `buildDirectArrangePrompt`, which renders the top 30 non-trivial pairs (≥15 min, fastest mode) into a `COMMUTE TIMES` block. The validator's `MIN_BUFFER_BETWEEN: 20` constant is deleted; overlap detection is true time overlap with no padding. The cleanup loop drops only the later-starting activity in an overlapping pair, not both.
+
+**Reasoning:** Sonnet was being asked to "leave reasonable transit time" via implicit prompt framing while the actual computed Google Maps numbers were thrown away — and the validator then punished dense placements with a 20-min buffer Sonnet didn't know existed. Two layers fighting the same problem with worse information than we already had on hand. With real numbers in the prompt, Sonnet schedules with knowledge; the validator only catches genuine physics violations (true overlap, lock conflict, day window, opening hours start). This is consistent with the 2026-04-27 reversion of the hybrid scheduler — the LLM owns scheduling, the system gives it good data and only flags the actually impossible.
+
+**Alternatives rejected:** (a) Add a "leave reasonable transit time" line to the prompt — vague, would not produce different behavior, contradicts the product ethos of avoiding hardcoded heuristics. (b) Bring back the hybrid scheduler with `arrangeTimeAssigner.js` — already rejected on 2026-04-27 for severing semantic intent (`sunset drinks`, local meal customs). (c) City-aware default buffers — real Distance Matrix data > any hand-rolled table. (d) Keep `MIN_BUFFER_BETWEEN` lower (e.g. 5 min) — still hardcoded heuristic, just smaller.
+
+**Tradeoffs:** Slight increase in prompt size (top 30 commute pairs ~1-2 KB on a 9-day trip). The matrix isn't free to compute (Distance Matrix API costs), but it was already being computed and shipped — pure plumbing fix, no new costs. If `/api/commute-matrix` returns empty (Maps API down or unconfigured), the prompt simply omits the COMMUTE TIMES block; Sonnet falls back to address-only reasoning, same as before this change.
+
+## [2026-05-09] Opening-hours check: "start within" instead of "fit entirely"
+
+**Decision:** `arrangeValidator` now checks that an activity's start time is within an opening window (`startMin >= s && startMin < e`), not that the entire activity fits inside the window (`startMin >= s && endMin <= e`). A 1-hour lunch starting at 14:30 at a restaurant listed `11:00-15:00` now passes; one starting at 10:00 still fails.
+
+**Reasoning:** LLM-emitted opening hours are lower bounds. Restaurants seat patrons up to close (kitchens stop new orders, but seated diners finish). Museums don't kick visitors out at the dot. The "fit entirely" check was producing false-positive `physics_unresolved` rejections on legitimate edge-of-window placements. Starting position is the real physical constraint — if you arrive at a closed venue, it's closed; if you arrive while it's open, you'll be served.
+
+**Alternatives rejected:** (a) Pad the window by N minutes ("treat 15:00 close as 15:30") — another hardcoded heuristic that varies by venue type. (b) Require LLM to emit closing-time-buffered hours — unreliable, depends on Sonnet getting the buffer guessing right. (c) Keep "fit entirely" — produces user-visible bug (pin café placement at 17:30 with 16:00 listed close fails); the resulting unplaced rate isn't worth the marginal correctness gain.
+
+**Tradeoffs:** A venue that closes at 21:00 will accept a placement at 20:55 even if the activity duration is 90 min (theoretical end 22:25). Acceptable — most venues close because they stop accepting new arrivals, not because they evict existing patrons. If this surfaces as a real-world bug (e.g. user reports being turned away because they arrived too close to close), revisit.
+
+---
+
+## [2026-05-08] Drop breakfast from generated meal slots; lunch + dinner only
+
+**Decision:** The activity-generation prompt now generates 2 meals per full day (lunch + dinner) instead of 3. The `breakfast` value is removed from the activity `type` enum. Activity-level breakfast picks (specific named cafés) can still appear if Sonnet judges them high-signal, but they come back as `food` type rather than mandated.
+**Reasoning:** Breakfast is usually low-effort: hotel buffet, café next door, or skipped. Forcing the LLM to name a specific 7:30am restaurant every day produced low-signal recommendations and ate one of the day's meal slots that the user rarely used meaningfully. Lunch and dinner are the meals worth curating.
+**Alternatives rejected:** (1) Keep 3 meals but soften breakfast wording — still produces forced low-signal picks. (2) Make breakfast optional via a profile question — adds a knob nobody will tune.
+**Tradeoffs:** Old itineraries with `type: "breakfast"` activities still render correctly (the type tag is descriptive only, and arrange-step CATEGORY_HINTS still maps "breakfast" to its 07:30-10:30 window). New plans will not include breakfast unless Sonnet decides one is genuinely worth recommending.
+
+## [2026-05-08] Activity count is a target with a ceiling, not an unbounded floor
+
+**Decision:** Generation prompt now specifies `target` activities with a `minTotal–maxTotal` acceptable range, where `maxTotal = round(minTotal * 1.15)`. Old prompt only set a hard floor with explicit "you may exceed."
+**Reasoning:** Without an upper bound the LLM produces ~50% more activities than fit, the user reviews a maximalist set, and the arrange step receives a payload that physically can't schedule. A 15% ceiling buffer leaves room for review-step decline churn without overproducing.
+**Alternatives rejected:** (1) Server-side trim post-generation — generation cost is sunk, and trimming hides regressions. (2) Same floor, no ceiling — the original behavior, which produced this bug.
+**Tradeoffs:** Power-user pace-5 trips may feel slightly less stuffed. Acceptable; user can manually add via the "+ Add Activity" card in review if they want more.
+
+## [2026-05-08] Strip `verdict` / `start_location` / `end_location` / `duration` (string) / `dedicated_time_block` from the LLM schema
+
+**Decision:** All five fields removed from the activity-generation schema. `verdict` is gone entirely; `dedicated_time_block` is derived server-side from `durationHours >= 2`; `start_location`/`end_location` are dropped (activities are points, not routes); `duration` (string) is dropped (`duration_hours` is the only source of truth, frontend formats display strings).
+**Reasoning:** Sonnet is good at synthesis when given clean primitives; it gets worse when asked to track 3+ overlapping rule systems. The Decision Framework rule says "do not recommend if Fun Factor is LOW," but the schema asked for `verdict: "Skip"` — the model has to satisfy two contradictory framings. `start_location` + `end_location` for a museum makes the model invent routes for stationary venues. `duration_hours` + `duration` is the same data twice, and the string is regex-parsed back to the number downstream.
+**Alternatives rejected:** Keeping fields "for backwards compat" — legacy itineraries already have them, and `normalizeActivity`'s read-side fallbacks still handle old data; the LLM just stops producing them.
+**Tradeoffs:** Frontend code that rendered the verdict badge is removed (different from the user's approve/decline state, which is unaffected). Calendar exports now prefer `location.address` and fall back to old fields for legacy itineraries.
+
+---
+
+## [2026-05-08] `insider_tips` is a separate field, not appended to `why_it_fits`
+
+**Decision:** Added `insider_tips` as a distinct optional string on the activity schema rather than extending `why_it_fits` or `pitfall`. Rendered with a 💡 accent so users can visually triage it as "extra credit knowledge."
+**Reasoning:** `why_it_fits` is the sales pitch ("why this matches you"); `pitfall` is "what to avoid." Insider tips are operational knowledge — peak crowding, best arrival time, neighborhood quirks, destination pricing arbitrage. Mixing these dilutes all three. Keeping them split also lets the LLM rule say "return null when you have no factual tip" without contaminating the always-required pitch copy.
+**Alternatives rejected:** (1) Extending `why_it_fits` — would force the LLM to either always include a tip or include hedged filler; rejected. (2) Storing tips in `state.reviewed[id].notes` — that's user-authored space, not LLM output; rejected.
+**Tradeoffs:** One extra schema field that legacy itineraries won't have (renders cleanly as nothing). Brave quota cost: one additional always-on `searchInsiderTips` call per planned city.
+
+## [2026-05-08] Shopping is a first-class interest, not a tag on existing categories
+
+**Decision:** Added `shoppingPerson` (1-5 slider) + `shoppingInterests` (freeform text) to the profile wizard, a dedicated `shopping` activity type, and a conditional Brave query (`searchShoppingDistricts`) that fires only when `shoppingPerson >= 3`. Shopping activities require specific stores/districts, tax-free refund + price-comparison guidance in `insider_tips`, and `booking_type: "none"`.
+**Reasoning:** Real-trip feedback showed travelers wandering Madrid without recommendations because no profile signal captured shopping interest. The existing 6 sliders covered cultural/food/outdoor/nightlife — retail was invisible to the planner. A dedicated slider + freeform anchor lets the LLM generate category-specific picks (Druni/Primor for fragrance, Zara for US-vs-EU pricing arbitrage, Salamanca for luxury) instead of generic "shopping in city center."
+**Alternatives rejected:** (1) Putting "shopping" inside `aboutMe` text — too unstructured for the LLM to weight reliably across cities. (2) Inferring shopping from `budgetStyle` text — silent and inconsistent. (3) Always firing the Brave shopping query — wastes the 2000/month quota for travelers who don't shop; rejected in favor of the `>= 3` gate.
+**Tradeoffs:** New profile field requires existing users to re-run wizard for ideal results; default value of 3 means existing users start receiving low-volume shopping recs (acceptable since the floor scales to trip length).
+
+---
+
+## [2026-04-28] Google Places is the source of truth for opening hours; LLM string is fallback only
+
+**Decision:** Widened the existing Places Text Search FieldMask to include `regularOpeningHours` and `location` alongside `priceLevel`. When Places returns hours, we overwrite the LLM-emitted `opening_hours` string in both `activity.timing.opening_hours` and the legacy top-level `activity.opening_hours`. When Places returns no hours, the LLM string is preserved untouched. Applies to a new `VENUE_CATEGORIES` set: food categories ∪ `museum, gallery, landmark, market, show, shopping, spa, sports, cultural`. Tours, walks, parks, sunsets, neighborhoods skip Places lookup entirely (open-air or composite venues).
+
+**Reasoning:** The arrange validator's opening-hours gate ([src/arrangeValidator.js:132](src/arrangeValidator.js#L132)) was the highest-leverage hallucination foot-gun in the system: if Claude's `opening_hours` string was wrong, a perfectly-fine schedule would fail validation and the activity would bounce to `unplaced`. We were already paying for a Places call per food activity for `priceLevel`; adding the hours field to the same FieldMask is a free upgrade in terms of round-trips and stays inside the same Text Search Advanced SKU tier (no billing change). LLM hours can drift weekly; Places hours are first-party current data.
+
+**Alternatives rejected:** (a) Switch to Place Details endpoint for the second call — rejected; doubles the round-trip count for no quality gain. (b) Expand to all activity categories including tours/walks — rejected; tours don't typically have a Places entry of their own (they inherit from the venue), and matching on a tour name would mis-resolve to a random business. (c) Model day-of-week closures (museum closed Mondays) — deferred. The current `parseOpeningHours` reads a single weekly-union string; a Monday placement could pass even if the museum is closed Mondays. Acknowledged as a Wave 2+ improvement.
+
+**Tradeoffs:** Day-of-week closure modeling deferred. The cache value shape changed from `{priceTier}` to `{priceTier, openingHours, location}` — old cached entries continue to work (we read keys defensively) and refresh organically as the 90-day TTL expires. A `[places-hours-delta]` console log fires whenever LLM and Places hours disagree; this is intentionally chatty in the first weeks for observability and can be downgraded later.
+
+## [2026-04-28] Same-venue activity pairs bypass the 20-min walk buffer
+
+**Decision:** `MIN_BUFFER_BETWEEN` (20 minutes between activities) is now skipped when two activities share a venue. Detection uses lat/lng (4-decimal precision, ~10 m), with `venue_name` and address as fallbacks for activities that haven't been geocoded yet at planning time. Implemented in `bufferBetween()` in `src/arrangeValidator.js`.
+
+**Reasoning:** The 20-minute buffer represents walk time between separate locations. When the user (or the LLM) intentionally schedules two activities at the same venue — e.g., dinner then drinks at the bar across the street, or a wine tasting followed by dinner at the same restaurant — the buffer was firing and triggering false-positive overlap failures, pushing legitimate placements into `unplaced`. The buffer was modeling something real; we just had no concept of "no transit needed" in the data model.
+
+**Alternatives rejected:** (a) Reduce the global buffer to 10 minutes — rejected; legitimate cross-city walks really do need ~20. (b) Make the buffer LLM-supplied per-pair — rejected; gives the model another arithmetic surface to get wrong, when the venue match is mechanically obvious. (c) Drop the buffer entirely — rejected; same reason as (a).
+
+**Tradeoffs:** The lat/lng path requires venues to be geocoded; at `planCity` time they aren't yet (lat/lng are populated later by `/api/places/resolve`). The fallback to `venue_name` lowercase exact-match handles the common case. Activities with neither populated coordinates nor a venue_name will continue to use the 20-min buffer (safe default).
+
+---
+
+## [2026-04-27] No deterministic time-assignment fallback; broken activities go to `unplaced`
+
+**Decision:** Deleted `src/arrangeTimeAssigner.js` entirely. `/api/arrange` is now a two-tier flow: LLM proposes times → validator → optional repair pass. If repair still fails physics validation, the offending placements are moved to `unplaced` with reason `physics_unresolved` for the user to fix manually in the UI. There is no third-tier deterministic placement.
+**Reasoning:** The fallback was scaffolding from when the LLM was order-only and JS owned time-picking. Once Sonnet 4.6 was given direct timing, the fallback ran rarely and, when it did run, applied stale rules (notably `MEAL_BANDS` forcing American meal customs onto Spain/Japan/etc.) that conflicted with the LLM's better judgment. Surfacing physics-unresolvable activities to the user is more honest and avoids silent wrong placements; the existing `unplaced` chip/panel UI already handles them.
+**Alternatives rejected:** (a) Keep the fallback but strip `MEAL_BANDS` — rejected as half-measure; the rest of the assigner (earliest-slot greedy, opening-hours-only logic) was also worse than the LLM's reasoning. (b) Add a third repair pass before falling back — rejected; if two LLM passes can't resolve physics, a third unlikely will, and "unplaced" is a clear signal for manual intervention.
+**Tradeoffs:** Trips that previously got force-placed by the fallback may now show items in the unplaced panel. Acceptable — better visibility than silent bad placement. Validator still imports the four time helpers (`effectiveDayStart`, `effectiveDayEnd`, `getDuration`, `parseOpeningHours`); they were inlined into the validator since it became their only caller.
+
+## [2026-04-27] Removed `MEAL_BANDS` — global meal-time intersection was wrong by design
+
+**Decision:** Removed `MEAL_BANDS` from `src/arrangeConstants.js`. Meal times are now a function of opening hours and LLM judgment only, with no hard-coded breakfast/lunch/dinner windows.
+**Reasoning:** `MEAL_BANDS` defined breakfast as 7–9am, lunch 11:30am–1:30pm, dinner 6–8:30pm and intersected these with opening hours in the assigner — which would force a Madrid restaurant open until midnight to serve dinner by 8:30. Sonnet 4.6 knows local meal customs (Spanish dinner 9:30pm, Japanese fish-market breakfast 6am, Mediterranean lunch 2pm) far better than a hard-coded American-default table. Validator already enforces opening hours, which is the only physical constraint that matters.
+**Alternatives rejected:** (a) Make `MEAL_BANDS` city-aware via a lookup table — rejected as the wrong axis; meal customs vary by venue and season as much as by city, and the LLM already integrates these. (b) Pass `MEAL_BANDS` as soft hint in the prompt — rejected; the prompt already says "use what you know about local meal customs," adding a default table would push back against that.
+**Tradeoffs:** None observed. The single remaining caller (`arrangeTimeAssigner.js`) was deleted in the same sweep, so removal was safe.
+
+---
+
+## [2026-04-27] Validator enforces physics only, not taste
+
+**Decision:** The arrange validator (`src/arrangeValidator.js`) checks only mechanical/structural rules: overlap with buffer, lock overlap, day-window, opening hours. Removed `meal_cap` (≤1 of each meal type) and `category_cap` (≤2 of any non-meal category) — those are judgment calls, not physical constraints.
+**Reasoning:** The hybrid arrange split (LLM picks order, JS picks times) was severing the LLM's ability to act on semantic intent like "sunset drinks" or "no two food events back-to-back." Pulling the LLM back into time-selection meant the validator's job needed to shrink to match. Modern Sonnet won't schedule three museums in a row; rules-as-validator was scaffolding for a problem that no longer exists. Each rule we remove from the validator is a rule the user no longer has to fight when their intent doesn't fit the rule (e.g. a planned tapas + dinner pairing is now allowed; the LLM can use judgment).
+**Alternatives rejected:** (a) Keep the caps as soft warnings — rejected, would still surface as `diagnostics` and confuse users. (b) Move caps into the prompt as guidance — also rejected; they were not adding value at the prompt layer either, since Sonnet already paces well.
+**Tradeoffs:** If we ever swap to a weaker/cheaper model, the safety net for "3 museums in a row" outputs is gone — would need to be added back as prompt guidance, not as validator rules. Accepted.
+
+## [2026-04-27] Restaurant price tiers come from Google Places, not LLM cost guesses
+
+**Decision:** `price_tier` (1–4 → `$`–`$$$$`) is sourced from Google Places API Text Search `priceLevel` field, cached in `data/places-cache.json` keyed by `name|city`. Enrichment runs once per food activity inside `planCity`.
+**Reasoning:** Cost-bucket thresholds derived from `estimated_cost_usd` (itself an LLM guess) compound error. Places `priceLevel` is grounded ground truth and uses the same `GOOGLE_MAPS_API_KEY` already configured for Distance Matrix — no new credential, no new vendor. Caching keeps marginal cost near zero ($0.32 per ~10 unique restaurants, then free on re-plans).
+**Alternatives rejected:** (a) Threshold-derive from `estimated_cost_usd` — rejected because it inherits the LLM's cost guess and would feel inconsistent (Casa Lucio bucketed by an LLM number rather than what diners actually pay). (b) Have Claude emit `price_tier` directly — rejected because it's another LLM-judgment field that would drift across plans for the same restaurant.
+**Tradeoffs:** Generic activity names ("Tapas Crawl", "Street food walk") won't match a real Place and silently render without a tier. Acceptable — empty subtitle suffix is better than a wrong $$$.
+
+---
+
 ## [2026-04-25] Consolidated time helpers into shared/timeHelpers.js
 
 **Decision:** Both client (`public/app.js`) and server (`src/services/distanceMatrix.js`) now import `parseTimeTo24`, `minutesFromTime`, `timeFromMinutes`, `extractTimeFromDateTime` from `shared/timeHelpers.js`. The server-side function name `parseMinutesFromTime` is preserved at the call site via a local rename (`{ minutesFromTime: parseMinutesFromTime }`).

@@ -1,26 +1,31 @@
 # Current State
 
-_Last updated: 2026-04-26_
+_Last updated: 2026-05-12_
 
 ## Objective
-Phase 5 (arrange polish) implemented on `feature/arrange-polish`: intensity alternation prompt rule, repair-pass telemetry + admin stats endpoint, Distance Matrix file-backed cache, unplaced-activity recovery chip/panel UI.
+Distance Matrix cost cut from ~$9 → ~$2 per first-arrange of a 60-activity trip via Haversine pre-filter (<1.5 km skip), geographic clustering with centroid pairs (~2 km radius), 1-year cache TTL, and per-leg pills re-enabled live during drafting. Sonnet keeps real commute data flowing into the arrange prompt.
 
 ## Active Workstream
-Pending user smoke test of Phase 5 changes:
-- Run auto-arrange on a multi-activity city and confirm that `data/commute-cache.json` is created and a re-run is noticeably faster.
-- Trigger an unplaceable scenario (e.g. too many of one category) and verify the "Unplaced (N)" chip appears, opens to a panel, and clicking an item scrolls + flashes the staging card.
-- Verify `logs/arrange.jsonl` accrues per-call entries; if `ADMIN_TOKEN` is set, `GET /api/admin/arrange-stats?token=...` returns a summary.
+Smoke test the new matrix on a fresh 60-activity Tokyo trip. Expected:
+- First arrange: ~300 matrix calls + ~150 per-leg = ~450 total (~$2)
+- Repeat arrange: ~0 (cache hits)
+- 20 drags on finalized schedule: ≤60 new calls
+
+User-side ops still pending:
+1. Distance Matrix API → Quotas → Elements/day ~5000 (hard 429 stop)
+2. Billing → Budgets & alerts → $20/month with 50/90/100% emails
 
 ## Constraints
-- No database — flat JSON files (cache uses same pattern)
-- All `/api/*` route paths preserved; arrange request/response shape unchanged
-- 99/99 tests passing
+- Distance Matrix per-call billing active (free tier exhausted).
+- Inner ring: `MAX_PAIRS_PER_REQUEST = 2000` now applied to combined intra + inter cluster pair count.
+- 91/91 tests passing.
 
 ## Risks
-- Commute cache is keyed by the resolved origin/destination string (coords or text). If activity location text changes, the old key becomes orphaned but TTL-expires harmlessly.
-- Telemetry log grows unbounded — `readRecent` reads the whole file. Acceptable for low traffic; rotate if it grows >5MB.
+- Greedy first-fit clustering is order-dependent. If activities arrive in a weird order the clusters may be slightly suboptimal; cost still bounded, quality impact minor.
+- Inter-cluster pair uses first member as representative — if first member is at the edge of its cluster the centroid estimate skews. Acceptable for the cost savings.
+- Per-leg pills fire on every drag/drop; cache hit rate observed in production will determine real cost.
 
 ## Next Actions
-- User smoke test of Phase 5.
-- If green, merge `feature/arrange-polish` to main.
-- Phase 4 cleanup item still open: delete unused `src/services/arrangePrompt.js` after Phase 4 smoke test confirmation.
+- Smoke test arrange on Tokyo trip; capture clusters count, intra/inter pair counts, total call count.
+- Confirm `🚶 walk` pill renders for sub-1.5 km pairs with zero API calls.
+- Set Console quota cap and budget alarm.

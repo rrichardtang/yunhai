@@ -3243,7 +3243,7 @@ function getFilteredReviewActivities() {
 
   return state.activities.filter((a) => {
     const review = state.reviewed[a.id] || { approved: null };
-    const text = [a.name, a.city, a.type, a.why_it_fits, a.pitfall, a.booking_advice].join(' ').toLowerCase();
+    const text = [a.name, a.city, a.type, a.why_it_fits, a.pitfall, a.booking_advice, a.insider_tips].join(' ').toLowerCase();
 
     if (search && !text.includes(search)) return false;
     if (city && String(a.city || '').trim().toLowerCase() !== city) return false;
@@ -3535,6 +3535,7 @@ function openOptCardExpand(act, label) {
       <p><strong>Why it fits:</strong> ${esc(act.why_it_fits || '')}</p>
       ${act.pitfall ? `<p><strong>Pitfall:</strong> ${esc(act.pitfall)}</p>` : ''}
       ${act.booking_advice ? `<p><strong>Booking advice:</strong> ${esc(act.booking_advice)}</p>` : ''}
+      ${act.insider_tips ? `<p class="activity-insider-tip"><i class="ph-bold ph-lightbulb" aria-hidden="true"></i> <strong>Insider tip:</strong> ${esc(act.insider_tips)}</p>` : ''}
     </div>`;
 
   overlay.appendChild(closeBtn);
@@ -3757,7 +3758,6 @@ function renderActivities() {
     const approveBtnClass = `primary approve btn-approve ${isApproved ? 'active' : ''} ${isDeclined ? 'inactive' : ''}`.trim();
     const declineBtnClass = `secondary decline btn-decline ${isDeclined ? 'active' : ''} ${isApproved ? 'inactive' : ''}`.trim();
     const cardStateClass = isApproved ? 'approved' : isDeclined ? 'declined' : '';
-    const verdictClass = `verdict-${(a.verdict || '').replace(/\s+/g, '-')}`;
     const isFlipped = Boolean(state.reviewCardFlips[a.id]);
     const card = document.createElement('article');
     card.className = `card activity-card card-reveal ${cardStateClass} ${isFlipped ? 'is-flipped' : ''}`.trim();
@@ -3773,7 +3773,6 @@ function renderActivities() {
             <div class="activity-card-head-actions">
               <div>
                 ${a.type ? `<span class="badge">${esc(a.type)}</span>` : ''}
-                <span class="badge ${verdictClass}">${esc(a.verdict || 'N/A')}</span>
                 <span data-price-badges="${esc(a.id)}">${headerPriceBadgeHtml(a)}</span>
                 ${googleMapsLinkHtml(a)}
               </div>
@@ -3783,6 +3782,7 @@ function renderActivities() {
             <p><strong>Why it fits:</strong> ${esc(a.why_it_fits || '')}</p>
             <p><strong>Pitfall:</strong> ${esc(a.pitfall || '')}</p>
             <p><strong>Booking advice:</strong> ${esc(a.booking_advice || '')}</p>
+            ${a.insider_tips ? `<p class="activity-insider-tip"><i class="ph-bold ph-lightbulb" aria-hidden="true"></i> <strong>Insider tip:</strong> ${esc(a.insider_tips)}</p>` : ''}
             <div class="actions">
               <button class="${approveBtnClass}"><i class="ph-bold ph-check-circle" aria-hidden="true"></i> Approve</button>
               <button class="${declineBtnClass}"><i class="ph-bold ph-x-circle" aria-hidden="true"></i> Decline</button>
@@ -4517,7 +4517,6 @@ function makePlacedCard(item) {
                 data-tooltip-type-icon="${esc(icon)}"
                 data-tooltip-type="${esc(typeLabel)}"
                 data-tooltip-duration="${esc(durationLabel)}"
-                data-tooltip-verdict="${esc(item.verdict || 'N/A')}"
                 data-tooltip-why="${esc(item.why_it_fits || '')}"
                 data-tooltip-start-location="${esc(actAddress(item))}"
               >
@@ -5146,6 +5145,19 @@ async function updateCommutesForCityDays(dayIds = []) {
   }
 }
 
+const UNPLACED_REASON_LABELS = {
+  physics_unresolved: "Couldn't fit into the day without conflicts",
+  no_time_remaining: 'No time remaining in the day window',
+  outside_opening_hours: 'Outside the venue opening hours',
+  outside_window: 'Outside the day window'
+};
+
+function friendlyUnplacedReason(raw) {
+  const key = String(raw || '').trim().toLowerCase().replace(/\s+/g, '_');
+  if (UNPLACED_REASON_LABELS[key]) return UNPLACED_REASON_LABELS[key];
+  return raw || 'no reason given';
+}
+
 function renderArrangeDiagnostics() {
   if (!els.arrangeDiagnostics) return;
   const activeCity = state.arrangeCity;
@@ -5165,7 +5177,7 @@ function renderArrangeDiagnostics() {
           <li>
             <button type="button" class="unplaced-item" data-unplaced-id="${esc(u.id)}">
               <span class="unplaced-item-name">${esc(u.name)}</span>
-              <span class="unplaced-item-reason">${esc(u.reason || 'no reason given')}</span>
+              <span class="unplaced-item-reason">${esc(friendlyUnplacedReason(u.reason))}</span>
             </button>
           </li>`).join('')}</ul>
       </div>`;
@@ -5290,6 +5302,7 @@ function openFinalizeModal() {
         const meta = entry.sourceKind === 'verified' ? 'from checklist' : entry.sourceKind === 'fixed' ? 'fixed time' : '';
         const why = entry.activity.why_it_fits || '';
         const pitfall = entry.activity.pitfall || '';
+        const insiderTips = entry.activity.insider_tips || '';
         const notes = state.reviewed[entry.activity.id]?.notes || '';
         return `
           <div class="cl-item${checkedClass} finalize-item" data-idx="${globalIdx}">
@@ -5310,6 +5323,7 @@ function openFinalizeModal() {
               <div class="cl-item-expanded-wrap finalize-expanded">
                 ${why ? `<p class="finalize-exp-line"><strong>Why it fits:</strong> ${esc(why)}</p>` : ''}
                 ${pitfall ? `<p class="finalize-exp-line"><strong>Pitfall:</strong> ${esc(pitfall)}</p>` : ''}
+                ${insiderTips ? `<p class="finalize-exp-line activity-insider-tip"><i class="ph-bold ph-lightbulb" aria-hidden="true"></i> <strong>Insider tip:</strong> ${esc(insiderTips)}</p>` : ''}
                 ${notes ? `<p class="finalize-exp-line"><strong>Notes:</strong> ${esc(notes)}</p>` : ''}
               </div>` : ''}
           </div>`;
@@ -5615,7 +5629,8 @@ async function autoArrangeActiveCity(opts = {}) {
       }
     }
 
-    const res = await apiFetch('/api/arrange', {
+    const arrangeUrl = '/api/arrange' + (location.search.includes('debug=1') ? '?debug=1' : '');
+    const res = await apiFetch(arrangeUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5665,7 +5680,9 @@ async function autoArrangeActiveCity(opts = {}) {
     const unplacedItems = unplaced
       .map((u) => {
         const a = flexible.find((x) => x.id === u.id);
-        return a ? { id: a.id, name: a.name, reason: u.reason } : null;
+        if (!a) return null;
+        if (state.placements[a.id]?.dayId) return null;
+        return { id: a.id, name: a.name, reason: u.reason };
       })
       .filter(Boolean);
     state.arrangeUnplaced[activeCity] = unplacedItems;
@@ -5743,9 +5760,7 @@ function showPlacedTooltip(anchorEl) {
     <div class="placed-tooltip-title">${anchorEl.dataset.tooltipName || ''}</div>
     <div class="placed-tooltip-row"><strong>Type:</strong> ${anchorEl.dataset.tooltipTypeIcon || ''} ${anchorEl.dataset.tooltipType || ''}</div>
     <div class="placed-tooltip-row"><strong>Duration:</strong> ${anchorEl.dataset.tooltipDuration || ''}</div>
-    <div class="placed-tooltip-row"><strong>Verdict:</strong> ${anchorEl.dataset.tooltipVerdict || 'N/A'}</div>
-    <div class="placed-tooltip-row"><strong>Start:</strong> ${anchorEl.dataset.tooltipStartLocation || '—'}</div>
-    <div class="placed-tooltip-row"><strong>End:</strong> ${anchorEl.dataset.tooltipEndLocation || '—'}</div>
+    <div class="placed-tooltip-row"><strong>Location:</strong> ${anchorEl.dataset.tooltipStartLocation || '—'}</div>
     <div class="placed-tooltip-row"><strong>Why it fits:</strong> ${anchorEl.dataset.tooltipWhy || ''}</div>
   `;
   layer.classList.add('visible');
@@ -6049,6 +6064,7 @@ function getItineraryRows() {
       const notes = String(state.reviewed[activity.id]?.notes || '').trim();
       const referenceNum = getActivityReferenceNum(activity.id);
 
+      const priceTier = Number.isInteger(activity.price_tier) ? activity.price_tier : null;
       return {
         id: activity.id,
         date: day.date,
@@ -6060,6 +6076,7 @@ function getItineraryRows() {
         notes,
         referenceNum,
         navigateHref,
+        priceTier,
         fileCount: getItemAttachments(activity.id).length
       };
     })
@@ -6292,7 +6309,7 @@ function renderItineraryItemCard(row) {
         <h3 class="itinerary-title">${esc(row.title)}</h3>
         <time class="itinerary-time">${esc(row.timeLabel || '')}</time>
       </header>
-      ${row.location ? `<div class="itinerary-subtitle">${esc(row.location)}</div>` : ''}
+      ${row.location || row.priceTier ? `<div class="itinerary-subtitle">${esc(row.location || '')}${row.priceTier ? `${row.location ? ' · ' : ''}<span class="itinerary-price-tier">${'$'.repeat(row.priceTier)}</span>` : ''}</div>` : ''}
       ${row.notes ? `<p class="itinerary-notes">${esc(row.notes)}</p>` : ''}
       <div class="itinerary-reference${hasRef ? ' has-value' : ''}">
         <i class="ph-bold ph-ticket" aria-hidden="true"></i>

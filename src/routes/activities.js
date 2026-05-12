@@ -16,9 +16,9 @@ const {
 const { search, isConfigured: isBraveConfigured, shouldUseBrave } = require('../braveSearch');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('../arrangeConfig');
 const { buildBookingLinks } = require('../services/bookingLinks');
-const { buildHybridArrangePrompt, buildRepairPrompt } = require('../services/arrangePromptHybrid');
-const { assignTimes } = require('../arrangeTimeAssigner');
+const { buildDirectArrangePrompt, buildRepairPrompt } = require('../services/arrangePromptDirect');
 const { validate: validateArrangement } = require('../arrangeValidator');
+const { minutesFromTime } = require('../../shared/timeHelpers');
 const { buildCityTravelTiming } = require('../services/distanceMatrix');
 const arrangeTelemetry = require('../services/arrangeTelemetry');
 
@@ -51,6 +51,83 @@ function extractText(content = []) {
     .map((c) => c.text)
     .join('\n')
     .trim();
+}
+
+function stripCodeFences(raw = '') {
+  let cleaned = String(raw || '').trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  }
+  return cleaned.trim();
+}
+
+function extractLikelyJsonObject(raw = '') {
+  const text = String(raw || '');
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) { escaped = false; continue; }
+      if (ch === '\\') { escaped = true; continue; }
+      if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === '{') depth += 1;
+    if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+function repairTruncatedJson(raw = '') {
+  let text = String(raw || '').trim();
+  text = text.replace(/,\s*$/, '');
+  text = text.replace(/,?\s*"[^"]*"\s*:\s*(?:"[^"]*)?$/, '');
+  const opens = [];
+  let inStr = false, esc = false;
+  for (const ch of text) {
+    if (inStr) { if (esc) { esc = false; } else if (ch === '\\') { esc = true; } else if (ch === '"') { inStr = false; } continue; }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === '{' || ch === '[') opens.push(ch);
+    if (ch === '}' || ch === ']') opens.pop();
+  }
+  while (opens.length) {
+    const open = opens.pop();
+    text += open === '{' ? '}' : ']';
+  }
+  return text;
+}
+
+function tryParseJsonObject(raw = '') {
+  const stripped = stripCodeFences(raw);
+  const attempts = [stripped];
+  const extracted = extractLikelyJsonObject(stripped);
+  if (extracted && extracted !== stripped) attempts.push(extracted);
+  const relaxed = extracted
+    ? extracted.replace(/,\s*([}\]])/g, '$1').replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+    : null;
+  if (relaxed && !attempts.includes(relaxed)) attempts.push(relaxed);
+  const repaired = repairTruncatedJson(extracted || stripped);
+  if (!attempts.includes(repaired)) attempts.push(repaired);
+
+  for (const candidate of attempts) {
+    try {
+      const obj = JSON.parse(candidate);
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj;
+    } catch {
+      // try next strategy
+    }
+  }
+  return null;
 }
 
 function register(app) {
@@ -233,9 +310,12 @@ Return ONLY valid JSON (no markdown fences):
         messages: [{ role: 'user', content: userContent }]
       });
 
-      const raw = extractText(response.content).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-      const parsed = JSON.parse(raw);
-
+      const raw = extractText(response.content);
+      const parsed = tryParseJsonObject(raw);
+      if (!parsed) {
+        console.error('activity/replace JSON parse failed; raw response (first 800 chars):', raw.slice(0, 800));
+        return res.status(500).json({ error: 'Failed to parse replacement JSON' });
+      }
       if (!parsed.activity || typeof parsed.activity !== 'object') {
         return res.status(500).json({ error: 'LLM returned unexpected shape' });
       }
@@ -279,35 +359,49 @@ Return ONLY valid JSON (no markdown fences):
 
     async function callClaudeForJson(prompt) {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const response = await anthropic.messages.create({
+      const stream = anthropic.messages.stream({
         model: 'claude-sonnet-4-6',
-        max_tokens: 2048,
-        messages: [{ role: 'user', content: prompt }]
+        max_tokens: 32768,
+        system: 'You are a JSON-only API endpoint. Do NOT think out loud, narrate your process, list constraints, or write any preamble. Your ENTIRE response must be a single JSON object beginning with { and ending with }. The very first character you emit must be {. Internal reasoning must happen silently before you start emitting tokens.',
+        messages: [{ role: 'user', content: prompt + '\n\nRespond with the JSON object only. The first character of your response must be {. No preamble, no analysis, no constraint listing — just the JSON.' }]
       });
-      const raw = extractText(response.content);
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('Failed to parse arrangement JSON');
-      return JSON.parse(match[0]);
+      const final = await stream.finalMessage();
+      const raw = extractText(final.content);
+      const parsed = tryParseJsonObject(raw);
+      if (!parsed) {
+        console.error(`arrange JSON parse failed (stop_reason=${final.stop_reason}, length=${raw.length})`);
+        console.error('arrange raw response (first 800 chars):', raw.slice(0, 800));
+        console.error('arrange raw response (last 400 chars):', raw.slice(-400));
+        const err = new Error('Failed to parse arrangement JSON');
+        err.diagnostic = {
+          stop_reason: final.stop_reason,
+          length: raw.length,
+          head: raw.slice(0, 800),
+          tail: raw.slice(-400)
+        };
+        throw err;
+      }
+      return parsed;
     }
 
-    function sanitizeDayPlans(parsed) {
-      const dayPlans = Array.isArray(parsed?.day_plans) ? parsed.day_plans : [];
-      const seen = new Set();
-      const cleaned = dayPlans.map((p) => {
-        const ids = Array.isArray(p?.ordered_ids) ? p.ordered_ids : [];
-        const ordered = [];
-        for (const rawId of ids) {
-          const id = String(rawId);
-          if (lockedIdSet.has(id)) continue;
-          if (!activitiesById[id]) continue;
-          if (seen.has(id)) continue;
-          seen.add(id);
-          ordered.push(id);
-        }
-        return { date: p?.date, ordered_ids: ordered };
-      });
-      const unplaced = Array.isArray(parsed?.unplaced) ? parsed.unplaced.filter((u) => activitiesById[String(u?.id)]) : [];
-      return { dayPlans: cleaned, unplaced, seen };
+    function sanitizePlacements(parsed) {
+      const rawPlacements = parsed?.placements && typeof parsed.placements === 'object' ? parsed.placements : {};
+      const placements = {};
+      for (const [rawId, val] of Object.entries(rawPlacements)) {
+        const id = String(rawId);
+        if (lockedIdSet.has(id)) continue;
+        if (!activitiesById[id]) continue;
+        if (!val || typeof val !== 'object') continue;
+        const date = String(val.date || '');
+        const time = String(val.time || '');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+        if (!/^\d{1,2}:\d{2}$/.test(time)) continue;
+        placements[id] = { date, time };
+      }
+      const unplaced = Array.isArray(parsed?.unplaced)
+        ? parsed.unplaced.filter((u) => activitiesById[String(u?.id)]).map((u) => ({ id: String(u.id), reason: String(u.reason || '') }))
+        : [];
+      return { placements, unplaced };
     }
 
     const cityName = days[0]?.city || '';
@@ -317,51 +411,66 @@ Return ONLY valid JSON (no markdown fences):
     let secondPassValid = false;
 
     try {
-      const prompt = buildHybridArrangePrompt({
+      const prompt = buildDirectArrangePrompt({
         days,
         flexible,
         locked: resolvedLocked,
         profile,
         prefSummary,
         numTravelers,
-        numChildren
+        numChildren,
+        cityName,
+        commuteMatrix: matrix
       });
       const parsed = await callClaudeForJson(prompt);
-      const { dayPlans, unplaced: llmUnplaced } = sanitizeDayPlans(parsed);
+      let { placements, unplaced } = sanitizePlacements(parsed);
 
-      const ctx = { days, activitiesById, lockedActivities: resolvedLocked, commuteMatrix: matrix };
-      let assigned = assignTimes({ ...ctx, dayPlans });
-      let v = validateArrangement({
-        placements: assigned.placements,
-        lockedActivities: resolvedLocked,
-        days,
-        activitiesById
-      });
+      let v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
       firstPassValid = v.ok;
       firstPassIssues = v.issues || [];
 
       if (!v.ok) {
         repairUsed = true;
         try {
-          const repairPrompt = buildRepairPrompt({ dayPlans, issues: v.issues });
+          const repairPrompt = buildRepairPrompt({ placements, issues: v.issues, activitiesById });
           const repaired = await callClaudeForJson(repairPrompt);
-          const { dayPlans: repairedPlans, unplaced: repairedUnplaced } = sanitizeDayPlans(repaired);
-          const reAssigned = assignTimes({ ...ctx, dayPlans: repairedPlans });
-          const v2 = validateArrangement({
-            placements: reAssigned.placements,
-            lockedActivities: resolvedLocked,
-            days,
-            activitiesById
+          const repairedSan = sanitizePlacements(repaired);
+          placements = repairedSan.placements;
+          unplaced = [...unplaced, ...repairedSan.unplaced];
+          const placedIds = new Set(Object.keys(placements));
+          const seen = new Set();
+          unplaced = unplaced.filter((u) => {
+            if (placedIds.has(u.id)) return false;
+            if (seen.has(u.id)) return false;
+            seen.add(u.id);
+            return true;
           });
-          assigned = {
-            placements: reAssigned.placements,
-            unplaced: [...reAssigned.unplaced, ...repairedUnplaced]
-          };
-          v = v2;
-          secondPassValid = v2.ok;
+          v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
+          secondPassValid = v.ok;
         } catch (repairErr) {
           console.warn('[arrange] repair pass failed:', repairErr.message);
         }
+      }
+
+      if (!v.ok) {
+        const toDrop = new Set();
+        for (const issue of v.issues) {
+          if (issue.type === 'overlap' && Array.isArray(issue.ids) && issue.ids.length === 2) {
+            const [idA, idB] = issue.ids;
+            const aStart = minutesFromTime(placements[idA]?.time || '00:00');
+            const bStart = minutesFromTime(placements[idB]?.time || '00:00');
+            toDrop.add(aStart <= bStart ? idB : idA);
+          } else if (issue.id) {
+            toDrop.add(issue.id);
+          }
+        }
+        for (const id of toDrop) {
+          if (placements[id]) {
+            unplaced.push({ id, reason: 'physics_unresolved' });
+            delete placements[id];
+          }
+        }
+        v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
       }
 
       arrangeTelemetry.logRun({
@@ -376,8 +485,8 @@ Return ONLY valid JSON (no markdown fences):
       });
 
       return res.json({
-        placements: assigned.placements,
-        unplaced: [...assigned.unplaced, ...llmUnplaced],
+        placements,
+        unplaced,
         diagnostics: v.ok ? [] : v.issues.map((i) => i.message)
       });
     } catch (error) {
@@ -392,7 +501,10 @@ Return ONLY valid JSON (no markdown fences):
         lockedCount: resolvedLocked.length,
         error: error.message
       });
-      return res.status(500).json({ error: error.message || 'Failed to arrange activities' });
+      const debugMode = process.env.ARRANGE_DEBUG === '1' || req.query.debug === '1';
+      const body = { error: error.message || 'Failed to arrange activities' };
+      if (debugMode && error.diagnostic) body.diagnostic = error.diagnostic;
+      return res.status(500).json(body);
     }
   });
 

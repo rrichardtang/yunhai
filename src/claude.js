@@ -1,65 +1,36 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { getSummary } = require('./preferences');
-const { inferCategory, getCategoryDefaults } = require('./arrangeConfig');
-const { searchCityActivities, searchTopRestaurants } = require('./braveSearch');
+const { inferCategory, getCategoryDefaults, paceDescFromValue } = require('./arrangeConfig');
+const { searchCityActivities, searchTopRestaurants, searchInsiderTips, searchShoppingDistricts } = require('./braveSearch');
+const { enrichWithPlaceDetails } = require('./services/placesEnrich');
 const { isLegacyActivity, migrateActivity, parseTimeString, parseDurationToMinutes, inferMealType } = require('../shared/activityMigration');
 
 const MODEL = 'claude-sonnet-4-6';
 
 const SYSTEM_PROMPT = `## Role
-You are a blunt, opinionated travel planning agent. Your job is to design itineraries tailored to the specific traveler's preferences and profile. You are not a generalist — you filter everything through what this specific user actually enjoys. Be concise. At most 3 sentences per activity. Use provided accommodation and trip entry context to shape recommendation timing and geography.
-
----
-
-
-## Decision Framework
-
-Evaluate every activity across five dimensions before recommending it:
-
-| Dimension | What to assess |
-|---|---|
-| **Fun Factor** | Will it hold attention? Is there energy, novelty, or interactivity? |
-| **Disappointment Risk** | Could it feel repetitive, flat, overly ceremonial, or staged? |
-| **Cost vs. Payoff** | Is the price justified for what this traveler actually experiences? |
-| **Planning Flexibility** | Can it be booked last-minute or adjusted around weather/schedule? |
-| **Engagement Type** | Is it interactive, sensory, visceral, or purely observational? |
-
-**Default recommendation rule:**
-- Recommend if: Fun Factor is HIGH or MEDIUM and Disappointment Risk is LOW or MEDIUM
-- Flag with warning if: Disappointment Risk is HIGH but the traveler may still want it
-- Do not recommend if: Fun Factor is LOW, regardless of cultural or historical prestige
-
-When in doubt between two activities, recommend the one that better fits the traveler's stated preferences.
-
----
+You are a blunt, opinionated travel planning agent. Design itineraries tailored to this specific traveler's preferences and profile. Filter everything through what they actually enjoy — fit-to-person beats fit-to-tourist-list. Skip prestige picks (museums, ceremonies, big-name attractions) when they're likely to feel flat for this person, regardless of cultural or historical reputation. Be concise: at most 3 sentences per activity.
 
 ## Output Format
 
 Return a JSON array of activity objects. Each object must have these fields:
 - name (string)
-- type (string: show / tour / food / sports / cultural / walk / sunset / neighborhood / breakfast / lunch / dinner)
+- type (string: show / tour / food / sports / cultural / walk / sunset / neighborhood / lunch / dinner / shopping)
 - city (string)
 - venue_name (string or null) — the specific place as it appears on Google Maps (e.g. \`Casa Lucio, Madrid\`, \`Colosseum, Rome\`). For meals, this MUST be the restaurant name + city. For generic activities (free time, walks, sunsets, neighborhoods), set to null.
-- start_location (string)
-- end_location (string)
 - why_it_fits (string, 1-2 sentences)
 - pitfall (string, 1 sentence)
 - booking_advice (string, 1 sentence)
+- insider_tips (string or null, 1-2 sentences) — local knowledge a tourist would not know: peak-crowding window, best arrival time, common tourist mistake, neighborhood quirk, "if you do X also do Y" pairing, or destination-specific value/pricing tip (e.g. tax-free refund eligibility, brands cheaper here than at home). If you have no specific, factual tip, return null — never fabricate a generic "arrive early" platitude.
 - smarter_alternative (string or null)
-- verdict (string: "Recommend" / "Recommend with caveats" / "Skip")
-- dedicated_time_block (boolean — true if this requires 2+ hours of committed time)
 - suggested_time (string — e.g. "9:00am", "2:00pm", "sunset")
 - duration_hours (number)
-- duration (string, e.g. "2 hours")
 - category (string, e.g. museum / restaurant / park)
 - opening_hours (string, e.g. "10:00-18:00" or "12:00-14:30,19:00-22:00")
 - estimated_cost_usd (number — estimated cost in USD. Overestimate rather than underestimate. Scale to the city's cost of living. Return 0 for free activities like walks, parks, sunsets.)
 - cost_type (string: "per_person" or "per_group" — per_person: any activity where each person pays individually (museum entry, meal, theme park ticket, boat tour ticket, cooking class). per_group: a single price covers the whole group regardless of headcount (private airport transfer, car rental, private guided tour hired for the group, apartment/villa rental). When in doubt, use per_person.)
-- booking_type (string: "tour" / "attraction" / "restaurant" / "none" — tour: guided or operator-led experiences booked through tour platforms, e.g. "Guided Walking Tour of Alhambra", "Pub Crawl", "Cooking Class with Local Chef". attraction: standalone venues with their own ticketing website, e.g. "teamLab Borderless", "Colosseum", "Disneyland", "Sagrada Familia". restaurant: a specific named restaurant, e.g. "Sukiyabashi Jiro", "Café Central". none: generic or free activities, e.g. "Morning walk", "Sunset at the beach" — NEVER use "none" for food/breakfast/lunch/dinner activities.)
+- booking_type (string: "tour" / "attraction" / "restaurant" / "none" — tour: guided or operator-led experiences booked through tour platforms, e.g. "Guided Walking Tour of Alhambra", "Pub Crawl", "Cooking Class with Local Chef". attraction: standalone venues with their own ticketing website, e.g. "teamLab Borderless", "Colosseum", "Disneyland", "Sagrada Familia". restaurant: a specific named restaurant, e.g. "Sukiyabashi Jiro", "Café Central". none: generic or free activities, e.g. "Morning walk", "Sunset at the beach" — NEVER use "none" for food/lunch/dinner activities.)
 
-MANDATORY RULE — meals: Every activity with type food, breakfast, lunch, or dinner MUST name a specific restaurant (not a cuisine, neighborhood, or meal type). The name field must be the restaurant's name, e.g. "Ichiran Ramen Shinjuku", not "Ramen lunch in Shinjuku". The why_it_fits field must mention 1–2 must-order dishes at that restaurant.
-
-For each activity, provide realistic start and end locations based on the activity description and the city. Use recognizable landmarks, neighborhoods, or points of interest.
+MANDATORY RULE — meals: Every activity with type food, lunch, or dinner MUST name a specific restaurant (not a cuisine, neighborhood, or meal type). The name field must be the restaurant's name, e.g. "Ichiran Ramen Shinjuku", not "Ramen lunch in Shinjuku". The why_it_fits field must mention 1–2 must-order dishes at that restaurant.
 
 Example object:
 {
@@ -67,8 +38,6 @@ Example object:
   "type": "walk",
   "city": "Lisbon",
   "venue_name": null,
-  "start_location": "Alfama neighborhood, Lisbon",
-  "end_location": "Miradouro da Graça, Lisbon",
   "why_it_fits": "..."
 }
 
@@ -218,11 +187,11 @@ function blankActivity(overrides = {}) {
 
     cost: { estimated_usd: null, type: 'per_person' },
 
-    verdict: 'Recommend',
     dedicated_time_block: false,
     why_it_fits: '',
     pitfall: '',
     booking_advice: '',
+    insider_tips: null,
     smarter_alternative: null,
     ...overrides
   };
@@ -230,10 +199,6 @@ function blankActivity(overrides = {}) {
 
 function normalizeActivity(raw = {}, fallbackCity = '') {
   if (!isLegacyActivity(raw)) return raw;
-
-  const verdictRaw = String(raw.verdict || '').trim();
-  const verdict = ['Recommend', 'Recommend with caveats', 'Skip'].includes(verdictRaw)
-    ? verdictRaw : 'Recommend';
 
   const normalizedCategory = inferCategory(raw);
   const defaults = getCategoryDefaults(normalizedCategory);
@@ -259,6 +224,8 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
     return 'none';
   })();
 
+  const address = String(raw.start_location || raw.location?.address || venue_name || '').trim();
+
   return {
     id: raw.id,
     name,
@@ -267,7 +234,7 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
 
     location: {
       name: venue_name || name,
-      address: String(raw.start_location || '').trim(),
+      address,
       lat: null,
       lng: null
     },
@@ -298,11 +265,11 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
       type: raw.cost_type === 'per_group' ? 'per_group' : 'per_person'
     },
 
-    verdict,
-    dedicated_time_block: Boolean(raw.dedicated_time_block),
+    dedicated_time_block: durationHours >= 2,
     why_it_fits: String(raw.why_it_fits || '').trim(),
     pitfall: String(raw.pitfall || '').trim(),
     booking_advice: String(raw.booking_advice || '').trim(),
+    insider_tips: raw.insider_tips == null ? null : (String(raw.insider_tips).trim() || null),
     smarter_alternative: raw.smarter_alternative == null ? null : String(raw.smarter_alternative).trim()
   };
 }
@@ -347,64 +314,96 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     travelTiming?.interCitySummary || ''
   ].filter(Boolean).join('\n') || 'No computed transfer-time constraints available.';
 
-  const pace = Math.max(1, Math.min(5, Math.round(Number(profile?.answers?.pace) || 3)));
-  const paceLabels = { 1: 'very relaxed', 2: 'easy-going', 3: 'moderate', 4: 'active', 5: 'non-stop' };
-  const paceDesc = paceLabels[pace];
+  const { value: pace, desc: paceDesc } = paceDescFromValue(profile?.answers?.pace);
+  const nonMealPerDayByPace = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6 };
+  const nonMealPerDay = nonMealPerDayByPace[pace];
 
-  const [webResearch, restaurantResearch] = await Promise.all([
-    searchCityActivities(name),
-    searchTopRestaurants(name)
+  const tripDays = (() => {
+    if (!startDate || !endDate) return 1;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diff = Math.round((end - start) / 86400000) + 1;
+    return Number.isFinite(diff) && diff > 0 ? diff : 1;
+  })();
+  const minNonMeal = nonMealPerDay * tripDays;
+  const minMeals = 2 * tripDays;
+  const minTotal = minNonMeal + minMeals;
+  const maxTotal = Math.round(minTotal * 1.15);
+
+  const tripYear = (() => {
+    if (startDate) {
+      const y = new Date(startDate).getFullYear();
+      if (Number.isFinite(y) && y >= 2000) return y;
+    }
+    return new Date().getFullYear();
+  })();
+  const shoppingPersonRaw = Number(profile?.answers?.shoppingPerson);
+  const shoppingPerson = Number.isFinite(shoppingPersonRaw) ? Math.max(1, Math.min(5, Math.round(shoppingPersonRaw))) : 1;
+  const shoppingInterests = String(profile?.answers?.shoppingInterests || '').trim();
+  const shoppingActive = shoppingPerson >= 3;
+
+  const [webResearch, restaurantResearch, insiderResearch, shoppingResearch] = await Promise.all([
+    searchCityActivities(name, { year: tripYear }),
+    searchTopRestaurants(name, { year: tripYear }),
+    searchInsiderTips(name, { year: tripYear }),
+    shoppingActive ? searchShoppingDistricts(name, shoppingInterests, { year: tripYear }) : Promise.resolve('')
   ]);
   const webBlock = webResearch
     ? `\n\nWeb research (use as supplementary inspiration, not a strict list):\n${webResearch}`
     : '';
   const restaurantBlock = restaurantResearch
-    ? `\n\nTop restaurant research — for every food/breakfast/lunch/dinner activity, pick a specific named restaurant from this list. Choose the one that best fits the day's geographic area relative to the accommodation. Include 1–2 must-order dishes in why_it_fits:\n${restaurantResearch}`
+    ? `\n\nTop restaurant research — pick named restaurants from this list to fill the ${minMeals} meal slots above (one per slot). Do NOT generate additional food/restaurant activities beyond the meal target — each slot is one restaurant. Choose ones that fit the day's geographic area relative to the accommodation. Include 1–2 must-order dishes in why_it_fits:\n${restaurantResearch}`
+    : '';
+  const insiderBlock = insiderResearch
+    ? `\n\nLocal knowledge / insider notes — use these to populate the insider_tips field with specific, factual tips (peak crowding, best arrival time, common tourist mistakes, neighborhood quirks). Do not copy phrases verbatim; synthesize:\n${insiderResearch}`
+    : '';
+  const shoppingPerDay = { 3: 0.33, 4: 0.5, 5: 0.75 };
+  const shoppingTarget = shoppingActive ? Math.max(1, Math.round((shoppingPerDay[shoppingPerson] || 0.5) * tripDays)) : 0;
+  const shoppingBlock = shoppingActive
+    ? `\n\nSHOPPING (traveler interest ${shoppingPerson}/5${shoppingInterests ? `, focus: ${shoppingInterests}` : ''})\nInclude ${shoppingTarget} shopping activit${shoppingTarget === 1 ? 'y' : 'ies'} across the stay (counted within the non-meal target above, not in addition). Each must name a specific store/district/market — never "go shopping in ${name}". Set type to "shopping" and booking_type to "none". insider_tips should cover tax-free refund eligibility for non-EU travelers (where applicable), price-vs-home-country deltas if obvious (e.g. Zara cheaper in Spain than US), and the best neighborhood for the category.${shoppingResearch ? `\n\nShopping research:\n${shoppingResearch}` : ''}`
     : '';
 
   const travelersDesc = numChildren > 0 ? `${numTravelers} adult${numTravelers > 1 ? 's' : ''} and ${numChildren} child${numChildren > 1 ? 'ren' : ''}` : `${numTravelers} adult${numTravelers > 1 ? 's' : ''}`;
   const budgetBlock = budget && numCities
-    ? `\nBudget context: The traveler has a total trip budget of $${budget} for ${travelersDesc} across ${numCities} cit${numCities > 1 ? 'ies' : 'y'} (~$${Math.round(budget / numCities)} per city). Children's tickets/meals are typically ~60% of adult price. Be budget-conscious — prefer good-value activities and flag expensive options with a caveat in the verdict.`
+    ? `\nBudget context: The traveler has a total trip budget of $${budget} for ${travelersDesc} across ${numCities} cit${numCities > 1 ? 'ies' : 'y'} (~$${Math.round(budget / numCities)} per city). Children's tickets/meals are typically ~60% of adult price. Be budget-conscious — prefer good-value activities.`
     : '';
 
   const lockedBlock = Array.isArray(lockedActivities) && lockedActivities.length
-    ? `\n\nAlready locked activities — DO NOT re-suggest or generate similar alternatives for these (same name, same venue, same cuisine type, or same attraction type at the same location):\n${
+    ? `\n\nAlready locked activities — do not duplicate venues, cuisines, or experience types from this set:\n${
         lockedActivities.map((a) =>
-          `- "${a.name}" | type: ${a.type || ''} | category: ${a.category || ''} | location: ${a.start_location || ''} | time: ${a.suggested_time || 'flexible'}, ~${a.duration_hours || 1}h`
+          `- "${a.name}" | type: ${a.type || ''} | category: ${a.category || ''}`
         ).join('\n')
-      }\n\nNew activities must: (1) not overlap with the above time blocks, (2) not duplicate any of the above venues, cuisines, or experience types, (3) complement the locked set rather than replace it.`
+      }`
     : '';
 
-  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace. Generate a number of activities proportional to the length of stay and their pace preference — fewer for relaxed travelers, more for active ones. Use accommodation and travel timing when choosing and sequencing activities (e.g. lighter arrivals/departures, practical first/last activities near accommodation or transport hubs). Respect the computed time windows exactly on arrival/departure/transfer days. Be concise.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}\n\nReturn JSON only.`;
+  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace.\n\nACTIVITY COUNT\nGenerate ${minTotal} activities (${minTotal}–${maxTotal} acceptable). Composition: ${minNonMeal} non-meal (${nonMealPerDay}/day) + EXACTLY ${minMeals} meals (1 lunch + 1 dinner per full day, no more). Do not generate additional food/restaurant activities beyond the meal count — if you have many strong restaurant candidates, pick the ${minMeals} best and skip the rest. On arrival/departure days, drop a meal whose natural time falls outside the available window (e.g. drop lunch on a 3pm arrival, drop dinner on an 11am departure) — each dropped meal reduces the count by 1. Use accommodation and travel timing to shape sequencing — lighter arrivals/departures, first/last activities near accommodation or transport hubs.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}${insiderBlock}${shoppingBlock}\n\nReturn JSON only.`;
 
   const learnedSummary = getSummary(userId);
   const effectiveSystemPrompt = learnedSummary
     ? `${SYSTEM_PROMPT}\n\n${learnedSummary}`
     : SYSTEM_PROMPT;
 
-  const res = await client.messages.create({
-    model: MODEL,
-    max_tokens: 16384,
-    system: effectiveSystemPrompt,
-    messages: [{ role: 'user', content: prompt }]
-  });
+  async function streamMessage(userContent) {
+    const stream = client.messages.stream({
+      model: MODEL,
+      max_tokens: 32768,
+      system: effectiveSystemPrompt,
+      messages: [{ role: 'user', content: userContent }]
+    });
+    const final = await stream.finalMessage();
+    return { text: extractTextBlock(final.content), stop_reason: final.stop_reason };
+  }
 
-  const response = extractTextBlock(res.content);
-  console.log(`planCity(${name}): stop_reason=${res.stop_reason}, response_length=${response.length}`);
+  const { text: response, stop_reason } = await streamMessage(prompt);
+  console.log(`planCity(${name}): stop_reason=${stop_reason}, response_length=${response.length}`);
   let parsed = tryParseJsonArray(response);
 
   if (!parsed) {
-    console.error(`JSON parse failed for ${name} (stop_reason=${res.stop_reason}), retrying...`);
+    console.error(`JSON parse failed for ${name} (stop_reason=${stop_reason}), retrying...`);
     console.error(`Raw response (first 500 chars): ${response.slice(0, 500)}`);
     console.error(`Raw response (last 500 chars): ${response.slice(-500)}`);
-    const retry = await client.messages.create({
-      model: MODEL,
-      max_tokens: 16384,
-      system: effectiveSystemPrompt,
-      messages: [{ role: 'user', content: prompt + '\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.' }]
-    });
-    const retryResponse = extractTextBlock(retry.content);
-    parsed = tryParseJsonArray(retryResponse);
+    const retry = await streamMessage(prompt + '\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.');
+    parsed = tryParseJsonArray(retry.text);
   }
 
   if (!parsed) {
@@ -412,7 +411,9 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     throw new Error(`Claude returned invalid JSON for ${name}.`);
   }
 
-  return parsed.map((item) => normalizeActivity(item, name));
+  const normalized = parsed.map((item) => normalizeActivity(item, name));
+  await enrichWithPlaceDetails(normalized, name);
+  return normalized;
 }
 
 module.exports = { planCity, normalizeActivity, normalizeLegacyActivity, blankActivity, SYSTEM_PROMPT };

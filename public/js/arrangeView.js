@@ -25,6 +25,7 @@
     tour: { durationHours: 2.5, openingHours: '09:00-17:00' },
     walk: { durationHours: 1.5, openingHours: '08:00-19:00' },
     sunset: { durationHours: 1, openingHours: '17:30-20:30' },
+    shopping: { durationHours: 1.5, openingHours: '10:00-21:00' },
     default: { durationHours: 1.5, openingHours: '09:00-18:00' }
   };
 
@@ -149,6 +150,7 @@
   }
 
   function formatCommuteBadge(commute) {
+    if (commute && commute.isWalkingDistance) return '🚶 walk';
     const selected = resolveSelectedCommuteDetails(commute);
     if (!selected || !Number.isFinite(selected.durationMinutes)) return '';
     return `${selected.modeIcon} ${selected.durationMinutes} min`;

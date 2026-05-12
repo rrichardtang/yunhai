@@ -1,10 +1,56 @@
-const { MIN_BUFFER_BETWEEN } = require('./arrangeConstants');
-const { inferCategory } = require('./arrangeConfig');
-const { effectiveDayStart, effectiveDayEnd, getDuration } = require('./arrangeTimeAssigner');
 const { minutesFromTime } = require('../shared/timeHelpers');
 
-const MEAL_CATEGORIES = new Set(['breakfast', 'lunch', 'dinner']);
-const NON_MEAL_CAP_CATEGORIES = new Set(['sightseeing', 'cultural', 'tour', 'shopping', 'nature', 'landmark', 'relaxation', 'museum', 'gallery', 'walk']);
+function getDuration(activity) {
+  if (activity?.timing?.duration_minutes != null) return Number(activity.timing.duration_minutes) || 60;
+  if (activity?.duration_hours != null) return Math.round(Number(activity.duration_hours) * 60) || 60;
+  return 60;
+}
+
+function getOpeningHoursRaw(activity) {
+  return activity?.timing?.opening_hours || activity?.opening_hours || '';
+}
+
+function toMin(h, m, ap) {
+  let hour = Number(h) || 0;
+  const min = Number(m) || 0;
+  if (ap) {
+    const lower = ap.toLowerCase();
+    if (lower === 'pm' && hour < 12) hour += 12;
+    if (lower === 'am' && hour === 12) hour = 0;
+  }
+  return hour * 60 + min;
+}
+
+function parseOpeningHours(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return [[0, 1440]];
+  const ranges = [];
+  for (const part of text.split(/[,;]/)) {
+    const m = part.trim().match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*[-–]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+    if (!m) continue;
+    const start = toMin(m[1], m[2], m[3]);
+    let end = toMin(m[4], m[5], m[6]);
+    if (end <= start) end = 1440;
+    ranges.push([start, end]);
+  }
+  return ranges.length ? ranges.sort((a, b) => a[0] - b[0]) : [[0, 1440]];
+}
+
+function effectiveDayStart(day) {
+  const winStart = minutesFromTime(day.windowStart || '00:00');
+  const arrival = day.arrivalAvailableMin != null
+    ? Number(day.arrivalAvailableMin)
+    : (day.arrivalAvailableTime ? minutesFromTime(day.arrivalAvailableTime) : 0);
+  return Math.max(winStart, arrival);
+}
+
+function effectiveDayEnd(day) {
+  const winEnd = day.windowEnd ? minutesFromTime(day.windowEnd) : 1440;
+  const departure = day.departureMustLeaveMin != null
+    ? Number(day.departureMustLeaveMin)
+    : (day.departureMustLeaveTime ? minutesFromTime(day.departureMustLeaveTime) : 1440);
+  return Math.min(winEnd, departure);
+}
 
 function buildEntry(id, placement, activity) {
   const startMin = minutesFromTime(placement.time || '00:00');
@@ -12,8 +58,12 @@ function buildEntry(id, placement, activity) {
   return { id, date: placement.date, startMin, endMin: startMin + duration, activity };
 }
 
-function overlapsWithBuffer(a, b) {
-  return a.startMin < b.endMin + MIN_BUFFER_BETWEEN && b.startMin < a.endMin + MIN_BUFFER_BETWEEN;
+function overlaps(a, b) {
+  return a.startMin < b.endMin && b.startMin < a.endMin;
+}
+
+function startsWithinAnyWindow(startMin, windows) {
+  return windows.some(([s, e]) => startMin >= s && startMin < e);
 }
 
 function validate({ placements, lockedActivities = [], days, activitiesById }) {
@@ -33,12 +83,12 @@ function validate({ placements, lockedActivities = [], days, activitiesById }) {
 
     for (let i = 0; i < entries.length; i += 1) {
       for (let j = i + 1; j < entries.length; j += 1) {
-        if (overlapsWithBuffer(entries[i], entries[j])) {
+        if (overlaps(entries[i], entries[j])) {
           issues.push({
             type: 'overlap',
             day: date,
             ids: [entries[i].id, entries[j].id],
-            message: `${entries[i].id} and ${entries[j].id} overlap on ${date}`
+            message: `${entries[i].id} ("${entries[i].activity.name}") overlaps ${entries[j].id} ("${entries[j].activity.name}") on ${date}`
           });
         }
       }
@@ -48,16 +98,16 @@ function validate({ placements, lockedActivities = [], days, activitiesById }) {
       .filter((l) => l.date === date)
       .map((l) => {
         const startMin = minutesFromTime(l.time || '00:00');
-        return { id: l.id, startMin, endMin: startMin + (Number(l.duration_minutes) || 60) };
+        return { id: l.id, name: l.name, startMin, endMin: startMin + (Number(l.duration_minutes) || 60) };
       });
     for (const e of entries) {
       for (const l of lockEntries) {
-        if (overlapsWithBuffer(e, l)) {
+        if (overlaps(e, l)) {
           issues.push({
             type: 'lock_overlap',
             day: date,
             id: e.id,
-            message: `${e.id} overlaps locked anchor ${l.id} on ${date}`
+            message: `${e.id} ("${e.activity.name}") overlaps locked anchor "${l.name}" on ${date}`
           });
         }
       }
@@ -72,39 +122,22 @@ function validate({ placements, lockedActivities = [], days, activitiesById }) {
             type: 'window',
             day: date,
             id: e.id,
-            message: `${e.id} outside day window on ${date}`
+            message: `${e.id} ("${e.activity.name}") is outside day window on ${date}`
           });
         }
       }
     }
 
-    const meals = { breakfast: 0, lunch: 0, dinner: 0 };
-    const cats = {};
     for (const e of entries) {
-      const cat = inferCategory(e.activity);
-      if (MEAL_CATEGORIES.has(cat)) {
-        meals[cat] += 1;
-      } else if (NON_MEAL_CAP_CATEGORIES.has(cat)) {
-        cats[cat] = (cats[cat] || 0) + 1;
-      }
-    }
-    for (const [mt, n] of Object.entries(meals)) {
-      if (n > 1) {
+      const raw = getOpeningHoursRaw(e.activity);
+      if (!raw) continue;
+      const windows = parseOpeningHours(raw);
+      if (!startsWithinAnyWindow(e.startMin, windows)) {
         issues.push({
-          type: 'meal_cap',
+          type: 'opening_hours',
           day: date,
-          meal: mt,
-          message: `${n} ${mt} activities on ${date} (max 1)`
-        });
-      }
-    }
-    for (const [cat, n] of Object.entries(cats)) {
-      if (n > 2) {
-        issues.push({
-          type: 'category_cap',
-          day: date,
-          category: cat,
-          message: `${n} ${cat} activities on ${date} (max 2)`
+          id: e.id,
+          message: `${e.id} ("${e.activity.name}") scheduled outside opening hours (${raw}) on ${date}`
         });
       }
     }
@@ -113,4 +146,4 @@ function validate({ placements, lockedActivities = [], days, activitiesById }) {
   return { ok: issues.length === 0, issues };
 }
 
-module.exports = { validate, overlapsWithBuffer };
+module.exports = { validate, overlaps, parseOpeningHours, getDuration, effectiveDayStart, effectiveDayEnd };

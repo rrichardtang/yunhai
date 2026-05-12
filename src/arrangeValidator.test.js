@@ -55,7 +55,58 @@ test('detects window violation', () => {
   assert.ok(v.issues.some((i) => i.type === 'window'));
 });
 
-test('detects two lunches as meal cap violation', () => {
+test('flags opening_hours when activity starts before venue opens', () => {
+  const a = { id: 'a', name: 'a', timing: { duration_minutes: 60, opening_hours: '14:00-18:00' } };
+  const v = validate({
+    placements: { a: { date: '2026-05-03', time: '10:00' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { a }
+  });
+  assert.equal(v.ok, false);
+  assert.ok(v.issues.some((i) => i.type === 'opening_hours'));
+});
+
+test('opening_hours allows activity that extends past listed close (start-within-window)', () => {
+  // Restaurant lists 11:00-15:00. Lunch at 14:30 for 1h ends at 15:30 — fine, kitchens often serve seated diners past close.
+  const a = { id: 'a', name: 'a', timing: { duration_minutes: 60, opening_hours: '11:00-15:00' } };
+  const v = validate({
+    placements: { a: { date: '2026-05-03', time: '14:30' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { a }
+  });
+  assert.equal(v.ok, true);
+});
+
+test('back-to-back activities at different venues pass (LLM owns transit budgeting)', () => {
+  const a = { id: 'a', name: 'A', timing: { duration_minutes: 60 }, venue_name: 'Cafe Alpha' };
+  const b = { id: 'b', name: 'B', timing: { duration_minutes: 60 }, venue_name: 'Cafe Beta' };
+  // a ends at 13:00, b starts at 13:00 — zero gap. Validator no longer enforces a buffer.
+  const v = validate({
+    placements: { a: { date: '2026-05-03', time: '12:00' }, b: { date: '2026-05-03', time: '13:00' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { a, b }
+  });
+  assert.equal(v.ok, true);
+});
+
+test('actual time overlap (no buffer added) is still flagged', () => {
+  const a = { id: 'a', name: 'A', timing: { duration_minutes: 90 }, venue_name: 'Cafe Alpha' };
+  const b = { id: 'b', name: 'B', timing: { duration_minutes: 60 }, venue_name: 'Cafe Beta' };
+  // a runs 12:00-13:30, b runs 13:00-14:00 — real overlap.
+  const v = validate({
+    placements: { a: { date: '2026-05-03', time: '12:00' }, b: { date: '2026-05-03', time: '13:00' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { a, b }
+  });
+  assert.equal(v.ok, false);
+  assert.equal(v.issues[0].type, 'overlap');
+});
+
+test('does not enforce meal caps (judgment, not physics)', () => {
   const l1 = mkAct('l1', { duration: 60, category: 'lunch' });
   const l2 = mkAct('l2', { duration: 60, category: 'lunch' });
   const v = validate({
@@ -64,23 +115,5 @@ test('detects two lunches as meal cap violation', () => {
     days,
     activitiesById: { l1, l2 }
   });
-  assert.equal(v.ok, false);
-  assert.ok(v.issues.some((i) => i.type === 'meal_cap' && i.meal === 'lunch'));
-});
-
-test('detects three museums as category cap violation', () => {
-  const m1 = mkAct('m1', { duration: 60, category: 'museum' });
-  const m2 = mkAct('m2', { duration: 60, category: 'museum' });
-  const m3 = mkAct('m3', { duration: 60, category: 'museum' });
-  const v = validate({
-    placements: {
-      m1: { date: '2026-05-03', time: '09:00' },
-      m2: { date: '2026-05-03', time: '11:00' },
-      m3: { date: '2026-05-03', time: '14:00' }
-    },
-    lockedActivities: [],
-    days,
-    activitiesById: { m1, m2, m3 }
-  });
-  assert.ok(v.issues.some((i) => i.type === 'category_cap' && i.category === 'museum'));
+  assert.equal(v.ok, true);
 });

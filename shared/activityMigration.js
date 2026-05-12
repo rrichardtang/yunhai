@@ -135,12 +135,12 @@
         type: a.cost_type === 'per_group' ? 'per_group' : 'per_person'
       },
 
-      verdict: a.verdict || 'Recommend',
-      dedicated_time_block: Boolean(a.dedicated_time_block),
+      dedicated_time_block: durationHours >= 2,
 
       why_it_fits: String(a.why_it_fits || '').trim(),
       pitfall: String(a.pitfall || '').trim(),
       booking_advice: String(a.booking_advice || '').trim(),
+      insider_tips: a.insider_tips == null ? null : (String(a.insider_tips).trim() || null),
       smarter_alternative: a.smarter_alternative == null ? null : String(a.smarter_alternative).trim()
     };
   }

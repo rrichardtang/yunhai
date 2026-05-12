@@ -15,14 +15,16 @@ function formatProfileForEnrichment(profile = {}) {
     ['livePerformances', 'Live performances'],
     ['outdoorNature', 'Outdoor / nature activities'],
     ['nightlifeBars', 'Nightlife and bars'],
-    ['structuredTours', 'Structured tours']
+    ['structuredTours', 'Structured tours'],
+    ['shoppingPerson', 'Shopping while traveling']
   ];
   const textQuestions = [
     ['dayStructure', 'Day structure'],
     ['dietaryRestrictions', 'Dietary restrictions'],
     ['mobilityConsiderations', 'Mobility considerations'],
     ['budgetStyle', 'Budget style'],
-    ['travelCompanions', 'Travel companions']
+    ['travelCompanions', 'Travel companions'],
+    ['shoppingInterests', 'Shopping interests']
   ];
   const paceLabels = { 1: 'Very relaxed', 2: 'Easy-going', 3: 'Moderate', 4: 'Active', 5: 'Non-stop' };
 

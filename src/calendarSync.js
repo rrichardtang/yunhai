@@ -57,7 +57,7 @@ function buildCalendarItems(itinerary = {}, { metadataMode = 'compact' } = {}) {
       const end = new Date(start.getTime() + (durationMinutes * 60 * 1000));
 
       const title = String(activity?.name || 'Travel activity').trim();
-      const location = [activity?.start_location, activity?.end_location].filter(Boolean).join(' → ') || day?.city || '';
+      const location = activity?.location?.address || activity?.venue_name || [activity?.start_location, activity?.end_location].filter(Boolean).join(' → ') || day?.city || '';
       const compactDescription = '';
       const fullDescription = [
         `Type: ${activity?.type || 'activity'}`,
