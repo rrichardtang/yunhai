@@ -61,16 +61,13 @@
 
   function representativeCostUsd(activity = {}) {
     const type = String(activity?.type || '').toLowerCase();
-    const bookingType = actBookingType(activity);
-    const mealTypes = ['meal', 'food', 'breakfast', 'lunch', 'dinner', 'restaurant'];
-    if (mealTypes.includes(type) || bookingType === 'restaurant') {
+    if (type === 'meal') {
       const lvl = activity?.price_level;
       if (typeof lvl === 'number' && PRICE_LEVEL_USD[lvl] != null) return PRICE_LEVEL_USD[lvl];
       return null;
     }
-    if (bookingType === 'tour' || type === 'tour') return 75;
-    if (bookingType === 'attraction' || type === 'museum' || type === 'landmark' || type === 'cultural' || type === 'gallery' || type === 'sports') return 25;
-    if (type === 'show') return 80;
+    if (type === 'tour') return 75;
+    if (type === 'museum' || type === 'landmark' || type === 'sports') return 25;
     return null;
   }
 

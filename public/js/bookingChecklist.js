@@ -3,10 +3,8 @@
 
   function migrateChecklistType(type = 'other') {
     const v = String(type || 'other').toLowerCase();
-    if (['flight', 'train', 'car_rental', 'transfer', 'transportation'].includes(v)) return 'transportation';
-    if (['hotel', 'accommodation'].includes(v)) return 'accommodation';
-    if (['meal', 'restaurant', 'food', 'cafe', 'bar', 'dining'].includes(v)) return 'activity';
-    if (['attraction', 'tour', 'museum', 'park', 'landmark', 'entertainment', 'shopping', 'nightlife', 'activity', 'other'].includes(v)) return 'activity';
+    if (['transportation'].includes(v)) return 'transportation';
+    if (['accommodation'].includes(v)) return 'accommodation';
     return 'activity';
   }
 
