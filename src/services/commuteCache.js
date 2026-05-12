@@ -3,7 +3,7 @@ const path = require('path');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 const CACHE_PATH = path.join(DATA_DIR, 'commute-cache.json');
-const TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const FLUSH_DEBOUNCE_MS = 2000;
 
 let cache = null;

@@ -4,6 +4,22 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-12] Distance Matrix: Haversine pre-filter + cluster-centroid pairs over Mapbox migration or Finalize-deferral
+
+**Decision:** Keep Google Distance Matrix and feed Sonnet real commute data at arrange time, but cut call volume via (1) Haversine pre-filter at 1.5 km (sub-threshold pairs skipped — prompt already ignores <15-min walking pairs), (2) greedy 2 km clustering with single inter-cluster representative pair fanned out to all member-pairs, (3) cache TTL 30d → 365d, (4) per-leg UI pills stay live during drafting now that arrange cost is bounded.
+
+**Reasoning:** Sonnet's schedule quality degrades noticeably without grounded commute data — it falls back to vibes about venue geography. Earlier proposal to defer all Distance Matrix until Finalize was rejected for this reason. The cost problem is fixable by computing fewer pairs, not by removing data from the prompt.
+
+**Alternatives rejected:**
+- **Mapbox Matrix API**: no public transit data, which is the dominant mode in Tokyo/most cities the user plans for.
+- **Defer Distance Matrix until Finalize**: degrades arrange quality.
+- **K-means clustering**: greedy first-fit is simpler and the optimality gap is irrelevant at this scale.
+- **Per-leg pills only after Finalize**: with the matrix cost cut ~10×, per-leg pills become affordable (~$0.50 per session) and are a real UX win during iteration.
+
+**Tradeoffs:** Inter-cluster pairs receive a centroid-derived estimate, not exact venue-to-venue time — e.g. all Asakusa↔Shibuya pairs share one number. Sonnet doesn't know which numbers are exact vs approximate, which is the right design. Greedy clustering is order-dependent; produces slightly suboptimal partitions in pathological cases but cost stays bounded.
+
+---
+
 ## [2026-05-10] Matrix endpoint uses single-mode (transit-with-driving-fallback); per-leg UI endpoint keeps 3 modes
 
 **Decision:** `/api/commute-matrix` now calls Distance Matrix once per pair (mode=transit), falling back to driving only when transit returns no result. Single-direction queries with both-direction storage in the matrix. Hard cap of 2000 pairs per request (circuit breaker). The `/api/commute` per-leg endpoint that powers the UI mode-pill dropdowns keeps the existing 3-mode `getCommuteBetweenActivities` because the UI needs all three.
