@@ -437,6 +437,14 @@ Return ONLY valid JSON (no markdown fences):
           const repairedSan = sanitizePlacements(repaired);
           placements = repairedSan.placements;
           unplaced = [...unplaced, ...repairedSan.unplaced];
+          const placedIds = new Set(Object.keys(placements));
+          const seen = new Set();
+          unplaced = unplaced.filter((u) => {
+            if (placedIds.has(u.id)) return false;
+            if (seen.has(u.id)) return false;
+            seen.add(u.id);
+            return true;
+          });
           v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
           secondPassValid = v.ok;
         } catch (repairErr) {

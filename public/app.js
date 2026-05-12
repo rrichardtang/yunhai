@@ -5680,7 +5680,9 @@ async function autoArrangeActiveCity(opts = {}) {
     const unplacedItems = unplaced
       .map((u) => {
         const a = flexible.find((x) => x.id === u.id);
-        return a ? { id: a.id, name: a.name, reason: u.reason } : null;
+        if (!a) return null;
+        if (state.placements[a.id]?.dayId) return null;
+        return { id: a.id, name: a.name, reason: u.reason };
       })
       .filter(Boolean);
     state.arrangeUnplaced[activeCity] = unplacedItems;
