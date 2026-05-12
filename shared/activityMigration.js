@@ -1,20 +1,19 @@
 (function (root) {
   const CATEGORY_MAP = {
-    breakfast: 'food', lunch: 'food', dinner: 'food', food: 'food', restaurant: 'food',
+    breakfast: 'meal', lunch: 'meal', dinner: 'meal', food: 'meal', restaurant: 'meal', meal: 'meal',
     tour: 'tour', show: 'tour',
-    museum: 'cultural', gallery: 'cultural',
+    museum: 'museum', gallery: 'museum', cultural: 'museum',
     walk: 'sightseeing', walking: 'sightseeing',
     park: 'nature', garden: 'nature',
     market: 'shopping', shopping: 'shopping',
     spa: 'relaxation', relax: 'relaxation', relaxation: 'relaxation',
     landmark: 'landmark', viewpoint: 'landmark',
-    cultural: 'cultural',
     sightseeing: 'sightseeing',
     nature: 'nature'
   };
 
   const TAG_MAP = {
-    museum: 'museum', gallery: 'gallery',
+    museum: 'museum', gallery: 'museum',
     walk: 'walking', walking: 'walking',
     market: 'market'
   };

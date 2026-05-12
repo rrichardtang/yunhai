@@ -1,6 +1,6 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { getSummary } = require('./preferences');
-const { inferCategory, getCategoryDefaults, paceDescFromValue, LEGACY_MEAL_TYPES, canonicalizeMealCategory } = require('./arrangeConfig');
+const { inferCategory, getCategoryDefaults, paceDescFromValue, LEGACY_MEAL_TYPES, LEGACY_CULTURE_TYPES } = require('./arrangeConfig');
 const { searchCityActivities, searchTopRestaurants, searchInsiderTips, searchShoppingDistricts } = require('./braveSearch');
 const { enrichWithPlaceDetails } = require('./services/placesEnrich');
 const { isLegacyActivity, migrateActivity, parseTimeString, parseDurationToMinutes, inferMealType } = require('../shared/activityMigration');
@@ -14,7 +14,7 @@ You are a blunt, opinionated travel planning agent. Design itineraries tailored 
 
 Return a JSON array of activity objects. Each object must have these fields:
 - name (string)
-- type (string: show / tour / meal / sports / cultural / walk / sunset / neighborhood / shopping) — use "meal" for any restaurant or food activity. Do NOT use "lunch", "dinner", "breakfast", "food", or "restaurant" as type values.
+- type (string: show / tour / meal / sports / museum / landmark / walk / sunset / neighborhood / shopping) — use "meal" for any restaurant or food activity. Use "museum" for any indoor exhibit-style attraction (museums, galleries, art spaces, science centers). Use "landmark" for outdoor architectural sights (monuments, castles, cathedrals, viewpoints). Do NOT use "lunch", "dinner", "breakfast", "food", "restaurant", "cultural", or "gallery" as type values.
 - city (string)
 - venue_name (string or null) — the specific place as it appears on Google Maps (e.g. \`Casa Lucio, Madrid\`, \`Colosseum, Rome\`). For meals, this MUST be the restaurant name + city. For generic activities (free time, walks, sunsets, neighborhoods), set to null.
 - why_it_fits (string, 1-2 sentences)
@@ -207,7 +207,8 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
 
   const rawType = String(raw.type || 'tour').trim().toLowerCase();
   const isMealType = LEGACY_MEAL_TYPES.includes(rawType) || rawType === 'meal';
-  const type = isMealType ? 'meal' : rawType;
+  const isLegacyCultureType = LEGACY_CULTURE_TYPES.includes(rawType);
+  const type = isMealType ? 'meal' : isLegacyCultureType ? 'museum' : rawType;
 
   const rawName = String(raw.name || 'Untitled activity').trim();
   const name = isMealType
@@ -225,7 +226,7 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
   const bookingType = (() => {
     if (['tour', 'attraction', 'restaurant', 'none'].includes(raw.booking_type)) return raw.booking_type;
     if (type === 'tour' || type === 'show') return 'tour';
-    if (['cultural', 'sports'].includes(type)) return 'attraction';
+    if (['museum', 'landmark', 'sports'].includes(type)) return 'attraction';
     if (type === 'meal') return 'restaurant';
     return 'none';
   })();

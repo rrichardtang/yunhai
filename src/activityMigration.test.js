@@ -41,16 +41,26 @@ test('suggested_time "2:30pm" → preferred_time "14:30"', () => {
   assert.equal(result.timing.preferred_time, '14:30');
 });
 
-test('type "lunch" → category "food", meal_type "lunch"', () => {
+test('type "lunch" → category "meal", meal_type "lunch"', () => {
   const result = migrateActivity({ ...baseLegacy, type: 'lunch', category: 'lunch' });
-  assert.equal(result.category, 'food');
+  assert.equal(result.category, 'meal');
   assert.equal(result.meal_type, 'lunch');
 });
 
-test('type "museum" → category "cultural", tags ["museum"]', () => {
+test('type "museum" → category "museum", tags ["museum"]', () => {
   const result = migrateActivity({ ...baseLegacy, type: 'museum', category: 'museum' });
-  assert.equal(result.category, 'cultural');
+  assert.equal(result.category, 'museum');
   assert.deepEqual(result.tags, ['museum']);
+});
+
+test('type "gallery" → category "museum" (legacy collapse)', () => {
+  const result = migrateActivity({ ...baseLegacy, type: 'gallery', category: 'gallery' });
+  assert.equal(result.category, 'museum');
+});
+
+test('type "cultural" → category "museum" (legacy collapse)', () => {
+  const result = migrateActivity({ ...baseLegacy, type: 'cultural', category: 'cultural' });
+  assert.equal(result.category, 'museum');
 });
 
 test('idempotency: migrateActivity(migrateActivity(x)) deep equals migrateActivity(x)', () => {

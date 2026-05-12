@@ -1,10 +1,10 @@
 const placesCache = require('./placesCache');
 const { inferCategory } = require('../arrangeConfig');
 
-const FOOD_CATEGORIES = new Set(['breakfast', 'lunch', 'dinner', 'restaurant', 'food', 'cafe', 'nightlife']);
+const FOOD_CATEGORIES = new Set(['meal', 'breakfast', 'lunch', 'dinner', 'restaurant', 'food', 'cafe', 'nightlife']);
 const VENUE_CATEGORIES = new Set([
   ...FOOD_CATEGORIES,
-  'museum', 'gallery', 'landmark', 'market', 'show', 'shopping', 'spa', 'sports', 'cultural'
+  'museum', 'landmark', 'market', 'show', 'shopping', 'spa', 'sports'
 ]);
 const ENDPOINT = 'https://places.googleapis.com/v1/places:searchText';
 
