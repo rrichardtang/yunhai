@@ -298,19 +298,31 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
   }
 
   const response = await fetch(`${DISTANCE_MATRIX_BASE_URL}?${params.toString()}`);
-  if (!response.ok) return null;
+  if (!response.ok) {
+    if (mode === 'transit') console.warn(`[dm-transit] HTTP ${response.status} for ${origin} -> ${destination}`);
+    return null;
+  }
 
   const data = await response.json();
-  if (data?.status !== 'OK' || !Array.isArray(data?.rows) || !data.rows.length) return null;
+  if (data?.status !== 'OK' || !Array.isArray(data?.rows) || !data.rows.length) {
+    if (mode === 'transit') console.warn(`[dm-transit] top-status=${data?.status} msg=${data?.error_message || ''} for ${origin} -> ${destination}`);
+    return null;
+  }
 
   const element = Array.isArray(data.rows[0]?.elements) && data.rows[0].elements.length
     ? data.rows[0].elements[0]
     : null;
 
-  if (!element || element.status !== 'OK') return null;
+  if (!element || element.status !== 'OK') {
+    if (mode === 'transit') console.warn(`[dm-transit] element-status=${element?.status} for ${origin} -> ${destination}`);
+    return null;
+  }
 
   const durationSeconds = Number(element?.duration?.value || 0);
-  if (!durationSeconds) return null;
+  if (!durationSeconds) {
+    if (mode === 'transit') console.warn(`[dm-transit] no duration for ${origin} -> ${destination}`);
+    return null;
+  }
 
   const minutes = Math.max(1, Math.round(durationSeconds / 60));
   commuteCache.set(origin, destination, mode, minutes);
