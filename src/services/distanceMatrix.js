@@ -293,6 +293,9 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
     mode,
     key: apiKey
   });
+  if (mode === 'transit' || mode === 'driving') {
+    params.set('departure_time', 'now');
+  }
 
   const response = await fetch(`${DISTANCE_MATRIX_BASE_URL}?${params.toString()}`);
   if (!response.ok) return null;
