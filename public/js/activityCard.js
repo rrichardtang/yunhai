@@ -69,7 +69,7 @@
       return null;
     }
     if (bookingType === 'tour' || type === 'tour') return 75;
-    if (bookingType === 'attraction' || type === 'cultural' || type === 'sports') return 25;
+    if (bookingType === 'attraction' || type === 'museum' || type === 'landmark' || type === 'cultural' || type === 'gallery' || type === 'sports') return 25;
     if (type === 'show') return 80;
     return null;
   }

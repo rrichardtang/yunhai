@@ -3214,13 +3214,13 @@ function getActivityStyle(type = '') {
     dinner:       { icon: ph('ph-wine'),                colorClass: 'activity-food' },
     show:         { icon: ph('ph-ticket'),              colorClass: 'activity-show' },
     tour:         { icon: ph('ph-compass'),             colorClass: 'activity-tour' },
-    cultural:     { icon: ph('ph-palette'),             colorClass: 'activity-cultural' },
     walk:         { icon: ph('ph-person-simple-walk'),  colorClass: 'activity-walk' },
     neighborhood: { icon: ph('ph-map-trifold'),         colorClass: 'activity-neighborhood' },
     sports:       { icon: ph('ph-soccer-ball'),         colorClass: 'activity-sports' },
     sunset:       { icon: ph('ph-sun-horizon'),         colorClass: 'activity-sunset' },
     museum:       { icon: ph('ph-columns'),             colorClass: 'activity-cultural' },
-    gallery:      { icon: ph('ph-paint-brush'),         colorClass: 'activity-show' },
+    gallery:      { icon: ph('ph-columns'),             colorClass: 'activity-cultural' },
+    cultural:     { icon: ph('ph-columns'),             colorClass: 'activity-cultural' },
     landmark:     { icon: ph('ph-buildings'),           colorClass: 'activity-tour' },
     park:         { icon: ph('ph-tree'),                colorClass: 'activity-walk' },
     market:       { icon: ph('ph-storefront'),          colorClass: 'activity-default' },
@@ -4118,24 +4118,26 @@ async function ensureMiniMapForCard(card, activity) {
 }
 
 const CATEGORY_ICONS = {
-  museum: 'ph-columns', gallery: 'ph-paint-brush', landmark: 'ph-buildings',
+  museum: 'ph-columns', gallery: 'ph-columns', cultural: 'ph-columns',
+  landmark: 'ph-buildings',
   park: 'ph-tree', neighborhood: 'ph-map-trifold', market: 'ph-storefront',
+  meal: 'ph-fork-knife',
   food: 'ph-fork-knife', restaurant: 'ph-fork-knife', breakfast: 'ph-coffee',
   lunch: 'ph-fork-knife', dinner: 'ph-wine', nightlife: 'ph-martini',
   show: 'ph-ticket', tour: 'ph-compass', walk: 'ph-person-simple-walk',
-  sunset: 'ph-sun-horizon', sports: 'ph-soccer-ball', cultural: 'ph-palette',
+  sunset: 'ph-sun-horizon', sports: 'ph-soccer-ball',
   shopping: 'ph-bag', spa: 'ph-sparkle', default: 'ph-map-pin'
 };
 
 const CATEGORY_HINTS_CLIENT = [
-  [/\b(museum|exhibit)\b/i, 'museum'], [/\b(gallery|art)\b/i, 'gallery'],
+  [/\b(museum|exhibit|gallery|art)\b/i, 'museum'],
   [/\b(park|garden)\b/i, 'park'], [/\b(neighborhood|district|quarter)\b/i, 'neighborhood'],
-  [/\b(market|bazaar|souq)\b/i, 'market'], [/\b(breakfast|brunch|cafe)\b/i, 'breakfast'],
-  [/\b(lunch)\b/i, 'lunch'], [/\b(dinner|supper)\b/i, 'dinner'],
+  [/\b(market|bazaar|souq)\b/i, 'market'],
+  [/\b(breakfast|brunch|cafe|lunch|dinner|supper|restaurant|dining)\b/i, 'meal'],
   [/\b(bar|cocktail|nightlife|club)\b/i, 'nightlife'],
   [/\b(show|concert|theatre|theater|performance)\b/i, 'show'],
   [/\b(tour|day trip|excursion)\b/i, 'tour'], [/\b(walk|hike|stroll)\b/i, 'walk'],
-  [/\b(sunset)\b/i, 'sunset'], [/\b(restaurant|dining)\b/i, 'restaurant'],
+  [/\b(sunset)\b/i, 'sunset'],
   [/\b(landmark|monument|castle|palace|cathedral|church)\b/i, 'landmark'],
 ];
 
