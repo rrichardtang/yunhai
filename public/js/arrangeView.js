@@ -14,25 +14,22 @@
     arrival: { durationHours: 1, openingHours: '00:00-23:59' },
     departure: { durationHours: 1, openingHours: '00:00-23:59' },
     museum: { durationHours: 2.5, openingHours: '10:00-18:00' },
-    gallery: { durationHours: 2, openingHours: '10:00-18:00' },
+    landmark: { durationHours: 1.5, openingHours: '09:00-18:00' },
     park: { durationHours: 1.5, openingHours: '07:00-19:00' },
     neighborhood: { durationHours: 2, openingHours: '09:00-21:00' },
     market: { durationHours: 1.5, openingHours: '09:00-17:00' },
-    breakfast: { durationHours: 1, openingHours: '07:30-10:30' },
-    lunch: { durationHours: 1.25, openingHours: '12:00-14:30' },
-    dinner: { durationHours: 1.75, openingHours: '18:30-22:30' },
-    show: { durationHours: 2, openingHours: '19:00-23:00' },
+    meal: { durationHours: 1.5, openingHours: '' },
     tour: { durationHours: 2.5, openingHours: '09:00-17:00' },
-    walk: { durationHours: 1.5, openingHours: '08:00-19:00' },
-    sunset: { durationHours: 1, openingHours: '17:30-20:30' },
+    nightlife: { durationHours: 2, openingHours: '20:00-23:59' },
     shopping: { durationHours: 1.5, openingHours: '10:00-21:00' },
+    sports: { durationHours: 2, openingHours: '10:00-21:00' },
     default: { durationHours: 1.5, openingHours: '09:00-18:00' }
   };
 
   const COMMUTE_MODE_ORDER = ['transit', 'driving', 'walking'];
   const COMMUTE_MODE_LABEL = { transit: 'Transit', driving: 'Driving', walking: 'Walking' };
   const COMMUTE_MODE_DEFAULT_ICON = { transit: '🚇', driving: '🚗', walking: '🚶' };
-  const FIXED_HOUR_CATEGORIES = new Set(['breakfast', 'lunch', 'dinner', 'nightlife', 'sunset']);
+  const FIXED_HOUR_CATEGORIES = new Set(['meal', 'nightlife']);
 
   function expandDays(cities) {
     const days = [];
@@ -66,12 +63,9 @@
     if (raw && getArrangeCategoryDefaults(raw, config)) return raw;
     if (/\b(arrival|arrive|check[- ]?in)\b/i.test(text)) return 'arrival';
     if (/\b(depart|departure|check[- ]?out)\b/i.test(text)) return 'departure';
-    if (/\b(museum|exhibit)\b/i.test(text)) return 'museum';
+    if (/\b(museum|exhibit|gallery|art)\b/i.test(text)) return 'museum';
     if (/\b(park|garden)\b/i.test(text)) return 'park';
-    if (/\b(breakfast|brunch|cafe)\b/i.test(text)) return 'breakfast';
-    if (/\b(lunch)\b/i.test(text)) return 'lunch';
-    if (/\b(dinner|supper|restaurant)\b/i.test(text)) return 'dinner';
-    if (/\b(show|concert|theatre|theater)\b/i.test(text)) return 'show';
+    if (/\b(landmark|monument|castle|palace|cathedral|church)\b/i.test(text)) return 'landmark';
     return raw || 'default';
   }
 

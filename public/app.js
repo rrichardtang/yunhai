@@ -2759,17 +2759,13 @@ function renderCities() {
 
 function typeToTime(type) {
   const map = {
-    breakfast: '8:30am',
     tour: '10:00am',
-    walk: '11:00am',
     neighborhood: '11:30am',
-    lunch: '1:00pm',
-    cultural: '2:30pm',
-    show: '8:00pm',
+    museum: '2:30pm',
     sports: '4:00pm',
-    sunset: 'sunset',
-    food: '7:30pm',
-    dinner: '8:00pm'
+    landmark: '11:00am',
+    shopping: '3:00pm',
+    meal: '1:00pm'
   };
   return map[type] || 'TBD';
 }
@@ -3207,25 +3203,15 @@ function getActivityStyle(type = '') {
   const ph = (name) => `<i class="ph-bold ${name}" aria-hidden="true"></i>`;
   const map = {
     meal:         { icon: ph('ph-fork-knife'),          colorClass: 'activity-food' },
-    food:         { icon: ph('ph-fork-knife'),          colorClass: 'activity-food' },
-    restaurant:   { icon: ph('ph-fork-knife'),          colorClass: 'activity-food' },
-    breakfast:    { icon: ph('ph-coffee'),              colorClass: 'activity-food' },
-    lunch:        { icon: ph('ph-fork-knife'),          colorClass: 'activity-food' },
-    dinner:       { icon: ph('ph-wine'),                colorClass: 'activity-food' },
-    show:         { icon: ph('ph-ticket'),              colorClass: 'activity-show' },
     tour:         { icon: ph('ph-compass'),             colorClass: 'activity-tour' },
-    walk:         { icon: ph('ph-person-simple-walk'),  colorClass: 'activity-walk' },
+    museum:       { icon: ph('ph-columns'),             colorClass: 'activity-cultural' },
+    landmark:     { icon: ph('ph-buildings'),           colorClass: 'activity-tour' },
     neighborhood: { icon: ph('ph-map-trifold'),         colorClass: 'activity-neighborhood' },
     sports:       { icon: ph('ph-soccer-ball'),         colorClass: 'activity-sports' },
-    sunset:       { icon: ph('ph-sun-horizon'),         colorClass: 'activity-sunset' },
-    museum:       { icon: ph('ph-columns'),             colorClass: 'activity-cultural' },
-    gallery:      { icon: ph('ph-columns'),             colorClass: 'activity-cultural' },
-    cultural:     { icon: ph('ph-columns'),             colorClass: 'activity-cultural' },
-    landmark:     { icon: ph('ph-buildings'),           colorClass: 'activity-tour' },
+    shopping:     { icon: ph('ph-bag'),                 colorClass: 'activity-default' },
     park:         { icon: ph('ph-tree'),                colorClass: 'activity-walk' },
     market:       { icon: ph('ph-storefront'),          colorClass: 'activity-default' },
     nightlife:    { icon: ph('ph-martini'),             colorClass: 'activity-show' },
-    shopping:     { icon: ph('ph-bag'),                 colorClass: 'activity-default' },
     spa:          { icon: ph('ph-sparkle'),             colorClass: 'activity-default' },
   };
   return map[normalized] || { icon: ph('ph-map-pin'), colorClass: 'activity-default' };
@@ -4118,26 +4104,28 @@ async function ensureMiniMapForCard(card, activity) {
 }
 
 const CATEGORY_ICONS = {
-  museum: 'ph-columns', gallery: 'ph-columns', cultural: 'ph-columns',
-  landmark: 'ph-buildings',
-  park: 'ph-tree', neighborhood: 'ph-map-trifold', market: 'ph-storefront',
   meal: 'ph-fork-knife',
-  food: 'ph-fork-knife', restaurant: 'ph-fork-knife', breakfast: 'ph-coffee',
-  lunch: 'ph-fork-knife', dinner: 'ph-wine', nightlife: 'ph-martini',
-  show: 'ph-ticket', tour: 'ph-compass', walk: 'ph-person-simple-walk',
-  sunset: 'ph-sun-horizon', sports: 'ph-soccer-ball',
-  shopping: 'ph-bag', spa: 'ph-sparkle', default: 'ph-map-pin'
+  tour: 'ph-compass',
+  museum: 'ph-columns',
+  landmark: 'ph-buildings',
+  neighborhood: 'ph-map-trifold',
+  sports: 'ph-soccer-ball',
+  shopping: 'ph-bag',
+  park: 'ph-tree',
+  market: 'ph-storefront',
+  nightlife: 'ph-martini',
+  spa: 'ph-sparkle',
+  default: 'ph-map-pin'
 };
 
 const CATEGORY_HINTS_CLIENT = [
   [/\b(museum|exhibit|gallery|art)\b/i, 'museum'],
-  [/\b(park|garden)\b/i, 'park'], [/\b(neighborhood|district|quarter)\b/i, 'neighborhood'],
+  [/\b(park|garden)\b/i, 'park'],
+  [/\b(neighborhood|district|quarter|walk|hike|stroll|sunset|sightseeing)\b/i, 'neighborhood'],
   [/\b(market|bazaar|souq)\b/i, 'market'],
   [/\b(breakfast|brunch|cafe|lunch|dinner|supper|restaurant|dining)\b/i, 'meal'],
   [/\b(bar|cocktail|nightlife|club)\b/i, 'nightlife'],
-  [/\b(show|concert|theatre|theater|performance)\b/i, 'show'],
-  [/\b(tour|day trip|excursion)\b/i, 'tour'], [/\b(walk|hike|stroll)\b/i, 'walk'],
-  [/\b(sunset)\b/i, 'sunset'],
+  [/\b(tour|day trip|excursion|show|concert|theatre|theater|performance|class)\b/i, 'tour'],
   [/\b(landmark|monument|castle|palace|cathedral|church)\b/i, 'landmark'],
 ];
 
@@ -6824,8 +6812,7 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
       }
 
       const cityActivities = (evt.activities || []).map((a, i) => {
-        const migrated = window.ActivityMigration ? window.ActivityMigration.migrateActivity(a) : a;
-        const normalized = normalizeActivityMetadata(migrated);
+        const normalized = normalizeActivityMetadata(a);
         return {
           id: normalized.id || `${evt.city}-${i}-${uid()}`,
           ...normalized,
@@ -7401,21 +7388,13 @@ function hydrateFromSnapshot(snapshot) {
   state.cities = (snapshot.cities || []).map(normalizeCityData);
   state.travels = Array.isArray(snapshot.travels) ? snapshot.travels.slice(0, 1).map(normalizeTravelEntry) : [];
   hydrateTravelIntoCities();
-  state.activities = (snapshot.activities || []).map(
-    (a) => window.ActivityMigration ? window.ActivityMigration.migrateActivity(a) : a
-  );
+  state.activities = snapshot.activities || [];
   state.placements = snapshot.placements || {};
   state.commutes = normalizeCommuteStateMap(snapshot.commutes || {});
   state.reviewed = snapshot.reviewed || {};
   const snapshotDays = Array.isArray(snapshot.days) ? snapshot.days : [];
-  const migrateDay = (d) => ({
-    ...d,
-    activities: Array.isArray(d.activities)
-      ? d.activities.map((a) => window.ActivityMigration ? window.ActivityMigration.migrateActivity(a) : a)
-      : []
-  });
   state.days = daysMatchCities(snapshotDays, state.cities)
-    ? snapshotDays.map(migrateDay)
+    ? snapshotDays
     : expandDays(state.cities);
   state.arrangeCity = snapshot.arrangeCity || state.days[0]?.city || null;
 
