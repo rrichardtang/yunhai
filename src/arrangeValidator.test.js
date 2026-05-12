@@ -106,14 +106,51 @@ test('actual time overlap (no buffer added) is still flagged', () => {
   assert.equal(v.issues[0].type, 'overlap');
 });
 
-test('does not enforce meal caps (judgment, not physics)', () => {
-  const l1 = mkAct('l1', { duration: 60, category: 'lunch' });
-  const l2 = mkAct('l2', { duration: 60, category: 'lunch' });
+test('flags duplicate_meal_slot when two meals land in the same lunch window', () => {
+  const l1 = { id: 'l1', name: 'Ramen Spot', type: 'meal', timing: { duration_minutes: 60 } };
+  const l2 = { id: 'l2', name: 'Sushi Counter', type: 'meal', timing: { duration_minutes: 60 } };
   const v = validate({
-    placements: { l1: { date: '2026-05-03', time: '12:00' }, l2: { date: '2026-05-03', time: '14:00' } },
+    placements: { l1: { date: '2026-05-03', time: '12:00' }, l2: { date: '2026-05-03', time: '13:00' } },
     lockedActivities: [],
     days,
     activitiesById: { l1, l2 }
+  });
+  assert.equal(v.ok, false);
+  assert.ok(v.issues.some((i) => i.type === 'duplicate_meal_slot'));
+});
+
+test('flags meal_outside_windows for meal scheduled at 15:30', () => {
+  const m = { id: 'm', name: 'Cafe', type: 'meal', timing: { duration_minutes: 60 } };
+  const v = validate({
+    placements: { m: { date: '2026-05-03', time: '15:30' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { m }
+  });
+  assert.equal(v.ok, false);
+  assert.ok(v.issues.some((i) => i.type === 'meal_outside_windows'));
+});
+
+test('flags opening_hours for dinner-only restaurant scheduled at lunch', () => {
+  const m = { id: 'm', name: 'Omakase', type: 'meal', timing: { duration_minutes: 60, opening_hours: '17:00-22:00' } };
+  const v = validate({
+    placements: { m: { date: '2026-05-03', time: '12:30' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { m }
+  });
+  assert.equal(v.ok, false);
+  assert.ok(v.issues.some((i) => i.type === 'opening_hours'));
+});
+
+test('allows one meal in lunch window and one in dinner window on same day', () => {
+  const l = { id: 'l', name: 'Lunch Spot', type: 'meal', timing: { duration_minutes: 60 } };
+  const d = { id: 'd', name: 'Dinner Spot', type: 'meal', timing: { duration_minutes: 60 } };
+  const v = validate({
+    placements: { l: { date: '2026-05-03', time: '12:30' }, d: { date: '2026-05-03', time: '19:00' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { l, d }
   });
   assert.equal(v.ok, true);
 });

@@ -3206,7 +3206,9 @@ function getActivityStyle(type = '') {
   const normalized = String(type || '').toLowerCase().trim();
   const ph = (name) => `<i class="ph-bold ${name}" aria-hidden="true"></i>`;
   const map = {
+    meal:         { icon: ph('ph-fork-knife'),          colorClass: 'activity-food' },
     food:         { icon: ph('ph-fork-knife'),          colorClass: 'activity-food' },
+    restaurant:   { icon: ph('ph-fork-knife'),          colorClass: 'activity-food' },
     breakfast:    { icon: ph('ph-coffee'),              colorClass: 'activity-food' },
     lunch:        { icon: ph('ph-fork-knife'),          colorClass: 'activity-food' },
     dinner:       { icon: ph('ph-wine'),                colorClass: 'activity-food' },

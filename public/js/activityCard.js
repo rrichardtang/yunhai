@@ -62,7 +62,7 @@
   function representativeCostUsd(activity = {}) {
     const type = String(activity?.type || '').toLowerCase();
     const bookingType = actBookingType(activity);
-    const mealTypes = ['food', 'breakfast', 'lunch', 'dinner'];
+    const mealTypes = ['meal', 'food', 'breakfast', 'lunch', 'dinner', 'restaurant'];
     if (mealTypes.includes(type) || bookingType === 'restaurant') {
       const lvl = activity?.price_level;
       if (typeof lvl === 'number' && PRICE_LEVEL_USD[lvl] != null) return PRICE_LEVEL_USD[lvl];
