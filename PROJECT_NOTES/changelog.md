@@ -4,6 +4,19 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-12] Distance Matrix cost: second wave (~10× further reduction) + per-leg pills back live
+
+Layered four optimizations on top of the 2026-05-10 single-mode/dedup work. Expected 60-activity Tokyo trip: ~$9 → ~$2 first arrange, ~$0 on repeats.
+
+- `src/services/distanceMatrix.js`: added `haversineKm`, `getActivityCoords`, `isWalkingDistancePair`, `WALKING_DISTANCE_KM = 1.5`. `getFastestCommuteMinutes` returns `null` for sub-1.5 km pairs before any API call. `getCommuteBetweenActivities` short-circuits sub-1.5 km pairs with a synthetic walking response carrying `isWalkingDistance: true` — no 3-mode Promise.all fires.
+- `src/routes/commute.js` `/api/commute-matrix`: refactored to two-phase clustering. `clusterByProximity` greedy first-fit by 2 km centroid distance. All intra-cluster pairs compute exact data; each inter-cluster pair fires one Distance Matrix call (using first member as representative) and fans the minute count out to every member-pair. Circuit breaker now wraps combined intra+inter pair count.
+- `src/routes/commute.js` `/api/commute` (per-leg): passes `isWalkingDistance` through to the frontend.
+- `src/services/commuteCache.js`: `TTL_MS` 30 days → 365 days.
+- `public/js/arrangeView.js` `formatCommuteBadge`: renders `🚶 walk` for `isWalkingDistance: true`. Per-leg pills remain live during drafting.
+- 91/91 tests passing.
+
+---
+
 ## [2026-05-10] Distance Matrix cost emergency: 5.7× call-volume reduction
 
 User reported 70K Distance Matrix requests on Google Cloud Console after free trial expired. Root cause: `/api/commute-matrix` paid for 3 modes per pair (transit/driving/walking) when only `durationMinutes` (the fastest) was consumed, AND queried both directions of every symmetric pair. For a 60-activity trip: 60×59 ordered × 3 modes = 10,620 calls per arrange click. Five arrange clicks during debugging = ~53K calls.

@@ -27,6 +27,34 @@ function buildDistanceMatrixQuery(activity = {}) {
   return [activity.name, activity.city].filter(Boolean).join(', ').trim();
 }
 
+const WALKING_DISTANCE_KM = 1.5;
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function getActivityCoords(activity) {
+  const lat = Number(activity?.location?.lat);
+  const lng = Number(activity?.location?.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  const sLat = Number(activity?.start_latitude);
+  const sLng = Number(activity?.start_longitude);
+  if (Number.isFinite(sLat) && Number.isFinite(sLng)) return { lat: sLat, lng: sLng };
+  return null;
+}
+
+function isWalkingDistancePair(fromActivity, toActivity) {
+  const a = getActivityCoords(fromActivity);
+  const b = getActivityCoords(toActivity);
+  if (!a || !b) return false;
+  return haversineKm(a.lat, a.lng, b.lat, b.lng) < WALKING_DISTANCE_KM;
+}
+
 function formatLatLng(lat, lng) {
   const latitude = Number(lat);
   const longitude = Number(lng);
@@ -287,6 +315,8 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
 }
 
 async function getFastestCommuteMinutes(fromActivity, toActivity) {
+  if (isWalkingDistancePair(fromActivity, toActivity)) return null;
+
   const origin = resolveCommuteQuery(fromActivity, 'end_location');
   const destination = resolveCommuteQuery(toActivity, 'start_location');
   if (!origin || !destination) return null;
@@ -314,6 +344,20 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
       selectedMode: 'transit',
       durationMinutes: null,
       modeIcon: COMMUTE_MODE_ICON.transit
+    };
+  }
+
+  if (isWalkingDistancePair(fromActivity, toActivity)) {
+    return {
+      modes: {
+        transit: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.transit },
+        driving: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.driving },
+        walking: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.walking, isWalkingDistance: true }
+      },
+      selectedMode: 'walking',
+      durationMinutes: null,
+      modeIcon: COMMUTE_MODE_ICON.walking,
+      isWalkingDistance: true
     };
   }
 
@@ -377,5 +421,9 @@ module.exports = {
   resolveCommuteQuery,
   fetchDistanceMatrixDuration,
   getCommuteBetweenActivities,
-  getFastestCommuteMinutes
+  getFastestCommuteMinutes,
+  haversineKm,
+  getActivityCoords,
+  isWalkingDistancePair,
+  WALKING_DISTANCE_KM
 };

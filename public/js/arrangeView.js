@@ -150,6 +150,7 @@
   }
 
   function formatCommuteBadge(commute) {
+    if (commute && commute.isWalkingDistance) return '🚶 walk';
     const selected = resolveSelectedCommuteDetails(commute);
     if (!selected || !Number.isFinite(selected.durationMinutes)) return '';
     return `${selected.modeIcon} ${selected.durationMinutes} min`;
