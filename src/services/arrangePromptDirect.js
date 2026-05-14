@@ -113,7 +113,7 @@ SOFT PREFERENCES (use to choose between valid placements, never to reject):
 
 PLACEMENT STRATEGY:
 - Days have ~12-16 hours of window. Multiple activities per day is expected and encouraged.
-- MEALS (activity.category === "meal"): place AT MOST one meal in the lunch window (11:00-14:30) and one meal in the dinner window (17:00-22:00) per day. Decide each meal's slot by checking its opening_hours — if the restaurant only opens after 17:00, it can ONLY be that day's dinner, never the lunch. If multiple approved meals qualify for the same slot on the same day, pick the one closest geographically to that day's other activities and move the rest to unplaced with reason "no_time_slot_remaining". Never schedule two meals in the same slot on the same day. Never schedule a meal outside both windows.
+- MEALS (activity.type === "meal"): place AT MOST one meal in the lunch window (11:00-14:30) and one meal in the dinner window (17:00-22:00) per day. Decide each meal's slot by checking its opening_hours — if the restaurant only opens after 17:00, it can ONLY be that day's dinner, never the lunch. If multiple approved meals qualify for the same slot on the same day, pick the one closest geographically to that day's other activities and move the rest to unplaced with reason "no_time_slot_remaining". Never schedule two meals in the same slot on the same day. Never schedule a meal outside both windows.
 - Lunch and dinner anchor the day; non-meal activities fit between them.
 - A typical full day has 4–8 activities depending on pace.
 - Distribute activities evenly across days. A day with 0–2 activities while another has 8+ is poor balance — move overflow to the lighter day before pushing anything to unplaced.

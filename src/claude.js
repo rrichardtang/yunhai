@@ -1,7 +1,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs');
 const { getSummary } = require('./preferences');
-const { inferCategory, getCategoryDefaults, paceDescFromValue } = require('./arrangeConfig');
+const { getCategoryDefaults, paceDescFromValue } = require('./arrangeConfig');
 
 const MEAL_DEBUG_LOG = '/tmp/meal-debug.log';
 function mealDebug(line) {
@@ -39,7 +39,6 @@ Return a JSON array of activity objects. Each object must have these fields:
 - smarter_alternative (string or null)
 - suggested_time (string — e.g. "9:00am", "2:00pm", "sunset")
 - duration_hours (number)
-- category (string, e.g. museum / restaurant / park)
 - opening_hours (string, e.g. "10:00-18:00" or "12:00-14:30,19:00-22:00") — MANDATORY for type "meal". Use the restaurant's actual hours from the restaurant research provided. Format: "HH:MM-HH:MM" or "HH:MM-HH:MM,HH:MM-HH:MM" for split-shift venues. If actual hours are not in the research, OMIT the restaurant from your output rather than guessing.
 - estimated_cost_usd (number — estimated cost in USD. Overestimate rather than underestimate. Scale to the city's cost of living. Return 0 for free activities like walks, parks, sunsets.)
 - cost_type (string: "per_person" or "per_group" — per_person: any activity where each person pays individually (museum entry, meal, theme park ticket, boat tour ticket, cooking class). per_group: a single price covers the whole group regardless of headcount (private airport transfer, car rental, private guided tour hired for the group, apartment/villa rental). When in doubt, use per_person.)
@@ -176,6 +175,7 @@ function blankActivity(overrides = {}) {
     name: overrides.name || 'Untitled activity',
     city: overrides.city || '',
     venue_name: overrides.venue_name || null,
+    type: overrides.type || 'tour',
 
     location: {
       name: overrides.venue_name || overrides.name || 'Untitled activity',
@@ -184,7 +184,6 @@ function blankActivity(overrides = {}) {
       lng: null
     },
 
-    category: overrides.category || 'default',
     tags: [],
 
     timing: {
@@ -214,13 +213,11 @@ function blankActivity(overrides = {}) {
 function normalizeActivity(raw = {}, fallbackCity = '') {
   if (!isLegacyActivity(raw)) return raw;
 
-  const normalizedCategory = inferCategory(raw);
-  const defaults = getCategoryDefaults(normalizedCategory);
-  const duration = Number(raw.duration_hours);
-  const durationHours = Number.isFinite(duration) && duration > 0 ? duration : defaults.durationHours;
-
   const type = String(raw.type || '').trim().toLowerCase();
   const isMealType = type === 'meal';
+  const defaults = getCategoryDefaults(type);
+  const duration = Number(raw.duration_hours);
+  const durationHours = Number.isFinite(duration) && duration > 0 ? duration : defaults.durationHours;
 
   const name = String(raw.name || 'Untitled activity').trim();
 
@@ -247,6 +244,7 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
     name,
     city,
     venue_name,
+    type,
 
     location: {
       name: venue_name || name,
@@ -255,7 +253,6 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
       lng: null
     },
 
-    category: normalizedCategory,
     tags: [],
 
     timing: {
@@ -442,16 +439,16 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   mealDebug(`${name} | minMeals=${minMeals} | claude_raw: total=${parsed.length} meals=${rawMealCount} types=${JSON.stringify(rawTypeBreakdown)}`);
 
   const normalized = parsed.map((item) => normalizeActivity(item, name));
-  const normalizedMealCount = normalized.filter((a) => String(a?.category || '').toLowerCase() === 'meal').length;
-  const mealsWithHours = normalized.filter((a) => String(a?.category || '').toLowerCase() === 'meal' && a?.timing?.opening_hours).length;
+  const normalizedMealCount = normalized.filter((a) => String(a?.type || '').toLowerCase() === 'meal').length;
+  const mealsWithHours = normalized.filter((a) => String(a?.type || '').toLowerCase() === 'meal' && a?.timing?.opening_hours).length;
   mealDebug(`${name} | after_normalize: total=${normalized.length} meals=${normalizedMealCount} meals_with_hours=${mealsWithHours}`);
 
   const validTyped = filterInvalidTypes(normalized, name);
-  const validMealCount = validTyped.filter((a) => String(a?.category || '').toLowerCase() === 'meal').length;
+  const validMealCount = validTyped.filter((a) => String(a?.type || '').toLowerCase() === 'meal').length;
   mealDebug(`${name} | after_filterInvalidTypes: total=${validTyped.length} meals=${validMealCount}`);
 
   const filtered = applyMealPoolCap(validTyped, { city: name, minMeals });
-  const finalMealCount = filtered.filter((a) => String(a?.category || '').toLowerCase() === 'meal').length;
+  const finalMealCount = filtered.filter((a) => String(a?.type || '').toLowerCase() === 'meal').length;
   mealDebug(`${name} | after_applyMealPoolCap: total=${filtered.length} meals=${finalMealCount}`);
 
   try {
@@ -468,7 +465,7 @@ function filterInvalidTypes(activities, city) {
   const kept = [];
   const dropped = [];
   for (const a of activities) {
-    const t = String(a?.category || '').toLowerCase();
+    const t = String(a?.type || '').toLowerCase();
     if (CANONICAL_TYPES.has(t)) kept.push(a);
     else dropped.push({ name: a?.name, type: t });
   }
@@ -479,7 +476,7 @@ function filterInvalidTypes(activities, city) {
 }
 
 function isMealNormalized(activity) {
-  return String(activity?.category || '').toLowerCase() === 'meal';
+  return String(activity?.type || '').toLowerCase() === 'meal';
 }
 
 function mealQualityScore(activity) {
