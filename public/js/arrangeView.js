@@ -57,15 +57,9 @@
     return merged[key] || merged.default || DEFAULT_ARRANGE_CATEGORY_CONFIG.default;
   }
 
-  function inferActivityCategory(activity = {}, { config = null, preferredTime = '' } = {}) {
-    const raw = String(activity.category || activity.type || '').trim().toLowerCase();
-    const text = `${activity.name || ''} ${activity.type || ''} ${preferredTime || ''}`;
+  function inferActivityCategory(activity = {}, { config = null } = {}) {
+    const raw = String(activity.type || '').trim().toLowerCase();
     if (raw && getArrangeCategoryDefaults(raw, config)) return raw;
-    if (/\b(arrival|arrive|check[- ]?in)\b/i.test(text)) return 'arrival';
-    if (/\b(depart|departure|check[- ]?out)\b/i.test(text)) return 'departure';
-    if (/\b(museum|exhibit|gallery|art)\b/i.test(text)) return 'museum';
-    if (/\b(park|garden)\b/i.test(text)) return 'park';
-    if (/\b(landmark|monument|castle|palace|cathedral|church)\b/i.test(text)) return 'landmark';
     return raw || 'default';
   }
 

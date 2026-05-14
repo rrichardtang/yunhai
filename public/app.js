@@ -4118,23 +4118,9 @@ const CATEGORY_ICONS = {
   default: 'ph-map-pin'
 };
 
-const CATEGORY_HINTS_CLIENT = [
-  [/\b(museum|exhibit|gallery|art)\b/i, 'museum'],
-  [/\b(park|garden)\b/i, 'park'],
-  [/\b(neighborhood|district|quarter|walk|hike|stroll|sunset|sightseeing)\b/i, 'neighborhood'],
-  [/\b(market|bazaar|souq)\b/i, 'market'],
-  [/\b(breakfast|brunch|cafe|lunch|dinner|supper|restaurant|dining)\b/i, 'meal'],
-  [/\b(bar|cocktail|nightlife|club)\b/i, 'nightlife'],
-  [/\b(tour|day trip|excursion|show|concert|theatre|theater|performance|class)\b/i, 'tour'],
-  [/\b(landmark|monument|castle|palace|cathedral|church)\b/i, 'landmark'],
-];
-
 function inferCategoryClient(activity = {}) {
-  const raw = String(activity.category || activity.type || '').trim().toLowerCase();
-  if (CATEGORY_ICONS[raw]) return raw;
-  const haystack = `${activity.name || ''} ${activity.type || ''}`;
-  const hit = CATEGORY_HINTS_CLIENT.find(([re]) => re.test(haystack));
-  return hit ? hit[1] : (raw || 'default');
+  const t = String(activity.type || '').trim().toLowerCase();
+  return CATEGORY_ICONS[t] ? t : 'default';
 }
 
 function markerContent(activity, highlighted = false) {
@@ -5616,7 +5602,7 @@ async function autoArrangeActiveCity(opts = {}) {
         date: entry.date,
         time: entry.time,
         duration_minutes: fromEnd > 0 ? fromEnd : fallback,
-        category: entry.activity.category,
+        type: entry.activity.type,
         name: entry.activity.name
       };
     });

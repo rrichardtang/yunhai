@@ -1,9 +1,8 @@
 const placesCache = require('./placesCache');
-const { inferCategory } = require('../arrangeConfig');
 
-const FOOD_CATEGORIES = new Set(['meal', 'nightlife']);
-const VENUE_CATEGORIES = new Set([
-  ...FOOD_CATEGORIES,
+const FOOD_TYPES = new Set(['meal', 'nightlife']);
+const VENUE_TYPES = new Set([
+  ...FOOD_TYPES,
   'museum', 'landmark', 'market', 'tour', 'shopping', 'sports'
 ]);
 const ENDPOINT = 'https://places.googleapis.com/v1/places:searchText';
@@ -16,12 +15,16 @@ const PRICE_LEVEL_MAP = {
   PRICE_LEVEL_VERY_EXPENSIVE: 4
 };
 
+function activityType(activity) {
+  return String(activity?.type || '').trim().toLowerCase();
+}
+
 function isFoodActivity(activity) {
-  return FOOD_CATEGORIES.has(inferCategory(activity));
+  return FOOD_TYPES.has(activityType(activity));
 }
 
 function isVenueActivity(activity) {
-  return VENUE_CATEGORIES.has(inferCategory(activity));
+  return VENUE_TYPES.has(activityType(activity));
 }
 
 function pad2(n) {
@@ -120,5 +123,5 @@ module.exports = {
   isVenueActivity,
   formatOpeningHoursFromPlaces,
   PRICE_LEVEL_MAP,
-  VENUE_CATEGORIES
+  VENUE_TYPES
 };
