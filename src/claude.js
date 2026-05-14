@@ -1,12 +1,6 @@
 const Anthropic = require('@anthropic-ai/sdk');
-const fs = require('fs');
 const { getSummary } = require('./preferences');
 const { getCategoryDefaults, paceDescFromValue } = require('./arrangeConfig');
-
-const MEAL_DEBUG_LOG = '/tmp/meal-debug.log';
-function mealDebug(line) {
-  try { fs.appendFileSync(MEAL_DEBUG_LOG, `${new Date().toISOString()} ${line}\n`); } catch {}
-}
 
 const CANONICAL_TYPES = new Set(['tour', 'meal', 'sports', 'museum', 'landmark', 'neighborhood', 'shopping']);
 const { searchCityActivities, searchTopRestaurants, searchInsiderTips, searchShoppingDistricts } = require('./braveSearch');
@@ -294,10 +288,8 @@ function normalizeLegacyActivity(raw, fallbackCity = '') {
 
 async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0, lockedActivities = []) {
   const { name, startDate, endDate, leaveTime, notes, accommodations } = city;
-  mealDebug(`planCity ENTRY city=${name} dates=${startDate}..${endDate}`);
   const client = getClient();
   if (!client) {
-    mealDebug(`planCity ABORT city=${name} reason=no_anthropic_key`);
     const err = new Error('Anthropic API key not configured');
     err.code = 'ANTHROPIC_KEY_MISSING';
     throw err;
@@ -411,12 +403,10 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   }
 
   const { text: response, stop_reason } = await streamMessage(prompt);
-  mealDebug(`${name} | claude_response: stop_reason=${stop_reason} length=${response.length} first200=${JSON.stringify(response.slice(0, 200))}`);
   console.log(`planCity(${name}): stop_reason=${stop_reason}, response_length=${response.length}`);
   let parsed = tryParseJsonArray(response);
 
   if (!parsed) {
-    mealDebug(`${name} | parse_failed_first_attempt last200=${JSON.stringify(response.slice(-200))}`);
     console.error(`JSON parse failed for ${name} (stop_reason=${stop_reason}), retrying...`);
     console.error(`Raw response (first 500 chars): ${response.slice(0, 500)}`);
     console.error(`Raw response (last 500 chars): ${response.slice(-500)}`);
@@ -425,39 +415,14 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   }
 
   if (!parsed) {
-    mealDebug(`${name} | parse_failed_after_retry`);
     console.error('Failed to parse Claude JSON response after retry.');
     throw new Error(`Claude returned invalid JSON for ${name}.`);
   }
 
-  const rawMealCount = parsed.filter((a) => String(a?.type || '').toLowerCase() === 'meal').length;
-  const rawTypeBreakdown = parsed.reduce((acc, a) => {
-    const t = String(a?.type || '<none>').toLowerCase();
-    acc[t] = (acc[t] || 0) + 1;
-    return acc;
-  }, {});
-  mealDebug(`${name} | minMeals=${minMeals} | claude_raw: total=${parsed.length} meals=${rawMealCount} types=${JSON.stringify(rawTypeBreakdown)}`);
-
   const normalized = parsed.map((item) => normalizeActivity(item, name));
-  const normalizedMealCount = normalized.filter((a) => String(a?.type || '').toLowerCase() === 'meal').length;
-  const mealsWithHours = normalized.filter((a) => String(a?.type || '').toLowerCase() === 'meal' && a?.timing?.opening_hours).length;
-  mealDebug(`${name} | after_normalize: total=${normalized.length} meals=${normalizedMealCount} meals_with_hours=${mealsWithHours}`);
-
   const validTyped = filterInvalidTypes(normalized, name);
-  const validMealCount = validTyped.filter((a) => String(a?.type || '').toLowerCase() === 'meal').length;
-  mealDebug(`${name} | after_filterInvalidTypes: total=${validTyped.length} meals=${validMealCount}`);
-
   const filtered = applyMealPoolCap(validTyped, { city: name, minMeals });
-  const finalMealCount = filtered.filter((a) => String(a?.type || '').toLowerCase() === 'meal').length;
-  mealDebug(`${name} | after_applyMealPoolCap: total=${filtered.length} meals=${finalMealCount}`);
-
-  try {
-    await enrichWithPlaceDetails(filtered, name);
-  } catch (e) {
-    mealDebug(`${name} | enrichWithPlaceDetails THREW: ${e?.message || e}`);
-    throw e;
-  }
-  mealDebug(`${name} | RETURN total=${filtered.length} meals=${finalMealCount}`);
+  await enrichWithPlaceDetails(filtered, name);
   return filtered;
 }
 

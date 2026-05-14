@@ -20,22 +20,21 @@ app.get('/planner.html', (_req, res) => {
     .replaceAll('__CLERK_FAPI_DOMAIN__', fapiDomain));
 });
 
-app.get('/debug-meal-log', (_req, res) => {
-  try {
-    const log = fs.readFileSync('/tmp/meal-debug.log', 'utf8');
-    res.type('text/plain').send(log);
-  } catch (e) {
-    res.status(404).type('text/plain').send(`No log yet: ${e.message}`);
-  }
+const { readDebugLog, clearDebugLog } = require('./services/debugLog');
+
+app.get('/debug', (req, res) => {
+  const log = readDebugLog();
+  if (log == null) return res.status(404).type('text/plain').send('No log yet');
+  const scope = String(req.query.scope || '').trim();
+  const tailRaw = Number(req.query.tail);
+  let lines = log.split('\n');
+  if (scope) lines = lines.filter((l) => l.includes(`[${scope}]`));
+  if (Number.isInteger(tailRaw) && tailRaw > 0) lines = lines.slice(-tailRaw);
+  res.type('text/plain').send(lines.join('\n'));
 });
 
-app.get('/debug-meal-log-clear', (_req, res) => {
-  try {
-    fs.writeFileSync('/tmp/meal-debug.log', '');
-    res.type('text/plain').send('cleared');
-  } catch (e) {
-    res.status(500).type('text/plain').send(`failed: ${e.message}`);
-  }
+app.get('/debug/clear', (_req, res) => {
+  res.type('text/plain').send(clearDebugLog() ? 'cleared' : 'failed');
 });
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
