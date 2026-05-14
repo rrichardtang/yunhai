@@ -422,9 +422,27 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     throw new Error(`Claude returned invalid JSON for ${name}.`);
   }
 
+  const rawMealCount = parsed.filter((a) => String(a?.type || '').toLowerCase() === 'meal').length;
+  const rawTypeBreakdown = parsed.reduce((acc, a) => {
+    const t = String(a?.type || '<none>').toLowerCase();
+    acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
+  console.log(`[meal-debug] ${name} | minMeals=${minMeals} | claude_raw: total=${parsed.length} meals=${rawMealCount} types=${JSON.stringify(rawTypeBreakdown)}`);
+
   const normalized = parsed.map((item) => normalizeActivity(item, name));
+  const normalizedMealCount = normalized.filter((a) => String(a?.category || '').toLowerCase() === 'meal').length;
+  const mealsWithHours = normalized.filter((a) => String(a?.category || '').toLowerCase() === 'meal' && a?.timing?.opening_hours).length;
+  console.log(`[meal-debug] ${name} | after_normalize: total=${normalized.length} meals=${normalizedMealCount} meals_with_hours=${mealsWithHours}`);
+
   const validTyped = filterInvalidTypes(normalized, name);
+  const validMealCount = validTyped.filter((a) => String(a?.category || '').toLowerCase() === 'meal').length;
+  console.log(`[meal-debug] ${name} | after_filterInvalidTypes: total=${validTyped.length} meals=${validMealCount}`);
+
   const filtered = applyMealPoolCap(validTyped, { city: name, minMeals });
+  const finalMealCount = filtered.filter((a) => String(a?.category || '').toLowerCase() === 'meal').length;
+  console.log(`[meal-debug] ${name} | after_applyMealPoolCap: total=${filtered.length} meals=${finalMealCount}`);
+
   await enrichWithPlaceDetails(filtered, name);
   return filtered;
 }
