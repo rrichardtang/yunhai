@@ -558,7 +558,14 @@ Return ONLY valid JSON (no markdown fences):
           : [];
         await acquireLlmSlot();
         try {
-          const activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren, cityLocked);
+          let activities;
+          try {
+            activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren, cityLocked);
+          } catch (planErr) {
+            try { require('fs').appendFileSync('/tmp/meal-debug.log', `${new Date().toISOString()} ROUTE planCity THREW city=${city.name} err=${planErr?.message || planErr}\nstack=${planErr?.stack || ''}\n`); } catch {}
+            throw planErr;
+          }
+          try { require('fs').appendFileSync('/tmp/meal-debug.log', `${new Date().toISOString()} ROUTE planCity RETURNED city=${city.name} count=${activities?.length || 0}\n`); } catch {}
 
           const cityStartDate = city.startDate || '';
           for (const a of activities) {
