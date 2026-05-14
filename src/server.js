@@ -20,16 +20,7 @@ app.get('/planner.html', (_req, res) => {
     .replaceAll('__CLERK_FAPI_DOMAIN__', fapiDomain));
 });
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
-app.use('/shared', express.static(path.join(__dirname, '..', 'shared')));
-
-require('./routes/status').register(app);
-require('./routes/email').register(app);
-require('./routes/geocode').register(app);
-
-app.use('/api', requireConfiguredAuth);
-
-app.get('/api/debug/meal-log', (_req, res) => {
+app.get('/debug-meal-log', (_req, res) => {
   try {
     const log = fs.readFileSync('/tmp/meal-debug.log', 'utf8');
     res.type('text/plain').send(log);
@@ -38,7 +29,7 @@ app.get('/api/debug/meal-log', (_req, res) => {
   }
 });
 
-app.delete('/api/debug/meal-log', (_req, res) => {
+app.get('/debug-meal-log-clear', (_req, res) => {
   try {
     fs.writeFileSync('/tmp/meal-debug.log', '');
     res.type('text/plain').send('cleared');
@@ -46,6 +37,15 @@ app.delete('/api/debug/meal-log', (_req, res) => {
     res.status(500).type('text/plain').send(`failed: ${e.message}`);
   }
 });
+
+app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use('/shared', express.static(path.join(__dirname, '..', 'shared')));
+
+require('./routes/status').register(app);
+require('./routes/email').register(app);
+require('./routes/geocode').register(app);
+
+app.use('/api', requireConfiguredAuth);
 
 require('./routes/attachments').register(app);
 require('./routes/activities').register(app);
