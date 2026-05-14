@@ -29,6 +29,24 @@ require('./routes/geocode').register(app);
 
 app.use('/api', requireConfiguredAuth);
 
+app.get('/api/debug/meal-log', (_req, res) => {
+  try {
+    const log = fs.readFileSync('/tmp/meal-debug.log', 'utf8');
+    res.type('text/plain').send(log);
+  } catch (e) {
+    res.status(404).type('text/plain').send(`No log yet: ${e.message}`);
+  }
+});
+
+app.delete('/api/debug/meal-log', (_req, res) => {
+  try {
+    fs.writeFileSync('/tmp/meal-debug.log', '');
+    res.type('text/plain').send('cleared');
+  } catch (e) {
+    res.status(500).type('text/plain').send(`failed: ${e.message}`);
+  }
+});
+
 require('./routes/attachments').register(app);
 require('./routes/activities').register(app);
 require('./routes/image').register(app);
