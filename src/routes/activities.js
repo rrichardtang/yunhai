@@ -21,6 +21,7 @@ const { validate: validateArrangement } = require('../arrangeValidator');
 const { minutesFromTime } = require('../../shared/timeHelpers');
 const { buildCityTravelTiming } = require('../services/distanceMatrix');
 const arrangeTelemetry = require('../services/arrangeTelemetry');
+const { debugLog } = require('../services/debugLog');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
 
@@ -562,10 +563,10 @@ Return ONLY valid JSON (no markdown fences):
           try {
             activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren, cityLocked);
           } catch (planErr) {
-            try { require('fs').appendFileSync('/tmp/meal-debug.log', `${new Date().toISOString()} ROUTE planCity THREW city=${city.name} err=${planErr?.message || planErr}\nstack=${planErr?.stack || ''}\n`); } catch {}
+            debugLog('plan', `planCity THREW city=${city.name} err=${planErr?.message || planErr}`);
             throw planErr;
           }
-          try { require('fs').appendFileSync('/tmp/meal-debug.log', `${new Date().toISOString()} ROUTE planCity RETURNED city=${city.name} count=${activities?.length || 0}\n`); } catch {}
+          debugLog('plan', `planCity RETURNED city=${city.name} count=${activities?.length || 0}`);
 
           const cityStartDate = city.startDate || '';
           for (const a of activities) {
