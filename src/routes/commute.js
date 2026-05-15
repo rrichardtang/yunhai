@@ -71,6 +71,7 @@ function register(app) {
 
       console.log(`[commute-matrix] ${activities.length} activities → ${clusters.length} clusters → ${intraPairs.length} intra + ${interPairs.length} inter pairs`);
       debugLog('commute-matrix', `PAIRS clusters=${clusters.length} intra=${intraPairs.length} inter=${interPairs.length}`);
+      const tStart = Date.now();
 
       const setPair = (fromId, toId, minutes) => {
         if (!matrix[fromId]) matrix[fromId] = {};
@@ -102,7 +103,7 @@ function register(app) {
       }
 
       const populated = Object.values(matrix).reduce((s, row) => s + Object.keys(row).length, 0);
-      debugLog('commute-matrix', `RETURN populated_pairs=${populated}`);
+      debugLog('commute-matrix', `RETURN populated_pairs=${populated} elapsed_ms=${Date.now() - tStart}`);
       return res.json({ matrix });
     } catch (err) {
       debugLog('commute-matrix', `ERROR msg="${err?.message || err}"`);
