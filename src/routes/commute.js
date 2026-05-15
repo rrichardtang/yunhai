@@ -4,6 +4,7 @@ const {
   haversineKm,
   getActivityCoords
 } = require('../services/distanceMatrix');
+const { debugLog } = require('../services/debugLog');
 
 const MAX_PAIRS_PER_REQUEST = 2000;
 const CLUSTER_RADIUS_KM = 2.0;
@@ -37,6 +38,8 @@ function register(app) {
     try {
       const activities = Array.isArray(req.body?.activities) ? req.body.activities : [];
       const matrix = {};
+      const withCoords = activities.filter((a) => getActivityCoords(a)).length;
+      debugLog('commute-matrix', `START activities=${activities.length} with_coords=${withCoords} api_key_set=${!!process.env.GOOGLE_MAPS_API_KEY}`);
       if (activities.length < 2) return res.json({ matrix });
 
       const clusters = clusterByProximity(activities);
@@ -62,10 +65,12 @@ function register(app) {
       const allPairs = [...intraPairs, ...interPairs];
       if (allPairs.length > MAX_PAIRS_PER_REQUEST) {
         console.warn(`[commute-matrix] throttled: ${activities.length} activities → ${allPairs.length} pairs (${intraPairs.length} intra + ${interPairs.length} inter) > ${MAX_PAIRS_PER_REQUEST} cap`);
+        debugLog('commute-matrix', `THROTTLED pairs=${allPairs.length} cap=${MAX_PAIRS_PER_REQUEST}`);
         return res.json({ matrix: {}, throttled: true });
       }
 
       console.log(`[commute-matrix] ${activities.length} activities → ${clusters.length} clusters → ${intraPairs.length} intra + ${interPairs.length} inter pairs`);
+      debugLog('commute-matrix', `PAIRS clusters=${clusters.length} intra=${intraPairs.length} inter=${interPairs.length}`);
 
       const setPair = (fromId, toId, minutes) => {
         if (!matrix[fromId]) matrix[fromId] = {};
@@ -96,8 +101,11 @@ function register(app) {
         }
       }
 
+      const populated = Object.values(matrix).reduce((s, row) => s + Object.keys(row).length, 0);
+      debugLog('commute-matrix', `RETURN populated_pairs=${populated}`);
       return res.json({ matrix });
-    } catch {
+    } catch (err) {
+      debugLog('commute-matrix', `ERROR msg="${err?.message || err}"`);
       return res.json({ matrix: {} });
     }
   });
