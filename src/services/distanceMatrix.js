@@ -283,10 +283,12 @@ function resolveCommuteQuery(activity = {}, locationField) {
 
 async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) return { minutes: null, source: 'no-key' };
 
   const cached = commuteCache.get(origin, destination, mode);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) {
+    return { minutes: cached, source: cached === null ? 'cache-neg' : 'cache-hit' };
+  }
 
   const params = new URLSearchParams({
     origins: origin,
@@ -302,14 +304,14 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
   if (!response.ok) {
     debugLog('dm', `HTTP ${response.status} mode=${mode} ${origin} -> ${destination}`);
     commuteCache.setNegative(origin, destination, mode);
-    return null;
+    return { minutes: null, source: 'live-fail' };
   }
 
   const data = await response.json();
   if (data?.status !== 'OK' || !Array.isArray(data?.rows) || !data.rows.length) {
     debugLog('dm', `top-status=${data?.status} mode=${mode} msg="${data?.error_message || ''}" ${origin} -> ${destination}`);
     commuteCache.setNegative(origin, destination, mode);
-    return null;
+    return { minutes: null, source: 'live-fail' };
   }
 
   const element = Array.isArray(data.rows[0]?.elements) && data.rows[0].elements.length
@@ -319,32 +321,41 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
   if (!element || element.status !== 'OK') {
     debugLog('dm', `element-status=${element?.status} mode=${mode} ${origin} -> ${destination}`);
     commuteCache.setNegative(origin, destination, mode);
-    return null;
+    return { minutes: null, source: 'live-fail' };
   }
 
   const durationSeconds = Number(element?.duration?.value || 0);
   if (!durationSeconds) {
     debugLog('dm', `no-duration mode=${mode} ${origin} -> ${destination}`);
     commuteCache.setNegative(origin, destination, mode);
-    return null;
+    return { minutes: null, source: 'live-fail' };
   }
 
   const minutes = Math.max(1, Math.round(durationSeconds / 60));
   commuteCache.set(origin, destination, mode, minutes);
-  return minutes;
+  return { minutes, source: 'live-ok' };
+}
+
+async function getFastestCommuteWithSource(fromActivity, toActivity) {
+  if (isWalkingDistancePair(fromActivity, toActivity)) {
+    return { minutes: null, sources: ['walking-skip'] };
+  }
+  const origin = resolveCommuteQuery(fromActivity, 'end_location');
+  const destination = resolveCommuteQuery(toActivity, 'start_location');
+  if (!origin || !destination) return { minutes: null, sources: ['no-query'] };
+
+  const sources = [];
+  const transit = await fetchDistanceMatrixDuration({ origin, destination, mode: 'transit' });
+  sources.push(transit.source);
+  if (transit.minutes != null) return { minutes: transit.minutes, sources };
+
+  const driving = await fetchDistanceMatrixDuration({ origin, destination, mode: 'driving' });
+  sources.push(driving.source);
+  return { minutes: driving.minutes, sources };
 }
 
 async function getFastestCommuteMinutes(fromActivity, toActivity) {
-  if (isWalkingDistancePair(fromActivity, toActivity)) return null;
-
-  const origin = resolveCommuteQuery(fromActivity, 'end_location');
-  const destination = resolveCommuteQuery(toActivity, 'start_location');
-  if (!origin || !destination) return null;
-
-  let minutes = await fetchDistanceMatrixDuration({ origin, destination, mode: 'transit' });
-  if (minutes == null) {
-    minutes = await fetchDistanceMatrixDuration({ origin, destination, mode: 'driving' });
-  }
+  const { minutes } = await getFastestCommuteWithSource(fromActivity, toActivity);
   return minutes;
 }
 
@@ -376,8 +387,8 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
   const modeResults = await Promise.all(
     COMMUTE_MODE_PRIORITY.map(async (mode) => {
       try {
-        const durationMinutes = await fetchDistanceMatrixDuration({ origin, destination, mode });
-        return { mode, durationMinutes };
+        const { minutes } = await fetchDistanceMatrixDuration({ origin, destination, mode });
+        return { mode, durationMinutes: minutes };
       } catch {
         return { mode, durationMinutes: null };
       }
@@ -427,6 +438,7 @@ module.exports = {
   fetchDistanceMatrixDuration,
   getCommuteBetweenActivities,
   getFastestCommuteMinutes,
+  getFastestCommuteWithSource,
   haversineKm,
   getActivityCoords,
   isWalkingDistancePair,

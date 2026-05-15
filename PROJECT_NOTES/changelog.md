@@ -4,6 +4,20 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-15] Fix missing activity coords + cache visibility in debug logs
+
+Root cause of `acts_with_coords=0/28` was a taxonomy mismatch: `placesEnrich` only geocoded activities with `type` in a hardcoded allow-list `{meal, nightlife, museum, landmark, market, tour, shopping, sports}`, but the LLM prompt's taxonomy includes `neighborhood` (and the example showed `walk`). Activities outside the allow-list were stored without coords, breaking the cluster/Haversine/matrix pipeline downstream.
+
+- `src/services/placesEnrich.js`: replaced `isVenueActivity` filter with `hasCoords` filter — now geocodes any activity missing `location.lat/lng` regardless of type. Added `MISSING_COORDS_AFTER` debug log naming activities that still failed to resolve.
+- `src/claude.js:46`: stale example `"type": "walk"` → `"type": "neighborhood"` (matches the documented taxonomy on line 19).
+- `src/services/placesEnrich.test.js`: deleted — tests were orphaned (not picked up by `src/*.test.js` glob) and stale (used `category` field while code reads `type`).
+- `src/services/distanceMatrix.js`: `fetchDistanceMatrixDuration` now returns `{ minutes, source }` distinguishing `cache-hit / cache-neg / live-ok / live-fail`. Added `getFastestCommuteWithSource` sibling so callers can tally outcomes; `getFastestCommuteMinutes` preserved as thin wrapper.
+- `src/routes/commute.js`: `/api/commute-matrix` now tallies per-source counters and emits `CACHE hits=N neg_hits=N live_ok=N live_fail=N walking_skip=N (total_api=N)` debug line per request. Added `/api/commute` lifecycle logs (`START` / `RETURN` / `ERROR`).
+- `src/routes/activities.js`: `/api/arrange` now emits `INBOUND activities=N locked=N days=N city="..."` before validation, catching empty-payload or wrong-city silent failures.
+- 91/91 tests passing.
+
+---
+
 ## [2026-05-12] Distance Matrix cost: second wave (~10× further reduction) + per-leg pills back live
 
 Layered four optimizations on top of the 2026-05-10 single-mode/dedup work. Expected 60-activity Tokyo trip: ~$9 → ~$2 first arrange, ~$0 on repeats.
