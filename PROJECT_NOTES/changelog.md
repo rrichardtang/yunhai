@@ -4,6 +4,22 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-15] End-to-end debugLog coverage for activity-creation pipeline
+
+Stop the whack-a-mole pattern of adding one log at a time. Every step in the trip planning, enrichment, persistence, and arrange pipelines now emits debug log lines visible at `/debug?tail=N` (or `/debug?scope=foo`).
+
+New scopes: `plan`, `plan-city`, `places-fetch`, `activity-refine`, `activity-replace`, `itinerary-store`. Existing scopes preserved: `arrange`, `commute`, `commute-matrix`, `dm`, `places-enrich`.
+
+- `src/routes/activities.js` `/api/plan`: `INBOUND` / `DONE` / `ERROR` / `REJECT` lifecycle around the SSE handler.
+- `src/claude.js` `planCity`: replaced console.log/error with `plan-city` scope: `START` / `LLM_CALL` / `LLM_RESPONSE` / `PARSE_FAIL` / `RETRY` / `NORMALIZED` (with raw/after-type-filter/after-meal-cap counts) / `ENRICH_CALL` / `RETURN` / `THREW`.
+- `src/services/placesEnrich.js` `fetchPlaceDetails`: new `places-fetch` scope on every call — `OK` (with lat/lng/price/source=live|cache) or `FAIL` (reason=HTTP_status / no_place / no_api_key / exception). One line per Places lookup. Cache hits inside `enrichWithPlaceDetails` also emit `OK ... source=cache`.
+- `src/routes/activities.js` `/api/activity/refine` + `/api/activity/replace`: `INBOUND` / `DONE` / `ERROR` / `REJECT` lifecycle. `/api/activity/replace` now also calls `enrichWithPlaceDetails` on the normalized result so replacement activities have coords when returned to the client.
+- `src/itineraryStore.js`: `SAVE` / `UPDATE` / `GET_LATEST` / `GET_BY_ID` lines under `itinerary-store` scope to disambiguate "trip was just generated" vs "trip was loaded from storage."
+- `src/routes/activities.js` `/api/arrange`: defensive city fallback — when `days[0].city` is empty, derive cityName from the dominant `activity.city` value and emit `CITY_FALLBACK` log line; emit `CITY_EMPTY` if no city anywhere.
+- 91/91 tests passing.
+
+---
+
 ## [2026-05-15] Fix missing activity coords + cache visibility in debug logs
 
 Root cause of `acts_with_coords=0/28` was a taxonomy mismatch: `placesEnrich` only geocoded activities with `type` in a hardcoded allow-list `{meal, nightlife, museum, landmark, market, tour, shopping, sports}`, but the LLM prompt's taxonomy includes `neighborhood` (and the example showed `walk`). Activities outside the allow-list were stored without coords, breaking the cluster/Haversine/matrix pipeline downstream.

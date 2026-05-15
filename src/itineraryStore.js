@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { debugLog } = require('./services/debugLog');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'itineraries.json');
@@ -62,6 +63,9 @@ function saveItinerary(payload = {}, userId) {
     generatedAt: now,
     updatedAt: now
   };
+  const activityCount = Array.isArray(payload.activities) ? payload.activities.length : 0;
+  const cityCount = Array.isArray(payload.cities) ? payload.cities.length : 0;
+  debugLog('itinerary-store', `SAVE userId=${userId} id=${itinerary.id} cities=${cityCount} activities=${activityCount}`);
 
   const userExisting = store.items.filter((item) => item.userId === userId);
   const otherUsers = store.items.filter((item) => item.userId !== userId);
@@ -83,7 +87,12 @@ function updateItinerary(id, payload = {}, userId) {
   if (!id || !userId) return null;
   const store = readStore();
   const idx = store.items.findIndex((item) => item.id === id && item.userId === userId);
-  if (idx === -1) return null;
+  if (idx === -1) {
+    debugLog('itinerary-store', `UPDATE userId=${userId} id=${id} found=false`);
+    return null;
+  }
+  const activityCount = Array.isArray(payload.activities) ? payload.activities.length : (Array.isArray(store.items[idx].activities) ? store.items[idx].activities.length : 0);
+  debugLog('itinerary-store', `UPDATE userId=${userId} id=${id} activities=${activityCount}`);
 
   const existing = store.items[idx];
   store.items[idx] = {
@@ -105,16 +114,25 @@ function getLatestItinerary(userId) {
   if (!userId) return null;
   const store = readStore();
   const userItems = store.items.filter((item) => item.userId === userId);
-  if (!userItems.length) return null;
+  if (!userItems.length) {
+    debugLog('itinerary-store', `GET_LATEST userId=${userId} found=false`);
+    return null;
+  }
 
   const latestId = store.latestByUser?.[userId] || null;
-  return userItems.find((item) => item.id === latestId) || userItems[0];
+  const found = userItems.find((item) => item.id === latestId) || userItems[0];
+  const activityCount = Array.isArray(found?.activities) ? found.activities.length : 0;
+  debugLog('itinerary-store', `GET_LATEST userId=${userId} id=${found?.id} activities=${activityCount}`);
+  return found;
 }
 
 function getItineraryById(id, userId) {
   if (!id || !userId) return null;
   const store = readStore();
-  return store.items.find((item) => item.id === id && item.userId === userId) || null;
+  const found = store.items.find((item) => item.id === id && item.userId === userId) || null;
+  const activityCount = Array.isArray(found?.activities) ? found.activities.length : 0;
+  debugLog('itinerary-store', `GET_BY_ID userId=${userId} id=${id} found=${!!found} activities=${activityCount}`);
+  return found;
 }
 
 function listItineraries(userId) {
