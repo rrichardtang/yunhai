@@ -21,6 +21,7 @@ const { validate: validateArrangement } = require('../arrangeValidator');
 const { minutesFromTime } = require('../../shared/timeHelpers');
 const { buildCityTravelTiming } = require('../services/distanceMatrix');
 const arrangeTelemetry = require('../services/arrangeTelemetry');
+const { enrichWithPlaceDetails } = require('../services/placesEnrich');
 const { debugLog } = require('../services/debugLog');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
@@ -180,12 +181,16 @@ function register(app) {
   });
 
   app.post('/api/activity/refine', async (req, res) => {
+    const refineStartTs = Date.now();
     if (!process.env.OPENAI_API_KEY) {
+      debugLog('activity-refine', `REJECT reason=openai_key_missing`);
       return res.status(503).json({ error: 'OpenAI API key not configured' });
     }
 
     const { activity, note, budget_target } = req.body || {};
+    debugLog('activity-refine', `INBOUND name="${activity?.name || ''}" city="${activity?.city || ''}" note_chars=${(note || '').length}`);
     if (!activity?.name || !note) {
+      debugLog('activity-refine', `REJECT reason=missing_activity_or_note`);
       return res.status(400).json({ error: 'activity and note are required' });
     }
 
@@ -247,20 +252,25 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
         updates.booking_links = [];
       }
 
+      debugLog('activity-refine', `DONE name="${updatedName}" updated_fields=${Object.keys(updates).join(',')} elapsed_ms=${Date.now() - refineStartTs}`);
       return res.json({ updates });
     } catch (error) {
-      console.error('[/api/activity/refine]', error);
+      debugLog('activity-refine', `ERROR msg="${error?.message || error}" elapsed_ms=${Date.now() - refineStartTs}`);
       return res.status(500).json({ error: error.message || 'Failed to refine activity' });
     }
   });
 
   app.post('/api/activity/replace', async (req, res) => {
+    const replaceStartTs = Date.now();
     if (!process.env.ANTHROPIC_API_KEY) {
+      debugLog('activity-replace', `REJECT reason=anthropic_key_missing`);
       return res.status(503).json({ error: 'Anthropic API key not configured' });
     }
 
     const { activity, reason, notes, userId } = req.body || {};
+    debugLog('activity-replace', `INBOUND name="${activity?.name || ''}" city="${activity?.city || ''}" type="${activity?.type || ''}" reason_chars=${(reason || '').length}`);
     if (!activity?.name || !activity?.city) {
+      debugLog('activity-replace', `REJECT reason=missing_name_or_city`);
       return res.status(400).json({ error: 'activity.name and activity.city are required' });
     }
 
@@ -323,12 +333,16 @@ Return ONLY valid JSON (no markdown fences):
       }
 
       const normalized = normalizeActivity(parsed.activity, activity.city);
+      await enrichWithPlaceDetails([normalized], activity.city);
 
       for (const p of (Array.isArray(parsed.preferences) ? parsed.preferences : [])) recordPreference(resolvedUserId, p);
       for (const c of (Array.isArray(parsed.constraints) ? parsed.constraints : [])) recordConstraint(resolvedUserId, c);
 
+      const hasCoords = Number.isFinite(Number(normalized?.location?.lat)) && Number.isFinite(Number(normalized?.location?.lng));
+      debugLog('activity-replace', `DONE name="${normalized?.name || ''}" has_coords=${hasCoords} elapsed_ms=${Date.now() - replaceStartTs}`);
       return res.json({ activity: normalized });
     } catch (error) {
+      debugLog('activity-replace', `ERROR msg="${error?.message || error}" elapsed_ms=${Date.now() - replaceStartTs}`);
       return res.status(500).json({ error: error.message || 'Failed to replace activity' });
     }
   });
@@ -360,7 +374,20 @@ Return ONLY valid JSON (no markdown fences):
     const activitiesById = Object.fromEntries(flexible.map((a) => [String(a.id), a]));
     const matrix = commuteMatrix && typeof commuteMatrix === 'object' ? commuteMatrix : {};
     const matrixPairCount = Object.values(matrix).reduce((sum, row) => sum + (row && typeof row === 'object' ? Object.keys(row).length : 0), 0);
-    debugLog('arrange', `START model=${ARRANGE_MODEL} flexible=${flexible.length} locked=${resolvedLocked.length} days=${days.length} city="${days[0]?.city || ''}" matrix_pairs=${matrixPairCount}`);
+
+    let cityName = days[0]?.city || '';
+    if (!cityName) {
+      const counts = {};
+      for (const a of activities) {
+        const c = String(a?.city || '').trim();
+        if (c) counts[c] = (counts[c] || 0) + 1;
+      }
+      cityName = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+      if (cityName) debugLog('arrange', `CITY_FALLBACK derived="${cityName}" reason=days[0].city_empty`);
+      else debugLog('arrange', `CITY_EMPTY no city available — downstream lookups will be unqualified`);
+    }
+
+    debugLog('arrange', `START model=${ARRANGE_MODEL} flexible=${flexible.length} locked=${resolvedLocked.length} days=${days.length} city="${cityName}" matrix_pairs=${matrixPairCount}`);
 
     async function callLlmForJson(prompt) {
       debugLog('arrange', `LLM_CALL model=${ARRANGE_MODEL} prompt_chars=${prompt.length}`);
@@ -414,7 +441,6 @@ Return ONLY valid JSON (no markdown fences):
       return { placements, unplaced };
     }
 
-    const cityName = days[0]?.city || '';
     let firstPassValid = false;
     let firstPassIssues = [];
     let repairUsed = false;
@@ -552,7 +578,9 @@ Return ONLY valid JSON (no markdown fences):
   });
 
   app.post('/api/plan', async (req, res) => {
+    const planStartTs = Date.now();
     const { cities, travels, profile, budget, numTravelers, numChildren, lockedActivities } = req.body || {};
+    debugLog('plan', `INBOUND cities=${Array.isArray(cities) ? cities.length : 'N/A'} travelers=${numTravelers || 1} children=${numChildren || 0} budget=${budget || 'none'}`);
     const resolvedBudget = Number.isFinite(Number(budget)) && Number(budget) > 0 ? Number(budget) : null;
     const resolvedTravelers = Math.max(1, Math.round(Number(numTravelers) || 1));
     const resolvedChildren = Math.max(0, Math.round(Number(numChildren) || 0));
@@ -560,6 +588,7 @@ Return ONLY valid JSON (no markdown fences):
       ? lockedActivities
       : {};
     if (!Array.isArray(cities) || cities.length === 0) {
+      debugLog('plan', `REJECT reason=cities_empty_or_invalid`);
       return res.status(400).json({ error: 'cities must be a non-empty array' });
     }
 
@@ -625,8 +654,10 @@ Return ONLY valid JSON (no markdown fences):
       }
 
       sendEvent({ type: 'done' });
+      debugLog('plan', `DONE cities=${cities.length} elapsed_ms=${Date.now() - planStartTs}`);
       res.end();
     } catch (error) {
+      debugLog('plan', `ERROR msg="${error?.message || error}" code=${error?.code || ''} elapsed_ms=${Date.now() - planStartTs}`);
       if (error.code === 'ANTHROPIC_KEY_MISSING') {
         sendEvent({
           type: 'error',

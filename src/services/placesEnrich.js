@@ -55,7 +55,10 @@ function formatOpeningHoursFromPlaces(regularOpeningHours) {
 
 async function fetchPlaceDetails(name, city) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    debugLog('places-fetch', `FAIL name="${name}" city="${city}" reason=no_api_key`);
+    return null;
+  }
   const query = `${name}${city ? `, ${city}` : ''}`;
   try {
     const res = await fetch(ENDPOINT, {
@@ -67,17 +70,28 @@ async function fetchPlaceDetails(name, city) {
       },
       body: JSON.stringify({ textQuery: query, maxResultCount: 1 })
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      debugLog('places-fetch', `FAIL name="${name}" city="${city}" reason=HTTP_${res.status} msg="${errText.slice(0, 200).replace(/"/g, "'")}"`);
+      return null;
+    }
     const data = await res.json();
     const place = data?.places?.[0];
-    if (!place) return null;
+    if (!place) {
+      debugLog('places-fetch', `FAIL name="${name}" city="${city}" reason=no_place`);
+      return null;
+    }
     const tier = PRICE_LEVEL_MAP[place.priceLevel];
+    const lat = place.location?.latitude;
+    const lng = place.location?.longitude;
+    debugLog('places-fetch', `OK name="${name}" city="${city}" lat=${lat ?? 'none'} lng=${lng ?? 'none'} price=${Number.isInteger(tier) ? tier : 'none'} source=live`);
     return {
       priceTier: Number.isInteger(tier) ? tier : null,
       openingHours: formatOpeningHoursFromPlaces(place.regularOpeningHours),
       location: place.location || null
     };
-  } catch {
+  } catch (err) {
+    debugLog('places-fetch', `FAIL name="${name}" city="${city}" reason=exception msg="${(err?.message || err).toString().slice(0, 200).replace(/"/g, "'")}"`);
     return null;
   }
 }
@@ -126,6 +140,7 @@ async function enrichWithPlaceDetails(activities, cityName) {
   await Promise.all(targets.map(async (activity) => {
     const cached = placesCache.get(activity.name, cityName);
     if (hasUsefulDetails(cached) && hasLocation(cached)) {
+      debugLog('places-fetch', `OK name="${activity.name}" city="${cityName}" lat=${cached.location?.latitude} lng=${cached.location?.longitude} source=cache`);
       applyDetails(activity, cached);
       return;
     }

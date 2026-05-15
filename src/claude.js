@@ -5,6 +5,7 @@ const { getCategoryDefaults, paceDescFromValue } = require('./arrangeConfig');
 const CANONICAL_TYPES = new Set(['tour', 'meal', 'sports', 'museum', 'landmark', 'neighborhood', 'shopping']);
 const { searchCityActivities, searchTopRestaurants, searchInsiderTips, searchShoppingDistricts } = require('./braveSearch');
 const { enrichWithPlaceDetails } = require('./services/placesEnrich');
+const { debugLog } = require('./services/debugLog');
 const { isLegacyActivity, parseTimeString, parseDurationToMinutes } = require('../shared/activityMigration');
 
 const MODEL = 'claude-sonnet-4-6';
@@ -287,9 +288,12 @@ function normalizeLegacyActivity(raw, fallbackCity = '') {
 }
 
 async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0, lockedActivities = []) {
+  const planCityStartTs = Date.now();
   const { name, startDate, endDate, leaveTime, notes, accommodations } = city;
+  debugLog('plan-city', `START city="${name}" travelers=${numTravelers} children=${numChildren} budget=${budget || 'none'} locked=${Array.isArray(lockedActivities) ? lockedActivities.length : 0}`);
   const client = getClient();
   if (!client) {
+    debugLog('plan-city', `THREW city="${name}" reason=anthropic_key_missing`);
     const err = new Error('Anthropic API key not configured');
     err.code = 'ANTHROPIC_KEY_MISSING';
     throw err;
@@ -402,27 +406,31 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     return { text: extractTextBlock(final.content), stop_reason: final.stop_reason };
   }
 
+  debugLog('plan-city', `LLM_CALL city="${name}" model=${MODEL} prompt_chars=${prompt.length}`);
   const { text: response, stop_reason } = await streamMessage(prompt);
-  console.log(`planCity(${name}): stop_reason=${stop_reason}, response_length=${response.length}`);
+  debugLog('plan-city', `LLM_RESPONSE city="${name}" chars=${response.length} stop_reason=${stop_reason}`);
   let parsed = tryParseJsonArray(response);
 
   if (!parsed) {
-    console.error(`JSON parse failed for ${name} (stop_reason=${stop_reason}), retrying...`);
-    console.error(`Raw response (first 500 chars): ${response.slice(0, 500)}`);
-    console.error(`Raw response (last 500 chars): ${response.slice(-500)}`);
+    debugLog('plan-city', `PARSE_FAIL city="${name}" stop_reason=${stop_reason} tail="${response.slice(-200).replace(/"/g, "'")}"`);
+    debugLog('plan-city', `RETRY city="${name}"`);
     const retry = await streamMessage(prompt + '\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.');
+    debugLog('plan-city', `LLM_RESPONSE city="${name}" chars=${retry.text.length} stop_reason=${retry.stop_reason} (retry)`);
     parsed = tryParseJsonArray(retry.text);
   }
 
   if (!parsed) {
-    console.error('Failed to parse Claude JSON response after retry.');
+    debugLog('plan-city', `THREW city="${name}" reason=parse_failed_after_retry`);
     throw new Error(`Claude returned invalid JSON for ${name}.`);
   }
 
   const normalized = parsed.map((item) => normalizeActivity(item, name));
   const validTyped = filterInvalidTypes(normalized, name);
   const filtered = applyMealPoolCap(validTyped, { city: name, minMeals });
+  debugLog('plan-city', `NORMALIZED city="${name}" raw=${parsed.length} after_type_filter=${validTyped.length} after_meal_cap=${filtered.length}`);
+  debugLog('plan-city', `ENRICH_CALL city="${name}" activities=${filtered.length}`);
   await enrichWithPlaceDetails(filtered, name);
+  debugLog('plan-city', `RETURN city="${name}" count=${filtered.length} elapsed_ms=${Date.now() - planCityStartTs}`);
   return filtered;
 }
 
