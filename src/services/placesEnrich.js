@@ -121,9 +121,12 @@ function applyDetails(activity, details) {
 }
 
 function hasCoords(activity) {
-  const lat = Number(activity?.location?.lat);
-  const lng = Number(activity?.location?.lng);
-  return Number.isFinite(lat) && Number.isFinite(lng);
+  const rawLat = activity?.location?.lat;
+  const rawLng = activity?.location?.lng;
+  if (rawLat == null || rawLng == null) return false;
+  const lat = Number(rawLat);
+  const lng = Number(rawLng);
+  return Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
 }
 
 async function enrichWithPlaceDetails(activities, cityName) {

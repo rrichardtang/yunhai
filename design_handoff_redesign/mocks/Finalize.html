@@ -1,0 +1,1052 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GuideMe — Finalize</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/planner.css">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    /* ============ FINALIZE ============
+       Calm pre-flight: one big status, a focused issue list, a final action.
+       The whole point: take everything that was loud in earlier steps and quiet it.
+    */
+
+    .fin {
+      max-width: 880px;
+      margin: 0 auto;
+    }
+
+    /* ---------- Eyebrow + headline ---------- */
+    .fin-h {
+      margin-bottom: 36px;
+    }
+    .fin-h h1 {
+      font-size: 40px; font-weight: 500; letter-spacing: -0.028em; line-height: 1.04;
+      color: var(--text-900);
+      margin-top: 12px;
+      max-width: 620px;
+      text-wrap: pretty;
+    }
+    .fin-h h1 .serif {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 400;
+    }
+    .fin-h p {
+      font-size: 14.5px;
+      color: var(--text-500);
+      margin-top: 14px;
+      max-width: 540px;
+      letter-spacing: -0.005em;
+      line-height: 1.55;
+    }
+
+    /* ---------- Trip card / status block ---------- */
+    .fin-trip {
+      background: var(--paper-1);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-lg);
+      box-shadow: var(--sh-sm);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .fin-trip__inner {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 0;
+    }
+    @media (max-width: 760px) { .fin-trip__inner { grid-template-columns: 1fr; } }
+
+    .fin-trip__title {
+      padding: 32px 32px 28px;
+      border-right: 1px solid var(--hair);
+    }
+    @media (max-width: 760px) {
+      .fin-trip__title { border-right: none; border-bottom: 1px solid var(--hair); }
+    }
+    .fin-trip__title .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--text-500);
+    }
+    .fin-trip__title h2 {
+      font-size: 24px; font-weight: 500; letter-spacing: -0.02em;
+      color: var(--text-900);
+      margin: 10px 0 14px;
+      line-height: 1.15;
+      text-wrap: pretty;
+    }
+    .fin-trip__title h2 .serif {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 400;
+    }
+    .fin-trip__route {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-500);
+      letter-spacing: 0.02em;
+      display: flex; flex-wrap: wrap; align-items: center;
+      gap: 6px 8px;
+    }
+    .fin-trip__route .city {
+      color: var(--text-900);
+      font-weight: 500;
+    }
+    .fin-trip__route .arrow { color: var(--text-400); }
+
+    .fin-trip__stats {
+      padding: 32px 32px 28px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px 24px;
+    }
+    .fin-stat.span2 { grid-column: span 2; }
+    @media (max-width: 520px) {
+      .fin-trip__stats { grid-template-columns: repeat(2, 1fr); }
+      .fin-stat.span2 { grid-column: span 2; }
+    }
+    .fin-stat .k {
+      font-family: var(--font-mono);
+      font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--text-500);
+      display: block;
+      margin-bottom: 6px;
+    }
+    .fin-stat .v {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: -0.005em;
+      color: var(--text-900);
+      font-variant-numeric: tabular-nums;
+      display: block;
+      white-space: nowrap;
+    }
+    .fin-stat .v .u {
+      color: var(--text-500);
+      font-weight: 400;
+      margin-left: 2px;
+    }
+
+    /* ---------- Health hero ---------- */
+    .fin-health {
+      background: var(--ink-900);
+      color: var(--paper-0);
+      border-radius: var(--r-lg);
+      padding: 32px 36px;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+    .fin-health::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 85% 30%, rgba(47,125,251,.22), transparent 70%);
+      pointer-events: none;
+    }
+    .fin-health__ring {
+      position: relative;
+      width: 96px; height: 96px;
+      flex-shrink: 0;
+    }
+    .fin-health__ring svg {
+      width: 100%; height: 100%;
+      transform: rotate(-90deg);
+    }
+    .fin-health__ring .track {
+      fill: none;
+      stroke: rgba(244,241,236,.08);
+      stroke-width: 4;
+    }
+    .fin-health__ring .arc {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 4;
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 6px rgba(47,125,251,.5));
+    }
+    .fin-health__ring .pct {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+    .fin-health__ring .pct .n {
+      font-size: 22px;
+      font-weight: 500;
+      color: var(--paper-0);
+      letter-spacing: -0.01em;
+    }
+    .fin-health__ring .pct .l {
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(244,241,236,.5);
+      margin-top: 1px;
+    }
+
+    .fin-health__body { flex: 1; min-width: 0; position: relative; }
+    .fin-health__body .label {
+      font-family: var(--font-mono);
+      font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: rgba(244,241,236,.55);
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .fin-health__body .label::before {
+      content: '∴';
+      color: var(--accent);
+      font-size: 13px;
+      letter-spacing: 0;
+    }
+    .fin-health__body h3 {
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: var(--paper-0);
+      margin: 8px 0 4px;
+      line-height: 1.2;
+      text-wrap: pretty;
+    }
+    .fin-health__body h3 .serif {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 400;
+    }
+    .fin-health__body p {
+      font-size: 13.5px;
+      color: rgba(244,241,236,.65);
+      letter-spacing: -0.005em;
+      max-width: 440px;
+    }
+    .fin-health__counts {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+      padding-left: 28px;
+      border-left: 1px solid rgba(244,241,236,.10);
+    }
+    .fin-health__counts .row {
+      display: flex; align-items: baseline; gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      letter-spacing: 0.04em;
+      color: rgba(244,241,236,.6);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .fin-health__counts .row b {
+      color: var(--paper-0);
+      font-weight: 500;
+      font-size: 13px;
+      min-width: 18px;
+      text-align: right;
+    }
+    .fin-health__counts .row .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--text-500);
+      flex-shrink: 0;
+    }
+    .fin-health__counts .row.warn .dot { background: var(--warn); }
+    .fin-health__counts .row.flag .dot { background: var(--accent); }
+    .fin-health__counts .row.ok .dot   { background: var(--ok); }
+
+    @media (max-width: 720px) {
+      .fin-health { flex-direction: column; align-items: flex-start; gap: 20px; padding: 26px; }
+      .fin-health__counts { border-left: none; padding-left: 0; padding-top: 16px; border-top: 1px solid rgba(244,241,236,.10); width: 100%; }
+    }
+
+    /* ---------- Issue list ---------- */
+    .fin-issues {
+      margin-bottom: 28px;
+    }
+    .fin-issues__head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin-bottom: 14px;
+      gap: 16px;
+    }
+    .fin-issues__head h3 {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-900);
+      letter-spacing: -0.005em;
+    }
+    .fin-issues__head h3 .count {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-500);
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      margin-left: 6px;
+    }
+    .fin-issues__filter {
+      display: inline-flex;
+      gap: 1px;
+      background: var(--hair);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-pill);
+      padding: 0;
+      overflow: hidden;
+    }
+    .fin-issues__filter button {
+      padding: 6px 12px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-500);
+      background: var(--paper-1);
+      transition: all var(--dur-fast);
+    }
+    .fin-issues__filter button:hover { color: var(--text-900); }
+    .fin-issues__filter button.on {
+      background: var(--ink-900);
+      color: var(--paper-0);
+    }
+
+    .fin-issues__list {
+      display: flex; flex-direction: column;
+      gap: 0;
+      background: var(--paper-1);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      box-shadow: var(--sh-sm);
+    }
+
+    .issue {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 16px;
+      padding: 18px 22px;
+      align-items: flex-start;
+      border-bottom: 1px solid var(--hair);
+      transition: background var(--dur-fast);
+    }
+    .issue:last-child { border-bottom: none; }
+    .issue:hover { background: var(--paper-0); }
+    .issue.resolved { opacity: 0.55; }
+
+    .issue__icon {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .issue__icon svg { width: 12px; height: 12px; }
+    .issue.warn .issue__icon  { background: rgba(192,139,16,.14); color: #8A6208; }
+    .issue.flag .issue__icon  { background: var(--accent-soft); color: var(--accent-deep); }
+    .issue.ok   .issue__icon  { background: rgba(31,157,85,.14); color: #18854A; }
+
+    .issue__body { min-width: 0; }
+    .issue__title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-900);
+      letter-spacing: -0.008em;
+      line-height: 1.35;
+    }
+    .issue__title .where {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-500);
+      font-weight: 500;
+      margin-right: 8px;
+      padding: 2px 7px;
+      border-radius: var(--r-sm);
+      background: var(--paper-2);
+      vertical-align: 2px;
+    }
+    .issue__detail {
+      font-size: 13px;
+      color: var(--text-500);
+      margin-top: 4px;
+      line-height: 1.5;
+      letter-spacing: -0.003em;
+    }
+    .issue__detail b {
+      color: var(--text-700);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+    .issue__actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+      align-items: center;
+    }
+    .issue-btn {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: var(--r-pill);
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text-700);
+      letter-spacing: -0.005em;
+      transition: all var(--dur-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .issue-btn:hover { color: var(--text-900); }
+    .issue-btn.fix {
+      background: var(--ink-900);
+      color: var(--paper-0);
+    }
+    .issue-btn.fix:hover { background: var(--ink-800); }
+    .issue-btn.dismiss {
+      color: var(--text-500);
+      background: var(--paper-2);
+    }
+    .issue-btn.dismiss:hover { color: var(--text-900); }
+    .issue-btn svg { width: 12px; height: 12px; }
+    .issue-btn.fix svg { transition: transform var(--dur-fast); }
+    .issue-btn.fix:hover svg { transform: translateX(2px); }
+
+    /* ---------- All-clear empty state ---------- */
+    .fin-clear {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 22px;
+      background: rgba(31,157,85,.06);
+      border: 1px solid rgba(31,157,85,.18);
+      border-radius: var(--r-lg);
+      color: #18854A;
+      font-size: 13.5px;
+      letter-spacing: -0.005em;
+    }
+    .fin-clear svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .fin-clear b { color: #0F6638; font-weight: 500; }
+
+    /* ---------- Send-off / final action ---------- */
+    .fin-send {
+      margin-top: 36px;
+      padding-top: 28px;
+      border-top: 1px solid var(--hair);
+    }
+    .fin-send__title {
+      font-family: var(--font-mono);
+      font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--text-500);
+      margin-bottom: 12px;
+    }
+    .fin-send__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    @media (max-width: 720px) { .fin-send__grid { grid-template-columns: 1fr; } }
+
+    .send-tile {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 16px 18px;
+      background: var(--paper-1);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-lg);
+      cursor: pointer;
+      text-align: left;
+      transition: all var(--dur-fast);
+      position: relative;
+    }
+    .send-tile:hover {
+      border-color: var(--text-900);
+      transform: translateY(-1px);
+      box-shadow: var(--sh-md);
+    }
+    .send-tile__icon {
+      width: 20px; height: 20px;
+      color: var(--text-700);
+      margin-bottom: 4px;
+    }
+    .send-tile__icon svg { width: 100%; height: 100%; }
+    .send-tile h4 {
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: -0.008em;
+      color: var(--text-900);
+    }
+    .send-tile p {
+      font-size: 12px;
+      color: var(--text-500);
+      letter-spacing: -0.003em;
+      line-height: 1.45;
+    }
+    .send-tile__arrow {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      color: var(--text-400);
+      transition: all var(--dur-fast);
+    }
+    .send-tile:hover .send-tile__arrow {
+      color: var(--text-900);
+      transform: translate(2px, -2px);
+    }
+    .send-tile__arrow svg { width: 14px; height: 14px; }
+
+    /* ---------- Primary CTA row ---------- */
+    .fin-cta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 22px;
+      background: var(--paper-1);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-lg);
+      box-shadow: var(--sh-sm);
+    }
+    .fin-cta__copy {
+      display: flex; flex-direction: column;
+      gap: 2px;
+    }
+    .fin-cta__copy .t {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-900);
+      letter-spacing: -0.008em;
+    }
+    .fin-cta__copy .s {
+      font-size: 12.5px;
+      color: var(--text-500);
+      letter-spacing: -0.003em;
+    }
+    .fin-cta__btns { display: flex; gap: 10px; }
+
+    .fin-foot {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap;
+      margin-top: 24px;
+      padding-top: 20px;
+    }
+    .fin-foot .meta {
+      font-family: var(--font-mono);
+      font-size: 11px; letter-spacing: 0.04em;
+      color: var(--text-500);
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .fin-foot .meta .dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--ok);
+      box-shadow: 0 0 0 3px rgba(31,157,85,.18);
+    }
+  </style>
+</head>
+<body>
+
+<div class="planner">
+
+  <!-- TOPBAR -->
+  <header class="ptop">
+    <div class="ptop__brand">
+      <span class="name">Guide<span class="me">me</span></span>
+      <span class="sub">Personal AI itinerary builder</span>
+    </div>
+    <div class="ptop__actions">
+      <div class="mode" role="group">
+        <button class="active" type="button">Planning</button>
+        <button type="button">Itinerary</button>
+      </div>
+      <button class="ptop__icon health-ready" type="button" title="Trip Health">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2-5 4 10 2-5h7"></path></svg>
+      </button>
+      <button class="ptop__checklist" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="m8 12 3 3 5-6"></path></svg>
+        Checklist
+      </button>
+      <button class="ptop__icon" type="button" title="Profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="pmain">
+
+    <!-- STEPPER -->
+    <nav class="steps" aria-label="Planning steps">
+      <button class="step done" type="button">
+        <span class="step__node"></span>
+        <span class="step__label">Setup</span>
+      </button>
+      <button class="step done" type="button">
+        <span class="step__node"></span>
+        <span class="step__label">Review</span>
+      </button>
+      <button class="step done" type="button">
+        <span class="step__node"></span>
+        <span class="step__label">Arrange</span>
+      </button>
+      <button class="step active" type="button">
+        <span class="step__node"><span>4</span></span>
+        <span class="step__label">Finalize</span>
+      </button>
+    </nav>
+
+    <div class="fin">
+
+      <!-- HEADER -->
+      <div class="fin-h">
+        <span class="gm-eyebrow">Step 04 — Finalize</span>
+        <h1>Quick health check, <span class="serif">then you're off.</span></h1>
+        <p>We ran your itinerary against the usual suspects — overlapping dates, thin mornings, missing confirmations. Here's what wants a second look.</p>
+      </div>
+
+      <!-- TRIP CARD -->
+      <section class="fin-trip">
+        <div class="fin-trip__inner">
+          <div class="fin-trip__title">
+            <span class="eyebrow">Trip</span>
+            <h2>Allison &amp; Chard <span class="serif">take on</span> Spain</h2>
+            <div class="fin-trip__route">
+              <span class="city">Córdoba</span>
+              <span class="arrow">→</span>
+              <span class="city">Seville</span>
+              <span class="arrow">→</span>
+              <span class="city">Granada</span>
+            </div>
+          </div>
+          <div class="fin-trip__stats">
+            <div class="fin-stat">
+              <span class="k">Dates</span>
+              <span class="v">04/24 <span class="u">→</span> 05/03</span>
+            </div>
+            <div class="fin-stat">
+              <span class="k">Nights</span>
+              <span class="v">9</span>
+            </div>
+            <div class="fin-stat">
+              <span class="k">Travelers</span>
+              <span class="v">2</span>
+            </div>
+            <div class="fin-stat">
+              <span class="k">Cities</span>
+              <span class="v">3</span>
+            </div>
+            <div class="fin-stat">
+              <span class="k">Activities</span>
+              <span class="v">24</span>
+            </div>
+            <div class="fin-stat">
+              <span class="k">Spend</span>
+              <span class="v">$1,420 <span class="u">/ 1,500</span></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HEALTH HERO -->
+      <section class="fin-health">
+        <div class="fin-health__ring">
+          <svg viewBox="0 0 100 100">
+            <circle class="track" cx="50" cy="50" r="44"></circle>
+            <circle class="arc" cx="50" cy="50" r="44"
+              stroke-dasharray="276.5" stroke-dasharray="221.2 276.5"></circle>
+          </svg>
+          <div class="pct">
+            <span class="n">80</span>
+            <span class="l">Health</span>
+          </div>
+        </div>
+        <div class="fin-health__body">
+          <span class="label">Trip Health · ran 4 sec ago</span>
+          <h3>Almost ready — <span class="serif">three things</span> to look at.</h3>
+          <p>Nothing blocking. Two soft warnings on pacing and one missing booking confirmation. Fix or dismiss each below.</p>
+        </div>
+        <div class="fin-health__counts">
+          <div class="row warn"><span class="dot"></span><b>2</b><span>warnings</span></div>
+          <div class="row flag"><span class="dot"></span><b>1</b><span>to confirm</span></div>
+          <div class="row ok"><span class="dot"></span><b>9</b><span>checks passed</span></div>
+        </div>
+      </section>
+
+      <!-- ISSUES -->
+      <section class="fin-issues">
+        <div class="fin-issues__head">
+          <h3>Things to look at <span class="count">3 open</span></h3>
+          <div class="fin-issues__filter">
+            <button type="button" class="on">All</button>
+            <button type="button">Open</button>
+            <button type="button">Resolved</button>
+          </div>
+        </div>
+
+        <ul class="fin-issues__list" id="issueList">
+
+          <li class="issue flag">
+            <span class="issue__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4h12l-2 4 2 4H6"></path></svg>
+            </span>
+            <div class="issue__body">
+              <div class="issue__title">
+                <span class="where">Córdoba · Apr 25</span>
+                Mezquita tour confirmation missing
+              </div>
+              <div class="issue__detail">
+                You noted a tour at <b>15:00–17:00</b>, but no booking reference is attached. Without it we can't add it to your day-of pass.
+              </div>
+            </div>
+            <div class="issue__actions">
+              <button class="issue-btn fix" type="button">
+                Review
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+              </button>
+            </div>
+          </li>
+
+          <li class="issue warn">
+            <span class="issue__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+            </span>
+            <div class="issue__body">
+              <div class="issue__title">
+                <span class="where">Seville · Apr 28</span>
+                Thin morning before a long afternoon
+              </div>
+              <div class="issue__detail">
+                Nothing scheduled between <b>09:00</b> and <b>14:30</b>, then four back-to-back stops. Consider moving the Alcázar earlier — it opens at 09:30.
+              </div>
+            </div>
+            <div class="issue__actions">
+              <button class="issue-btn fix" type="button">
+                Review
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+              </button>
+            </div>
+          </li>
+
+          <li class="issue warn">
+            <span class="issue__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"></path><path d="m8 8 4 4 4-4"></path></svg>
+            </span>
+            <div class="issue__body">
+              <div class="issue__title">
+                <span class="where">Granada · Apr 30</span>
+                Tight transfer between bus &amp; check-in
+              </div>
+              <div class="issue__detail">
+                Bus arrives <b>09:40</b>; Parador check-in is at <b>10:00</b>. That's a 20-minute window for a 12-minute walk — fine on paper, fragile in practice.
+              </div>
+            </div>
+            <div class="issue__actions">
+              <button class="issue-btn fix" type="button">
+                Review
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+              </button>
+            </div>
+          </li>
+
+          <li class="issue ok resolved">
+            <span class="issue__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"></path></svg>
+            </span>
+            <div class="issue__body">
+              <div class="issue__title">
+                <span class="where">Trip · Resolved</span>
+                Madrid → Córdoba train booked &amp; confirmed
+              </div>
+              <div class="issue__detail">
+                Renfe <b>AVE 02064</b> · 14:00 departure · seat 7A. Confirmation attached to the leg.
+              </div>
+            </div>
+            <div class="issue__actions">
+              <button class="issue-btn dismiss" type="button">
+                View
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+              </button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <!-- SEND-OFF -->
+      <section class="fin-send">
+        <h3 class="fin-send__title">When you're ready · send it where you'll need it</h3>
+
+        <div class="fin-send__grid">
+          <button class="send-tile" type="button">
+            <span class="send-tile__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>
+            </span>
+            <h4>Sync to calendar</h4>
+            <p>Google, Apple, or Outlook — one event per stop, with addresses.</p>
+            <span class="send-tile__arrow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"></path></svg>
+            </span>
+          </button>
+
+          <button class="send-tile" type="button">
+            <span class="send-tile__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"></path><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7Z"></path><path d="M9 13h6M9 17h4"></path></svg>
+            </span>
+            <h4>Export PDF</h4>
+            <p>Print-ready dossier with maps, bookings, and offline-friendly day pages.</p>
+            <span class="send-tile__arrow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"></path></svg>
+            </span>
+          </button>
+
+          <button class="send-tile" type="button">
+            <span class="send-tile__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"></path></svg>
+            </span>
+            <h4>Share with travelers</h4>
+            <p>A live link Allison can open on her phone — read-only, always current.</p>
+            <span class="send-tile__arrow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"></path></svg>
+            </span>
+          </button>
+        </div>
+
+        <!-- PRIMARY CTA -->
+        <div class="fin-cta">
+          <div class="fin-cta__copy">
+            <span class="t">Ready to lock it in?</span>
+            <span class="s">Marks the trip as final and switches you over to Itinerary mode.</span>
+          </div>
+          <div class="fin-cta__btns">
+            <button type="button" class="gm-btn gm-btn--ghost">Keep editing</button>
+            <button type="button" class="gm-btn gm-btn--accent">
+              Lock trip &amp; open Itinerary →
+            </button>
+          </div>
+        </div>
+
+        <div class="fin-foot">
+          <span class="meta"><span class="dot"></span> Auto-saved · last edit 12s ago</span>
+          <span class="meta">v 03 · 9 nights · 24 activities</span>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- FLOATING STEP NAV -->
+  <div class="step-nav">
+    <button type="button" title="Back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>
+    </button>
+    <button type="button" title="Save progress">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"></path><path d="M17 21v-8H7v8M7 3v5h8"></path></svg>
+    </button>
+    <button type="button" class="primary" title="Lock trip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+    </button>
+  </div>
+
+  <!-- CHAT BUBBLE -->
+  <button class="chat-bubble" type="button" aria-label="Open travel assistant">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.6-.8L3 21l1.8-5.4A8.38 8.38 0 0 1 4 11.5a8.5 8.5 0 0 1 17 0Z"></path></svg>
+  </button>
+
+</div>
+
+<!-- Tweaks mount point -->
+<div id="tweaks-root"></div>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel">
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "density": "regular",
+    "accent": "#2F7DFB",
+    "headlineSerif": true,
+    "healthScore": 80,
+    "showHealth": true,
+    "showStats": true,
+    "showSendoff": true,
+    "ctaStyle": "accent",
+    "issueLayout": "list"
+  }/*EDITMODE-END*/;
+
+  function FinalizeTweaks() {
+    const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+    React.useEffect(() => {
+      // Density → adjust pmain padding-top + section gaps
+      const root = document.documentElement;
+      const dens = { compact: ['16px','16px'], regular: ['32px','24px'], comfy: ['56px','36px'] }[t.density] || ['32px','24px'];
+      root.style.setProperty('--fin-pad-top', dens[0]);
+      root.style.setProperty('--fin-gap', dens[1]);
+
+      // Accent
+      root.style.setProperty('--accent', t.accent);
+      // Recompute soft accent (light tint) — derive from hex
+      const hex = t.accent.replace('#','');
+      const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+      root.style.setProperty('--accent-soft', `rgba(${r},${g},${b},0.10)`);
+      root.style.setProperty('--accent-deep', `rgb(${Math.round(r*0.5)},${Math.round(g*0.5)},${Math.round(b*0.7)})`);
+
+      // Health ring
+      const arc = document.querySelector('.fin-health__ring .arc');
+      const num = document.querySelector('.fin-health__ring .pct .n');
+      if (arc && num) {
+        const C = 2 * Math.PI * 44; // ~276.5
+        const len = C * (t.healthScore / 100);
+        arc.setAttribute('stroke-dasharray', `${len} ${C}`);
+        arc.removeAttribute('stroke-dashoffset');
+        num.textContent = String(t.healthScore);
+      }
+
+      // Headline serif on/off
+      document.querySelectorAll('.fin-h h1 .serif, .fin-trip__title h2 .serif, .fin-health__body h3 .serif').forEach(el => {
+        el.style.fontFamily = t.headlineSerif ? '' : 'inherit';
+        el.style.fontStyle = t.headlineSerif ? '' : 'normal';
+      });
+
+      // Show/hide
+      const health = document.querySelector('.fin-health');
+      if (health) health.style.display = t.showHealth ? '' : 'none';
+      const trip = document.querySelector('.fin-trip');
+      if (trip) trip.style.display = t.showStats ? '' : 'none';
+      const send = document.querySelector('.fin-send__grid');
+      if (send) send.style.display = t.showSendoff ? '' : 'none';
+
+      // CTA style
+      const cta = document.querySelector('.fin-cta__btns .gm-btn--accent, .fin-cta__btns .gm-btn--primary');
+      if (cta) {
+        cta.classList.remove('gm-btn--accent','gm-btn--primary');
+        cta.classList.add(t.ctaStyle === 'accent' ? 'gm-btn--accent' : 'gm-btn--primary');
+      }
+
+      // Issue layout
+      const list = document.querySelector('.fin-issues__list');
+      if (list) {
+        list.classList.toggle('layout-cards', t.issueLayout === 'cards');
+      }
+    }, [t]);
+
+    return (
+      <TweaksPanel>
+        <TweakSection label="Layout" />
+        <TweakRadio label="Density" value={t.density}
+          options={['compact','regular','comfy']}
+          onChange={(v) => setTweak('density', v)} />
+        <TweakRadio label="Issues" value={t.issueLayout}
+          options={['list','cards']}
+          onChange={(v) => setTweak('issueLayout', v)} />
+
+        <TweakSection label="Sections" />
+        <TweakToggle label="Trip stats" value={t.showStats}
+          onChange={(v) => setTweak('showStats', v)} />
+        <TweakToggle label="Health hero" value={t.showHealth}
+          onChange={(v) => setTweak('showHealth', v)} />
+        <TweakToggle label="Send-off tiles" value={t.showSendoff}
+          onChange={(v) => setTweak('showSendoff', v)} />
+
+        <TweakSection label="Health" />
+        <TweakSlider label="Score" value={t.healthScore} min={0} max={100} unit="%"
+          onChange={(v) => setTweak('healthScore', v)} />
+
+        <TweakSection label="Style" />
+        <TweakColor label="Accent" value={t.accent}
+          onChange={(v) => setTweak('accent', v)} />
+        <TweakToggle label="Italic serif accents" value={t.headlineSerif}
+          onChange={(v) => setTweak('headlineSerif', v)} />
+        <TweakRadio label="Primary CTA" value={t.ctaStyle}
+          options={['accent','ink']}
+          onChange={(v) => setTweak('ctaStyle', v)} />
+      </TweaksPanel>
+    );
+  }
+
+  // Mount
+  const _mount = () => {
+    if (typeof TweaksPanel === 'undefined' || typeof useTweaks === 'undefined') {
+      return setTimeout(_mount, 50);
+    }
+    ReactDOM.createRoot(document.getElementById('tweaks-root')).render(<FinalizeTweaks />);
+  };
+  _mount();
+</script>
+
+<style>
+  /* Density vars + cards layout for issues */
+  .pmain { padding-top: var(--fin-pad-top, 32px) !important; }
+  .fin-trip, .fin-health, .fin-issues, .fin-send { margin-bottom: var(--fin-gap, 24px) !important; }
+
+  .fin-issues__list.layout-cards {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    overflow: visible;
+  }
+  @media (max-width: 720px) {
+    .fin-issues__list.layout-cards { grid-template-columns: 1fr; }
+  }
+  .fin-issues__list.layout-cards .issue {
+    background: var(--paper-1);
+    border: 1px solid var(--hair);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh-sm);
+    grid-template-columns: 28px 1fr;
+  }
+  .fin-issues__list.layout-cards .issue__actions {
+    grid-column: 1 / -1;
+    padding-left: 44px;
+    margin-top: 4px;
+    justify-content: flex-end;
+  }
+</style>
+
+<script>
+  // Issue filter pills
+  document.querySelectorAll('.fin-issues__filter button').forEach(b => {
+    b.addEventListener('click', () => {
+      b.parentElement.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      const mode = b.textContent.trim().toLowerCase();
+      document.querySelectorAll('#issueList .issue').forEach(it => {
+        const isResolved = it.classList.contains('resolved');
+        let show = true;
+        if (mode === 'open') show = !isResolved;
+        else if (mode === 'resolved') show = isResolved;
+        it.style.display = show ? '' : 'none';
+      });
+    });
+  });
+
+  // Mode toggle
+  document.querySelectorAll('.mode button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.mode button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  // Skip / dismiss issues
+  document.querySelectorAll('.fin-issues__list .issue-btn.dismiss').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const issue = btn.closest('.issue');
+      if (!issue || issue.classList.contains('resolved')) return;
+      issue.classList.add('resolved');
+    });
+  });
+</script>
+
+</body>
+</html>
