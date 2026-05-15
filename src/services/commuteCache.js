@@ -4,6 +4,8 @@ const path = require('path');
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 const CACHE_PATH = path.join(DATA_DIR, 'commute-cache.json');
 const TTL_MS = 365 * 24 * 60 * 60 * 1000;
+const NEGATIVE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const NEGATIVE_SENTINEL = -1;
 const FLUSH_DEBOUNCE_MS = 2000;
 
 let cache = null;
@@ -45,12 +47,17 @@ function key(origin, destination, mode) {
 }
 
 function get(origin, destination, mode) {
-  if (!origin || !destination || !mode) return null;
+  if (!origin || !destination || !mode) return undefined;
   const store = load();
   const entry = store[key(origin, destination, mode)];
-  if (!entry) return null;
-  if (Date.now() - entry.ts > TTL_MS) return null;
-  return Number.isFinite(entry.minutes) ? entry.minutes : null;
+  if (!entry) return undefined;
+  const age = Date.now() - entry.ts;
+  if (entry.minutes === NEGATIVE_SENTINEL) {
+    if (age > NEGATIVE_TTL_MS) return undefined;
+    return null;
+  }
+  if (age > TTL_MS) return undefined;
+  return Number.isFinite(entry.minutes) ? entry.minutes : undefined;
 }
 
 function set(origin, destination, mode, minutes) {
@@ -61,4 +68,11 @@ function set(origin, destination, mode, minutes) {
   scheduleFlush();
 }
 
-module.exports = { get, set };
+function setNegative(origin, destination, mode) {
+  if (!origin || !destination || !mode) return;
+  const store = load();
+  store[key(origin, destination, mode)] = { minutes: NEGATIVE_SENTINEL, ts: Date.now() };
+  scheduleFlush();
+}
+
+module.exports = { get, set, setNegative };
