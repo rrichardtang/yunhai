@@ -428,8 +428,14 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   const validTyped = filterInvalidTypes(normalized, name);
   const filtered = applyMealPoolCap(validTyped, { city: name, minMeals });
   debugLog('plan-city', `NORMALIZED city="${name}" raw=${parsed.length} after_type_filter=${validTyped.length} after_meal_cap=${filtered.length}`);
-  debugLog('plan-city', `ENRICH_CALL city="${name}" activities=${filtered.length}`);
-  await enrichWithPlaceDetails(filtered, name);
+  const firstAccomWithCoords = Array.isArray(accommodations)
+    ? accommodations.find((a) => Number.isFinite(Number(a?.latitude)) && Number.isFinite(Number(a?.longitude)))
+    : null;
+  const cityCenter = firstAccomWithCoords
+    ? { lat: Number(firstAccomWithCoords.latitude), lng: Number(firstAccomWithCoords.longitude) }
+    : null;
+  debugLog('plan-city', `ENRICH_CALL city="${name}" activities=${filtered.length} bias=${cityCenter ? `${cityCenter.lat},${cityCenter.lng}` : 'none'}`);
+  await enrichWithPlaceDetails(filtered, name, cityCenter);
   debugLog('plan-city', `RETURN city="${name}" count=${filtered.length} elapsed_ms=${Date.now() - planCityStartTs}`);
   return filtered;
 }

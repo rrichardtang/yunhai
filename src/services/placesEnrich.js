@@ -53,13 +53,34 @@ function formatOpeningHoursFromPlaces(regularOpeningHours) {
   return ranges.size ? [...ranges].sort().join(',') : null;
 }
 
-async function fetchPlaceDetails(name, city) {
+const CITY_BIAS_RADIUS_M = 30000;
+const CITY_REJECT_RADIUS_KM = 50;
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+async function fetchPlaceDetails(name, city, cityCenter = null) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     debugLog('places-fetch', `FAIL name="${name}" city="${city}" reason=no_api_key`);
     return null;
   }
   const query = `${name}${city ? `, ${city}` : ''}`;
+  const body = { textQuery: query, maxResultCount: 1 };
+  if (cityCenter && Number.isFinite(cityCenter.lat) && Number.isFinite(cityCenter.lng)) {
+    body.locationBias = {
+      circle: {
+        center: { latitude: cityCenter.lat, longitude: cityCenter.lng },
+        radius: CITY_BIAS_RADIUS_M
+      }
+    };
+  }
   try {
     const res = await fetch(ENDPOINT, {
       method: 'POST',
@@ -68,7 +89,7 @@ async function fetchPlaceDetails(name, city) {
         'X-Goog-Api-Key': apiKey,
         'X-Goog-FieldMask': 'places.priceLevel,places.displayName,places.regularOpeningHours,places.location'
       },
-      body: JSON.stringify({ textQuery: query, maxResultCount: 1 })
+      body: JSON.stringify(body)
     });
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
@@ -84,6 +105,13 @@ async function fetchPlaceDetails(name, city) {
     const tier = PRICE_LEVEL_MAP[place.priceLevel];
     const lat = place.location?.latitude;
     const lng = place.location?.longitude;
+    if (cityCenter && Number.isFinite(lat) && Number.isFinite(lng)) {
+      const distKm = haversineKm(cityCenter.lat, cityCenter.lng, lat, lng);
+      if (distKm > CITY_REJECT_RADIUS_KM) {
+        debugLog('places-fetch', `REJECT name="${name}" city="${city}" reason=too_far_from_city dist_km=${distKm.toFixed(1)} lat=${lat} lng=${lng}`);
+        return null;
+      }
+    }
     debugLog('places-fetch', `OK name="${name}" city="${city}" lat=${lat ?? 'none'} lng=${lng ?? 'none'} price=${Number.isInteger(tier) ? tier : 'none'} source=live`);
     return {
       priceTier: Number.isInteger(tier) ? tier : null,
@@ -129,11 +157,11 @@ function hasCoords(activity) {
   return Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
 }
 
-async function enrichWithPlaceDetails(activities, cityName) {
+async function enrichWithPlaceDetails(activities, cityName, cityCenter = null) {
   if (!Array.isArray(activities) || activities.length === 0) return activities;
   const targets = activities.filter((a) => !hasCoords(a));
   const withCoordsBefore = activities.length - targets.length;
-  debugLog('places-enrich', `START city="${cityName}" activities=${activities.length} targets=${targets.length} with_coords_before=${withCoordsBefore}`);
+  debugLog('places-enrich', `START city="${cityName}" activities=${activities.length} targets=${targets.length} with_coords_before=${withCoordsBefore} bias=${cityCenter ? `${cityCenter.lat},${cityCenter.lng}` : 'none'}`);
   function hasUsefulDetails(d) {
     return !!(d && (Number.isInteger(d.priceTier) || d.openingHours || (d.location?.latitude && d.location?.longitude)));
   }
@@ -143,11 +171,18 @@ async function enrichWithPlaceDetails(activities, cityName) {
   await Promise.all(targets.map(async (activity) => {
     const cached = placesCache.get(activity.name, cityName);
     if (hasUsefulDetails(cached) && hasLocation(cached)) {
-      debugLog('places-fetch', `OK name="${activity.name}" city="${cityName}" lat=${cached.location?.latitude} lng=${cached.location?.longitude} source=cache`);
-      applyDetails(activity, cached);
-      return;
+      const cLat = Number(cached.location?.latitude);
+      const cLng = Number(cached.location?.longitude);
+      if (cityCenter && Number.isFinite(cLat) && Number.isFinite(cLng)
+        && haversineKm(cityCenter.lat, cityCenter.lng, cLat, cLng) > CITY_REJECT_RADIUS_KM) {
+        debugLog('places-fetch', `REJECT name="${activity.name}" city="${cityName}" reason=too_far_cached lat=${cLat} lng=${cLng}`);
+      } else {
+        debugLog('places-fetch', `OK name="${activity.name}" city="${cityName}" lat=${cLat} lng=${cLng} source=cache`);
+        applyDetails(activity, cached);
+        return;
+      }
     }
-    const details = await fetchPlaceDetails(activity.name, cityName);
+    const details = await fetchPlaceDetails(activity.name, cityName, cityCenter);
     if (hasUsefulDetails(details)) {
       applyDetails(activity, details);
       placesCache.set(activity.name, cityName, details);
