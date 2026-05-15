@@ -431,6 +431,14 @@ Return ONLY valid JSON (no markdown fences):
         cityName,
         commuteMatrix: matrix
       });
+      const hasClusterBlock = prompt.includes('WALKING NEIGHBORS');
+      const hasCommuteBlock = prompt.includes('COMMUTE TIMES');
+      const activitiesWithCoords = flexible.filter((a) => {
+        const lat = Number(a?.location?.lat ?? a?.start_latitude);
+        const lng = Number(a?.location?.lng ?? a?.start_longitude);
+        return Number.isFinite(lat) && Number.isFinite(lng);
+      }).length;
+      debugLog('arrange', `PROMPT_INFO cluster_block=${hasClusterBlock} commute_block=${hasCommuteBlock} acts_with_coords=${activitiesWithCoords}/${flexible.length}`);
       const parsed = await callLlmForJson(prompt);
       let { placements, unplaced } = sanitizePlacements(parsed);
       debugLog('arrange', `FIRST_PASS placed=${Object.keys(placements).length} unplaced=${unplaced.length} unplaced_ids=${unplaced.map((u) => u.id).join(',') || 'none'}`);
