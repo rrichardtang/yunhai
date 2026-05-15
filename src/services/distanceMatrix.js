@@ -300,14 +300,14 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
 
   const response = await fetch(`${DISTANCE_MATRIX_BASE_URL}?${params.toString()}`);
   if (!response.ok) {
-    if (mode === 'transit') console.warn(`[dm-transit] HTTP ${response.status} for ${origin} -> ${destination}`);
+    debugLog('dm', `HTTP ${response.status} mode=${mode} ${origin} -> ${destination}`);
     commuteCache.setNegative(origin, destination, mode);
     return null;
   }
 
   const data = await response.json();
   if (data?.status !== 'OK' || !Array.isArray(data?.rows) || !data.rows.length) {
-    if (mode === 'transit') console.warn(`[dm-transit] top-status=${data?.status} msg=${data?.error_message || ''} for ${origin} -> ${destination}`);
+    debugLog('dm', `top-status=${data?.status} mode=${mode} msg="${data?.error_message || ''}" ${origin} -> ${destination}`);
     commuteCache.setNegative(origin, destination, mode);
     return null;
   }
@@ -317,14 +317,14 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
     : null;
 
   if (!element || element.status !== 'OK') {
-    if (mode === 'transit') console.warn(`[dm-transit] element-status=${element?.status} for ${origin} -> ${destination}`);
+    debugLog('dm', `element-status=${element?.status} mode=${mode} ${origin} -> ${destination}`);
     commuteCache.setNegative(origin, destination, mode);
     return null;
   }
 
   const durationSeconds = Number(element?.duration?.value || 0);
   if (!durationSeconds) {
-    if (mode === 'transit') console.warn(`[dm-transit] no duration for ${origin} -> ${destination}`);
+    debugLog('dm', `no-duration mode=${mode} ${origin} -> ${destination}`);
     commuteCache.setNegative(origin, destination, mode);
     return null;
   }
