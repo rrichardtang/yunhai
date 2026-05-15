@@ -347,26 +347,18 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
   const origin = resolveCommuteQuery(fromActivity, 'end_location');
   const destination = resolveCommuteQuery(toActivity, 'start_location');
 
-  const defaultModes = {
-    transit: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.transit },
-    driving: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.driving },
-    walking: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.walking }
-  };
-
   if (!origin || !destination) {
     return {
-      modes: defaultModes,
-      selectedMode: 'transit',
+      modes: {},
+      selectedMode: 'walking',
       durationMinutes: null,
-      modeIcon: COMMUTE_MODE_ICON.transit
+      modeIcon: COMMUTE_MODE_ICON.walking
     };
   }
 
   if (isWalkingDistancePair(fromActivity, toActivity)) {
     return {
       modes: {
-        transit: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.transit },
-        driving: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.driving },
         walking: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.walking, isWalkingDistance: true }
       },
       selectedMode: 'walking',
@@ -387,33 +379,26 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
     })
   );
 
-  const modes = {
-    transit: {
-      durationMinutes: modeResults.find((r) => r.mode === 'transit')?.durationMinutes ?? null,
-      modeIcon: COMMUTE_MODE_ICON.transit
-    },
-    driving: {
-      durationMinutes: modeResults.find((r) => r.mode === 'driving')?.durationMinutes ?? null,
-      modeIcon: COMMUTE_MODE_ICON.driving
-    },
-    walking: {
-      durationMinutes: modeResults.find((r) => r.mode === 'walking')?.durationMinutes ?? null,
-      modeIcon: COMMUTE_MODE_ICON.walking
+  const modes = {};
+  for (const mode of ['transit', 'driving', 'walking']) {
+    const d = modeResults.find((r) => r.mode === mode)?.durationMinutes;
+    if (Number.isFinite(d) && d > 0) {
+      modes[mode] = { durationMinutes: d, modeIcon: COMMUTE_MODE_ICON[mode] };
     }
-  };
+  }
 
   const fastest = COMMUTE_MODE_PRIORITY
     .map((mode) => ({ mode, durationMinutes: modes[mode]?.durationMinutes }))
     .filter((result) => Number.isFinite(result.durationMinutes))
     .sort((a, b) => a.durationMinutes - b.durationMinutes)[0];
 
-  const selectedMode = fastest?.mode || 'transit';
+  const selectedMode = fastest?.mode || 'walking';
 
   return {
     modes,
     selectedMode,
     durationMinutes: modes[selectedMode]?.durationMinutes ?? null,
-    modeIcon: modes[selectedMode]?.modeIcon || COMMUTE_MODE_ICON.transit
+    modeIcon: modes[selectedMode]?.modeIcon || COMMUTE_MODE_ICON.walking
   };
 }
 

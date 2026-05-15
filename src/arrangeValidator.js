@@ -67,7 +67,12 @@ function startsWithinAnyWindow(startMin, windows) {
   return windows.some(([s, e]) => startMin >= s && startMin < e);
 }
 
-function validate({ placements, lockedActivities = [], days, activitiesById }) {
+function parseOpeningHoursContains(raw, windowStart, windowEnd) {
+  const ranges = parseOpeningHours(raw);
+  return ranges.some(([s, e]) => s < windowEnd && e > windowStart);
+}
+
+function validate({ placements, lockedActivities = [], days, activitiesById, commuteMatrix = null, unplacedIds = [] }) {
   const issues = [];
   const byDate = {};
 
@@ -166,6 +171,43 @@ function validate({ placements, lockedActivities = [], days, activitiesById }) {
           id: e.id,
           message: `${e.id} ("${e.activity.name}") is a second ${slot} on ${date}`
         });
+      }
+    }
+
+    if (commuteMatrix && typeof commuteMatrix === 'object') {
+      const sorted = [...entries].sort((a, b) => a.startMin - b.startMin);
+      for (let i = 0; i < sorted.length - 1; i += 1) {
+        const prev = sorted[i];
+        const next = sorted[i + 1];
+        const commute = Number(commuteMatrix?.[prev.id]?.[next.id] ?? commuteMatrix?.[next.id]?.[prev.id]);
+        if (!Number.isFinite(commute) || commute < 15) continue;
+        const required = prev.endMin + commute + 10;
+        if (next.startMin < required) {
+          issues.push({
+            type: 'commute_gap_violation',
+            day: date,
+            ids: [prev.id, next.id],
+            message: `${prev.id} ("${prev.activity.name}") to ${next.id} ("${next.activity.name}") needs at least ${commute}+10 min between end and next start on ${date}`
+          });
+        }
+      }
+    }
+
+    if (slotsUsed.dinner.length === 0 && Array.isArray(unplacedIds) && unplacedIds.length) {
+      for (const uid of unplacedIds) {
+        const act = activitiesById[uid];
+        if (!act || !isMealActivity(act)) continue;
+        const raw = getOpeningHoursRaw(act);
+        const fits = !raw || parseOpeningHoursContains(raw, DINNER_WINDOW[0], DINNER_WINDOW[1]);
+        if (fits) {
+          issues.push({
+            type: 'empty_dinner_with_available_meal',
+            day: date,
+            id: uid,
+            message: `Dinner slot empty on ${date} but unplaced meal ${uid} ("${act.name}") opens during 17:00-22:00 — place it`
+          });
+          break;
+        }
       }
     }
   }
