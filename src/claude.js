@@ -43,7 +43,7 @@ MANDATORY RULE — meals: Every activity with type "meal" MUST name a specific r
 Example object:
 {
   "name": "Wander Alfama at Dawn",
-  "type": "walk",
+  "type": "neighborhood",
   "city": "Lisbon",
   "venue_name": null,
   "why_it_fits": "..."

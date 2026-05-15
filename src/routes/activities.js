@@ -343,6 +343,7 @@ Return ONLY valid JSON (no markdown fences):
     }
 
     const { days, activities, lockedActivities, commuteMatrix, profile, numTravelers, numChildren } = req.body || {};
+    debugLog('arrange', `INBOUND activities=${Array.isArray(activities) ? activities.length : 'N/A'} locked=${Array.isArray(lockedActivities) ? lockedActivities.length : 0} days=${Array.isArray(days) ? days.length : 'N/A'} city="${Array.isArray(days) ? (days[0]?.city || '') : ''}"`);
     if (!Array.isArray(days) || !Array.isArray(activities)) {
       return res.status(400).json({ error: 'days and activities are required arrays' });
     }

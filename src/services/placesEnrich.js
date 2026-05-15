@@ -106,12 +106,17 @@ function applyDetails(activity, details) {
   }
 }
 
+function hasCoords(activity) {
+  const lat = Number(activity?.location?.lat);
+  const lng = Number(activity?.location?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng);
+}
+
 async function enrichWithPlaceDetails(activities, cityName) {
   if (!Array.isArray(activities) || activities.length === 0) return activities;
-  const targets = activities.filter(isVenueActivity);
-  let withCoordsBefore = 0;
-  for (const a of activities) if (Number(a?.location?.lat) && Number(a?.location?.lng)) withCoordsBefore += 1;
-  debugLog('places-enrich', `START city="${cityName}" activities=${activities.length} venue_targets=${targets.length} with_coords_before=${withCoordsBefore}`);
+  const targets = activities.filter((a) => !hasCoords(a));
+  const withCoordsBefore = activities.length - targets.length;
+  debugLog('places-enrich', `START city="${cityName}" activities=${activities.length} targets=${targets.length} with_coords_before=${withCoordsBefore}`);
   function hasUsefulDetails(d) {
     return !!(d && (Number.isInteger(d.priceTier) || d.openingHours || (d.location?.latitude && d.location?.longitude)));
   }
@@ -132,9 +137,14 @@ async function enrichWithPlaceDetails(activities, cityName) {
       applyDetails(activity, cached);
     }
   }));
-  let withCoordsAfter = 0;
-  for (const a of activities) if (Number(a?.location?.lat) && Number(a?.location?.lng)) withCoordsAfter += 1;
+  const stillMissing = activities.filter((a) => !hasCoords(a));
+  const withCoordsAfter = activities.length - stillMissing.length;
   debugLog('places-enrich', `DONE city="${cityName}" with_coords_after=${withCoordsAfter}/${activities.length}`);
+  if (stillMissing.length) {
+    const names = stillMissing.slice(0, 10).map((a) => a.name).join(' | ');
+    const overflow = stillMissing.length > 10 ? ` (+${stillMissing.length - 10} more)` : '';
+    debugLog('places-enrich', `MISSING_COORDS_AFTER ${names}${overflow}`);
+  }
   return activities;
 }
 

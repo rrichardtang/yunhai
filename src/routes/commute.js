@@ -1,6 +1,6 @@
 const {
   getCommuteBetweenActivities,
-  getFastestCommuteMinutes,
+  getFastestCommuteWithSource,
   haversineKm,
   getActivityCoords
 } = require('../services/distanceMatrix');
@@ -78,14 +78,19 @@ function register(app) {
         matrix[toId][fromId] = minutes;
       };
 
+      const sourceCounts = { 'cache-hit': 0, 'cache-neg': 0, 'live-ok': 0, 'live-fail': 0, 'walking-skip': 0, 'no-query': 0, 'no-key': 0 };
+
       const CONCURRENCY = 6;
       for (let i = 0; i < allPairs.length; i += CONCURRENCY) {
         const slice = allPairs.slice(i, i + CONCURRENCY);
         const results = await Promise.all(slice.map(async (pair) => {
-          const minutes = await getFastestCommuteMinutes(pair.from, pair.to);
-          return { pair, minutes };
+          const { minutes, sources } = await getFastestCommuteWithSource(pair.from, pair.to);
+          return { pair, minutes, sources };
         }));
-        for (const { pair, minutes } of results) {
+        for (const { pair, minutes, sources } of results) {
+          for (const s of sources) {
+            if (sourceCounts[s] !== undefined) sourceCounts[s] += 1;
+          }
           if (!Number.isFinite(minutes)) continue;
           if (pair.kind === 'intra') {
             setPair(pair.from.id, pair.to.id, minutes);
@@ -101,6 +106,8 @@ function register(app) {
       }
 
       const populated = Object.values(matrix).reduce((s, row) => s + Object.keys(row).length, 0);
+      const totalApiAttempts = sourceCounts['cache-hit'] + sourceCounts['cache-neg'] + sourceCounts['live-ok'] + sourceCounts['live-fail'];
+      debugLog('commute-matrix', `CACHE hits=${sourceCounts['cache-hit']} neg_hits=${sourceCounts['cache-neg']} live_ok=${sourceCounts['live-ok']} live_fail=${sourceCounts['live-fail']} walking_skip=${sourceCounts['walking-skip']} (total_api=${totalApiAttempts})`);
       debugLog('commute-matrix', `RETURN populated_pairs=${populated} elapsed_ms=${Date.now() - tStart}`);
       return res.json({ matrix });
     } catch (err) {
@@ -110,9 +117,14 @@ function register(app) {
   });
 
   app.post('/api/commute', async (req, res) => {
+    const tStart = Date.now();
     try {
       const activities = Array.isArray(req.body?.activities) ? req.body.activities : [];
-      if (activities.length < 2) return res.json({ commutes: [] });
+      debugLog('commute', `START activities=${activities.length}`);
+      if (activities.length < 2) {
+        debugLog('commute', `RETURN commutes=0 elapsed_ms=${Date.now() - tStart}`);
+        return res.json({ commutes: [] });
+      }
 
       const commutes = [];
       for (let i = 0; i < activities.length - 1; i += 1) {
@@ -131,8 +143,10 @@ function register(app) {
         });
       }
 
+      debugLog('commute', `RETURN commutes=${commutes.length} elapsed_ms=${Date.now() - tStart}`);
       return res.json({ commutes });
-    } catch {
+    } catch (err) {
+      debugLog('commute', `ERROR msg="${err?.message || err}" elapsed_ms=${Date.now() - tStart}`);
       return res.json({ commutes: [] });
     }
   });
