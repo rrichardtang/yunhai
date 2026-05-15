@@ -1,4 +1,5 @@
 const commuteCache = require('./commuteCache');
+const { debugLog } = require('./debugLog');
 
 const DISTANCE_MATRIX_BASE_URL = 'https://maps.googleapis.com/maps/api/distancematrix/json';
 const COMMUTE_MODE_ICON = {

@@ -64,13 +64,11 @@ function register(app) {
 
       const allPairs = [...intraPairs, ...interPairs];
       if (allPairs.length > MAX_PAIRS_PER_REQUEST) {
-        console.warn(`[commute-matrix] throttled: ${activities.length} activities → ${allPairs.length} pairs (${intraPairs.length} intra + ${interPairs.length} inter) > ${MAX_PAIRS_PER_REQUEST} cap`);
-        debugLog('commute-matrix', `THROTTLED pairs=${allPairs.length} cap=${MAX_PAIRS_PER_REQUEST}`);
+        debugLog('commute-matrix', `THROTTLED activities=${activities.length} pairs=${allPairs.length} intra=${intraPairs.length} inter=${interPairs.length} cap=${MAX_PAIRS_PER_REQUEST}`);
         return res.json({ matrix: {}, throttled: true });
       }
 
-      console.log(`[commute-matrix] ${activities.length} activities → ${clusters.length} clusters → ${intraPairs.length} intra + ${interPairs.length} inter pairs`);
-      debugLog('commute-matrix', `PAIRS clusters=${clusters.length} intra=${intraPairs.length} inter=${interPairs.length}`);
+      debugLog('commute-matrix', `PAIRS activities=${activities.length} clusters=${clusters.length} intra=${intraPairs.length} inter=${interPairs.length}`);
       const tStart = Date.now();
 
       const setPair = (fromId, toId, minutes) => {
