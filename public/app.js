@@ -4485,12 +4485,13 @@ function makeStagingCard(item) {
 
 // formatTypeLabel, formatDurationHoursLong provided by /js/arrangeView.js
 
-function makePlacedCard(item) {
+function makePlacedCard(item, minTopFloor = null) {
   const { icon, colorClass } = getActivityStyle(item.type);
   const placement = state.placements[item.id] || {};
   const time = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
   const h = Math.max(28, actDurationHours(item) * PX_PER_HOUR);
-  const y = yFromTime(time);
+  const rawY = yFromTime(time);
+  const y = Number.isFinite(minTopFloor) ? Math.max(rawY, minTopFloor) : rawY;
   const typeLabel = formatTypeLabel(item.type);
   const durationLabel = formatDurationHoursLong(actDurationHours(item));
   const activeCity = state.arrangeCity;
@@ -4534,7 +4535,9 @@ function renderCommuteSelector(fromId, toId, y) {
   const options = COMMUTE_MODE_ORDER
     .map((mode) => {
       const option = commute?.modes?.[mode];
-      if (!option || !Number.isFinite(Number(option.durationMinutes))) return '';
+      if (!option) return '';
+      const dur = Number(option.durationMinutes);
+      if (!Number.isFinite(dur) || dur <= 0) return '';
       const isActive = selected.selectedMode === mode;
       return `
         <button type="button" class="commute-option ${isActive ? 'active' : ''}" data-mode="${mode}">
@@ -4561,11 +4564,12 @@ function renderCommuteSelector(fromId, toId, y) {
   `;
 }
 
-function makeCommuteIndicator(currentItem, nextItem) {
+function makeCommuteIndicator(currentItem, nextItem, currentTopOverride = null) {
   const placement = state.placements[currentItem.id] || {};
   const time = parseTimeTo24(placement.time || actPreferredTime(currentItem) || typeToTime(currentItem.type));
   const h = Math.max(28, actDurationHours(currentItem) * PX_PER_HOUR);
-  return renderCommuteSelector(currentItem.id, nextItem.id, yFromTime(time) + h + 6);
+  const topY = Number.isFinite(currentTopOverride) ? currentTopOverride : yFromTime(time);
+  return renderCommuteSelector(currentItem.id, nextItem.id, topY + h + 6);
 }
 
 function makeLogisticsCard(label, icon, time, subtitle = '') {
@@ -4874,11 +4878,20 @@ function renderArrange() {
       }
     }
 
+    let prevBottom = -Infinity;
     items.forEach((item, index) => {
-      html += makePlacedCard(item);
+      const placement = state.placements[item.id] || {};
+      const itemTime = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
+      const itemH = Math.max(28, actDurationHours(item) * PX_PER_HOUR);
+      const rawY = yFromTime(itemTime);
+      const PILL_RESERVE = 44;
+      const topFloor = prevBottom + PILL_RESERVE;
+      const effectiveTop = Math.max(rawY, topFloor);
+      html += makePlacedCard(item, effectiveTop);
       if (index < items.length - 1) {
-        html += makeCommuteIndicator(item, items[index + 1]);
+        html += makeCommuteIndicator(item, items[index + 1], effectiveTop);
       }
+      prevBottom = effectiveTop + itemH;
     });
 
     if (dayLogistics?.isDeparture) {

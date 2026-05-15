@@ -154,3 +154,44 @@ test('allows one meal in lunch window and one in dinner window on same day', () 
   });
   assert.equal(v.ok, true);
 });
+
+test('flags commute_gap_violation when same-day pair too close', () => {
+  const a = mkAct('a', { duration: 60 });
+  const b = mkAct('b', { duration: 60 });
+  const v = validate({
+    placements: { a: { date: '2026-05-03', time: '09:00' }, b: { date: '2026-05-03', time: '10:15' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { a, b },
+    commuteMatrix: { a: { b: 30 } }
+  });
+  assert.equal(v.ok, false);
+  assert.ok(v.issues.some((i) => i.type === 'commute_gap_violation'));
+});
+
+test('passes commute_gap when start times respect duration + commute + buffer', () => {
+  const a = mkAct('a', { duration: 60 });
+  const b = mkAct('b', { duration: 60 });
+  const v = validate({
+    placements: { a: { date: '2026-05-03', time: '09:00' }, b: { date: '2026-05-03', time: '10:40' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { a, b },
+    commuteMatrix: { a: { b: 30 } }
+  });
+  assert.equal(v.ok, true);
+});
+
+test('flags empty_dinner_with_available_meal when unplaced meal fits dinner window', () => {
+  const m = { id: 'm', name: 'Dinner Spot', type: 'meal', timing: { duration_minutes: 60, opening_hours: '17:00-22:00' } };
+  const other = mkAct('a', { duration: 60 });
+  const v = validate({
+    placements: { a: { date: '2026-05-03', time: '10:00' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { m, a: other },
+    unplacedIds: ['m']
+  });
+  assert.equal(v.ok, false);
+  assert.ok(v.issues.some((i) => i.type === 'empty_dinner_with_available_meal'));
+});

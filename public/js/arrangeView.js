@@ -120,21 +120,29 @@
     return `${fromId}->${toId}`;
   }
 
+  function hasValidDuration(modeEntry) {
+    const d = Number(modeEntry?.durationMinutes);
+    return Number.isFinite(d) && d > 0;
+  }
+
   function resolveSelectedCommuteMode(commute) {
     if (!commute || typeof commute !== 'object') return null;
-    const selectedMode = commute.selectedMode && commute.modes?.[commute.selectedMode]
+    const userSelected = commute.selectedMode && hasValidDuration(commute.modes?.[commute.selectedMode])
       ? commute.selectedMode
-      : COMMUTE_MODE_ORDER.find((mode) => Number.isFinite(commute.modes?.[mode]?.durationMinutes));
-    return selectedMode || COMMUTE_MODE_ORDER[0];
+      : null;
+    const fallback = COMMUTE_MODE_ORDER.find((mode) => hasValidDuration(commute.modes?.[mode]));
+    return userSelected || fallback || null;
   }
 
   function resolveSelectedCommuteDetails(commute) {
     if (!commute) return null;
     const selectedMode = resolveSelectedCommuteMode(commute);
+    if (!selectedMode) return null;
     const selected = commute.modes?.[selectedMode] || {};
-    const durationMinutes = Number.isFinite(Number(selected.durationMinutes)) ? Number(selected.durationMinutes) : null;
+    const dur = Number(selected.durationMinutes);
+    if (!Number.isFinite(dur) || dur <= 0) return null;
     const modeIcon = selected.modeIcon || COMMUTE_MODE_DEFAULT_ICON[selectedMode] || '🚇';
-    return { selectedMode, durationMinutes, modeIcon };
+    return { selectedMode, durationMinutes: dur, modeIcon };
   }
 
   function formatCommuteBadge(commute) {

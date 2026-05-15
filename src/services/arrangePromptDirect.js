@@ -2,6 +2,54 @@ const { showUpEarlyMins } = require('../../shared/arrangeArrivalBuffers');
 const { minutesFromTime, timeFromMinutes } = require('../../shared/timeHelpers');
 const { paceDescFromValue } = require('../arrangeConfig');
 
+const WALKING_CLUSTER_KM = 1.5;
+
+function activityCoords(a) {
+  const lat = Number(a?.location?.lat);
+  const lng = Number(a?.location?.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  const sLat = Number(a?.start_latitude);
+  const sLng = Number(a?.start_longitude);
+  if (Number.isFinite(sLat) && Number.isFinite(sLng)) return { lat: sLat, lng: sLng };
+  return null;
+}
+
+function haversineKm(a, b) {
+  const R = 6371;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const h = Math.sin(dLat / 2) ** 2
+    + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function buildClusterBlock(flexible) {
+  const withCoords = flexible
+    .map((a) => ({ a, coords: activityCoords(a) }))
+    .filter((x) => x.coords);
+  if (withCoords.length < 2) return '';
+  const neighborsByName = new Map();
+  for (let i = 0; i < withCoords.length; i += 1) {
+    const { a: ai, coords: ci } = withCoords[i];
+    const name = String(ai.name || ai.id);
+    if (!neighborsByName.has(name)) neighborsByName.set(name, []);
+    for (let j = 0; j < withCoords.length; j += 1) {
+      if (i === j) continue;
+      const { a: aj, coords: cj } = withCoords[j];
+      if (haversineKm(ci, cj) < WALKING_CLUSTER_KM) {
+        neighborsByName.get(name).push(String(aj.name || aj.id));
+      }
+    }
+  }
+  const lines = [];
+  for (const [name, others] of neighborsByName) {
+    if (!others.length) continue;
+    lines.push(`- "${name}" near ${others.map((n) => `"${n}"`).join(', ')}`);
+  }
+  if (!lines.length) return '';
+  return `\n\nWALKING NEIGHBORS (under 1.5 km apart — schedule consecutively on the same day when possible to minimize commute and fill gaps with nearby activities):\n${lines.join('\n')}`;
+}
+
 function activityLine(a) {
   const isNew = a.timing !== undefined;
   const dur = isNew ? a.timing.duration_minutes : Math.round((Number(a.duration_hours) || 1) * 60);
@@ -85,6 +133,7 @@ function buildDirectArrangePrompt({
   const daysText = days.map((d) => dayLine(d, locksByDate[d.date] || [])).join('\n');
   const activitiesText = flexible.map(activityLine).join('\n');
   const commuteText = buildCommuteBlock(commuteMatrix, flexible, locked);
+  const clusterText = buildClusterBlock(flexible);
 
   const { desc: paceDesc } = paceDescFromValue(profile?.answers?.pace);
 
@@ -114,6 +163,8 @@ SOFT PREFERENCES (use to choose between valid placements, never to reject):
 PLACEMENT STRATEGY:
 - Days have ~12-16 hours of window. Multiple activities per day is expected and encouraged.
 - MEALS (activity.type === "meal"): place AT MOST one meal in the lunch window (11:00-14:30) and one meal in the dinner window (17:00-22:00) per day. Decide each meal's slot by checking its opening_hours — if the restaurant only opens after 17:00, it can ONLY be that day's dinner, never the lunch. If multiple approved meals qualify for the same slot on the same day, pick the one closest geographically to that day's other activities and move the rest to unplaced with reason "no_time_slot_remaining". Never schedule two meals in the same slot on the same day. Never schedule a meal outside both windows.
+- DINNER MUST-FILL: If a day has no meal placed in the dinner window (17:00-22:00) but at least one unplaced meal-type activity has opening_hours that include any time in that window, you MUST place one of those meals there. Leaving an empty dinner slot while a compatible meal sits unplaced is a constraint violation, not a soft choice.
+- COMMUTE GAPS: When two activities appear in the COMMUTE TIMES block and are scheduled on the same day, the later one's start time must be at least (previous activity's duration + commute minutes + 10 min buffer) after the earlier one's start time. Do not place activities back-to-back without leaving room for travel. For pairs not in COMMUTE TIMES (walking distance), a 10-minute gap between activity end and next activity start is sufficient.
 - Lunch and dinner anchor the day; non-meal activities fit between them.
 - A typical full day has 4–8 activities depending on pace.
 - Distribute activities evenly across days. A day with 0–2 activities while another has 8+ is poor balance — move overflow to the lighter day before pushing anything to unplaced.
@@ -122,7 +173,7 @@ DAYS:
 ${daysText}
 
 ACTIVITIES TO SCHEDULE:
-${activitiesText}${commuteText}
+${activitiesText}${commuteText}${clusterText}
 
 TRAVELERS: ${travelerBlock}
 PACE: ${paceDesc}${profileBlock}

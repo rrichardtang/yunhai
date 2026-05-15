@@ -24,6 +24,7 @@ const arrangeTelemetry = require('../services/arrangeTelemetry');
 const { debugLog } = require('../services/debugLog');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
+const ARRANGE_MODEL = 'gpt-5.4';
 
 const placesCache = new Map();
 const PLACES_CACHE_MAX = 500;
@@ -337,8 +338,8 @@ Return ONLY valid JSON (no markdown fences):
   });
 
   app.post('/api/arrange', async (req, res) => {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return res.status(503).json({ error: 'Anthropic API key not configured' });
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(503).json({ error: 'OpenAI API key not configured' });
     }
 
     const { days, activities, lockedActivities, commuteMatrix, profile, numTravelers, numChildren } = req.body || {};
@@ -357,25 +358,32 @@ Return ONLY valid JSON (no markdown fences):
     const prefSummary = getPreferenceSummary(userId);
     const activitiesById = Object.fromEntries(flexible.map((a) => [String(a.id), a]));
     const matrix = commuteMatrix && typeof commuteMatrix === 'object' ? commuteMatrix : {};
+    const matrixPairCount = Object.values(matrix).reduce((sum, row) => sum + (row && typeof row === 'object' ? Object.keys(row).length : 0), 0);
+    debugLog('arrange', `START model=${ARRANGE_MODEL} flexible=${flexible.length} locked=${resolvedLocked.length} days=${days.length} city="${days[0]?.city || ''}" matrix_pairs=${matrixPairCount}`);
 
-    async function callClaudeForJson(prompt) {
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const stream = anthropic.messages.stream({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 32768,
-        system: 'You are a JSON-only API endpoint. Do NOT think out loud, narrate your process, list constraints, or write any preamble. Your ENTIRE response must be a single JSON object beginning with { and ending with }. The very first character you emit must be {. Internal reasoning must happen silently before you start emitting tokens.',
-        messages: [{ role: 'user', content: prompt + '\n\nRespond with the JSON object only. The first character of your response must be {. No preamble, no analysis, no constraint listing — just the JSON.' }]
+    async function callLlmForJson(prompt) {
+      debugLog('arrange', `LLM_CALL model=${ARRANGE_MODEL} prompt_chars=${prompt.length}`);
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const response = await openai.chat.completions.create({
+        model: ARRANGE_MODEL,
+        max_completion_tokens: 32768,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'You are a JSON-only API endpoint. Respond with a single JSON object only. No preamble, no narration, no markdown.' },
+          { role: 'user', content: prompt }
+        ]
       });
-      const final = await stream.finalMessage();
-      const raw = extractText(final.content);
+      const raw = String(response.choices?.[0]?.message?.content || '').trim();
+      debugLog('arrange', `LLM_RESPONSE finish=${response.choices?.[0]?.finish_reason} chars=${raw.length}`);
       const parsed = tryParseJsonObject(raw);
       if (!parsed) {
-        console.error(`arrange JSON parse failed (stop_reason=${final.stop_reason}, length=${raw.length})`);
+        const finishReason = response.choices?.[0]?.finish_reason;
+        console.error(`arrange JSON parse failed (finish_reason=${finishReason}, length=${raw.length})`);
         console.error('arrange raw response (first 800 chars):', raw.slice(0, 800));
         console.error('arrange raw response (last 400 chars):', raw.slice(-400));
         const err = new Error('Failed to parse arrangement JSON');
         err.diagnostic = {
-          stop_reason: final.stop_reason,
+          finish_reason: finishReason,
           length: raw.length,
           head: raw.slice(0, 800),
           tail: raw.slice(-400)
@@ -423,18 +431,25 @@ Return ONLY valid JSON (no markdown fences):
         cityName,
         commuteMatrix: matrix
       });
-      const parsed = await callClaudeForJson(prompt);
+      const parsed = await callLlmForJson(prompt);
       let { placements, unplaced } = sanitizePlacements(parsed);
+      debugLog('arrange', `FIRST_PASS placed=${Object.keys(placements).length} unplaced=${unplaced.length} unplaced_ids=${unplaced.map((u) => u.id).join(',') || 'none'}`);
 
-      let v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
+      let v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById, commuteMatrix: matrix, unplacedIds: unplaced.map((u) => u.id) });
       firstPassValid = v.ok;
       firstPassIssues = v.issues || [];
+      if (!v.ok) {
+        const issueSummary = v.issues.map((i) => i.type).join(',');
+        debugLog('arrange', `VALIDATE_FAIL count=${v.issues.length} types=${issueSummary}`);
+      } else {
+        debugLog('arrange', 'VALIDATE_OK first_pass');
+      }
 
       if (!v.ok) {
         repairUsed = true;
         try {
           const repairPrompt = buildRepairPrompt({ placements, issues: v.issues, activitiesById });
-          const repaired = await callClaudeForJson(repairPrompt);
+          const repaired = await callLlmForJson(repairPrompt);
           const repairedSan = sanitizePlacements(repaired);
           placements = repairedSan.placements;
           unplaced = [...unplaced, ...repairedSan.unplaced];
@@ -446,17 +461,20 @@ Return ONLY valid JSON (no markdown fences):
             seen.add(u.id);
             return true;
           });
-          v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
+          v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById, commuteMatrix: matrix, unplacedIds: unplaced.map((u) => u.id) });
           secondPassValid = v.ok;
+          debugLog('arrange', `REPAIR_PASS ok=${v.ok} remaining_issues=${(v.issues || []).map((i) => i.type).join(',') || 'none'}`);
         } catch (repairErr) {
           console.warn('[arrange] repair pass failed:', repairErr.message);
+          debugLog('arrange', `REPAIR_PASS_THREW err="${repairErr?.message || repairErr}"`);
         }
       }
 
       if (!v.ok) {
         const toDrop = new Set();
         for (const issue of v.issues) {
-          if (issue.type === 'overlap' && Array.isArray(issue.ids) && issue.ids.length === 2) {
+          if (issue.type === 'empty_dinner_with_available_meal') continue;
+          if ((issue.type === 'overlap' || issue.type === 'commute_gap_violation') && Array.isArray(issue.ids) && issue.ids.length === 2) {
             const [idA, idB] = issue.ids;
             const aStart = minutesFromTime(placements[idA]?.time || '00:00');
             const bStart = minutesFromTime(placements[idB]?.time || '00:00');
@@ -471,8 +489,11 @@ Return ONLY valid JSON (no markdown fences):
             delete placements[id];
           }
         }
+        debugLog('arrange', `FORCE_DROP ids=${[...toDrop].join(',') || 'none'}`);
         v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
       }
+
+      debugLog('arrange', `RETURN placed=${Object.keys(placements).length} unplaced=${unplaced.length} repair_used=${repairUsed} second_pass_ok=${secondPassValid}`);
 
       arrangeTelemetry.logRun({
         userId,
@@ -491,6 +512,7 @@ Return ONLY valid JSON (no markdown fences):
         diagnostics: v.ok ? [] : v.issues.map((i) => i.message)
       });
     } catch (error) {
+      debugLog('arrange', `ERROR msg="${error?.message || error}" diag=${JSON.stringify(error?.diagnostic || null)}`);
       arrangeTelemetry.logRun({
         userId,
         cityName,
