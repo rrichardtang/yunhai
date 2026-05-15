@@ -1,4 +1,5 @@
 const placesCache = require('./placesCache');
+const { debugLog } = require('./debugLog');
 
 const FOOD_TYPES = new Set(['meal', 'nightlife']);
 const VENUE_TYPES = new Set([
@@ -96,23 +97,44 @@ function applyDetails(activity, details) {
     if (activity.timing) activity.timing.opening_hours = details.openingHours;
     activity.opening_hours = details.openingHours;
   }
+  const lat = Number(details.location?.latitude);
+  const lng = Number(details.location?.longitude);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    if (!activity.location || typeof activity.location !== 'object') activity.location = {};
+    activity.location.lat = lat;
+    activity.location.lng = lng;
+  }
 }
 
 async function enrichWithPlaceDetails(activities, cityName) {
   if (!Array.isArray(activities) || activities.length === 0) return activities;
   const targets = activities.filter(isVenueActivity);
+  let withCoordsBefore = 0;
+  for (const a of activities) if (Number(a?.location?.lat) && Number(a?.location?.lng)) withCoordsBefore += 1;
+  debugLog('places-enrich', `START city="${cityName}" activities=${activities.length} venue_targets=${targets.length} with_coords_before=${withCoordsBefore}`);
+  function hasUsefulDetails(d) {
+    return !!(d && (Number.isInteger(d.priceTier) || d.openingHours || (d.location?.latitude && d.location?.longitude)));
+  }
+  function hasLocation(d) {
+    return !!(d && d.location?.latitude && d.location?.longitude);
+  }
   await Promise.all(targets.map(async (activity) => {
     const cached = placesCache.get(activity.name, cityName);
-    if (cached && (Number.isInteger(cached.priceTier) || cached.openingHours)) {
+    if (hasUsefulDetails(cached) && hasLocation(cached)) {
       applyDetails(activity, cached);
       return;
     }
     const details = await fetchPlaceDetails(activity.name, cityName);
-    if (details && (Number.isInteger(details.priceTier) || details.openingHours)) {
+    if (hasUsefulDetails(details)) {
       applyDetails(activity, details);
       placesCache.set(activity.name, cityName, details);
+    } else if (hasUsefulDetails(cached)) {
+      applyDetails(activity, cached);
     }
   }));
+  let withCoordsAfter = 0;
+  for (const a of activities) if (Number(a?.location?.lat) && Number(a?.location?.lng)) withCoordsAfter += 1;
+  debugLog('places-enrich', `DONE city="${cityName}" with_coords_after=${withCoordsAfter}/${activities.length}`);
   return activities;
 }
 
