@@ -461,9 +461,12 @@ Return ONLY valid JSON (no markdown fences):
       const hasClusterBlock = prompt.includes('WALKING NEIGHBORS');
       const hasCommuteBlock = prompt.includes('COMMUTE TIMES');
       const activitiesWithCoords = flexible.filter((a) => {
-        const lat = Number(a?.location?.lat ?? a?.start_latitude);
-        const lng = Number(a?.location?.lng ?? a?.start_longitude);
-        return Number.isFinite(lat) && Number.isFinite(lng);
+        const rawLat = a?.location?.lat ?? a?.start_latitude;
+        const rawLng = a?.location?.lng ?? a?.start_longitude;
+        if (rawLat == null || rawLng == null) return false;
+        const lat = Number(rawLat);
+        const lng = Number(rawLng);
+        return Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
       }).length;
       debugLog('arrange', `PROMPT_INFO cluster_block=${hasClusterBlock} commute_block=${hasCommuteBlock} acts_with_coords=${activitiesWithCoords}/${flexible.length}`);
       const parsed = await callLlmForJson(prompt);

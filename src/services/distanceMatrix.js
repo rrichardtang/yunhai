@@ -40,12 +40,20 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 }
 
 function getActivityCoords(activity) {
-  const lat = Number(activity?.location?.lat);
-  const lng = Number(activity?.location?.lng);
-  if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
-  const sLat = Number(activity?.start_latitude);
-  const sLng = Number(activity?.start_longitude);
-  if (Number.isFinite(sLat) && Number.isFinite(sLng)) return { lat: sLat, lng: sLng };
+  const rawLat = activity?.location?.lat;
+  const rawLng = activity?.location?.lng;
+  if (rawLat != null && rawLng != null) {
+    const lat = Number(rawLat);
+    const lng = Number(rawLng);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) return { lat, lng };
+  }
+  const rawSLat = activity?.start_latitude;
+  const rawSLng = activity?.start_longitude;
+  if (rawSLat != null && rawSLng != null) {
+    const sLat = Number(rawSLat);
+    const sLng = Number(rawSLng);
+    if (Number.isFinite(sLat) && Number.isFinite(sLng) && (sLat !== 0 || sLng !== 0)) return { lat: sLat, lng: sLng };
+  }
   return null;
 }
 
