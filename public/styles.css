@@ -2739,3 +2739,412 @@ select.gm-inp {
   font-size: 13px;
 }
 .gm-city__body .city-dropdown-error.hidden { display: none; }
+
+/* =====================================================================
+   STAGE 5c — Review (Step 2) reskin
+   Targets existing classes (.review-toolbar, .cards-grid, .card.activity-card)
+   so renderActivities()/buildActivityCard() output is unchanged.
+   ===================================================================== */
+
+/* Panel head spacing for Review (used elsewhere too) */
+.panel__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+.panel__head h2 { margin: 0; }
+.panel__sub {
+  font-size: 13.5px;
+  color: var(--text-500);
+  margin: 6px 0 0;
+  letter-spacing: -0.005em;
+  line-height: 1.5;
+}
+
+/* Review toolbar — pill search + pill selects + ink Approve All */
+.review-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+  align-items: center;
+  grid-template-columns: none;
+}
+.review-toolbar .search {
+  flex: 1;
+  min-width: 260px;
+  position: relative;
+}
+.review-toolbar .search i {
+  position: absolute;
+  left: 14px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: var(--text-500);
+  pointer-events: none;
+}
+.review-toolbar .search input {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px 0 38px;
+  border-radius: var(--r-pill);
+  background: var(--paper-0);
+  border: 1px solid var(--hair-strong);
+  font-size: 13.5px;
+  color: var(--text-900);
+  outline: none;
+  margin: 0;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.review-toolbar .search input::placeholder { color: var(--text-400); }
+.review-toolbar .search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(47,125,251,.14);
+}
+
+.review-toolbar select {
+  height: 40px;
+  padding: 0 38px 0 16px;
+  border-radius: var(--r-pill);
+  background: var(--paper-0) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4 L5 7 L8 4' fill='none' stroke='%235A6679' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat right 14px center;
+  border: 1px solid var(--hair-strong);
+  font-size: 13.5px;
+  color: var(--text-900);
+  margin: 0;
+  cursor: pointer;
+  transition: border-color var(--dur-fast);
+}
+.review-toolbar select:hover { border-color: var(--text-900); }
+
+.review-toolbar .approve-all {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: var(--r-pill);
+  background: var(--ink-900);
+  color: var(--paper-0);
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  transition: background var(--dur-fast), box-shadow var(--dur-fast);
+}
+.review-toolbar .approve-all:hover:not(:disabled) {
+  background: var(--ink-800);
+  box-shadow: var(--sh-md);
+  color: var(--paper-0);
+}
+.review-toolbar .approve-all i { font-size: 14px; }
+
+/* Cards grid — 3D-flipper activity card */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
+}
+.card.activity-card {
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-lg);
+  display: block;
+  position: relative;
+  perspective: 1600px;
+  overflow: visible;
+  box-shadow: none;
+  padding: 0;
+  transition: transform var(--dur-med) var(--ease-out);
+}
+.card.activity-card:hover { transform: translateY(-4px); }
+
+.activity-card-inner {
+  position: relative;
+  display: grid;
+  grid-template-areas: "stack";
+  transform-style: preserve-3d;
+  transition: transform 0.72s var(--ease-inout);
+  border-radius: var(--r-lg);
+}
+.card.activity-card.is-flipped .activity-card-inner { transform: rotateY(180deg); }
+
+.activity-card-face {
+  grid-area: stack;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper-1);
+  border: 1px solid rgba(10,22,40,.10);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  box-shadow:
+    0 1px 2px rgba(10,22,40,.06),
+    0 4px 12px rgba(10,22,40,.07),
+    0 16px 36px rgba(10,22,40,.08);
+  transition: box-shadow var(--dur-med) var(--ease-out),
+              border-color var(--dur-med) var(--ease-out);
+}
+.activity-card-back { transform: rotateY(180deg); }
+
+.card.activity-card:hover .activity-card-face {
+  border-color: rgba(10,22,40,.16);
+  box-shadow:
+    0 2px 4px rgba(10,22,40,.06),
+    0 12px 28px rgba(10,22,40,.10),
+    0 32px 56px rgba(10,22,40,.12);
+}
+.card.activity-card:not(.is-flipped) .activity-card-back,
+.card.activity-card.is-flipped .activity-card-front { pointer-events: none; }
+
+/* Approved / declined state tints (existing handlers add .approved / .declined) */
+.card.activity-card.approved .activity-card-face { border-color: rgba(31,157,85,.30); }
+.card.activity-card.declined .activity-card-face { border-color: rgba(192,54,44,.25); opacity: .82; }
+
+/* Media — image header with flip button + map pin */
+.activity-card-img-wrap {
+  aspect-ratio: 16/10;
+  position: relative;
+  overflow: hidden;
+  background: var(--paper-2);
+}
+.activity-card-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.activity-flip-btn-overlay {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 32px; height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(244,241,236,.92);
+  backdrop-filter: blur(6px);
+  border: 0;
+  color: var(--text-900);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--dur-fast), transform var(--dur-med) var(--ease-out);
+  z-index: 2;
+  font-size: 13px;
+}
+.activity-flip-btn-overlay:hover { background: var(--paper-0); }
+.activity-flip-btn-overlay i { font-size: 14px; }
+.card.activity-card.is-flipped .activity-flip-btn-overlay i { transform: rotate(180deg); }
+
+/* Card content */
+.activity-card .card-content {
+  padding: 12px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+.activity-card-head-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 2px !important;
+}
+.activity-card-head-actions > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+/* Tag pills — type badge + price/source */
+.activity-card .badge,
+.activity-card .price-badge,
+.activity-card [data-price-badges] > * {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 500;
+  background: var(--paper-2);
+  color: var(--text-500);
+  border: 1px solid var(--hair);
+}
+
+.activity-card h3 {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-900);
+  letter-spacing: -0.012em;
+  line-height: 1.25;
+  margin: 0;
+}
+.activity-card .card-content p {
+  font-size: 13px;
+  color: var(--text-700);
+  line-height: 1.55;
+  margin: 0;
+}
+.activity-card .card-content p strong { color: var(--text-900); font-weight: 500; }
+.activity-card .activity-insider-tip {
+  background: var(--accent-soft);
+  border: 1px solid rgba(47,125,251,.18);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  color: var(--text-700);
+  font-size: 12.5px;
+}
+.activity-card .activity-insider-tip i { color: var(--accent); }
+
+/* Approve / Decline action row */
+.activity-card .actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.activity-card .actions button {
+  flex: 1;
+  height: 34px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--r-pill);
+  padding: 0 14px;
+  letter-spacing: -0.005em;
+  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.activity-card .btn-approve {
+  background: var(--ink-900);
+  color: var(--paper-0);
+  border: 1px solid var(--ink-900);
+}
+.activity-card .btn-approve:hover:not(:disabled):not(.inactive) {
+  background: var(--ink-800);
+  box-shadow: var(--sh-md);
+}
+.activity-card .btn-approve.active {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #fff;
+}
+.activity-card .btn-decline {
+  background: transparent;
+  color: var(--text-700);
+  border: 1px solid var(--hair-strong);
+}
+.activity-card .btn-decline:hover:not(:disabled):not(.inactive) {
+  background: var(--paper-2);
+  border-color: var(--text-900);
+  color: var(--text-900);
+}
+.activity-card .btn-decline.active {
+  background: rgba(192,54,44,.08);
+  border-color: var(--err);
+  color: var(--err);
+}
+.activity-card .actions button.inactive { opacity: .55; }
+
+/* Notes / decline-reason rows */
+.activity-card .activity-inline-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin-top: 2px;
+}
+.activity-card .activity-notes-text,
+.activity-card .decline-reason {
+  font-size: 12.5px;
+  background: var(--paper-0);
+  border: 1px solid var(--hair-strong);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  min-height: 56px;
+  margin: 0;
+  color: var(--text-900);
+  resize: vertical;
+}
+.activity-card .icon-btn { color: var(--text-500); }
+.activity-card .icon-btn:hover:not(:disabled) { background: var(--paper-2); color: var(--text-900); text-shadow: none; }
+
+/* Back face — map view */
+.activity-card-back .card-content.map-back-content {
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+.activity-card-back .activity-card-head-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin: 0 !important;
+}
+.activity-card-back .activity-card-head-actions strong {
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--text-900);
+}
+.activity-card-back .flip-btn {
+  width: 32px; height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--paper-1);
+  color: var(--text-700);
+  border: 1px solid var(--hair-strong);
+  font-size: 13px;
+}
+.activity-card-back .flip-btn:hover {
+  background: var(--paper-2);
+  color: var(--text-900);
+  border-color: var(--text-900);
+}
+.activity-card-back .mini-map-wrap {
+  flex: 1;
+  display: block;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--hair);
+  background: var(--paper-2);
+  padding: 0;
+  cursor: pointer;
+  min-height: 200px;
+}
+.activity-card-back .mini-map {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+}
+.activity-card-back .muted-text {
+  font-size: 12.5px;
+  color: var(--text-500);
+  letter-spacing: -0.005em;
+}
+
+/* Enriching state */
+.activity-card-enriching {
+  background: var(--paper-1);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+}
+.activity-enriching-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-500);
+}
+.activity-enriching-label { font-size: 13px; text-align: center; }
+.activity-enriching-label strong { color: var(--text-900); font-weight: 500; }
