@@ -3397,13 +3397,35 @@ select.gm-inp {
   text-overflow: ellipsis;
 }
 
-/* Category color strips on the left edge */
-#step3 .placed-card.food-color    { background: linear-gradient(to right, #FFF4E6 0 3px, var(--paper-0) 3px); }
-#step3 .placed-card.tour-color    { background: linear-gradient(to right, #E6F0FE 0 3px, var(--paper-0) 3px); }
-#step3 .placed-card.culture-color { background: linear-gradient(to right, #F3E9FF 0 3px, var(--paper-0) 3px); }
-#step3 .placed-card.outdoor-color { background: linear-gradient(to right, #E6F7EA 0 3px, var(--paper-0) 3px); }
-#step3 .placed-card.night-color   { background: linear-gradient(to right, #FCE9F1 0 3px, var(--paper-0) 3px); }
-#step3 .placed-card.transit-color { background: linear-gradient(to right, #EAEDF2 0 3px, var(--paper-0) 3px); opacity: .85; }
+/* Category color strips on the left edge + matching dot on staging chips.
+   Activity types: meal/food, tour, museum/cultural, neighborhood, sports, walk/park, show/nightlife, default */
+#step3 .placed-card.activity-food         { background: linear-gradient(to right, #FFE2B8 0 4px, var(--paper-0) 4px); border-left-color: #E89B27; }
+#step3 .placed-card.activity-tour         { background: linear-gradient(to right, #CADCFE 0 4px, var(--paper-0) 4px); border-left-color: #2F7DFB; }
+#step3 .placed-card.activity-cultural     { background: linear-gradient(to right, #E0CCFB 0 4px, var(--paper-0) 4px); border-left-color: #7B3CD2; }
+#step3 .placed-card.activity-neighborhood { background: linear-gradient(to right, #C8EAD0 0 4px, var(--paper-0) 4px); border-left-color: #1F9D55; }
+#step3 .placed-card.activity-sports       { background: linear-gradient(to right, #FFD3CC 0 4px, var(--paper-0) 4px); border-left-color: #C0362C; }
+#step3 .placed-card.activity-walk         { background: linear-gradient(to right, #D9F0DC 0 4px, var(--paper-0) 4px); border-left-color: #2BA158; }
+#step3 .placed-card.activity-show         { background: linear-gradient(to right, #FBD0E1 0 4px, var(--paper-0) 4px); border-left-color: #CF3273; }
+#step3 .placed-card.activity-default      { background: linear-gradient(to right, #DEE2E8 0 4px, var(--paper-0) 4px); border-left-color: #6F7886; }
+
+#step3 .staging-card { position: relative; padding-left: 22px; }
+#step3 .staging-card::before {
+  content: '';
+  position: absolute;
+  left: 10px; top: 50%;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: #6F7886;
+}
+#step3 .staging-card.activity-food::before         { background: #E89B27; }
+#step3 .staging-card.activity-tour::before         { background: #2F7DFB; }
+#step3 .staging-card.activity-cultural::before     { background: #7B3CD2; }
+#step3 .staging-card.activity-neighborhood::before { background: #1F9D55; }
+#step3 .staging-card.activity-sports::before       { background: #C0362C; }
+#step3 .staging-card.activity-walk::before         { background: #2BA158; }
+#step3 .staging-card.activity-show::before         { background: #CF3273; }
+#step3 .staging-card.activity-default::before      { background: #6F7886; }
 
 #step3 .placed-card--locked {
   border-color: rgba(10,22,40,.18);
@@ -3421,13 +3443,17 @@ select.gm-inp {
 /* Commute selector — restyle as a transit pill */
 #step3 .commute-indicator {
   position: absolute;
-  left: 0; right: 0;
-  display: flex; justify-content: center;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
   z-index: 4;
   pointer-events: none;
+  white-space: nowrap;
 }
 #step3 .commute-selector {
+  position: relative;
   pointer-events: auto;
+  display: inline-block;
 }
 #step3 .commute-selector-trigger {
   display: inline-flex; align-items: center; gap: 6px;
@@ -3451,6 +3477,10 @@ select.gm-inp {
   color: var(--text-900);
 }
 #step3 .commute-selector-arrow { font-size: 9px; opacity: .55; }
+#step3 .commute-selected-label { display: inline-flex; align-items: center; gap: 6px; }
+#step3 .commute-selected-label i { font-size: 13px; line-height: 1; }
+#step3 .commute-option-label { display: inline-flex; align-items: center; gap: 8px; }
+#step3 .commute-option-label i { font-size: 14px; line-height: 1; color: var(--text-700); }
 #step3 .commute-selector-menu {
   position: absolute;
   top: calc(100% + 4px);

@@ -4657,6 +4657,12 @@ function makePlacedCard(item, minTopFloor = null) {
   `;
 }
 
+const COMMUTE_MODE_PHOSPHOR = {
+  transit: '<i class="ph-bold ph-train" aria-hidden="true"></i>',
+  driving: '<i class="ph-bold ph-car" aria-hidden="true"></i>',
+  walking: '<i class="ph-bold ph-person-simple-walk" aria-hidden="true"></i>'
+};
+
 function renderCommuteSelector(fromId, toId, y) {
   const commute = state.commutes[commutePairKey(fromId, toId)] || null;
   const selected = resolveSelectedCommuteDetails(commute);
@@ -4669,9 +4675,10 @@ function renderCommuteSelector(fromId, toId, y) {
       const dur = Number(option.durationMinutes);
       if (!Number.isFinite(dur) || dur <= 0) return '';
       const isActive = selected.selectedMode === mode;
+      const icon = COMMUTE_MODE_PHOSPHOR[mode] || '';
       return `
         <button type="button" class="commute-option ${isActive ? 'active' : ''}" data-mode="${mode}">
-          <span>${esc(option.modeIcon || '🚇')} ${esc(COMMUTE_MODE_LABEL[mode] || mode)} - ${Number(option.durationMinutes)} min</span>
+          <span class="commute-option-label">${icon} <span>${esc(COMMUTE_MODE_LABEL[mode] || mode)} – ${Number(option.durationMinutes)} min</span></span>
           ${isActive ? '<span class="commute-option-check">✓</span>' : ''}
         </button>
       `;
@@ -4681,11 +4688,16 @@ function renderCommuteSelector(fromId, toId, y) {
 
   if (!options) return '';
 
+  const triggerIcon = COMMUTE_MODE_PHOSPHOR[selected.selectedMode] || COMMUTE_MODE_PHOSPHOR.driving;
+  const triggerLabel = commute && commute.isWalkingDistance
+    ? `${COMMUTE_MODE_PHOSPHOR.walking} <span>walk</span>`
+    : `${triggerIcon} <span>${selected.durationMinutes} min</span>`;
+
   return `
     <div class="commute-indicator" style="top:${y}px;">
       <div class="commute-selector" data-from-id="${esc(fromId)}" data-to-id="${esc(toId)}">
         <button type="button" class="commute-selector-trigger" aria-expanded="false">
-          <span class="commute-selected-label">${esc(formatCommuteBadge(commute))}</span>
+          <span class="commute-selected-label">${triggerLabel}</span>
           <span class="commute-selector-arrow" aria-hidden="true">▾</span>
         </button>
         <div class="commute-selector-menu" role="menu">${options}</div>
