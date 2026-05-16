@@ -1,51 +1,114 @@
-/* ── Design tokens (UI.md palette) ── */
+/* ── Design tokens (GuideMe redesign — handoff §3) ── */
 :root {
-  --primary: #0B2545;
-  --primary-light: #133C73;
-  --secondary: #C4CDD5;
-  --secondary-light: #E2E8F0;
-  --base: #F5F0EB;
-  --base-light: #FAF8F5;
-  --accent: #2A7DE1;
-  --accent-hover: #1D6DC1;
-  --accent-soft: #EDF2FB;
-  --heading: #0B2545;
-  --text: #1E293B;
-  --text-muted: #475569;
-  --text-on-dark: #F5F0EB;
-  --ok: #16a34a;
-  --warn: #d97706;
-  --bad: #dc2626;
-  --shadow-sm: 0 1px 3px rgba(11,37,69,.06), 0 1px 2px rgba(11,37,69,.04);
-  --shadow-md: 0 4px 16px rgba(11,37,69,.08), 0 2px 6px rgba(11,37,69,.04);
-  --shadow-lg: 0 12px 40px rgba(11,37,69,.12), 0 4px 12px rgba(11,37,69,.06);
-  /* Legacy aliases for JS-generated markup */
-  --bg: var(--base);
-  --surface: var(--primary);
-  --card: var(--base-light);
-  --border: var(--secondary);
-  --gray: var(--text-muted);
-  --gray-light: var(--secondary-light);
-  --muted: var(--text-muted);
-  --ink: var(--text);
+  /* Surfaces — dark */
+  --ink-abyss: #070B12;
+  --ink-900: #0A1628;
+  --ink-800: #112240;
+  --ink-700: #1B2A47;
+  --ink-600: #2B3A5A;
+
+  /* Surfaces — paper */
+  --paper-0: #F4F1EC;
+  --paper-1: #FAF8F4;
+  --paper-2: #EEEAE3;
+  --paper-3: #E2DED6;
+
+  /* Text */
+  --text-900: #0A1628;
+  --text-700: #1E293B;
+  --text-500: #5A6679;
+  --text-400: #8490A3;
+
+  /* Hairlines */
+  --hair: rgba(10,22,40,.08);
+  --hair-strong: rgba(10,22,40,.14);
+  --hair-dark: rgba(244,241,236,.10);
+
+  /* Accent — electric ocean */
+  --accent: #2F7DFB;
+  --accent-hover: #1D6DE8;
+  --accent-soft: #E6EFFE;
+  --accent-deep: #0B4AB8;
+
+  /* Status */
+  --ok: #1F9D55;
+  --warn: #C08B10;
+  --err: #C0362C;
+
+  /* Type */
+  --font-display: 'Instrument Serif', 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Geist', 'Inter', 'Söhne', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Radii */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  /* Shadows */
+  --sh-sm: 0 1px 2px rgba(10,22,40,.04), 0 1px 1px rgba(10,22,40,.03);
+  --sh-md: 0 4px 18px rgba(10,22,40,.06), 0 2px 6px rgba(10,22,40,.04);
+  --sh-lg: 0 24px 60px rgba(10,22,40,.12), 0 8px 20px rgba(10,22,40,.06);
+  --sh-glow: 0 0 0 1px rgba(47,125,251,.25), 0 10px 40px rgba(47,125,251,.18);
+
+  /* Motion */
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-inout: cubic-bezier(.65, 0, .35, 1);
+  --dur-fast: 140ms;
+  --dur-med: 280ms;
+  --dur-slow: 520ms;
+
+  /* ── Legacy aliases — keep existing selectors working until per-screen reskin ── */
+  --primary: var(--ink-900);
+  --primary-light: var(--ink-800);
+  --secondary: var(--paper-3);
+  --secondary-light: var(--paper-2);
+  --base: var(--paper-0);
+  --base-light: var(--paper-1);
+  --heading: var(--text-900);
+  --text: var(--text-700);
+  --text-muted: var(--text-500);
+  --text-on-dark: var(--paper-0);
+  --bad: var(--err);
+  --shadow-sm: var(--sh-sm);
+  --shadow-md: var(--sh-md);
+  --shadow-lg: var(--sh-lg);
+  --bg: var(--paper-0);
+  --surface: var(--ink-900);
+  --card: var(--paper-1);
+  --border: var(--hair-strong);
+  --gray: var(--text-500);
+  --gray-light: var(--paper-2);
+  --muted: var(--text-500);
+  --ink: var(--text-700);
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, sans-serif;
-  color: var(--text);
-  background: var(--base);
-  line-height: 1.6;
+  font-family: var(--font-sans);
+  color: var(--text-700);
+  background: var(--paper-0);
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'ss01', 'cv11', 'tnum';
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Plus Jakarta Sans', 'DM Sans', 'Inter', system-ui, sans-serif;
-  color: var(--heading);
+  font-family: var(--font-sans);
+  color: var(--text-900);
   line-height: 1.15;
   letter-spacing: -0.02em;
+  font-weight: 500;
+}
+
+.serif {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
 }
 
 /* ── Topbar ── */
