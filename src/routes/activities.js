@@ -18,6 +18,7 @@ const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('../arrangeConfig');
 const { buildBookingLinks } = require('../services/bookingLinks');
 const { buildDirectArrangePrompt, buildRepairPrompt } = require('../services/arrangePromptDirect');
 const { validate: validateArrangement } = require('../arrangeValidator');
+const { adjust: adjustArrangementTimes } = require('../services/arrangeTimeAdjuster');
 const { minutesFromTime } = require('../../shared/timeHelpers');
 const { buildCityTravelTiming } = require('../services/distanceMatrix');
 const arrangeTelemetry = require('../services/arrangeTelemetry');
@@ -25,7 +26,7 @@ const { enrichWithPlaceDetails } = require('../services/placesEnrich');
 const { debugLog } = require('../services/debugLog');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
-const ARRANGE_MODEL = 'gpt-5.4';
+const ARRANGE_MODEL = 'claude-sonnet-4-6';
 
 const placesCache = new Map();
 const PLACES_CACHE_MAX = 500;
@@ -352,8 +353,8 @@ Return ONLY valid JSON (no markdown fences):
   });
 
   app.post('/api/arrange', async (req, res) => {
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(503).json({ error: 'OpenAI API key not configured' });
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(503).json({ error: 'Anthropic API key not configured' });
     }
 
     const { days, activities, lockedActivities, commuteMatrix, profile, numTravelers, numChildren } = req.body || {};
@@ -391,27 +392,23 @@ Return ONLY valid JSON (no markdown fences):
 
     async function callLlmForJson(prompt) {
       debugLog('arrange', `LLM_CALL model=${ARRANGE_MODEL} prompt_chars=${prompt.length}`);
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const response = await openai.chat.completions.create({
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const response = await anthropic.messages.create({
         model: ARRANGE_MODEL,
-        max_completion_tokens: 32768,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: 'You are a JSON-only API endpoint. Respond with a single JSON object only. No preamble, no narration, no markdown.' },
-          { role: 'user', content: prompt }
-        ]
+        max_tokens: 8192,
+        system: 'You are a JSON-only API endpoint. Respond with a single JSON object only. No preamble, no narration, no markdown.',
+        messages: [{ role: 'user', content: prompt }]
       });
-      const raw = String(response.choices?.[0]?.message?.content || '').trim();
-      debugLog('arrange', `LLM_RESPONSE finish=${response.choices?.[0]?.finish_reason} chars=${raw.length}`);
+      const raw = extractText(response.content).trim();
+      debugLog('arrange', `LLM_RESPONSE finish=${response.stop_reason} chars=${raw.length}`);
       const parsed = tryParseJsonObject(raw);
       if (!parsed) {
-        const finishReason = response.choices?.[0]?.finish_reason;
-        console.error(`arrange JSON parse failed (finish_reason=${finishReason}, length=${raw.length})`);
+        console.error(`arrange JSON parse failed (stop_reason=${response.stop_reason}, length=${raw.length})`);
         console.error('arrange raw response (first 800 chars):', raw.slice(0, 800));
         console.error('arrange raw response (last 400 chars):', raw.slice(-400));
         const err = new Error('Failed to parse arrangement JSON');
         err.diagnostic = {
-          finish_reason: finishReason,
+          stop_reason: response.stop_reason,
           length: raw.length,
           head: raw.slice(0, 800),
           tail: raw.slice(-400)
@@ -507,6 +504,24 @@ Return ONLY valid JSON (no markdown fences):
           debugLog('arrange', `REPAIR_PASS_THREW err="${repairErr?.message || repairErr}"`);
         }
       }
+
+      const adjusterResult = adjustArrangementTimes({
+        placements,
+        days,
+        activitiesById,
+        lockedActivities: resolvedLocked,
+        commuteMatrix: matrix
+      });
+      placements = adjusterResult.placements;
+      if (adjusterResult.drops.length) {
+        const placedIds = new Set(Object.keys(placements));
+        unplaced = unplaced.filter((u) => !placedIds.has(u.id));
+        for (const d of adjusterResult.drops) {
+          if (!unplaced.find((u) => u.id === d.id)) unplaced.push(d);
+        }
+      }
+      debugLog('arrange', `ADJUSTER_RUN day_count=${days.length} moved=${adjusterResult.moved} dropped=${adjusterResult.drops.length}`);
+      v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById, commuteMatrix: matrix, unplacedIds: unplaced.map((u) => u.id) });
 
       if (!v.ok) {
         const toDrop = new Set();

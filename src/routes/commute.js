@@ -7,7 +7,7 @@ const {
 const { debugLog } = require('../services/debugLog');
 
 const MAX_PAIRS_PER_REQUEST = 2000;
-const CLUSTER_RADIUS_KM = 2.0;
+const CLUSTER_RADIUS_KM = 3.0;
 
 function clusterByProximity(activities, radiusKm = CLUSTER_RADIUS_KM) {
   const clusters = [];

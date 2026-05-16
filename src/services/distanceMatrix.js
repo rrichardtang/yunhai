@@ -65,9 +65,11 @@ function isWalkingDistancePair(fromActivity, toActivity) {
 }
 
 function formatLatLng(lat, lng) {
+  if (lat == null || lng == null) return '';
   const latitude = Number(lat);
   const longitude = Number(lng);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return '';
+  if (latitude === 0 && longitude === 0) return '';
   return `${latitude},${longitude}`;
 }
 
