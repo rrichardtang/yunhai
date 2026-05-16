@@ -1908,6 +1908,53 @@ body.overlay-active #chatWidget {
 .budget-opt-grid { /* inherits .cards-grid */ }
 
 .opt-card { position: relative; overflow: visible; }
+.card.activity-card.opt-card {
+  background: var(--paper-1);
+  border: 1px solid rgba(10,22,40,.10);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow:
+    0 1px 2px rgba(10,22,40,.06),
+    0 4px 12px rgba(10,22,40,.07),
+    0 16px 36px rgba(10,22,40,.08);
+}
+.card.activity-card.opt-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(10,22,40,.16);
+  box-shadow:
+    0 2px 4px rgba(10,22,40,.06),
+    0 12px 28px rgba(10,22,40,.10),
+    0 32px 56px rgba(10,22,40,.12);
+}
+.opt-card .opt-card-img-wrap img { border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.opt-card .card-content {
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.opt-card .card-content h3 {
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--text-900);
+  margin: 0;
+}
+.opt-card .card-content p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-700);
+  margin: 0;
+}
+.opt-card-inner {
+  background: var(--paper-1);
+  border-radius: var(--r-lg);
+}
+.opt-card-face {
+  background: var(--paper-1);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
 
 .opt-lock-btn, .opt-flip-btn {
   position: absolute; top: 6px; right: 6px; z-index: 10;
