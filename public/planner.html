@@ -147,11 +147,17 @@
       </section>
 
       <section id="step2" class="panel step-panel">
-        <div class="between">
-          <h2>Review Activities</h2>
+        <div class="panel__head">
+          <div>
+            <h2>Review <span class="serif">Activities</span></h2>
+            <p class="panel__sub">Approve what fits. Skip the rest. Tap any card for details and budget alternatives.</p>
+          </div>
         </div>
         <div class="review-toolbar">
-          <input id="reviewSearch" type="search" placeholder="Search activities, neighborhoods, cuisines..." />
+          <div class="search">
+            <i class="ph-bold ph-magnifying-glass" aria-hidden="true"></i>
+            <input id="reviewSearch" type="search" placeholder="Search activities, neighborhoods, cuisines..." />
+          </div>
           <select id="reviewCityFilter" aria-label="Filter by city">
             <option value="">All cities</option>
           </select>
@@ -161,7 +167,7 @@
             <option value="approved">Approved</option>
             <option value="declined">Declined</option>
           </select>
-          <button id="approveVisibleBtn" class="secondary" type="button"><i class="ph-bold ph-check-circle"></i> Approve All</button>
+          <button id="approveVisibleBtn" class="approve-all" type="button"><i class="ph-bold ph-check-circle"></i> Approve All</button>
         </div>
         <div id="activitiesGrid" class="cards-grid"></div>
         <div class="step-nav sticky-nav step-nav-split">

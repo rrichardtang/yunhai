@@ -946,6 +946,7 @@ function setStep(n, { pushHistory = true } = {}) {
     if (n === 4) renderItinerary();
   }
 
+  renderBudgetTracker();
   updateStepNavButtons();
   renderTripHealth();
 }
@@ -3481,7 +3482,7 @@ function computeBudgetLensBreakdown() {
 
 function renderBudgetTracker() {
   const existing = document.getElementById('budgetTracker');
-  if (!state.tripBudget) { if (existing) existing.remove(); return; }
+  if (!state.tripBudget || state.step < 2) { if (existing) existing.remove(); return; }
 
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true);
   const used = computeBudgetLensBreakdown().budgetLensTotal;
