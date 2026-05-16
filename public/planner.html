@@ -107,14 +107,14 @@
       <input id="attachmentFileInput" type="file" accept="application/pdf,image/png,image/jpeg,image/webp,image/heic" multiple class="hidden" />
 
       <nav class="steps" id="stepIndicator">
-        <div class="step active">1. Setup</div>
-        <div class="step">2. Review</div>
-        <div class="step">3. Arrange</div>
-        <div class="step">4. Finalize</div>
+        <div class="step active" data-step-label="Setup">1. Setup</div>
+        <div class="step" data-step-label="Review">2. Review</div>
+        <div class="step" data-step-label="Arrange">3. Arrange</div>
+        <div class="step" data-step-label="Finalize">4. Finalize</div>
       </nav>
 
       <section id="step1" class="panel step-panel active">
-        <h2>Trip Setup</h2>
+        <h2>Build your trip <span class="serif">leg</span> by leg.</h2>
         <label>Trip Name <input id="tripName" placeholder="Spain Spring Escape" /></label>
         <div class="trip-meta-row">
           <label>Total Budget (USD) <input id="tripBudget" type="number" min="0" placeholder="e.g. 2000 (optional)" /></label>

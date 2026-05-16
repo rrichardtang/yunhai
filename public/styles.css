@@ -2087,3 +2087,307 @@ body.overlay-active #chatWidget {
   border-radius: 8px; font-size: 0.85rem;
 }
 .finalize-conflict-icon { margin-right: 4px; }
+
+/* =====================================================================
+   STAGE 5 — SETUP (Step 1) reskin
+   Overrides target only existing selectors so JS render output is unchanged.
+   Mock reference: design_handoff_redesign/mocks/Setup.html
+   ===================================================================== */
+
+/* Container width — mock uses 1120px, the app uses 960px. Bump to match. */
+.container { max-width: 1120px; padding: 0 clamp(20px, 4vw, 40px) 80px; margin: 32px auto 0; }
+
+/* Stepper — pill-shaped chips become numbered nodes on a hairline track */
+.steps {
+  display: flex;
+  gap: 0;
+  align-items: flex-start;
+  margin-bottom: 32px;
+  position: relative;
+}
+.steps::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: calc(14px + 5%);
+  right: calc(14px + 5%);
+  height: 1px;
+  background: var(--hair-strong);
+  z-index: 0;
+}
+.step {
+  flex: 1;
+  background: transparent;
+  color: var(--text-500);
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+  text-align: center;
+  font-weight: 500;
+  font-size: 12.5px;
+  letter-spacing: -0.005em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+  white-space: nowrap;
+  transition: color var(--dur-fast);
+}
+/* The existing markup is `<div class="step">1. Setup</div>` — turn the leading
+   `1. ` into a node-like badge with CSS counters + ::before. Easier: just style
+   the whole chip as a single horizontal label below an emoji-free dot. We achieve
+   the node by repainting the chip itself as a row: bullet + label. */
+.step::before {
+  content: '';
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--hair-strong);
+  background: var(--paper-0);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-500);
+  box-shadow: 0 0 0 4px var(--paper-0);
+  transition: all var(--dur-med) var(--ease-out);
+}
+.steps .step:nth-child(1)::before { content: '1'; }
+.steps .step:nth-child(2)::before { content: '2'; }
+.steps .step:nth-child(3)::before { content: '3'; }
+.steps .step:nth-child(4)::before { content: '4'; }
+/* Hide the existing "1. " / "2. " prefix the markup ships with — keep only the label */
+.step { font-size: 0; }
+.step::before { font-size: 11px; }
+.step::after {
+  content: attr(data-step-label);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--text-500);
+  transition: color var(--dur-fast);
+}
+
+.step.active {
+  background: transparent;
+  border: 0;
+  color: var(--text-900);
+}
+.step.active::before {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 0 4px var(--paper-0), 0 0 0 5px rgba(47,125,251,.25);
+}
+.step.active::after { color: var(--text-900); font-weight: 600; }
+.step.reachable:not(.active) {
+  background: transparent;
+  color: var(--text-500);
+  border: 0;
+}
+.step.reachable:not(.active):hover {
+  background: transparent;
+  color: var(--text-900);
+  border: 0;
+  opacity: 1;
+}
+.step.reachable:not(.active):hover::before { border-color: var(--text-900); color: var(--text-900); }
+.step.reachable:not(.active):hover::after { color: var(--text-900); }
+
+/* Panels — ivory card, hairline border, subtle shadow */
+.panel {
+  background: var(--paper-1);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  padding: 28px clamp(20px, 3vw, 32px);
+  box-shadow: var(--sh-sm);
+}
+.card-panel {
+  background: var(--paper-1);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  box-shadow: var(--sh-sm);
+}
+
+/* Headings inside panels */
+.panel h2 {
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  color: var(--text-900);
+  line-height: 1.1;
+  margin: 0 0 22px;
+}
+.panel h3 {
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--text-900);
+  margin: 18px 0 10px;
+}
+
+/* Form fields — paper-0 surface, tighter radius, mono dates */
+input, textarea {
+  background: var(--paper-0);
+  border: 1px solid var(--hair-strong);
+  border-radius: var(--r-sm);
+  padding: 0 12px;
+  height: 38px;
+  font-size: 13.5px;
+  color: var(--text-900);
+  letter-spacing: -0.005em;
+}
+textarea { height: auto; min-height: 64px; padding: 9px 12px; line-height: 1.5; }
+input[type="date"], input[type="time"], input[type="number"] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(47,125,251,.14);
+}
+select {
+  background: var(--paper-0);
+  border: 1px solid var(--hair-strong);
+  border-radius: var(--r-sm);
+  padding: 0 32px 0 12px;
+  height: 38px;
+  font-size: 13.5px;
+  color: var(--text-900);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4 L5 7 L8 4' fill='none' stroke='%235A6679' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-500);
+  margin-bottom: 12px;
+}
+label > input, label > textarea, label > select { margin-top: 6px; }
+
+/* Buttons — pills, ink primary, ghost secondary */
+button { padding: 0 16px; height: 38px; font-size: 13.5px; font-weight: 500; letter-spacing: -0.005em; border-radius: var(--r-pill); }
+button.primary { background: var(--ink-900); color: var(--paper-0); }
+button.primary:hover:not(:disabled) { background: var(--ink-800); box-shadow: var(--sh-md); transform: none; }
+button.secondary {
+  background: transparent;
+  color: var(--text-700);
+  border: 1px solid var(--hair-strong);
+}
+button.secondary:hover:not(:disabled) {
+  background: var(--paper-2);
+  color: var(--text-900);
+  border-color: var(--text-900);
+}
+
+/* Setup-specific */
+.trip-meta-row { gap: 12px; margin-bottom: 16px; }
+.setup-actions { gap: 10px; margin: 8px 0 14px; }
+.setup-insights {
+  border: 1px solid var(--hair);
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  color: var(--text-500);
+  padding: 12px 14px;
+  font-size: 13px;
+}
+.setup-insights strong { color: var(--text-900); font-weight: 500; }
+.setup-insights .warn { color: var(--err); font-weight: 500; }
+
+/* City rows — paper-1 card with hairline */
+.city-row {
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: var(--paper-1);
+  box-shadow: var(--sh-sm);
+  transition: border-color var(--dur-fast);
+}
+.city-row:hover { border-color: var(--hair-strong); }
+.city-row-main { gap: 10px; }
+.city-notes-row,
+.city-drawer { border-top: 1px solid var(--hair); }
+.city-dropdown-section {
+  border: 1px solid var(--hair);
+  border-radius: var(--r-md);
+  background: var(--paper-0);
+  padding: 14px;
+}
+.city-dropdown-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-500);
+}
+
+/* City suggestions dropdown */
+.city-suggestions {
+  background: var(--paper-1);
+  border: 1px solid var(--hair-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-md);
+}
+.city-suggestion-item { padding: 9px 14px; font-weight: 500; font-size: 13.5px; color: var(--text-900); }
+.city-suggestion-item:hover,
+.city-suggestion-item.active { background: var(--accent-soft); }
+.city-suggestion-item + .city-suggestion-item { border-top: 1px solid var(--hair); }
+
+/* Floating step nav — paper-1 pill, hair-strong border, sh-lg shadow */
+.sticky-nav {
+  background: var(--paper-1);
+  border: 1px solid var(--hair-strong);
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-lg);
+  height: 50px;
+  padding: 0 10px;
+}
+.nav-primary {
+  font-size: 1rem !important;
+  width: 38px; height: 38px;
+  border-radius: 50% !important;
+  background: var(--ink-900) !important;
+  color: var(--paper-0) !important;
+}
+.nav-primary:hover:not(:disabled) {
+  background: var(--ink-800) !important;
+  color: var(--paper-0) !important;
+  text-shadow: none;
+  box-shadow: var(--sh-md);
+}
+.nav-secondary {
+  font-size: 1rem !important;
+  width: 38px; height: 38px;
+  border-radius: 50% !important;
+  color: var(--text-700) !important;
+}
+.nav-secondary:hover:not(:disabled) {
+  background: var(--paper-2) !important;
+  color: var(--text-900) !important;
+  text-shadow: none;
+}
+.save-progress-btn { font-size: 1rem; width: 38px; height: 38px; border-radius: 50%; }
+.sticky-nav .icon-btn:disabled { opacity: .4; }
+
+/* My Trips panel */
+.my-trips-panel {
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  background: var(--paper-1);
+  padding: 18px;
+  margin-top: 18px;
+}
