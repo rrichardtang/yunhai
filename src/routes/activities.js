@@ -395,11 +395,15 @@ Return ONLY valid JSON (no markdown fences):
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const response = await anthropic.messages.create({
         model: ARRANGE_MODEL,
-        max_tokens: 8192,
-        system: 'You are a JSON-only API endpoint. Respond with a single JSON object only. No preamble, no narration, no markdown.',
-        messages: [{ role: 'user', content: prompt }]
+        max_tokens: 16384,
+        system: 'You are a JSON-only API endpoint. Respond with a single JSON object only. No preamble, no narration, no markdown, no reasoning out loud.',
+        messages: [
+          { role: 'user', content: prompt },
+          { role: 'assistant', content: '{' }
+        ]
       });
-      const raw = extractText(response.content).trim();
+      const rawBody = extractText(response.content).trim();
+      const raw = rawBody.startsWith('{') ? rawBody : `{${rawBody}`;
       debugLog('arrange', `LLM_RESPONSE finish=${response.stop_reason} chars=${raw.length}`);
       const parsed = tryParseJsonObject(raw);
       if (!parsed) {
