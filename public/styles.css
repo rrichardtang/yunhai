@@ -2873,6 +2873,9 @@ select.gm-inp {
 
 .activity-card-face {
   grid-area: stack;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--paper-1);
@@ -2907,9 +2910,11 @@ select.gm-inp {
 /* Media — image header with flip button + map pin */
 .activity-card-img-wrap {
   aspect-ratio: 16/10;
+  min-height: 180px;
   position: relative;
   overflow: hidden;
-  background: var(--paper-2);
+  background: linear-gradient(135deg, var(--paper-2), var(--paper-1));
+  flex-shrink: 0;
 }
 .activity-card-img-wrap img {
   width: 100%;
@@ -2917,26 +2922,30 @@ select.gm-inp {
   object-fit: cover;
   display: block;
 }
+.activity-card-img-wrap img[src=""],
+.activity-card-img-wrap img:not([src]) { visibility: hidden; }
 .activity-flip-btn-overlay {
   position: absolute;
   top: 12px;
-  left: 12px;
-  width: 32px; height: 32px;
+  right: 12px;
+  left: auto;
+  width: 34px; height: 34px;
   padding: 0;
   border-radius: 50%;
-  background: rgba(244,241,236,.92);
-  backdrop-filter: blur(6px);
-  border: 0;
-  color: var(--text-900);
+  background: rgba(10,22,40,.78);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.18);
+  color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  box-shadow: 0 4px 12px rgba(10,22,40,.22);
   transition: background var(--dur-fast), transform var(--dur-med) var(--ease-out);
-  z-index: 2;
-  font-size: 13px;
+  z-index: 3;
+  font-size: 14px;
 }
-.activity-flip-btn-overlay:hover { background: var(--paper-0); }
+.activity-flip-btn-overlay:hover { background: rgba(10,22,40,.92); transform: scale(1.06); }
 .activity-flip-btn-overlay i { font-size: 14px; }
 .card.activity-card.is-flipped .activity-flip-btn-overlay i { transform: rotate(180deg); }
 
