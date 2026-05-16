@@ -390,35 +390,66 @@ Return ONLY valid JSON (no markdown fences):
 
     debugLog('arrange', `START model=${ARRANGE_MODEL} flexible=${flexible.length} locked=${resolvedLocked.length} days=${days.length} city="${cityName}" matrix_pairs=${matrixPairCount}`);
 
+    const SCHEDULE_TOOL = {
+      name: 'submit_schedule',
+      description: 'Submit the final activity schedule with concrete date+time for placements and reasons for unplaced activities.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          placements: {
+            type: 'object',
+            description: 'Map of activity id to scheduled date and time.',
+            additionalProperties: {
+              type: 'object',
+              properties: {
+                date: { type: 'string', description: 'YYYY-MM-DD' },
+                time: { type: 'string', description: '24-hour HH:MM' }
+              },
+              required: ['date', 'time']
+            }
+          },
+          unplaced: {
+            type: 'array',
+            description: 'Activities that could not be placed and why.',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                reason: { type: 'string' }
+              },
+              required: ['id', 'reason']
+            }
+          }
+        },
+        required: ['placements', 'unplaced']
+      }
+    };
+
     async function callLlmForJson(prompt) {
       debugLog('arrange', `LLM_CALL model=${ARRANGE_MODEL} prompt_chars=${prompt.length}`);
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const response = await anthropic.messages.create({
         model: ARRANGE_MODEL,
         max_tokens: 16384,
-        system: 'You are a JSON-only API endpoint. Output rules: (1) Your FIRST character MUST be "{". (2) Your LAST character MUST be "}". (3) NO preamble, NO narration, NO step-by-step reasoning, NO markdown fences, NO explanatory text before or after the JSON. Reason internally; only emit the final JSON object.',
+        tools: [SCHEDULE_TOOL],
+        tool_choice: { type: 'tool', name: 'submit_schedule' },
         messages: [{ role: 'user', content: prompt }]
       });
-      const rawBody = extractText(response.content).trim();
-      const firstBrace = rawBody.indexOf('{');
-      const lastBrace = rawBody.lastIndexOf('}');
-      const raw = (firstBrace !== -1 && lastBrace > firstBrace) ? rawBody.slice(firstBrace, lastBrace + 1) : rawBody;
-      debugLog('arrange', `LLM_RESPONSE finish=${response.stop_reason} chars=${raw.length}`);
-      const parsed = tryParseJsonObject(raw);
-      if (!parsed) {
-        console.error(`arrange JSON parse failed (stop_reason=${response.stop_reason}, length=${raw.length})`);
-        console.error('arrange raw response (first 800 chars):', raw.slice(0, 800));
-        console.error('arrange raw response (last 400 chars):', raw.slice(-400));
+      const toolUse = (response.content || []).find((c) => c.type === 'tool_use' && c.name === 'submit_schedule');
+      debugLog('arrange', `LLM_RESPONSE finish=${response.stop_reason} tool_use=${!!toolUse}`);
+      if (!toolUse || !toolUse.input || typeof toolUse.input !== 'object') {
+        console.error(`arrange tool_use missing (stop_reason=${response.stop_reason})`);
+        const rawText = extractText(response.content).slice(0, 800);
+        console.error('arrange response text (first 800 chars):', rawText);
         const err = new Error('Failed to parse arrangement JSON');
         err.diagnostic = {
           stop_reason: response.stop_reason,
-          length: raw.length,
-          head: raw.slice(0, 800),
-          tail: raw.slice(-400)
+          tool_use: false,
+          head: rawText
         };
         throw err;
       }
-      return parsed;
+      return toolUse.input;
     }
 
     function sanitizePlacements(parsed) {
