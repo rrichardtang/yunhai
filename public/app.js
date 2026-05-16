@@ -4633,22 +4633,17 @@ function makePlacedCard(item, minTopFloor = null) {
       <div class="placed-body">
         <div class="placed-head-row">
           <h4>
-            <span class="activity-icon activity-icon-wrap" aria-hidden="true">
-              ${icon}
-              <button
-                type="button"
-                class="placed-info-wrap"
-                aria-label="Activity details"
-                data-tooltip-name="${esc(item.name)}"
-                data-tooltip-type-icon="${esc(icon)}"
-                data-tooltip-type="${esc(typeLabel)}"
-                data-tooltip-duration="${esc(durationLabel)}"
-                data-tooltip-why="${esc(item.why_it_fits || '')}"
-                data-tooltip-start-location="${esc(actAddress(item))}"
-              >
-                <span class="placed-info-icon" aria-hidden="true">ℹ</span>
-              </button>
-            </span>
+            <button
+              type="button"
+              class="activity-icon activity-icon-wrap placed-info-wrap"
+              aria-label="Activity details"
+              data-tooltip-name="${esc(item.name)}"
+              data-tooltip-type-icon="${esc(icon)}"
+              data-tooltip-type="${esc(typeLabel)}"
+              data-tooltip-duration="${esc(durationLabel)}"
+              data-tooltip-why="${esc(item.why_it_fits || '')}"
+              data-tooltip-start-location="${esc(actAddress(item))}"
+            >${icon}</button>
             <span class="activity-name">${esc(item.name)}</span>
           </h4>
         </div>
