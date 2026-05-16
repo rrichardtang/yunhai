@@ -3186,3 +3186,306 @@ select.gm-inp {
 }
 .activity-enriching-label { font-size: 13px; text-align: center; }
 .activity-enriching-label strong { color: var(--text-900); font-weight: 500; }
+
+/* =====================================================
+   STAGE 5d — Arrange (Step 3) reskin
+   Targets emitted markup: .day-col.schedule-col > .day-head + .day-grid-wrap > .hour-grid > .hour-line + .day-schedule > .placed-card
+   ===================================================== */
+
+#step3 .panel__head { align-items: flex-start; margin-bottom: 14px; }
+#step3 .arrange-actions { display: inline-flex; gap: 8px; }
+#step3 .arrange-actions .auto-arrange-btn {
+  height: 36px; padding: 0 16px;
+  border-radius: var(--r-pill);
+  font-size: 13px; font-weight: 500;
+  display: inline-flex; align-items: center; gap: 8px;
+  letter-spacing: -0.005em;
+  border: 1px solid var(--hair-strong);
+  background: var(--paper-0);
+  color: var(--text-900);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+#step3 .arrange-actions .auto-arrange-btn:hover:not(:disabled) {
+  border-color: var(--text-900); box-shadow: var(--sh-sm);
+}
+#step3 .arrange-actions .auto-arrange-btn.primary {
+  background: var(--text-900); color: var(--paper-0);
+  border-color: var(--text-900);
+}
+#step3 .arrange-actions .auto-arrange-btn.primary:hover:not(:disabled) {
+  background: var(--text-800);
+}
+#step3 .arrange-actions .auto-arrange-btn:disabled {
+  opacity: .55; cursor: not-allowed;
+}
+
+#step3 .arrange-city-nav {
+  display: flex; flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+#step3 .arrange-city-nav button,
+#step3 .arrange-city-nav .city-tab {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  background: var(--paper-0);
+  border: 1px solid var(--hair);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-700);
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+#step3 .arrange-city-nav button:hover,
+#step3 .arrange-city-nav .city-tab:hover {
+  border-color: var(--text-900); color: var(--text-900);
+}
+#step3 .arrange-city-nav button.active,
+#step3 .arrange-city-nav .city-tab.active {
+  background: var(--text-900); color: var(--paper-0);
+  border-color: var(--text-900);
+}
+
+#step3 .arrange-section-title {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-500);
+  font-weight: 500;
+  margin: 22px 0 10px;
+}
+
+#step3 .staging-section { margin-top: 8px; }
+#step3 .staging.list {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 12px;
+  background: var(--paper-2);
+  border: 1px dashed var(--hair-strong);
+  border-radius: var(--r-md);
+  min-height: 56px;
+}
+#step3 .staging-card {
+  height: 32px;
+  padding: 0 12px;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--paper-0);
+  border: 1px solid var(--hair-strong);
+  border-radius: var(--r-pill);
+  font-size: 12.5px;
+  color: var(--text-900);
+  cursor: grab;
+  box-shadow: 0 1px 2px rgba(10,22,40,.04);
+  transition: box-shadow var(--dur-fast), border-color var(--dur-fast);
+}
+#step3 .staging-card:hover {
+  border-color: var(--text-900);
+  box-shadow: 0 2px 6px rgba(10,22,40,.08);
+}
+#step3 .staging-card:active { cursor: grabbing; }
+#step3 .staging-card h4 { margin: 0; font-size: 12.5px; font-weight: 500; color: var(--text-900); display: inline-flex; align-items: center; gap: 6px; }
+
+#step3 .day-columns {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 4px 12px;
+  margin: 0 -4px;
+}
+#step3 .day-columns::-webkit-scrollbar { height: 8px; }
+#step3 .day-columns::-webkit-scrollbar-thumb { background: var(--hair-strong); border-radius: 4px; }
+
+#step3 .day-col,
+#step3 .day-col.schedule-col {
+  flex-shrink: 0;
+  width: 280px;
+  min-width: 280px;
+  max-width: 280px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+}
+#step3 .day-col .day-head {
+  height: 44px;
+  padding: 0 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--paper-0);
+  border: 1px solid var(--hair);
+  border-bottom: none;
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  color: var(--text-900);
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: -0.005em;
+}
+#step3 .day-col .day-head > div {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-900);
+}
+#step3 .day-col .day-head small {
+  display: inline-block;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-500);
+  padding: 2px 8px;
+  background: var(--paper-2);
+  border-radius: var(--r-pill);
+  font-weight: 500;
+  text-transform: none;
+}
+#step3 .day-grid-wrap {
+  position: relative;
+  background: var(--paper-0);
+  border: 1px solid var(--hair);
+  border-radius: 0 0 var(--r-md) var(--r-md);
+  overflow: hidden;
+}
+#step3 .hour-line {
+  border-top: 1px dashed var(--hair);
+}
+#step3 .hour-line:first-child { border-top: none; }
+#step3 .hour-line span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-500);
+  background: transparent;
+  padding: 0 6px 0 8px;
+  top: -7px;
+}
+
+#step3 .placed-card {
+  border-radius: 8px;
+  background: var(--paper-0);
+  border: 1px solid rgba(10,22,40,.12);
+  box-shadow:
+    0 1px 2px rgba(10,22,40,.04),
+    0 4px 10px rgba(10,22,40,.06);
+  padding: 8px 10px;
+  overflow: hidden;
+  transition: box-shadow var(--dur-fast), border-color var(--dur-fast);
+}
+#step3 .placed-card:hover {
+  border-color: rgba(10,22,40,.22);
+  box-shadow:
+    0 2px 4px rgba(10,22,40,.06),
+    0 8px 20px rgba(10,22,40,.10);
+}
+#step3 .placed-card .placed-body { padding: 0; }
+#step3 .placed-card h4 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--text-900);
+  line-height: 1.3;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+#step3 .placed-card .activity-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Category color strips on the left edge */
+#step3 .placed-card.food-color    { background: linear-gradient(to right, #FFF4E6 0 3px, var(--paper-0) 3px); }
+#step3 .placed-card.tour-color    { background: linear-gradient(to right, #E6F0FE 0 3px, var(--paper-0) 3px); }
+#step3 .placed-card.culture-color { background: linear-gradient(to right, #F3E9FF 0 3px, var(--paper-0) 3px); }
+#step3 .placed-card.outdoor-color { background: linear-gradient(to right, #E6F7EA 0 3px, var(--paper-0) 3px); }
+#step3 .placed-card.night-color   { background: linear-gradient(to right, #FCE9F1 0 3px, var(--paper-0) 3px); }
+#step3 .placed-card.transit-color { background: linear-gradient(to right, #EAEDF2 0 3px, var(--paper-0) 3px); opacity: .85; }
+
+#step3 .placed-card--locked {
+  border-color: rgba(10,22,40,.18);
+  background: var(--paper-2);
+}
+#step3 .placed-lock-badge {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-500);
+  font-size: 11px;
+}
+
+/* Commute selector — restyle as a transit pill */
+#step3 .commute-indicator {
+  position: absolute;
+  left: 0; right: 0;
+  display: flex; justify-content: center;
+  z-index: 4;
+  pointer-events: none;
+}
+#step3 .commute-selector {
+  pointer-events: auto;
+}
+#step3 .commute-selector-trigger {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 24px; padding: 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--paper-0);
+  border: 1.5px solid var(--hair-strong);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-700);
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 4px rgba(10,22,40,.08);
+  cursor: pointer;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+  white-space: nowrap;
+}
+#step3 .commute-selector-trigger:hover,
+#step3 .commute-selector.open .commute-selector-trigger {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(47,125,251,.18);
+  color: var(--text-900);
+}
+#step3 .commute-selector-arrow { font-size: 9px; opacity: .55; }
+#step3 .commute-selector-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--paper-0);
+  border: 1px solid var(--hair-strong);
+  border-radius: 12px;
+  padding: 6px;
+  min-width: 200px;
+  box-shadow: 0 8px 24px rgba(10,22,40,.14), 0 2px 6px rgba(10,22,40,.08);
+  z-index: 50;
+}
+#step3 .commute-option {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-900);
+  cursor: pointer;
+  transition: background var(--dur-fast);
+  text-align: left;
+}
+#step3 .commute-option:hover { background: var(--paper-2); }
+#step3 .commute-option.active { background: var(--paper-2); }
+#step3 .commute-option-check { color: var(--accent); font-size: 14px; margin-left: 8px; }
+
+/* Diagnostics row */
+#step3 #arrangeDiagnostics {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-500);
+  margin: 0 0 12px;
+}

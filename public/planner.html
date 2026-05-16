@@ -179,8 +179,11 @@
       </section>
 
       <section id="step3" class="panel step-panel">
-        <div class="between arrange-header">
-          <h2>Arrange Approved Activities</h2>
+        <div class="panel__head between arrange-header">
+          <div>
+            <h2>Arrange your <span class="serif">days</span>.</h2>
+            <p class="panel__sub">Drag activities across days and times. The timeline shows real hours — conflicts become visible.</p>
+          </div>
           <div class="arrange-actions">
             <button id="autoArrangeBtn" class="secondary auto-arrange-btn" type="button"><i class="ph-bold ph-magic-wand"></i> Draft</button>
             <button id="finalizeArrangeBtn" class="primary auto-arrange-btn" type="button" disabled><i class="ph-bold ph-lock"></i> Finalize</button>
@@ -188,11 +191,11 @@
         </div>
         <div id="arrangeCityNav" class="arrange-city-nav"></div>
         <div id="arrangeDiagnostics" class="muted-text"></div>
-        <div>
-          <h3>Staging</h3>
+        <div class="staging-section">
+          <h3 class="arrange-section-title">Staging</h3>
           <div id="stagingArea" class="staging list"></div>
         </div>
-        <h3>Days</h3>
+        <h3 class="arrange-section-title">Days</h3>
         <div id="dayColumns" class="day-columns"></div>
         <div class="step-nav sticky-nav step-nav-split">
           <button id="backToReviewBtn" class="icon-btn nav-secondary" type="button" data-nav-back="3" title="Back" aria-label="Back"><i class="ph-bold ph-arrow-left"></i></button>
