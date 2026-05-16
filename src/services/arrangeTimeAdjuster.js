@@ -6,6 +6,7 @@ const {
   effectiveDayStart,
   effectiveDayEnd
 } = require('../arrangeValidator');
+const { debugLog } = require('./debugLog');
 
 const COMMUTE_BUFFER_MIN = 10;
 const WALKING_FALLBACK_MIN = 10;
@@ -70,6 +71,7 @@ function adjust({ placements, days, activitiesById, lockedActivities = [], commu
       for (const { id } of entries) {
         newPlacements[id] = placements[id];
       }
+      debugLog('arrange', `ADJUSTER_DAY_SKIP date=${date} reason=day_not_found entries=${entries.length}`);
       continue;
     }
 
@@ -78,6 +80,7 @@ function adjust({ placements, days, activitiesById, lockedActivities = [], commu
     const locked = buildLockedObstacles(lockedActivities, date);
 
     entries.sort((a, b) => a.llmStart - b.llmStart);
+    debugLog('arrange', `ADJUSTER_DAY_START date=${date} window=${timeFromMinutes(dayStart)}-${timeFromMinutes(dayEnd)} entries=${entries.length} locked=${locked.length} order=[${entries.map((e) => `${e.id}@${timeFromMinutes(e.llmStart)}`).join(',')}]`);
 
     let prevEndMin = dayStart;
     let prevId = null;
@@ -88,11 +91,15 @@ function adjust({ placements, days, activitiesById, lockedActivities = [], commu
       const duration = getDuration(activity);
       const bookingType = getBookingType(activity);
       const earlyMins = showUpEarlyMins(bookingType) || 0;
+      const name = String(activity?.name || id).slice(0, 40);
 
       let earliest = Math.max(dayStart, llmStart, prevEndMin);
+      let commuteApplied = 0;
       if (prevId) {
         const commute = getCommuteMin(commuteMatrix, prevId, id);
-        const required = prevEndMin + (commute >= MIN_COMMUTE_THRESHOLD_MIN ? commute : WALKING_FALLBACK_MIN) + COMMUTE_BUFFER_MIN;
+        const commutePart = commute >= MIN_COMMUTE_THRESHOLD_MIN ? commute : WALKING_FALLBACK_MIN;
+        const required = prevEndMin + commutePart + COMMUTE_BUFFER_MIN;
+        commuteApplied = commutePart + COMMUTE_BUFFER_MIN;
         earliest = Math.max(earliest, required);
       }
 
@@ -104,6 +111,7 @@ function adjust({ placements, days, activitiesById, lockedActivities = [], commu
       const rawHours = getOpeningHoursRaw(activity);
       const window = pickActiveOpeningWindow(rawHours, earliest, dayEnd);
       if (!window) {
+        debugLog('arrange', `ADJUSTER_DROP id=${id} name="${name}" reason=no_window_at_or_after_${timeFromMinutes(earliest)} hours="${rawHours || 'none'}" day_end=${timeFromMinutes(dayEnd)}`);
         drops.push({ id, reason: 'no_time_slot_after_adjustment' });
         continue;
       }
@@ -111,11 +119,13 @@ function adjust({ placements, days, activitiesById, lockedActivities = [], commu
 
       let start = winStart + earlyMins;
       let end = start + duration;
+      let pushedPastLock = false;
 
       if (nextLocked && start < nextLocked.endMin && end > nextLocked.startMin) {
         const afterLockEarliest = Math.max(nextLocked.endMin, earliest);
         const afterWindow = pickActiveOpeningWindow(rawHours, afterLockEarliest, dayEnd);
         if (!afterWindow) {
+          debugLog('arrange', `ADJUSTER_DROP id=${id} name="${name}" reason=no_window_past_lock lock=${timeFromMinutes(nextLocked.startMin)}-${timeFromMinutes(nextLocked.endMin)}`);
           drops.push({ id, reason: 'no_time_slot_after_adjustment' });
           continue;
         }
@@ -123,9 +133,11 @@ function adjust({ placements, days, activitiesById, lockedActivities = [], commu
         winEnd = afterWindow[1];
         start = winStart + earlyMins;
         end = start + duration;
+        pushedPastLock = true;
       }
 
       if (end > winEnd || end > dayEnd) {
+        debugLog('arrange', `ADJUSTER_DROP id=${id} name="${name}" reason=end_exceeds_window start=${timeFromMinutes(start)} end=${timeFromMinutes(end)} win_end=${timeFromMinutes(winEnd)} day_end=${timeFromMinutes(dayEnd)} duration=${duration}`);
         drops.push({ id, reason: 'no_time_slot_after_adjustment' });
         continue;
       }
@@ -133,6 +145,8 @@ function adjust({ placements, days, activitiesById, lockedActivities = [], commu
       const originalTime = placements[id].time;
       const newTime = timeFromMinutes(start);
       if (originalTime !== newTime) movedCount += 1;
+
+      debugLog('arrange', `ADJUSTER_PLACE id=${id} name="${name}" llm=${originalTime} -> new=${newTime} end=${timeFromMinutes(end)} dur=${duration} commute_buf=${commuteApplied} early=${earlyMins} prev=${prevId || 'none'}${pushedPastLock ? ' pushed_past_lock' : ''}`);
 
       newPlacements[id] = { date, time: newTime };
       prevEndMin = end;
