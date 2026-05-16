@@ -2447,6 +2447,31 @@ function sortCitiesByDate() {
   showToast('Cities sorted by start date.', 'success');
 }
 
+function splitCityName(full) {
+  const s = String(full || '').trim();
+  if (!s) return { primary: '', country: '' };
+  const parts = s.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 1) return { primary: parts[0], country: '' };
+  return { primary: parts[0], country: parts[parts.length - 1] };
+}
+
+function computeNightsBetween(startYmd, endYmd) {
+  if (!startYmd || !endYmd) return 0;
+  const start = parseYmdAsLocal(startYmd);
+  const end = parseYmdAsLocal(endYmd);
+  if (!start || !end) return 0;
+  const ms = end.getTime() - start.getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return 0;
+  return Math.round(ms / 86400000);
+}
+
+function shortenAddr(addr) {
+  const s = String(addr || '').trim();
+  if (!s) return '';
+  const first = s.split(',')[0].trim();
+  return first.length > 30 ? first.slice(0, 28) + '…' : first;
+}
+
 function renderCities() {
   bindCityAutocompleteOutsideClick();
   els.citiesContainer.innerHTML = '';
@@ -2462,84 +2487,174 @@ function renderCities() {
     syncCityLegacyDates(city);
     const timelineError = validateCityTimeline(city);
 
-    const row = document.createElement('div');
-    row.className = 'city-row';
+    const row = document.createElement('article');
+    row.className = `city-row gm-city ${city.detailsExpanded ? '' : 'collapsed'}`;
     row.dataset.cityId = city.id;
+
+    const { primary: cityPrimary, country: cityCountry } = splitCityName(city.name || '');
+    const nightsCount = computeNightsBetween(city.logistics.arrival.date, city.logistics.departure.date);
+    const subParts = [];
+    const stayAddr = city.accommodation?.address || '';
+    if (stayAddr) subParts.push(`Stay <b>${esc(shortenAddr(stayAddr))}</b>`);
+    const arr = city.logistics.arrival;
+    if (arr.time) subParts.push(`Arrive <b>${esc(arr.time)} ${esc(arr.mode || '')}</b>`);
+    const subLine = subParts.join(' · ');
+
+    const activeTab = city.activeTab || 'stay';
+    const hasStay = !!(stayAddr || city.logistics.accommodation.checkIn);
+    const hasArrival = !!(arr.location || arr.time);
+    const hasDeparture = !!(city.logistics.departure.location || city.logistics.departure.time);
+    const hasNotes = !!(city.notes && city.notes.trim());
+
     row.innerHTML = `
-      <div class="city-row-main">
-        <button class="icon-btn grey city-row-toggle" type="button" data-toggle-details title="${city.detailsExpanded ? 'Collapse' : 'Expand'}" ${readyForDetails ? '' : 'disabled'}><i class="ph-bold ${city.detailsExpanded ? 'ph-caret-up' : 'ph-caret-down'}" aria-hidden="true"></i></button>
-        <div class="city-autocomplete">
-          <input type="text" placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off" />
+      <div class="city-row-main gm-city__head" data-toggle-details>
+        <span class="gm-city__num">${String(index + 1).padStart(2, '0')}</span>
+        <div class="gm-city__main">
+          <span class="gm-city__name">
+            <span class="gm-city__name-text">${esc(cityPrimary) || '<span class="gm-city__sub-empty">Untitled city</span>'}</span>
+            ${cityCountry ? `<span class="gm-city__country">${esc(cityCountry)}</span>` : ''}
+          </span>
+          <span class="gm-city__sub">${subLine || '<span class="gm-city__sub-empty">Add stay &amp; arrival details</span>'}</span>
         </div>
-        <input type="date" value="${esc(city.logistics.arrival.date)}" data-field="dateFrom" aria-label="Start date" title="Start date" />
-        <input type="date" value="${esc(city.logistics.departure.date)}" data-field="dateTo" aria-label="End date" title="End date" />
-        <button class="icon-btn red" type="button" data-remove-city title="Remove city"><i class="ph-bold ph-trash" aria-hidden="true"></i></button>
-      </div>
-      <div class="city-notes-row">
-        <div class="textarea-expand-wrap">
-          <textarea id="cityNotes-${city.id}" rows="2" class="profile-textarea-fixed city-notes-textarea" placeholder="Notes — any reminders, preferences, or details for this city…" data-field="notes">${esc(city.notes || '')}</textarea>
-          <button class="textarea-expand-btn city-notes-expand-btn" type="button" data-expand="cityNotes-${city.id}" data-title="Notes — ${esc(city.name || 'City')}" aria-label="Expand notes"><i class="ph-bold ph-arrows-out-simple"></i></button>
+        <div class="gm-city__dates" data-stop>
+          <input type="date" class="gm-city__date" value="${esc(city.logistics.arrival.date)}" data-field="dateFrom" aria-label="Start date" title="Start date" />
+          <span class="arrow">→</span>
+          <input type="date" class="gm-city__date" value="${esc(city.logistics.departure.date)}" data-field="dateTo" aria-label="End date" title="End date" />
+          ${nightsCount ? `<span class="nights">${nightsCount} ${nightsCount === 1 ? 'night' : 'nights'}</span>` : ''}
         </div>
+        <button class="gm-city__chev" type="button" data-toggle-details aria-label="${city.detailsExpanded ? 'Collapse' : 'Expand'}" ${readyForDetails ? '' : 'disabled'} data-stop>
+          <i class="ph-bold ph-caret-right" aria-hidden="true"></i>
+        </button>
+        <button class="gm-city__del" type="button" data-remove-city aria-label="Remove city" data-stop><i class="ph-bold ph-trash" aria-hidden="true"></i></button>
       </div>
+
       ${readyForDetails && city.detailsExpanded ? `
-        <div class="city-drawer">
-          <div class="city-dropdown-grid" role="group" aria-label="City stay details">
-            <div class="city-dropdown-section">
-              <label class="city-dropdown-label">Accommodation</label>
-              <div class="city-dropdown-row accommodation-row">
-                <div class="city-autocomplete">
-                  <input type="text" placeholder="Accommodation address" value="${esc(city.accommodation?.address || '')}" data-accommodation-field="address" autocomplete="off" aria-label="Accommodation address" />
-                </div>
-                <input type="date" value="${esc(city.logistics.accommodation.checkIn)}" data-logistics="accommodationCheckIn" aria-label="Check-in date" />
-                <input type="date" value="${esc(city.logistics.accommodation.checkOut)}" data-logistics="accommodationCheckOut" aria-label="Check-out date" />
+        <div class="gm-city__body">
+          <nav class="gm-city__tabs" role="tablist">
+            <span class="gm-city__tab ${activeTab === 'stay' ? 'active' : ''} ${hasStay ? 'has-data' : ''}" data-tab="stay" role="tab" tabindex="0"><span class="dot"></span> Stay</span>
+            <span class="gm-city__tab ${activeTab === 'arrival' ? 'active' : ''} ${hasArrival ? 'has-data' : ''}" data-tab="arrival" role="tab" tabindex="0"><span class="dot"></span> Arrival</span>
+            <span class="gm-city__tab ${activeTab === 'departure' ? 'active' : ''} ${hasDeparture ? 'has-data' : ''}" data-tab="departure" role="tab" tabindex="0"><span class="dot"></span> Departure</span>
+            <span class="gm-city__tab ${activeTab === 'notes' ? 'active' : ''} ${hasNotes ? 'has-data' : ''}" data-tab="notes" role="tab" tabindex="0"><span class="dot"></span> Notes</span>
+          </nav>
+
+          <div class="gm-pane ${activeTab === 'stay' ? 'active' : ''}" data-pane="stay">
+            <div class="gm-grid c-loc-time" style="margin-bottom:14px;">
+              <div class="gm-f">
+                <label>City <span class="opt">required</span></label>
+                <span class="city-autocomplete">
+                  <input class="gm-inp with-icon" type="text" placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off" />
+                </span>
+              </div>
+              <div class="gm-f">
+                <label>Nights</label>
+                <input class="gm-inp" value="${nightsCount ? `${nightsCount} ${nightsCount === 1 ? 'night' : 'nights'}` : '—'}" readonly aria-readonly="true" />
               </div>
             </div>
+            <div class="gm-grid c2">
+              <div class="gm-f">
+                <label>Check-in</label>
+                <input class="gm-inp" type="date" value="${esc(city.logistics.accommodation.checkIn)}" data-logistics="accommodationCheckIn" aria-label="Check-in date" />
+              </div>
+              <div class="gm-f">
+                <label>Check-out</label>
+                <input class="gm-inp" type="date" value="${esc(city.logistics.accommodation.checkOut)}" data-logistics="accommodationCheckOut" aria-label="Check-out date" />
+              </div>
+            </div>
+            <div class="gm-f" style="margin-top:14px;">
+              <label>Accommodation address <span class="opt">optional</span></label>
+              <span class="city-autocomplete">
+                <input class="gm-inp with-pin" type="text" placeholder="Hotel, address, or neighborhood" value="${esc(city.accommodation?.address || '')}" data-accommodation-field="address" autocomplete="off" aria-label="Accommodation address" />
+              </span>
+            </div>
+          </div>
 
-            <div class="city-dropdown-section">
-              <label class="city-dropdown-label">Arrival</label>
-              <div class="city-dropdown-row arrival-row">
-                <div class="city-autocomplete">
-                  <input type="text" placeholder="Arrival location (e.g. airport)" value="${esc(city.logistics.arrival.location)}" data-logistics="arrivalLocation" autocomplete="off" aria-label="Arrival location" />
-                </div>
-                <input type="time" value="${esc(city.logistics.arrival.time || '')}" data-logistics="arrivalTime" aria-label="Arrival time" />
-                <select data-logistics="arrivalMode" aria-label="Arrival transport">
-                  <option value="flight" ${city.logistics.arrival.mode === 'flight' ? 'selected' : ''}>Flight</option>
-                  <option value="train" ${city.logistics.arrival.mode === 'train' ? 'selected' : ''}>Train</option>
-                  <option value="car" ${city.logistics.arrival.mode === 'car' ? 'selected' : ''}>Car</option>
-                  <option value="other" ${city.logistics.arrival.mode === 'other' ? 'selected' : ''}>Other</option>
+          <div class="gm-pane ${activeTab === 'arrival' ? 'active' : ''}" data-pane="arrival">
+            <div class="gm-grid c-loc-time">
+              <div class="gm-f">
+                <label>Arriving at <span class="opt">station, airport, or address</span></label>
+                <span class="city-autocomplete">
+                  <input class="gm-inp with-pin" type="text" placeholder="Station, airport, or address" value="${esc(city.logistics.arrival.location)}" data-logistics="arrivalLocation" autocomplete="off" aria-label="Arrival location" />
+                </span>
+              </div>
+              <div class="gm-f">
+                <label>Time</label>
+                <input class="gm-inp" type="time" value="${esc(city.logistics.arrival.time || '')}" data-logistics="arrivalTime" aria-label="Arrival time" />
+              </div>
+            </div>
+            <div class="gm-grid c-mode-intl" style="margin-top:14px;">
+              <div class="gm-f">
+                <label>Mode</label>
+                <select class="gm-inp" data-logistics="arrivalMode" aria-label="Arrival transport">
+                  <option value="flight" ${arr.mode === 'flight' ? 'selected' : ''}>Flight</option>
+                  <option value="train" ${arr.mode === 'train' ? 'selected' : ''}>Train</option>
+                  <option value="car" ${arr.mode === 'car' ? 'selected' : ''}>Car</option>
+                  <option value="other" ${arr.mode === 'other' ? 'selected' : ''}>Other</option>
                 </select>
-                <label class="intl-toggle" data-mode-dep="arrivalMode" ${city.logistics.arrival.mode !== 'flight' ? 'hidden' : ''}>
-                  <input type="checkbox" data-logistics="arrivalInternational" ${city.logistics.arrival.international ? 'checked' : ''}>
+              </div>
+              <div class="gm-f">
+                <label>&nbsp;</label>
+                <label class="gm-check-inline intl-toggle" data-mode-dep="arrivalMode" ${arr.mode !== 'flight' ? 'hidden' : ''}>
+                  <input type="checkbox" data-logistics="arrivalInternational" ${arr.international ? 'checked' : ''}>
                   International
                 </label>
               </div>
             </div>
+          </div>
 
-            <div class="city-dropdown-section">
-              <label class="city-dropdown-label">Departure</label>
-              <div class="city-dropdown-row departure-row">
-                <div class="city-autocomplete">
-                  <input type="text" placeholder="Departure location (e.g. train station)" value="${esc(city.logistics.departure.location)}" data-logistics="departureLocation" autocomplete="off" aria-label="Departure location" />
-                </div>
-                <input type="time" value="${esc(city.logistics.departure.time || '')}" data-logistics="departureTime" aria-label="Departure time" />
-                <select data-logistics="departureMode" aria-label="Departure transport">
+          <div class="gm-pane ${activeTab === 'departure' ? 'active' : ''}" data-pane="departure">
+            <div class="gm-grid c-loc-time">
+              <div class="gm-f">
+                <label>Departing from</label>
+                <span class="city-autocomplete">
+                  <input class="gm-inp with-pin" type="text" placeholder="Station, airport, or address" value="${esc(city.logistics.departure.location)}" data-logistics="departureLocation" autocomplete="off" aria-label="Departure location" />
+                </span>
+              </div>
+              <div class="gm-f">
+                <label>Time</label>
+                <input class="gm-inp" type="time" value="${esc(city.logistics.departure.time || '')}" data-logistics="departureTime" aria-label="Departure time" />
+              </div>
+            </div>
+            <div class="gm-grid c-mode-intl" style="margin-top:14px;">
+              <div class="gm-f">
+                <label>Mode</label>
+                <select class="gm-inp" data-logistics="departureMode" aria-label="Departure transport">
                   <option value="flight" ${city.logistics.departure.mode === 'flight' ? 'selected' : ''}>Flight</option>
                   <option value="train" ${city.logistics.departure.mode === 'train' ? 'selected' : ''}>Train</option>
                   <option value="car" ${city.logistics.departure.mode === 'car' ? 'selected' : ''}>Car</option>
                   <option value="other" ${city.logistics.departure.mode === 'other' ? 'selected' : ''}>Other</option>
                 </select>
-                <label class="intl-toggle" data-mode-dep="departureMode" ${city.logistics.departure.mode !== 'flight' ? 'hidden' : ''}>
+              </div>
+              <div class="gm-f">
+                <label>&nbsp;</label>
+                <label class="gm-check-inline intl-toggle" data-mode-dep="departureMode" ${city.logistics.departure.mode !== 'flight' ? 'hidden' : ''}>
                   <input type="checkbox" data-logistics="departureInternational" ${city.logistics.departure.international ? 'checked' : ''}>
                   International
                 </label>
               </div>
             </div>
-
-            <p class="city-dropdown-error ${timelineError ? '' : 'hidden'}" role="alert">${esc(timelineError || '')}</p>
           </div>
+
+          <div class="gm-pane ${activeTab === 'notes' ? 'active' : ''}" data-pane="notes">
+            <div class="gm-f">
+              <label>Notes for this city <span class="opt">bookings, must-sees, anything</span></label>
+              <div class="textarea-expand-wrap">
+                <textarea id="cityNotes-${city.id}" rows="4" class="gm-ta city-notes-textarea" placeholder="e.g. tour booked Mar 25 3–5pm, want to see X…" data-field="notes">${esc(city.notes || '')}</textarea>
+                <button class="textarea-expand-btn city-notes-expand-btn" type="button" data-expand="cityNotes-${city.id}" data-title="Notes — ${esc(city.name || 'City')}" aria-label="Expand notes"><i class="ph-bold ph-arrows-out-simple"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <p class="city-dropdown-error ${timelineError ? '' : 'hidden'}" role="alert">${esc(timelineError || '')}</p>
         </div>
       ` : ''}
     `;
+
+    row.querySelectorAll('[data-tab]').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        city.activeTab = tab.dataset.tab;
+        renderCities();
+      });
+    });
 
     row.querySelectorAll('[data-field]').forEach((input) => {
       const eventType = (input.type === 'date' || input.type === 'time') ? 'change' : 'input';
@@ -2588,8 +2703,16 @@ function renderCities() {
       });
     });
 
-    row.querySelector('[data-toggle-details]')?.addEventListener('click', () => {
+    const head = row.querySelector('.gm-city__head');
+    head?.addEventListener('click', (e) => {
       if (!readyForDetails) return;
+      if (e.target.closest('[data-stop]') && !e.target.closest('[data-toggle-details]')) return;
+      city.detailsExpanded = !city.detailsExpanded;
+      renderCities();
+    });
+    row.querySelector('.gm-city__chev')?.addEventListener('click', (e) => {
+      if (!readyForDetails) return;
+      e.stopPropagation();
       city.detailsExpanded = !city.detailsExpanded;
       renderCities();
     });
@@ -2752,6 +2875,12 @@ function renderCities() {
 
     els.citiesContainer.appendChild(row);
   });
+
+  const countEl = document.getElementById('citiesCount');
+  if (countEl) {
+    const n = state.cities.length;
+    countEl.textContent = `${n} ${n === 1 ? 'leg' : 'legs'}`;
+  }
 
   renderSetupInsights();
   initializePlacesWidgets();

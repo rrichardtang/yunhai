@@ -121,11 +121,14 @@
           <label>Adults <input id="numTravelers" type="number" min="1" value="1" /></label>
           <label>Children <input id="numChildren" type="number" min="0" value="0" /></label>
         </div>
-        <div class="setup-actions">
-          <button id="addCityBtn" class="secondary">+ Add City</button>
-          <button id="sortCitiesBtn" class="secondary" type="button"><i class="ph-bold ph-arrows-down-up"></i> Sort cities by date</button>
+        <div class="cities-section-head">
+          <h3 class="cities-title">Cities <span class="cities-count" id="citiesCount">0 legs</span></h3>
+          <div class="cities-actions setup-actions">
+            <button id="sortCitiesBtn" class="secondary" type="button"><i class="ph-bold ph-arrows-down-up"></i> Sort by date</button>
+            <button id="addCityBtn" class="primary"><i class="ph-bold ph-plus"></i> Add city</button>
+          </div>
         </div>
-        <div id="citiesContainer"></div>
+        <div id="citiesContainer" class="cities-stack"></div>
         <div id="locationValidationError" class="muted-text warn hidden"></div>
 
         <div id="setupInsights" class="setup-insights muted-text"></div>
