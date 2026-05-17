@@ -4956,6 +4956,17 @@ function hasOverlapInDay(activityId, dayId, placementOverride = null) {
     const dayStartMinutes = getCityDayWindowStart(city, day.date);
     const dayEndMinutes = getCityDayWindowEnd(city, day.date);
     if (droppedRange.startMinutes < dayStartMinutes || droppedRange.endMinutes > dayEndMinutes) {
+      console.warn('[overlap] window-violation', {
+        activity: dropped.name,
+        droppedRange,
+        dayStartMinutes,
+        dayEndMinutes,
+        cityArrival: city?.travelTiming?.arrivalAvailableTime,
+        cityLeave: city?.travelTiming?.departureMustLeaveTime || city?.leaveTime,
+        date: day.date,
+        cityStart: city?.startDate,
+        cityEnd: city?.endDate
+      });
       return true;
     }
   }
