@@ -1,6 +1,18 @@
 const persist = window.TravelPlannerStatePersistence.createStatePersistence();
 const overlayManager = window.TravelPlannerOverlayManager.createOverlayManager();
 
+function sendDebug(scope, payload) {
+  try {
+    const message = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    fetch('/debug/client', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope, message }),
+      keepalive: true
+    }).catch(() => {});
+  } catch {}
+}
+
 ['prefsModal', 'checklistModal', 'budgetOptOverlay', 'addActivityModal',
  'attachmentViewerModal',
  'planningOverlay', 'textareaExpandModal', 'confirmDialog']
@@ -4956,7 +4968,8 @@ function hasOverlapInDay(activityId, dayId, placementOverride = null) {
     const dayStartMinutes = getCityDayWindowStart(city, day.date);
     const dayEndMinutes = getCityDayWindowEnd(city, day.date);
     if (droppedRange.startMinutes < dayStartMinutes || droppedRange.endMinutes > dayEndMinutes) {
-      console.warn('[overlap] window-violation', {
+      sendDebug('overlap', {
+        kind: 'window-violation',
         activity: dropped.name,
         droppedRange,
         dayStartMinutes,
