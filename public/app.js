@@ -8338,6 +8338,9 @@ els.syncGoogleCalendarBtn?.addEventListener('click', () => {
   }
   syncGoogleCalendar();
 });
+document.getElementById('savePdfBtn')?.addEventListener('click', () => {
+  window.print();
+});
 document.getElementById('shareTripLinkBtn')?.addEventListener('click', () => {
   const id = state.currentItineraryId;
   if (!id) { showToast('Save your trip first', 'info'); return; }
