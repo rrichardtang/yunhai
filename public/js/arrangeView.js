@@ -6,8 +6,8 @@
   const formatYmdLocal = (root && root.formatYmdLocal) || (() => '');
 
   const DAY_START_HOUR = 6;
-  const DAY_END_HOUR = 24;
-  const PX_PER_HOUR = 60;
+  const DAY_END_HOUR = 26;
+  const PX_PER_HOUR = 80;
   const GRID_HEIGHT = (DAY_END_HOUR - DAY_START_HOUR) * PX_PER_HOUR;
 
   const DEFAULT_ARRANGE_CATEGORY_CONFIG = {

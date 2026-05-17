@@ -1,6 +1,18 @@
 const persist = window.TravelPlannerStatePersistence.createStatePersistence();
 const overlayManager = window.TravelPlannerOverlayManager.createOverlayManager();
 
+function sendDebug(scope, payload) {
+  try {
+    const message = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    fetch('/debug/client', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope, message }),
+      keepalive: true
+    }).catch(() => {});
+  } catch {}
+}
+
 ['prefsModal', 'checklistModal', 'budgetOptOverlay', 'addActivityModal',
  'attachmentViewerModal',
  'planningOverlay', 'textareaExpandModal', 'confirmDialog']
@@ -61,6 +73,11 @@ const state = {
   bookingChecklistIssueMeta: {},
   lastFinalizeLocks: {}
 };
+window.state = state;
+window.addEventListener('DOMContentLoaded', () => {
+  if (typeof showToast === 'function') window.showToast = showToast;
+  if (typeof setViewMode === 'function') window.setViewMode = setViewMode;
+});
 
 let budgetOptState = null;
 
@@ -946,6 +963,7 @@ function setStep(n, { pushHistory = true } = {}) {
     if (n === 4) renderItinerary();
   }
 
+  renderBudgetTracker();
   updateStepNavButtons();
   renderTripHealth();
 }
@@ -1151,38 +1169,6 @@ function buildChecklistFromState() {
     }
   });
 
-  // Accommodations per city
-  (state.cities || []).forEach((city) => {
-    const acc = city.accommodation || city.logistics?.accommodation;
-    if (!acc || acc.type === 'none') return;
-    const checkIn = acc.checkIn || city.startDate || '';
-    const checkOut = acc.checkOut || city.endDate || '';
-    const item = normalizeChecklistItem({ type: 'accommodation', name: '', accommodationCity: city.name || '', checkInDate: checkIn, checkOutDate: checkOut });
-    if (!existingKeys.has(keyOf(item))) {
-      items.push(item);
-      existingKeys.add(keyOf(item));
-    }
-  });
-
-  // Transportation per city (travel entry)
-  (state.cities || []).forEach((city) => {
-    const te = city.travelEntry;
-    if (!te) return;
-    const dt = te.dateTime || '';
-    const item = normalizeChecklistItem({
-      type: 'transportation',
-      name: '',
-      transportScope: 'entry_exit',
-      startLocation: te.entryPoint || '',
-      departureDate: dt ? dt.slice(0, 10) : '',
-      departureTime: dt && dt.length > 10 ? dt.slice(11, 16) : ''
-    });
-    if (!existingKeys.has(keyOf(item))) {
-      items.push(item);
-      existingKeys.add(keyOf(item));
-    }
-  });
-
   state.bookingChecklist = items;
   return items;
 }
@@ -1373,9 +1359,17 @@ function computeTripHealthLocal() {
 const checklistSearch = { query: '', containerCollapsed: {} };
 let checklistSearchRenderTimer = null;
 
+function checklistAttachmentKey(item) {
+  return item.type === 'activity' && item.activityId ? item.activityId : item.id;
+}
+
 function renderChecklistItemExpanded(item) {
   const hasSecondary = item.referenceNum || item.notes || item.budgetUsd != null;
   const showReferenceField = item.type !== 'activity' || !item.bookingNotRequired;
+  const attachmentKey = checklistAttachmentKey(item);
+  const fileCount = getItemAttachments(attachmentKey).length;
+  const filesDisabled = fileCount === 0 ? ' disabled' : '';
+  const filesCountHtml = fileCount > 0 ? ` <span class="count">${fileCount}</span>` : '';
 
   const primaryFields = (() => {
     if (item.type === 'transportation') {
@@ -1441,13 +1435,6 @@ function renderChecklistItemExpanded(item) {
           </label>
         </div>
         ` : ''}
-        <label class="cl-field">
-          <span class="cl-field-label">Budget Tracker scope</span>
-          <select data-cl="transportScope">
-            <option value="entry_exit" ${item.transportScope === 'entry_exit' ? 'selected' : ''}>Entry/exit travel (exclude)</option>
-            <option value="experience" ${item.transportScope !== 'entry_exit' ? 'selected' : ''}>Experience-linked travel (include)</option>
-          </select>
-        </label>
       `;
     }
     if (item.type === 'accommodation') {
@@ -1524,6 +1511,10 @@ function renderChecklistItemExpanded(item) {
             <span class="cl-field-label">Notes</span>
             <textarea data-cl="notes" rows="2" placeholder="Any details, reminders, links…">${esc(item.notes)}</textarea>
           </label>
+          <div class="cl-file-actions stop__actions">
+            <button type="button" class="stop-act" data-cl-action="view-files" data-cl-key="${esc(attachmentKey)}"${filesDisabled}><i class="ph-bold ph-folder-open"></i>View Files${filesCountHtml}</button>
+            <button type="button" class="stop-act" data-cl-action="upload-files" data-cl-key="${esc(attachmentKey)}"><i class="ph-bold ph-upload-simple"></i>Upload Files</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1880,6 +1871,26 @@ function bindChecklistEvents(el) {
           renderTripHealthBadge();
         });
       }
+    });
+  });
+
+  // Upload Files / View Files (per checklist item)
+  el.querySelectorAll('[data-cl-action="upload-files"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.clKey;
+      if (!key) return;
+      _pendingUploadActivityId = key;
+      _pendingUploadButton = btn;
+      if (els.attachmentFileInput) {
+        els.attachmentFileInput.value = '';
+        els.attachmentFileInput.click();
+      }
+    });
+  });
+  el.querySelectorAll('[data-cl-action="view-files"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.clKey;
+      if (key) openAttachmentViewer(key);
     });
   });
 
@@ -2447,6 +2458,31 @@ function sortCitiesByDate() {
   showToast('Cities sorted by start date.', 'success');
 }
 
+function splitCityName(full) {
+  const s = String(full || '').trim();
+  if (!s) return { primary: '', country: '' };
+  const parts = s.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 1) return { primary: parts[0], country: '' };
+  return { primary: parts[0], country: parts[parts.length - 1] };
+}
+
+function computeNightsBetween(startYmd, endYmd) {
+  if (!startYmd || !endYmd) return 0;
+  const start = parseYmdAsLocal(startYmd);
+  const end = parseYmdAsLocal(endYmd);
+  if (!start || !end) return 0;
+  const ms = end.getTime() - start.getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return 0;
+  return Math.round(ms / 86400000);
+}
+
+function shortenAddr(addr) {
+  const s = String(addr || '').trim();
+  if (!s) return '';
+  const first = s.split(',')[0].trim();
+  return first.length > 30 ? first.slice(0, 28) + '…' : first;
+}
+
 function renderCities() {
   bindCityAutocompleteOutsideClick();
   els.citiesContainer.innerHTML = '';
@@ -2462,84 +2498,174 @@ function renderCities() {
     syncCityLegacyDates(city);
     const timelineError = validateCityTimeline(city);
 
-    const row = document.createElement('div');
-    row.className = 'city-row';
+    const row = document.createElement('article');
+    row.className = `city-row gm-city ${city.detailsExpanded ? '' : 'collapsed'}`;
     row.dataset.cityId = city.id;
+
+    const { primary: cityPrimary, country: cityCountry } = splitCityName(city.name || '');
+    const nightsCount = computeNightsBetween(city.logistics.arrival.date, city.logistics.departure.date);
+    const subParts = [];
+    const stayAddr = city.accommodation?.address || '';
+    if (stayAddr) subParts.push(`Stay <b>${esc(shortenAddr(stayAddr))}</b>`);
+    const arr = city.logistics.arrival;
+    if (arr.time) subParts.push(`Arrive <b>${esc(arr.time)} ${esc(arr.mode || '')}</b>`);
+    const subLine = subParts.join(' · ');
+
+    const activeTab = city.activeTab || 'stay';
+    const hasStay = !!(stayAddr || city.logistics.accommodation.checkIn);
+    const hasArrival = !!(arr.location || arr.time);
+    const hasDeparture = !!(city.logistics.departure.location || city.logistics.departure.time);
+    const hasNotes = !!(city.notes && city.notes.trim());
+
     row.innerHTML = `
-      <div class="city-row-main">
-        <button class="icon-btn grey city-row-toggle" type="button" data-toggle-details title="${city.detailsExpanded ? 'Collapse' : 'Expand'}" ${readyForDetails ? '' : 'disabled'}><i class="ph-bold ${city.detailsExpanded ? 'ph-caret-up' : 'ph-caret-down'}" aria-hidden="true"></i></button>
-        <div class="city-autocomplete">
-          <input type="text" placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off" />
+      <div class="city-row-main gm-city__head" data-toggle-details>
+        <span class="gm-city__num">${String(index + 1).padStart(2, '0')}</span>
+        <div class="gm-city__main">
+          <span class="gm-city__name">
+            <span class="gm-city__name-text">${esc(cityPrimary) || '<span class="gm-city__sub-empty">Untitled city</span>'}</span>
+            ${cityCountry ? `<span class="gm-city__country">${esc(cityCountry)}</span>` : ''}
+          </span>
+          <span class="gm-city__sub">${subLine || '<span class="gm-city__sub-empty">Add stay &amp; arrival details</span>'}</span>
         </div>
-        <input type="date" value="${esc(city.logistics.arrival.date)}" data-field="dateFrom" aria-label="Start date" title="Start date" />
-        <input type="date" value="${esc(city.logistics.departure.date)}" data-field="dateTo" aria-label="End date" title="End date" />
-        <button class="icon-btn red" type="button" data-remove-city title="Remove city"><i class="ph-bold ph-trash" aria-hidden="true"></i></button>
-      </div>
-      <div class="city-notes-row">
-        <div class="textarea-expand-wrap">
-          <textarea id="cityNotes-${city.id}" rows="2" class="profile-textarea-fixed city-notes-textarea" placeholder="Notes — any reminders, preferences, or details for this city…" data-field="notes">${esc(city.notes || '')}</textarea>
-          <button class="textarea-expand-btn city-notes-expand-btn" type="button" data-expand="cityNotes-${city.id}" data-title="Notes — ${esc(city.name || 'City')}" aria-label="Expand notes"><i class="ph-bold ph-arrows-out-simple"></i></button>
+        <div class="gm-city__dates" data-stop>
+          <input type="date" class="gm-city__date" value="${esc(city.logistics.arrival.date)}" data-field="dateFrom" aria-label="Start date" title="Start date" />
+          <span class="arrow">→</span>
+          <input type="date" class="gm-city__date" value="${esc(city.logistics.departure.date)}" data-field="dateTo" aria-label="End date" title="End date" />
+          ${nightsCount ? `<span class="nights">${nightsCount} ${nightsCount === 1 ? 'night' : 'nights'}</span>` : ''}
         </div>
+        <button class="gm-city__chev" type="button" data-toggle-details aria-label="${city.detailsExpanded ? 'Collapse' : 'Expand'}" ${readyForDetails ? '' : 'disabled'} data-stop>
+          <i class="ph-bold ph-caret-right" aria-hidden="true"></i>
+        </button>
+        <button class="gm-city__del" type="button" data-remove-city aria-label="Remove city" data-stop><i class="ph-bold ph-trash" aria-hidden="true"></i></button>
       </div>
+
       ${readyForDetails && city.detailsExpanded ? `
-        <div class="city-drawer">
-          <div class="city-dropdown-grid" role="group" aria-label="City stay details">
-            <div class="city-dropdown-section">
-              <label class="city-dropdown-label">Accommodation</label>
-              <div class="city-dropdown-row accommodation-row">
-                <div class="city-autocomplete">
-                  <input type="text" placeholder="Accommodation address" value="${esc(city.accommodation?.address || '')}" data-accommodation-field="address" autocomplete="off" aria-label="Accommodation address" />
-                </div>
-                <input type="date" value="${esc(city.logistics.accommodation.checkIn)}" data-logistics="accommodationCheckIn" aria-label="Check-in date" />
-                <input type="date" value="${esc(city.logistics.accommodation.checkOut)}" data-logistics="accommodationCheckOut" aria-label="Check-out date" />
+        <div class="gm-city__body">
+          <nav class="gm-city__tabs" role="tablist">
+            <span class="gm-city__tab ${activeTab === 'stay' ? 'active' : ''} ${hasStay ? 'has-data' : ''}" data-tab="stay" role="tab" tabindex="0"><span class="dot"></span> Stay</span>
+            <span class="gm-city__tab ${activeTab === 'arrival' ? 'active' : ''} ${hasArrival ? 'has-data' : ''}" data-tab="arrival" role="tab" tabindex="0"><span class="dot"></span> Arrival</span>
+            <span class="gm-city__tab ${activeTab === 'departure' ? 'active' : ''} ${hasDeparture ? 'has-data' : ''}" data-tab="departure" role="tab" tabindex="0"><span class="dot"></span> Departure</span>
+            <span class="gm-city__tab ${activeTab === 'notes' ? 'active' : ''} ${hasNotes ? 'has-data' : ''}" data-tab="notes" role="tab" tabindex="0"><span class="dot"></span> Notes</span>
+          </nav>
+
+          <div class="gm-pane ${activeTab === 'stay' ? 'active' : ''}" data-pane="stay">
+            <div class="gm-grid c-loc-time" style="margin-bottom:14px;">
+              <div class="gm-f">
+                <label>City <span class="opt">required</span></label>
+                <span class="city-autocomplete">
+                  <input class="gm-inp with-icon" type="text" placeholder="City" value="${esc(city.name)}" data-field="name" autocomplete="off" />
+                </span>
+              </div>
+              <div class="gm-f">
+                <label>Nights</label>
+                <input class="gm-inp" value="${nightsCount ? `${nightsCount} ${nightsCount === 1 ? 'night' : 'nights'}` : '—'}" readonly aria-readonly="true" />
               </div>
             </div>
+            <div class="gm-grid c2">
+              <div class="gm-f">
+                <label>Check-in</label>
+                <input class="gm-inp" type="date" value="${esc(city.logistics.accommodation.checkIn)}" data-logistics="accommodationCheckIn" aria-label="Check-in date" />
+              </div>
+              <div class="gm-f">
+                <label>Check-out</label>
+                <input class="gm-inp" type="date" value="${esc(city.logistics.accommodation.checkOut)}" data-logistics="accommodationCheckOut" aria-label="Check-out date" />
+              </div>
+            </div>
+            <div class="gm-f" style="margin-top:14px;">
+              <label>Accommodation address <span class="opt">optional</span></label>
+              <span class="city-autocomplete">
+                <input class="gm-inp with-pin" type="text" placeholder="Hotel, address, or neighborhood" value="${esc(city.accommodation?.address || '')}" data-accommodation-field="address" autocomplete="off" aria-label="Accommodation address" />
+              </span>
+            </div>
+          </div>
 
-            <div class="city-dropdown-section">
-              <label class="city-dropdown-label">Arrival</label>
-              <div class="city-dropdown-row arrival-row">
-                <div class="city-autocomplete">
-                  <input type="text" placeholder="Arrival location (e.g. airport)" value="${esc(city.logistics.arrival.location)}" data-logistics="arrivalLocation" autocomplete="off" aria-label="Arrival location" />
-                </div>
-                <input type="time" value="${esc(city.logistics.arrival.time || '')}" data-logistics="arrivalTime" aria-label="Arrival time" />
-                <select data-logistics="arrivalMode" aria-label="Arrival transport">
-                  <option value="flight" ${city.logistics.arrival.mode === 'flight' ? 'selected' : ''}>Flight</option>
-                  <option value="train" ${city.logistics.arrival.mode === 'train' ? 'selected' : ''}>Train</option>
-                  <option value="car" ${city.logistics.arrival.mode === 'car' ? 'selected' : ''}>Car</option>
-                  <option value="other" ${city.logistics.arrival.mode === 'other' ? 'selected' : ''}>Other</option>
+          <div class="gm-pane ${activeTab === 'arrival' ? 'active' : ''}" data-pane="arrival">
+            <div class="gm-grid c-loc-time">
+              <div class="gm-f">
+                <label>Arriving at <span class="opt">station, airport, or address</span></label>
+                <span class="city-autocomplete">
+                  <input class="gm-inp with-pin" type="text" placeholder="Station, airport, or address" value="${esc(city.logistics.arrival.location)}" data-logistics="arrivalLocation" autocomplete="off" aria-label="Arrival location" />
+                </span>
+              </div>
+              <div class="gm-f">
+                <label>Time</label>
+                <input class="gm-inp" type="time" value="${esc(city.logistics.arrival.time || '')}" data-logistics="arrivalTime" aria-label="Arrival time" />
+              </div>
+            </div>
+            <div class="gm-grid c-mode-intl" style="margin-top:14px;">
+              <div class="gm-f">
+                <label>Mode</label>
+                <select class="gm-inp" data-logistics="arrivalMode" aria-label="Arrival transport">
+                  <option value="flight" ${arr.mode === 'flight' ? 'selected' : ''}>Flight</option>
+                  <option value="train" ${arr.mode === 'train' ? 'selected' : ''}>Train</option>
+                  <option value="car" ${arr.mode === 'car' ? 'selected' : ''}>Car</option>
+                  <option value="other" ${arr.mode === 'other' ? 'selected' : ''}>Other</option>
                 </select>
-                <label class="intl-toggle" data-mode-dep="arrivalMode" ${city.logistics.arrival.mode !== 'flight' ? 'hidden' : ''}>
-                  <input type="checkbox" data-logistics="arrivalInternational" ${city.logistics.arrival.international ? 'checked' : ''}>
+              </div>
+              <div class="gm-f">
+                <label>&nbsp;</label>
+                <label class="gm-check-inline intl-toggle" data-mode-dep="arrivalMode" ${arr.mode !== 'flight' ? 'hidden' : ''}>
+                  <input type="checkbox" data-logistics="arrivalInternational" ${arr.international ? 'checked' : ''}>
                   International
                 </label>
               </div>
             </div>
+          </div>
 
-            <div class="city-dropdown-section">
-              <label class="city-dropdown-label">Departure</label>
-              <div class="city-dropdown-row departure-row">
-                <div class="city-autocomplete">
-                  <input type="text" placeholder="Departure location (e.g. train station)" value="${esc(city.logistics.departure.location)}" data-logistics="departureLocation" autocomplete="off" aria-label="Departure location" />
-                </div>
-                <input type="time" value="${esc(city.logistics.departure.time || '')}" data-logistics="departureTime" aria-label="Departure time" />
-                <select data-logistics="departureMode" aria-label="Departure transport">
+          <div class="gm-pane ${activeTab === 'departure' ? 'active' : ''}" data-pane="departure">
+            <div class="gm-grid c-loc-time">
+              <div class="gm-f">
+                <label>Departing from</label>
+                <span class="city-autocomplete">
+                  <input class="gm-inp with-pin" type="text" placeholder="Station, airport, or address" value="${esc(city.logistics.departure.location)}" data-logistics="departureLocation" autocomplete="off" aria-label="Departure location" />
+                </span>
+              </div>
+              <div class="gm-f">
+                <label>Time</label>
+                <input class="gm-inp" type="time" value="${esc(city.logistics.departure.time || '')}" data-logistics="departureTime" aria-label="Departure time" />
+              </div>
+            </div>
+            <div class="gm-grid c-mode-intl" style="margin-top:14px;">
+              <div class="gm-f">
+                <label>Mode</label>
+                <select class="gm-inp" data-logistics="departureMode" aria-label="Departure transport">
                   <option value="flight" ${city.logistics.departure.mode === 'flight' ? 'selected' : ''}>Flight</option>
                   <option value="train" ${city.logistics.departure.mode === 'train' ? 'selected' : ''}>Train</option>
                   <option value="car" ${city.logistics.departure.mode === 'car' ? 'selected' : ''}>Car</option>
                   <option value="other" ${city.logistics.departure.mode === 'other' ? 'selected' : ''}>Other</option>
                 </select>
-                <label class="intl-toggle" data-mode-dep="departureMode" ${city.logistics.departure.mode !== 'flight' ? 'hidden' : ''}>
+              </div>
+              <div class="gm-f">
+                <label>&nbsp;</label>
+                <label class="gm-check-inline intl-toggle" data-mode-dep="departureMode" ${city.logistics.departure.mode !== 'flight' ? 'hidden' : ''}>
                   <input type="checkbox" data-logistics="departureInternational" ${city.logistics.departure.international ? 'checked' : ''}>
                   International
                 </label>
               </div>
             </div>
-
-            <p class="city-dropdown-error ${timelineError ? '' : 'hidden'}" role="alert">${esc(timelineError || '')}</p>
           </div>
+
+          <div class="gm-pane ${activeTab === 'notes' ? 'active' : ''}" data-pane="notes">
+            <div class="gm-f">
+              <label>Notes for this city <span class="opt">bookings, must-sees, anything</span></label>
+              <div class="textarea-expand-wrap">
+                <textarea id="cityNotes-${city.id}" rows="4" class="gm-ta city-notes-textarea" placeholder="e.g. tour booked Mar 25 3–5pm, want to see X…" data-field="notes">${esc(city.notes || '')}</textarea>
+                <button class="textarea-expand-btn city-notes-expand-btn" type="button" data-expand="cityNotes-${city.id}" data-title="Notes — ${esc(city.name || 'City')}" aria-label="Expand notes"><i class="ph-bold ph-arrows-out-simple"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <p class="city-dropdown-error ${timelineError ? '' : 'hidden'}" role="alert">${esc(timelineError || '')}</p>
         </div>
       ` : ''}
     `;
+
+    row.querySelectorAll('[data-tab]').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        city.activeTab = tab.dataset.tab;
+        renderCities();
+      });
+    });
 
     row.querySelectorAll('[data-field]').forEach((input) => {
       const eventType = (input.type === 'date' || input.type === 'time') ? 'change' : 'input';
@@ -2588,8 +2714,19 @@ function renderCities() {
       });
     });
 
-    row.querySelector('[data-toggle-details]')?.addEventListener('click', () => {
+    const head = row.querySelector('.gm-city__head');
+    head?.addEventListener('click', (e) => {
       if (!readyForDetails) return;
+      const stopEl = e.target.closest('[data-stop]');
+      if (stopEl && head.contains(stopEl) && stopEl !== head) return;
+      const explicitToggle = e.target.closest('[data-toggle-details]');
+      if (explicitToggle && explicitToggle !== head && !head.contains(explicitToggle)) return;
+      city.detailsExpanded = !city.detailsExpanded;
+      renderCities();
+    });
+    row.querySelector('.gm-city__chev')?.addEventListener('click', (e) => {
+      if (!readyForDetails) return;
+      e.stopPropagation();
       city.detailsExpanded = !city.detailsExpanded;
       renderCities();
     });
@@ -2753,6 +2890,12 @@ function renderCities() {
     els.citiesContainer.appendChild(row);
   });
 
+  const countEl = document.getElementById('citiesCount');
+  if (countEl) {
+    const n = state.cities.length;
+    countEl.textContent = `${n} ${n === 1 ? 'leg' : 'legs'}`;
+  }
+
   renderSetupInsights();
   initializePlacesWidgets();
 }
@@ -2823,31 +2966,20 @@ function renderPreferencesModal() {
   const dotsHtml = (active, key) => {
     const dots = Array.from({ length: 5 }, (_, i) => {
       const v = i + 1;
-      return `<span class="dot-scale-dot${v === active ? ' active' : ''}" data-value="${v}" aria-label="${v}" role="button" tabindex="0"></span>`;
+      const cls = v === active ? 'active' : (v < active ? 'done' : '');
+      return `<span class="dot-scale-dot${cls ? ' ' + cls : ''}" data-value="${v}" aria-label="${v}" role="button" tabindex="0"></span>`;
     }).join('');
     const label = key === 'pace' ? pacePrefLabel(active) : profileLabel(active);
+    const isDefault = active === PROFILE_DEFAULT;
     return `
       <div class="dot-scale-wrap">
+        <span class="dot-scale-label${isDefault ? ' is-default' : ''}">${esc(label)}</span>
         <div class="dot-scale" data-rating>${dots}</div>
-        <span class="dot-scale-label">${esc(label)}</span>
       </div>
     `;
   };
 
-  els.profileQuestions.innerHTML = PROFILE_QUESTIONS.map((q) => {
-    if (q.type === 'text') {
-      const val = profile.answers[q.key] || '';
-      const inputId = `profileQ_${q.key}`;
-      return `
-        <div class="profile-question profile-question--text" data-question="${esc(q.key)}">
-          <p>${esc(q.label)}</p>
-          <div class="textarea-expand-wrap">
-            <textarea id="${inputId}" class="profile-text-answer profile-textarea-fixed" rows="5" placeholder="${esc(q.placeholder || '')}">${esc(val)}</textarea>
-            <button class="textarea-expand-btn" type="button" data-expand="${inputId}" data-title="${esc(q.label)}" aria-label="Expand ${esc(q.label)}"><i class="ph-bold ph-arrows-out-simple"></i></button>
-          </div>
-        </div>
-      `;
-    }
+  const scaleHtml = PROFILE_QUESTIONS.filter((q) => q.type !== 'text').map((q) => {
     const active = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Number(profile.answers[q.key] || PROFILE_DEFAULT)));
     return `
       <div class="profile-question" data-question="${esc(q.key)}">
@@ -2856,6 +2988,25 @@ function renderPreferencesModal() {
       </div>
     `;
   }).join('');
+
+  const textHtml = PROFILE_QUESTIONS.filter((q) => q.type === 'text').map((q) => {
+    const val = profile.answers[q.key] || '';
+    const inputId = `profileQ_${q.key}`;
+    return `
+      <div class="profile-question profile-question--text" data-question="${esc(q.key)}">
+        <p>${esc(q.label)}</p>
+        <div class="textarea-expand-wrap">
+          <textarea id="${inputId}" class="profile-text-answer profile-textarea-fixed" rows="4" placeholder="${esc(q.placeholder || '')}">${esc(val)}</textarea>
+          <button class="textarea-expand-btn" type="button" data-expand="${inputId}" data-title="${esc(q.label)}" aria-label="Expand ${esc(q.label)}"><i class="ph-bold ph-arrows-out-simple"></i></button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const scaleHost = document.getElementById('pfScaleQs');
+  const textHost = document.getElementById('pfTextQs');
+  if (scaleHost) scaleHost.innerHTML = scaleHtml;
+  if (textHost) textHost.innerHTML = textHtml;
 
   bindTextareaExpandButtons(els.profileQuestions);
 
@@ -2904,9 +3055,16 @@ function renderPreferencesModal() {
         answers: { ...(state.profile?.answers || {}), [key]: nextAnswer }
       });
 
-      scaleEl.querySelectorAll('.dot-scale-dot').forEach((d) => d.classList.toggle('active', Number(d.dataset.value) === nextAnswer));
-      const labelEl = scaleEl.nextElementSibling;
-      if (labelEl) labelEl.textContent = key === 'pace' ? pacePrefLabel(nextAnswer) : profileLabel(nextAnswer);
+      scaleEl.querySelectorAll('.dot-scale-dot').forEach((d) => {
+        const v = Number(d.dataset.value);
+        d.classList.toggle('active', v === nextAnswer);
+        d.classList.toggle('done', v < nextAnswer);
+      });
+      const labelEl = scaleEl.parentElement?.querySelector('.dot-scale-label');
+      if (labelEl) {
+        labelEl.textContent = key === 'pace' ? pacePrefLabel(nextAnswer) : profileLabel(nextAnswer);
+        labelEl.classList.toggle('is-default', nextAnswer === PROFILE_DEFAULT);
+      }
     });
 
     scaleEl.addEventListener('keydown', (e) => {
@@ -2969,71 +3127,159 @@ function openProfileWizard(store, { forced = false } = {}) {
     }
   }
 
+  const SCALE_ENDS = {
+    museumPerson:     ['NOT FOR ME', 'LOVE THEM'],
+    foodTravel:       ['CASUAL EATS', 'FINE DINING'],
+    livePerformances: ['SKIP IT',    'FRONT ROW'],
+    outdoorNature:    ['INDOORS',    'ALL DAY OUT'],
+    nightlifeBars:    ['EARLY NIGHT','LATE NIGHT'],
+    structuredTours:  ['DIY',        'GUIDED'],
+    shoppingPerson:   ['NOT MY THING','BIG HAUL'],
+    pace:             ['RELAXED',    'NON-STOP']
+  };
+  const WHY_WE_ASK = {
+    museumPerson: 'Tells us how many cultural stops to weave in.',
+    foodTravel: 'Decides how many meal slots we flag for booking and how special they are.',
+    livePerformances: 'Helps us scout shows, concerts, and ticketed performances.',
+    outdoorNature: 'Calibrates how often we route through parks, trails, and the outdoors.',
+    nightlifeBars: 'Shapes evening plans — bars, late-night spots, or quiet wind-downs.',
+    structuredTours: 'Determines how much we lean on guided experiences vs. self-led exploration.',
+    shoppingPerson: 'Decides whether we carve out time for shopping districts and markets.',
+    pace: 'Sets how many activities we plan per day.',
+    dayStructure: 'Helps shape morning, afternoon, and evening blocks to match your rhythm.',
+    dietaryRestrictions: 'Lets us filter restaurants and meal suggestions.',
+    mobilityConsiderations: 'So we keep walking, stairs, and transit within your limits.',
+    budgetStyle: 'Calibrates how aggressively we suggest splurges or saves.',
+    travelCompanions: 'Helps the planner match the vibe of who you’re with.',
+    shoppingInterests: 'Lets us flag the right shops, markets, and neighborhoods.',
+    name: 'Names this profile so you can tell yours apart if you make more later.',
+    aboutMe: 'Free-form context the planner uses to tailor recommendations.'
+  };
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function pipLadderHtml(activeIndex) {
+    return Array.from({ length: totalSteps }, (_, i) => {
+      const cls = i === activeIndex ? 'current' : (i < activeIndex ? 'done' : '');
+      return `<span class="wizard-pip${cls ? ' ' + cls : ''}"></span>`;
+    }).join('');
+  }
+
   function render() {
     const { stepIndex } = wizardState;
-    const pct = Math.max(4, Math.round((stepIndex / (totalSteps - 1)) * 100));
+    const pct = Math.max(6, Math.round(((stepIndex + 1) / totalSteps) * 100));
 
     overlay.querySelector('.profile-wizard-progress-bar').style.width = `${pct}%`;
-    overlay.querySelector('.wizard-step-counter').textContent = `${stepIndex + 1} of ${totalSteps}`;
+
+    const ladder = overlay.querySelector('#wizardPipLadder');
+    if (ladder) ladder.innerHTML = pipLadderHtml(stepIndex);
+
+    const isAboutMe = stepIndex === aboutMeStepIndex;
+    const isName = stepIndex === 0;
+    const q = (!isName && !isAboutMe) ? PROFILE_QUESTIONS[stepIndex - 1] : null;
+
+    const eyebrowKey = isName ? 'PROFILE'
+      : isAboutMe ? 'ABOUT YOU'
+      : (q.summary || q.key).toUpperCase();
+    overlay.querySelector('.wizard-step-counter').innerHTML =
+      `<strong>STEP ${pad2(stepIndex + 1)}</strong> / ${pad2(totalSteps)}`;
 
     const backBtn = overlay.querySelector('#wizardBackBtn');
     const nextBtn = overlay.querySelector('#wizardNextBtn');
     backBtn.classList.toggle('hidden', stepIndex === 0);
-    nextBtn.textContent = stepIndex === totalSteps - 1 ? 'Finish' : 'Next';
+    nextBtn.innerHTML = isAboutMe
+      ? `Finish <i class="ph-bold ph-check"></i>`
+      : `Next <i class="ph-bold ph-arrow-right"></i>`;
 
-    let bodyHtml;
-    if (stepIndex === 0) {
-      bodyHtml = `
-        <p class="wizard-question-label">What would you like to name this profile?</p>
-        <input class="wizard-input wizard-text-input" type="text" maxlength="32"
+    const hintEl = overlay.querySelector('.profile-wizard-nav .wizard-hint');
+    if (hintEl) hintEl.innerHTML = `<kbd>↵</kbd> to ${isAboutMe ? 'finish' : 'continue'}`;
+
+    let titleHtml, subHtml = '', contentHtml;
+    if (isName) {
+      titleHtml = `What should we call this <span class="serif">profile</span>?`;
+      subHtml = `<p class="wizard-sub">Just a label — you can rename it later.</p>`;
+      contentHtml = `
+        <input class="wizard-input wizard-text-input wizard-name-input" type="text" maxlength="32"
           value="${esc(wizardState.name)}" placeholder="${esc(suggestedName)}" autocomplete="off" />
+        <div class="wizard-sub" style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-400);">
+          <span><span id="wizardNameCount">${wizardState.name.length}</span> / 32</span>
+          <span>Press Tab to advance</span>
+        </div>
       `;
-    } else if (stepIndex === aboutMeStepIndex) {
-      bodyHtml = `
-        <p class="wizard-question-label">Anything else we might have missed?</p>
-        <textarea class="wizard-input wizard-text-input wizard-textarea" rows="4"
+    } else if (isAboutMe) {
+      titleHtml = `Anything else we might have <span class="serif">missed?</span>`;
+      subHtml = `<p class="wizard-sub">Free-form context — quirks, constraints, anything that sharpens the plan.</p>`;
+      contentHtml = `
+        <textarea class="wizard-input wizard-text-input wizard-textarea" rows="5"
           placeholder="e.g. I'm not a morning person, I have a smaller budget, avoid things with lots of walking...">${esc(wizardState.aboutMe)}</textarea>
       `;
+    } else if (q.type === 'text') {
+      titleHtml = esc(q.label);
+      contentHtml = `
+        <textarea class="wizard-input wizard-text-input wizard-textarea" rows="4"
+          placeholder="${esc(q.placeholder || '')}">${esc(wizardState.answers[q.key] || '')}</textarea>
+      `;
     } else {
-      const q = PROFILE_QUESTIONS[stepIndex - 1];
-      if (q.type === 'text') {
-        bodyHtml = `
-          <p class="wizard-question-label">${esc(q.label)}</p>
-          <textarea class="wizard-input wizard-text-input wizard-textarea" rows="3"
-            placeholder="${esc(q.placeholder || '')}">${esc(wizardState.answers[q.key] || '')}</textarea>
-        `;
-      } else {
-        const active = Number(wizardState.answers[q.key]) || PROFILE_DEFAULT;
-        const dots = Array.from({ length: 5 }, (_, i) => {
-          const v = i + 1;
-          return `<span class="dot-scale-dot${v === active ? ' active' : ''}" data-value="${v}" role="button" tabindex="0" aria-label="${v}"></span>`;
-        }).join('');
-        const labelText = q.key === 'pace' ? pacePrefLabel(active) : profileLabel(active);
-        bodyHtml = `
-          <p class="wizard-question-label">${esc(q.label)}</p>
-          <div class="wizard-dot-scale-wrap">
-            <div class="dot-scale wizard-dot-scale" data-rating>${dots}</div>
-            <span class="dot-scale-label wizard-scale-label">${esc(labelText)}</span>
+      const active = Number(wizardState.answers[q.key]) || PROFILE_DEFAULT;
+      const dots = Array.from({ length: 5 }, (_, i) => {
+        const v = i + 1;
+        const cls = v === active ? 'active' : (v < active ? 'done' : '');
+        return `<span class="dot-scale-dot${cls ? ' ' + cls : ''}" data-value="${v}" role="button" tabindex="0" aria-label="${v}"></span>`;
+      }).join('');
+      const labelText = q.key === 'pace' ? pacePrefLabel(active) : profileLabel(active);
+      const ends = SCALE_ENDS[q.key] || ['LESS', 'MORE'];
+      const fillPct = ((active - 1) / 4) * 100;
+      titleHtml = esc(q.label);
+      contentHtml = `
+        <div class="wizard-dot-scale-wrap">
+          <div class="wizard-scale-head">
+            <span class="wizard-scale-value">${esc(labelText)}</span>
+            <span class="wizard-scale-index"><span class="js-scale-idx">${active}</span> of 5</span>
           </div>
-        `;
-      }
+          <div class="dot-scale wizard-dot-scale" data-rating style="--wiz-fill:${fillPct}%">${dots}</div>
+          <div class="wizard-scale-ends">
+            <span>${esc(ends[0])}</span>
+            <span>${esc(ends[1])}</span>
+          </div>
+        </div>
+      `;
     }
 
-    overlay.querySelector('#wizardCardBody').innerHTML = bodyHtml;
+    const whyKey = isName ? 'name' : (isAboutMe ? 'aboutMe' : q.key);
+    const whyText = WHY_WE_ASK[whyKey];
 
-    if (stepIndex > 0 && stepIndex < aboutMeStepIndex) {
-      const q = PROFILE_QUESTIONS[stepIndex - 1];
-      if (!q.type) {
-        overlay.querySelector('[data-rating]').addEventListener('click', (e) => {
-          const dot = e.target.closest('.dot-scale-dot');
-          if (!dot) return;
-          const v = Number(dot.dataset.value);
-          wizardState.answers[q.key] = v;
-          overlay.querySelectorAll('.dot-scale-dot').forEach((d) => d.classList.toggle('active', Number(d.dataset.value) === v));
-          const labelEl = overlay.querySelector('.wizard-scale-label');
-          if (labelEl) labelEl.textContent = q.key === 'pace' ? pacePrefLabel(v) : profileLabel(v);
+    overlay.querySelector('#wizardCardBody').innerHTML = `
+      <div class="wizard-body-eyebrow"><span class="key">STEP ${pad2(stepIndex + 1)}</span> ${esc(eyebrowKey)}</div>
+      <h2 class="wizard-question-label">${titleHtml}</h2>
+      ${subHtml}
+      ${contentHtml}
+      ${whyText ? `<div class="wizard-aside"><span class="key">Why we ask</span><span>${esc(whyText)}</span></div>` : ''}
+    `;
+
+    if (q && !q.type) {
+      const rail = overlay.querySelector('[data-rating]');
+      rail.addEventListener('click', (e) => {
+        const dot = e.target.closest('.dot-scale-dot');
+        if (!dot) return;
+        const v = Number(dot.dataset.value);
+        wizardState.answers[q.key] = v;
+        rail.querySelectorAll('.dot-scale-dot').forEach((d) => {
+          const dv = Number(d.dataset.value);
+          d.classList.toggle('active', dv === v);
+          d.classList.toggle('done', dv < v);
         });
-      }
+        rail.style.setProperty('--wiz-fill', `${((v - 1) / 4) * 100}%`);
+        const valEl = overlay.querySelector('.wizard-scale-value');
+        if (valEl) valEl.textContent = q.key === 'pace' ? pacePrefLabel(v) : profileLabel(v);
+        const idxEl = overlay.querySelector('.js-scale-idx');
+        if (idxEl) idxEl.textContent = String(v);
+      });
+    }
+
+    if (isName) {
+      const inp = overlay.querySelector('.wizard-name-input');
+      const counter = overlay.querySelector('#wizardNameCount');
+      if (inp && counter) inp.addEventListener('input', () => { counter.textContent = inp.value.length; });
     }
 
     const input = overlay.querySelector('.wizard-input');
@@ -3315,7 +3561,6 @@ function computeApprovedCost(activities) {
 function computeBudgetLensBreakdown() {
   const checklist = buildChecklistFromState();
   let itineraryActivityTotal = 0;
-  let itineraryTransportTotal = 0;
   let entryExitTransportTotal = 0;
   let accommodationTotal = 0;
 
@@ -3329,22 +3574,20 @@ function computeBudgetLensBreakdown() {
     }
 
     if (item.type === 'transportation') {
-      if (item.transportScope === 'entry_exit') entryExitTransportTotal += cost;
-      else itineraryTransportTotal += cost;
+      entryExitTransportTotal += cost;
       return;
     }
 
     itineraryActivityTotal += cost;
   });
 
-  const budgetLensTotal = itineraryActivityTotal + itineraryTransportTotal;
+  const budgetLensTotal = itineraryActivityTotal;
   const absoluteTripTotal = budgetLensTotal + entryExitTransportTotal + accommodationTotal;
 
   return {
     budgetLensTotal,
     absoluteTripTotal,
     itineraryActivityTotal,
-    itineraryTransportTotal,
     entryExitTransportTotal,
     accommodationTotal
   };
@@ -3352,7 +3595,7 @@ function computeBudgetLensBreakdown() {
 
 function renderBudgetTracker() {
   const existing = document.getElementById('budgetTracker');
-  if (!state.tripBudget) { if (existing) existing.remove(); return; }
+  if (!state.tripBudget || state.step < 2) { if (existing) existing.remove(); return; }
 
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true);
   const used = computeBudgetLensBreakdown().budgetLensTotal;
@@ -4485,40 +4728,136 @@ function makeStagingCard(item) {
 
 // formatTypeLabel, formatDurationHoursLong provided by /js/arrangeView.js
 
+function closeTimeEditPopup() {
+  const existing = document.getElementById('time-edit-popup');
+  if (existing) existing.remove();
+  document.removeEventListener('mousedown', timeEditOutsideHandler, true);
+}
+
+function timeEditOutsideHandler(e) {
+  const popup = document.getElementById('time-edit-popup');
+  if (popup && !popup.contains(e.target)) closeTimeEditPopup();
+}
+
+function openTimeEditPopup(activityId, anchorEl) {
+  closeTimeEditPopup();
+  const item = state.activities.find((a) => String(a.id) === String(activityId));
+  if (!item) return;
+  const placement = state.placements[activityId] || {};
+  const startTime = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
+  const durHours = actDurationHours(item);
+  const startMins = minutesFromTime(startTime);
+  const endTime = timeFromMinutes(startMins + Math.round(durHours * 60));
+
+  const rect = anchorEl.getBoundingClientRect();
+  const left = Math.min(rect.left, window.innerWidth - 240);
+  const top = Math.min(rect.bottom + 6, window.innerHeight - 240);
+
+  const popup = document.createElement('div');
+  popup.id = 'time-edit-popup';
+  popup.className = 'time-edit-popup';
+  popup.style.left = `${left}px`;
+  popup.style.top = `${top}px`;
+  popup.innerHTML = `
+    <div class="tep-label">Edit timing</div>
+    <div class="tep-title">${esc(item.name)}</div>
+    <label class="tep-field">
+      <span class="tep-label">Start time</span>
+      <input type="time" class="tep-start" step="900" value="${startTime}">
+    </label>
+    <label class="tep-field">
+      <span class="tep-label">End time</span>
+      <input type="time" class="tep-end" step="900" value="${endTime}">
+    </label>
+    <div class="tep-actions">
+      <button type="button" class="tep-btn cancel">Cancel</button>
+      <button type="button" class="tep-btn save">Save</button>
+    </div>
+  `;
+  document.body.appendChild(popup);
+
+  const startInput = popup.querySelector('.tep-start');
+  const endInput = popup.querySelector('.tep-end');
+  startInput.focus();
+  startInput.select();
+
+  const save = () => {
+    const newStart = startInput.value;
+    const newEnd = endInput.value;
+    const sMin = minutesFromTime(newStart);
+    const eMin = minutesFromTime(newEnd);
+    if (!Number.isFinite(sMin) || !Number.isFinite(eMin) || eMin <= sMin) {
+      showToast('End time must be after start time');
+      return;
+    }
+    const newDurHours = (eMin - sMin) / 60;
+    state.placements[activityId] = {
+      ...(state.placements[activityId] || {}),
+      time: newStart
+    };
+    if (Math.abs(newDurHours - durHours) > 0.01) {
+      item.duration_hours = newDurHours;
+      if (item.timing) item.timing.duration_minutes = eMin - sMin;
+    }
+    closeTimeEditPopup();
+    renderArrange();
+    const editedDayId = state.placements[activityId]?.dayId;
+    if (editedDayId) {
+      updateCommutesForCityDays([editedDayId]).then(() => renderArrange()).catch(() => {});
+    }
+  };
+
+  popup.querySelector('.tep-btn.save').addEventListener('click', save);
+  popup.querySelector('.tep-btn.cancel').addEventListener('click', closeTimeEditPopup);
+  [startInput, endInput].forEach((inp) => {
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') save();
+      if (e.key === 'Escape') closeTimeEditPopup();
+    });
+  });
+
+  setTimeout(() => {
+    document.addEventListener('mousedown', timeEditOutsideHandler, true);
+  }, 0);
+}
+
 function makePlacedCard(item, minTopFloor = null) {
   const { icon, colorClass } = getActivityStyle(item.type);
   const placement = state.placements[item.id] || {};
   const time = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
-  const h = Math.max(28, actDurationHours(item) * PX_PER_HOUR);
+  const durHours = actDurationHours(item);
+  const h = Math.max(56, durHours * PX_PER_HOUR);
   const rawY = yFromTime(time);
   const y = Number.isFinite(minTopFloor) ? Math.max(rawY, minTopFloor) : rawY;
   const typeLabel = formatTypeLabel(item.type);
-  const durationLabel = formatDurationHoursLong(actDurationHours(item));
+  const durationLabel = formatDurationHoursLong(durHours);
   const activeCity = state.arrangeCity;
   const isLocked = (state.lastFinalizeLocks[activeCity] || []).some((e) => String(e.activity.id) === String(item.id));
   const lockBadge = isLocked ? '<span class="placed-lock-badge" title="Locked"><i class="ph-bold ph-lock-simple" aria-hidden="true"></i></span>' : '';
+  const startMins = minutesFromTime(time);
+  const endMins = startMins + Math.round(durHours * 60);
+  const timeRangeLabel = formatTimeRangeLabel(startMins, endMins);
   return `
     <article class="placed-card ${colorClass}${isLocked ? ' placed-card--locked' : ''}" data-id="${item.id}" style="height:${h}px;top:${y}px;">
       ${lockBadge}
       <div class="placed-body">
+        <button type="button" class="placed-time" data-edit-time="${item.id}" aria-label="Edit timing">
+          <i class="ph-bold ph-clock" aria-hidden="true"></i>
+          <span>${esc(timeRangeLabel)}</span>
+        </button>
         <div class="placed-head-row">
           <h4>
-            <span class="activity-icon activity-icon-wrap" aria-hidden="true">
-              ${icon}
-              <button
-                type="button"
-                class="placed-info-wrap"
-                aria-label="Activity details"
-                data-tooltip-name="${esc(item.name)}"
-                data-tooltip-type-icon="${esc(icon)}"
-                data-tooltip-type="${esc(typeLabel)}"
-                data-tooltip-duration="${esc(durationLabel)}"
-                data-tooltip-why="${esc(item.why_it_fits || '')}"
-                data-tooltip-start-location="${esc(actAddress(item))}"
-              >
-                <span class="placed-info-icon" aria-hidden="true">ℹ</span>
-              </button>
-            </span>
+            <button
+              type="button"
+              class="activity-icon activity-icon-wrap placed-info-wrap"
+              aria-label="Activity details"
+              data-tooltip-name="${esc(item.name)}"
+              data-tooltip-type-icon="${esc(icon)}"
+              data-tooltip-type="${esc(typeLabel)}"
+              data-tooltip-duration="${esc(durationLabel)}"
+              data-tooltip-why="${esc(item.why_it_fits || '')}"
+              data-tooltip-start-location="${esc(actAddress(item))}"
+            >${icon}</button>
             <span class="activity-name">${esc(item.name)}</span>
           </h4>
         </div>
@@ -4526,6 +4865,12 @@ function makePlacedCard(item, minTopFloor = null) {
     </article>
   `;
 }
+
+const COMMUTE_MODE_PHOSPHOR = {
+  transit: '<i class="ph-bold ph-train" aria-hidden="true"></i>',
+  driving: '<i class="ph-bold ph-car" aria-hidden="true"></i>',
+  walking: '<i class="ph-bold ph-person-simple-walk" aria-hidden="true"></i>'
+};
 
 function renderCommuteSelector(fromId, toId, y) {
   const commute = state.commutes[commutePairKey(fromId, toId)] || null;
@@ -4539,9 +4884,10 @@ function renderCommuteSelector(fromId, toId, y) {
       const dur = Number(option.durationMinutes);
       if (!Number.isFinite(dur) || dur <= 0) return '';
       const isActive = selected.selectedMode === mode;
+      const icon = COMMUTE_MODE_PHOSPHOR[mode] || '';
       return `
         <button type="button" class="commute-option ${isActive ? 'active' : ''}" data-mode="${mode}">
-          <span>${esc(option.modeIcon || '🚇')} ${esc(COMMUTE_MODE_LABEL[mode] || mode)} - ${Number(option.durationMinutes)} min</span>
+          <span class="commute-option-label">${icon} <span>${esc(COMMUTE_MODE_LABEL[mode] || mode)} – ${Number(option.durationMinutes)} min</span></span>
           ${isActive ? '<span class="commute-option-check">✓</span>' : ''}
         </button>
       `;
@@ -4551,11 +4897,16 @@ function renderCommuteSelector(fromId, toId, y) {
 
   if (!options) return '';
 
+  const triggerIcon = COMMUTE_MODE_PHOSPHOR[selected.selectedMode] || COMMUTE_MODE_PHOSPHOR.driving;
+  const triggerLabel = commute && commute.isWalkingDistance
+    ? `${COMMUTE_MODE_PHOSPHOR.walking} <span>walk</span>`
+    : `${triggerIcon} <span>${selected.durationMinutes} min</span>`;
+
   return `
     <div class="commute-indicator" style="top:${y}px;">
       <div class="commute-selector" data-from-id="${esc(fromId)}" data-to-id="${esc(toId)}">
         <button type="button" class="commute-selector-trigger" aria-expanded="false">
-          <span class="commute-selected-label">${esc(formatCommuteBadge(commute))}</span>
+          <span class="commute-selected-label">${triggerLabel}</span>
           <span class="commute-selector-arrow" aria-hidden="true">▾</span>
         </button>
         <div class="commute-selector-menu" role="menu">${options}</div>
@@ -4567,7 +4918,7 @@ function renderCommuteSelector(fromId, toId, y) {
 function makeCommuteIndicator(currentItem, nextItem, currentTopOverride = null) {
   const placement = state.placements[currentItem.id] || {};
   const time = parseTimeTo24(placement.time || actPreferredTime(currentItem) || typeToTime(currentItem.type));
-  const h = Math.max(28, actDurationHours(currentItem) * PX_PER_HOUR);
+  const h = Math.max(56, actDurationHours(currentItem) * PX_PER_HOUR);
   const topY = Number.isFinite(currentTopOverride) ? currentTopOverride : yFromTime(time);
   return renderCommuteSelector(currentItem.id, nextItem.id, topY + h + 6);
 }
@@ -4722,6 +5073,18 @@ function hasOverlapInDay(activityId, dayId, placementOverride = null) {
     const dayStartMinutes = getCityDayWindowStart(city, day.date);
     const dayEndMinutes = getCityDayWindowEnd(city, day.date);
     if (droppedRange.startMinutes < dayStartMinutes || droppedRange.endMinutes > dayEndMinutes) {
+      sendDebug('overlap', {
+        kind: 'window-violation',
+        activity: dropped.name,
+        droppedRange,
+        dayStartMinutes,
+        dayEndMinutes,
+        cityArrival: city?.travelTiming?.arrivalAvailableTime,
+        cityLeave: city?.travelTiming?.departureMustLeaveTime || city?.leaveTime,
+        date: day.date,
+        cityStart: city?.startDate,
+        cityEnd: city?.endDate
+      });
       return true;
     }
   }
@@ -4882,7 +5245,7 @@ function renderArrange() {
     items.forEach((item, index) => {
       const placement = state.placements[item.id] || {};
       const itemTime = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
-      const itemH = Math.max(28, actDurationHours(item) * PX_PER_HOUR);
+      const itemH = Math.max(56, actDurationHours(item) * PX_PER_HOUR);
       const rawY = yFromTime(itemTime);
       const PILL_RESERVE = 44;
       const topFloor = prevBottom + PILL_RESERVE;
@@ -5011,6 +5374,9 @@ function renderArrange() {
         if (previousDayId === nextPlacement.dayId && previousTime === nextPlacement.time) return;
 
         renderArrange();
+
+        const affectedDays = [dayId, previousDayId].filter((v, i, arr) => v && arr.indexOf(v) === i);
+        updateCommutesForCityDays(affectedDays).then(() => renderArrange()).catch(() => {});
       }
     }));
   });
@@ -5832,6 +6198,16 @@ function bindPlacedCardInteractions() {
       infoWrap.addEventListener('blur', hidePlacedTooltip);
     }
 
+    const timeBtn = card.querySelector('.placed-time');
+    if (timeBtn) {
+      timeBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+      timeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        openTimeEditPopup(id, timeBtn);
+      });
+    }
+
     card.addEventListener('mousedown', (e) => {
       e.stopPropagation();
       if (e.button !== 0) return;
@@ -5920,7 +6296,10 @@ function bindPlacedCardInteractions() {
 
         card.classList.remove('resize-hover');
         currentDragMode = null;
-        if (isDragging) renderArrange();
+        if (isDragging) {
+          renderArrange();
+          updateCommutesForCityDays([dayId]).then(() => renderArrange()).catch(() => {});
+        }
       };
 
       activePlacedCardDragCleanup = () => {
@@ -5979,31 +6358,261 @@ function renderItineraryInsights(approvedActivities) {
 }
 
 function renderItinerary() {
-  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
-  renderItineraryInsights(approved);
-  els.itineraryGrid.innerHTML = state.days.map((d) => {
-    const items = approved
-      .filter((a) => state.placements[a.id]?.dayId === d.id)
-      .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)))
-      .map((a) => `
-        <div class="item">
-          <h4>${esc(a.name)}</h4>
-          <p><strong>Time:</strong> ${esc(state.placements[a.id]?.time || parseTimeTo24(actPreferredTime(a) || typeToTime(a.type)))}</p>
-          <p><strong>Duration:</strong> ${esc(formatDuration(actDurationHours(a)))}</p>
-          <p><strong>Type:</strong> ${esc(a.type)}</p>
-          <p><strong>Why:</strong> ${esc(a.why_it_fits || '')}</p>
+  renderFinalize();
+  renderItineraryMode();
+  renderTripHealthBadge();
+}
+
+const FINALIZE_CAT_MAP = {
+  food: 'food', meal: 'food',
+  tour: 'tour',
+  museum: 'culture', landmark: 'culture', cultural: 'culture',
+  park: 'outdoor', walk: 'outdoor', neighborhood: 'outdoor', outdoor: 'outdoor',
+  nightlife: 'night', show: 'night',
+  sports: 'outdoor', shopping: 'tour',
+  arrival: 'transit', departure: 'transit', transit: 'transit'
+};
+const FINALIZE_CAT_LABEL = {
+  food: 'Food', tour: 'Tour', culture: 'Culture',
+  outdoor: 'Outdoor', night: 'Night', transit: 'Transit'
+};
+
+function mapTypeToFinalizeCat(type) {
+  const key = String(type || '').toLowerCase();
+  return FINALIZE_CAT_MAP[key] || 'tour';
+}
+
+function deriveDayTheme(day, dayIndex, allDays) {
+  if (allDays.length === 1) return 'Trip day';
+  if (dayIndex === 0) return 'Arrival';
+  if (dayIndex === allDays.length - 1) return 'Departure';
+  const firstForCity = !allDays.slice(0, dayIndex).some((d) => d.city === day.city);
+  const lastForCity = !allDays.slice(dayIndex + 1).some((d) => d.city === day.city);
+  if (firstForCity) return `To ${day.city}`;
+  if (lastForCity) return `Last in ${day.city}`;
+  return day.city;
+}
+
+function finalizeOpenChecklistItems() {
+  const list = Array.isArray(state.bookingChecklist) ? state.bookingChecklist : [];
+  return list.filter((item) => {
+    if (!item || item.bookingNotRequired) return false;
+    if (item.status === 'resolved') return false;
+    const ref = String(item.referenceNum || '').trim();
+    return !ref;
+  });
+}
+
+function activityHasPendingBooking(activityId) {
+  const list = Array.isArray(state.bookingChecklist) ? state.bookingChecklist : [];
+  return list.some((item) => (
+    item.type === 'activity'
+    && String(item.activityId) === String(activityId)
+    && !item.bookingNotRequired
+    && item.status !== 'resolved'
+    && !String(item.referenceNum || '').trim()
+  ));
+}
+
+function renderFinalize() {
+  renderFinalizeTripCard();
+  renderFinalizeOpenItems();
+  renderFinalizeDayByDay();
+  renderFinalizeFooter();
+}
+
+function renderFinalizeTripCard() {
+  const titleEl = document.getElementById('finTripTitle');
+  const routeEl = document.getElementById('finTripRoute');
+  const statsEl = document.getElementById('finTripStats');
+  if (!titleEl || !routeEl || !statsEl) return;
+
+  const cities = (state.cities || []).filter((c) => c.startDate && c.endDate);
+  const orderedCities = [...cities].sort((a, b) => parseYmdAsLocal(a.startDate) - parseYmdAsLocal(b.startDate));
+  const first = orderedCities[0];
+  const last = orderedCities[orderedCities.length - 1];
+  const start = first ? parseYmdAsLocal(first.startDate) : null;
+  const end = last ? parseYmdAsLocal(last.endDate) : null;
+  const nights = (start && end) ? Math.max(0, Math.round((end - start) / 86400000)) : 0;
+  const primaryCity = first?.name || 'your destination';
+
+  const rawTitle = (state.tripName || `${nights || 1} ${nights === 1 ? 'night' : 'nights'} in ${primaryCity}`).trim();
+  const titleParts = rawTitle.split(' ');
+  if (titleParts.length > 1) {
+    const last = titleParts.pop();
+    titleEl.innerHTML = `${esc(titleParts.join(' '))} <span class="serif">${esc(last)}</span>`;
+  } else {
+    titleEl.innerHTML = `<span class="serif">${esc(rawTitle)}</span>`;
+  }
+
+  if (orderedCities.length === 0) {
+    routeEl.innerHTML = '<span class="city">Add cities to see your route</span>';
+  } else {
+    routeEl.innerHTML = orderedCities
+      .map((c, i) => `${i ? '<span class="arrow">→</span>' : ''}<span class="city">${esc(c.name)}</span>`)
+      .join(' ');
+  }
+
+  const fmtMD = (d) => `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+  const datesValue = (start && end)
+    ? `${fmtMD(start)} <span class="u">→</span> ${fmtMD(end)}`
+    : '—';
+  const travelers = Number(state.numTravelers || 0) + Number(state.numChildren || 0) || 1;
+  const placedApproved = (state.activities || []).filter((a) => (
+    state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId
+  ));
+  const stats = [
+    { k: 'Dates', v: datesValue },
+    { k: 'Nights', v: String(nights || 0) },
+    { k: 'Travelers', v: String(travelers) },
+    { k: 'Cities', v: String(orderedCities.length || 0) },
+    { k: 'Activities', v: String(placedApproved.length) }
+  ];
+  statsEl.innerHTML = stats.map((s) => `
+    <div class="fin-stat">
+      <span class="k">${esc(s.k)}</span>
+      <span class="v">${s.v}</span>
+    </div>
+  `).join('');
+}
+
+function renderFinalizeOpenItems() {
+  const listEl = document.getElementById('finOpenList');
+  const countEl = document.getElementById('finOpenCount');
+  const attachAllBtn = document.getElementById('finAttachAllBtn');
+  if (!listEl || !countEl) return;
+
+  const open = finalizeOpenChecklistItems();
+  const n = open.length;
+  countEl.textContent = n === 0 ? 'All set' : `${n} open`;
+  countEl.classList.toggle('all-set', n === 0);
+  if (attachAllBtn) attachAllBtn.style.display = n === 0 ? 'none' : '';
+
+  if (n === 0) {
+    listEl.innerHTML = '<div class="fin-open__empty">Every booking has a reference. You\'re set.</div>';
+    return;
+  }
+
+  const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  listEl.innerHTML = open.map((item) => {
+    const linkedActivity = item.type === 'activity'
+      ? state.activities.find((a) => String(a.id) === String(item.activityId))
+      : null;
+    const placement = linkedActivity ? state.placements[linkedActivity.id] : null;
+    const day = placement?.dayId ? state.days.find((d) => d.id === placement.dayId) : null;
+    const dateStr = item.activityDate || item.date || day?.date || '';
+    let chipMonth = '—'; let chipDay = '—';
+    if (dateStr) {
+      const dt = parseYmdAsLocal(dateStr);
+      if (!Number.isNaN(dt.getTime())) {
+        chipMonth = MONTHS[dt.getMonth()];
+        chipDay = String(dt.getDate()).padStart(2, '0');
+      }
+    }
+    const chipTime = (item.activityTime || placement?.time || '').slice(0, 5) || '—';
+
+    const title = item.title || linkedActivity?.name || 'Untitled item';
+    const missingLabel = item.type === 'activity'
+      ? 'No booking ref'
+      : (item.type === 'flight' || item.type === 'transport' ? 'No confirmation' : 'No reservation');
+    const why = item.notes || linkedActivity?.why_it_fits || '';
+    const priceUsd = Number(actCostUsd(linkedActivity) || item.budgetUsd || 0);
+    const priceHtml = priceUsd > 0 ? ` <span class="price">$${Math.round(priceUsd).toLocaleString()}</span>` : '';
+
+    return `
+      <div class="open-item" data-checklist-id="${esc(item.id)}">
+        <div class="open-item__when">
+          <span class="d">${esc(chipMonth)}</span>
+          <span class="n">${esc(chipDay)}</span>
+          <span class="t">${esc(chipTime)}</span>
         </div>
-      `)
-      .join('');
-    const accommodation = getAccommodationForDay(d.city, d.date);
-    const accommodationInfo = accommodation
-      ? `<p class="muted-text"><strong>Accommodation:</strong> ${esc(accommodation.address || 'Address missing')}</p>`
-      : '';
-    return `<section class="day-col"><div class="day-head">${d.date} • ${esc(d.city)}</div><div class="list">${accommodationInfo}${items || '<em>No activities assigned.</em>'}</div></section>`;
+        <div class="open-item__body">
+          <div class="open-item__title">${esc(title)}<span class="open-item__missing">${esc(missingLabel)}</span></div>
+          ${why ? `<div class="open-item__why">${esc(why)}${priceHtml}</div>` : (priceHtml ? `<div class="open-item__why">${priceHtml}</div>` : '')}
+        </div>
+        <button class="open-item__cta" type="button" data-open-checklist="${esc(item.id)}">
+          Add confirmation <span class="arrow">→</span>
+        </button>
+      </div>
+    `;
   }).join('');
 
-  renderItineraryMode();
-  renderTripHealth();
+  listEl.querySelectorAll('[data-open-checklist]').forEach((btn) => {
+    btn.addEventListener('click', () => openChecklistModal());
+  });
+}
+
+function renderFinalizeDayByDay() {
+  const listEl = document.getElementById('finItinList');
+  const metaEl = document.getElementById('finItinMeta');
+  if (!listEl) return;
+
+  const days = Array.isArray(state.days) ? state.days : [];
+  const approved = (state.activities || []).filter((a) => state.reviewed[a.id]?.approved);
+
+  let totalStops = 0;
+  const citiesSet = new Set();
+
+  const html = days.map((day, idx) => {
+    citiesSet.add(day.city);
+    const items = approved
+      .filter((a) => state.placements[a.id]?.dayId === day.id)
+      .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+    totalStops += items.length;
+
+    const dt = parseYmdAsLocal(day.date);
+    const validDate = !Number.isNaN(dt.getTime());
+    const dayName = validDate
+      ? `${dt.toLocaleDateString(undefined, { weekday: 'short' })} · ${dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+      : day.date;
+
+    const theme = deriveDayTheme(day, idx, days);
+
+    const itemsHtml = items.map((a) => {
+      const placement = state.placements[a.id] || {};
+      const startMins = minutesFromTime(parseTimeTo24(placement.time || actPreferredTime(a) || typeToTime(a.type)));
+      const endMins = startMins + Math.round(actDurationHours(a) * 60);
+      const fmt = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+      const cat = mapTypeToFinalizeCat(a.type);
+      const pending = activityHasPendingBooking(a.id);
+      return `
+        <div class="item" data-activity-id="${esc(a.id)}">
+          <span class="item__time">${esc(fmt(startMins))}<span class="dash">–</span>${esc(fmt(endMins))}</span>
+          <span class="item__dot cat-${cat}" aria-hidden="true"></span>
+          <span class="item__title">${esc(a.name)}${pending ? '<span class="item__pending" role="img" aria-label="Booking confirmation needed" title="Booking confirmation needed">!</span>' : ''}</span>
+          <span class="item__cat">${esc(FINALIZE_CAT_LABEL[cat] || 'Stop')}</span>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <section class="day">
+        <div class="day__head">
+          <span class="day__num">Day ${String(idx + 1).padStart(2, '0')}</span>
+          <span class="day-name">${esc(dayName)}</span>
+          <span class="day__theme">${esc(theme)}</span>
+          <span class="day__city">${esc(day.city)}</span>
+        </div>
+        <div class="day__items">${itemsHtml}</div>
+      </section>
+    `;
+  }).join('');
+
+  listEl.innerHTML = html || '<div class="fin-open__empty">No days planned yet.</div>';
+  if (metaEl) {
+    metaEl.innerHTML = `${totalStops} stops<span class="pipe">·</span>${days.length} days<span class="pipe">·</span>${citiesSet.size} cities`;
+  }
+}
+
+function renderFinalizeFooter() {
+  const versionEl = document.getElementById('finVersionMeta');
+  const autosaveEl = document.getElementById('finAutosave');
+  if (versionEl) {
+    const days = (state.days || []).length;
+    const activities = (state.activities || []).filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId).length;
+    versionEl.innerHTML = `v 01<span class="pipe" style="color:var(--text-400);margin:0 6px;">·</span>${days} days<span class="pipe" style="color:var(--text-400);margin:0 6px;">·</span>${activities} activities`;
+  }
+  if (autosaveEl) autosaveEl.textContent = 'Auto-saved · just now';
 }
 
 function formatTimeRangeLabel(startMinutes, endMinutes) {
@@ -6117,6 +6726,8 @@ function getCityAccomTravelRows(city, cityIdx) {
       id: `acc_${cityIdx}`,
       title: address || 'Accommodation',
       timeLabel,
+      date: logAcc.checkIn || '',
+      kindLabel: 'Stay',
       location: '',
       notes: '',
       referenceNum: '',
@@ -6131,6 +6742,8 @@ function getCityAccomTravelRows(city, cityIdx) {
       id: `arr_${cityIdx}`,
       title: loc ? `Arrival: ${loc}` : 'Arrival',
       timeLabel: formatDateTimeLabel(arrival.date, arrival.time),
+      date: arrival.date || '',
+      kindLabel: modeToLabel(arrival.mode),
       location: '',
       notes: '',
       referenceNum: '',
@@ -6145,6 +6758,8 @@ function getCityAccomTravelRows(city, cityIdx) {
       id: `dep_${cityIdx}`,
       title: loc ? `Departure: ${loc}` : 'Departure',
       timeLabel: formatDateTimeLabel(departure.date, departure.time),
+      date: departure.date || '',
+      kindLabel: modeToLabel(departure.mode),
       location: '',
       notes: '',
       referenceNum: '',
@@ -6154,6 +6769,16 @@ function getCityAccomTravelRows(city, cityIdx) {
   }
 
   return rows;
+}
+
+function modeToLabel(mode) {
+  switch (String(mode || '').toLowerCase()) {
+    case 'flight': return 'Flight';
+    case 'train': return 'Train';
+    case 'car': return 'Car';
+    case 'other': return 'Other';
+    default: return 'Travel';
+  }
 }
 
 function getConsolidatedConfirmations() {
@@ -6280,67 +6905,134 @@ async function shareMinimalItinerary() {
     .catch(() => showToast('Could not copy share link.', 'error'));
 }
 
-function renderItineraryModeSummary(payload) {
-  if (!els.itineraryModeSummary) return;
-  const range = payload.firstDate && payload.lastDate ? `${payload.firstDate} → ${payload.lastDate}` : 'No date range';
-  els.itineraryModeSummary.innerHTML = `
-    <article class="itinerary-mode-summary-card">
-      <h4>Trip</h4>
-      <p>${esc(payload.tripName)}</p>
-    </article>
-    <article class="itinerary-mode-summary-card">
-      <h4>Dates</h4>
-      <p>${esc(range)}</p>
-    </article>
-    <article class="itinerary-mode-summary-card">
-      <h4>Cities</h4>
-      <p>${esc(payload.cities.join(', ') || '—')}</p>
-    </article>
-    <article class="itinerary-mode-summary-card">
-      <h4>Items</h4>
-      <p>${payload.itemCount}</p>
-    </article>
+function renderItineraryModeSummary() { /* legacy no-op; hero replaces this */ }
+
+function formatItinHeroDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return String(dateStr);
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function daysBetween(a, b) {
+  if (!a || !b) return 0;
+  const d1 = new Date(`${a}T12:00:00`);
+  const d2 = new Date(`${b}T12:00:00`);
+  if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return 0;
+  return Math.max(0, Math.round((d2 - d1) / 86400000));
+}
+
+function renderItineraryHero(payload) {
+  const heroEl = document.getElementById('itineraryModeHero');
+  if (!heroEl) return;
+  const tripName = String(payload.tripName || 'Untitled Trip').trim();
+  const lastWord = tripName.split(/\s+/).pop();
+  const head = tripName.slice(0, tripName.length - lastWord.length).trim();
+  const titleHtml = head
+    ? `${esc(head)} <span class="serif">${esc(lastWord)}</span>`
+    : `<span class="serif">${esc(tripName)}</span>`;
+  const dates = payload.firstDate && payload.lastDate
+    ? `${formatItinHeroDate(payload.firstDate)} → ${formatItinHeroDate(payload.lastDate)}`
+    : '—';
+  const nights = daysBetween(payload.firstDate, payload.lastDate);
+  const travelers = (Number(state.numTravelers || 0) + Number(state.numChildren || 0)) || 1;
+  const routeCities = payload.cities || [];
+  const routeHtml = routeCities.length
+    ? routeCities.map((c, i) => `${i > 0 ? '<span class="arrow">→</span>' : ''}<span class="city">${esc(c)}</span>`).join(' ')
+    : '<span class="city">—</span>';
+  heroEl.innerHTML = `
+    <div class="itin-hero__title">
+      <span class="eyebrow">Itinerary · v ${esc(String((state.itineraryVersion || 1)).padStart(2, '0'))}</span>
+      <h1>${titleHtml}</h1>
+      <div class="route">${routeHtml}</div>
+    </div>
+    <div class="itin-hero__meta">
+      <div><span class="k">Dates</span><span class="v">${esc(dates)}</span></div>
+      <div><span class="k">Nights</span><span class="v">${nights}</span></div>
+      <div><span class="k">Travelers</span><span class="v">${travelers}</span></div>
+      <div><span class="k">Items</span><span class="v">${payload.itemCount}</span></div>
+    </div>
   `;
 }
 
-function renderItineraryItemCard(row) {
+function classifyStop(row) {
+  const id = String(row.id || '');
+  if (id.startsWith('arr_') || id.startsWith('dep_')) return 'is-travel';
+  if (id.startsWith('acc_')) return 'is-lodging';
+  return '';
+}
+
+function formatStopTime(timeLabel) {
+  if (!timeLabel) return '<span class="end">—</span>';
+  const label = String(timeLabel);
+  const rangeParts = label.split(/\s*→\s*|\s+[–-]\s+/);
+  if (rangeParts.length >= 2) {
+    return `${esc(rangeParts[0])}<span class="end">→ ${esc(rangeParts[1])}</span>`;
+  }
+  const dateTimeParts = label.split(/,\s+/);
+  if (dateTimeParts.length >= 2) {
+    return `${esc(dateTimeParts[0])}<span class="end">${esc(dateTimeParts.slice(1).join(', '))}</span>`;
+  }
+  return esc(label);
+}
+
+function renderStop(row) {
+  const mod = classifyStop(row);
   const hasRef = Boolean(row.referenceNum);
-  const refText = hasRef ? row.referenceNum : 'No reference #';
-  const viewDisabled = row.fileCount === 0;
-  const fileCountText = row.fileCount ? ` (${row.fileCount})` : '';
-  const navigateBtn = row.navigateHref
-    ? `<a class="btn-ghost" href="${esc(row.navigateHref)}" target="_blank" rel="noopener noreferrer" data-action="navigate"><i class="ph-bold ph-navigation-arrow"></i> Navigate</a>`
+  const refHtml = hasRef
+    ? `<span class="stop__ref">Confirmation <code>${esc(row.referenceNum)}</code></span>`
+    : `<span class="stop__ref is-empty">No booking attached</span>`;
+  const fileCount = Number(row.fileCount || 0);
+  const filesDisabled = fileCount === 0 ? ' disabled' : '';
+  const filesCountHtml = fileCount > 0 ? ` <span class="count">${fileCount}</span>` : '';
+  const navDisabled = row.navigateHref ? '' : ' disabled';
+  const navigateAttr = row.navigateHref ? ` data-href="${esc(row.navigateHref)}"` : '';
+
+  const metaParts = [];
+  if (row.location) metaParts.push(esc(row.location));
+  if (row.priceTier) metaParts.push(`<b>${'$'.repeat(row.priceTier)}</b>`);
+  const metaHtml = metaParts.length
+    ? `<div class="stop__meta">${metaParts.join(' <span class="sep">·</span> ')}</div>`
     : '';
+  const noteHtml = row.notes ? `<p class="stop__note">${esc(row.notes)}</p>` : '';
+
+  let kindHtml = '';
+  if (row.kindLabel) {
+    const kindMod = mod === 'is-travel' ? 'stop__kind--travel' : mod === 'is-lodging' ? 'stop__kind--accent' : '';
+    kindHtml = `<span class="stop__kind ${kindMod}">${esc(row.kindLabel)}</span>`;
+  }
+
   return `
-    <article class="itinerary-item" data-activity-id="${esc(row.id)}">
-      <header class="itinerary-item-head">
-        <h3 class="itinerary-title">${esc(row.title)}</h3>
-        <time class="itinerary-time">${esc(row.timeLabel || '')}</time>
-      </header>
-      ${row.location || row.priceTier ? `<div class="itinerary-subtitle">${esc(row.location || '')}${row.priceTier ? `${row.location ? ' · ' : ''}<span class="itinerary-price-tier">${'$'.repeat(row.priceTier)}</span>` : ''}</div>` : ''}
-      ${row.notes ? `<p class="itinerary-notes">${esc(row.notes)}</p>` : ''}
-      <div class="itinerary-reference${hasRef ? ' has-value' : ''}">
-        <i class="ph-bold ph-ticket" aria-hidden="true"></i>
-        <span>${esc(refText)}</span>
+    <div class="stop ${mod}" data-activity-id="${esc(row.id)}">
+      <div class="stop__time">${formatStopTime(row.timeLabel)}</div>
+      <div class="stop__body">
+        <div class="stop__head">${kindHtml}<h4 class="stop__title">${esc(row.title || 'Untitled')}</h4></div>
+        ${metaHtml}
+        ${noteHtml}
+        ${refHtml}
+        <div class="stop__actions">
+          <button type="button" class="stop-act" data-action="navigate"${navigateAttr}${navDisabled}><i class="ph-bold ph-navigation-arrow"></i>Navigate</button>
+          <button type="button" class="stop-act" data-action="view-files"${filesDisabled}><i class="ph-bold ph-folder-open"></i>View Files${filesCountHtml}</button>
+          <button type="button" class="stop-act" data-action="upload-files"><i class="ph-bold ph-upload-simple"></i>Upload Tickets</button>
+        </div>
       </div>
-      <div class="itinerary-file-actions">
-        <button class="btn-ghost" type="button" data-action="upload-files">
-          <i class="ph-bold ph-upload-simple"></i> Upload tickets
-        </button>
-        <button class="btn-ghost" type="button" data-action="view-files"${viewDisabled ? ' disabled' : ''}>
-          <i class="ph-bold ph-folder-open"></i> View files${fileCountText}
-        </button>
-        ${navigateBtn}
-      </div>
-    </article>
+      <div class="stop__cost"></div>
+    </div>
   `;
+}
+
+function formatWeekday(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-US', { weekday: 'short' });
 }
 
 function renderItineraryMode() {
   if (!els.itineraryModeList) return;
   const payload = getMinimalPayload();
   const rows = payload.itineraryRows;
-  renderItineraryModeSummary(payload);
+  renderItineraryHero(payload);
 
   const cityOrder = [];
   const cityIdxByName = new Map();
@@ -6358,7 +7050,7 @@ function renderItineraryMode() {
   });
 
   if (!cityOrder.length) {
-    els.itineraryModeList.innerHTML = '<p class="muted-text">No scheduled itinerary yet. Build your plan in Planning Mode first.</p>';
+    els.itineraryModeList.innerHTML = '<p class="itin-empty">No scheduled itinerary yet. Build your plan in Planning Mode first.</p>';
     return;
   }
 
@@ -6367,36 +7059,73 @@ function renderItineraryMode() {
     return acc;
   }, {});
 
-  const html = cityOrder.map((cityName) => {
+  const totalCities = cityOrder.length;
+  let dayCounter = 0;
+
+  const html = cityOrder.map((cityName, cityIdxInOrder) => {
     const cityIdx = cityIdxByName.get(cityName);
     const cityObj = (state.cities || []).find((c) => String(c?.name || '').trim() === cityName) || {};
     const accomTravelRows = getCityAccomTravelRows(cityObj, cityIdx);
     const cityRows = rowsByCity[cityName] || [];
-    const dayGroups = cityRows.reduce((acc, row) => {
-      (acc[row.date] = acc[row.date] || []).push(row);
-      return acc;
-    }, {});
+
+    const dayGroups = {};
+    cityRows.forEach((row) => {
+      (dayGroups[row.date] = dayGroups[row.date] || []).push(row);
+    });
+
+    const orphanLogistics = [];
+    accomTravelRows.forEach((row) => {
+      const key = row.date || '';
+      if (key && dayGroups[key]) {
+        dayGroups[key].unshift(row);
+      } else if (key) {
+        dayGroups[key] = [row];
+      } else {
+        orphanLogistics.push(row);
+      }
+    });
+
     const dayOrder = Object.keys(dayGroups).sort();
 
-    const accomTravelHtml = accomTravelRows.length
-      ? `<section class="itinerary-city-block">
-          <h4 class="itinerary-block-head">Accommodation &amp; Travel</h4>
-          ${accomTravelRows.map(renderItineraryItemCard).join('')}
-        </section>`
+    const cityStart = dayOrder[0] ? formatDateShort(dayOrder[0]) : '';
+    const cityEnd = dayOrder[dayOrder.length - 1] ? formatDateShort(dayOrder[dayOrder.length - 1]) : '';
+    const nightsInCity = Math.max(1, dayOrder.length);
+    const whenHtml = cityStart && cityEnd
+      ? `<b>${esc(cityStart)}</b> → ${esc(cityEnd)} · ${nightsInCity} night${nightsInCity > 1 ? 's' : ''}`
+      : esc(cityStart || cityEnd || '');
+
+    const daysHtml = dayOrder.map((date) => {
+      dayCounter += 1;
+      const stops = dayGroups[date];
+      const weekday = formatWeekday(date);
+      const dateLabel = formatDateShort(date);
+
+      return `
+        <div class="day">
+          <div class="day__when">
+            <span class="day__date">${esc(weekday)} · ${esc(dateLabel)}</span>
+            <span class="day__weekday">Day<span class="num">Day ${String(dayCounter).padStart(2, '0')}</span></span>
+          </div>
+          <div class="stops">
+            ${stops.map(renderStop).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const orphanHtml = orphanLogistics.length
+      ? `<div class="day"><div class="day__when"><span class="day__date">Logistics</span><span class="day__weekday">&nbsp;</span></div><div class="stops">${orphanLogistics.map(renderStop).join('')}</div></div>`
       : '';
 
-    const daysHtml = dayOrder.map((date) => `
-      <section class="itinerary-city-block">
-        <h4 class="itinerary-block-head">${esc(formatDateShort(date))}</h4>
-        ${dayGroups[date].map(renderItineraryItemCard).join('')}
-      </section>
-    `).join('');
-
     return `
-      <section class="itinerary-city-group">
-        <h3 class="itinerary-city-title">${esc(cityName)}</h3>
-        ${accomTravelHtml}
+      <section class="city-section">
+        <header class="city-head">
+          <span class="city-head__index">${String(cityIdxInOrder + 1).padStart(2, '0')} / ${String(totalCities).padStart(2, '0')}</span>
+          <h2 class="city-head__name">${esc(cityName)}</h2>
+          <span class="city-head__when">${whenHtml}</span>
+        </header>
         ${daysHtml}
+        ${orphanHtml}
       </section>
     `;
   }).join('');
@@ -6503,7 +7232,10 @@ async function uploadActivityAttachments(activityId, fileList, buttonEl = null) 
     const added = Array.isArray(data?.attachments) ? data.attachments : [];
     setItemAttachments(activityId, [...getItemAttachments(activityId), ...added]);
     setUploadBtnState(buttonEl, 'success');
-    setTimeout(() => renderItineraryMode(), 1000);
+    setTimeout(() => {
+      renderItineraryMode();
+      if (els.checklistModal && !els.checklistModal.classList.contains('hidden')) renderChecklistModal();
+    }, 1000);
   } catch (err) {
     setUploadBtnState(buttonEl, 'idle');
     showToast(`Upload failed: ${err?.message || 'network error'}`, 'error');
@@ -6636,7 +7368,7 @@ function renderSavedItineraries() {
         if (state.currentItineraryId === id) {
           state.currentItineraryId = null;
           state.itinerary = null;
-          els.itineraryGrid.innerHTML = '';
+          if (els.itineraryGrid) els.itineraryGrid.innerHTML = '';
           if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
           updateCalendarControls();
         }
@@ -7375,7 +8107,7 @@ function resetToFresh() {
   renderActivities();
   els.dayColumns.innerHTML = '';
   els.stagingArea.innerHTML = '';
-  els.itineraryGrid.innerHTML = '';
+  if (els.itineraryGrid) els.itineraryGrid.innerHTML = '';
   if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
   updateCalendarControls();
   renderChatMessages();
@@ -7748,7 +8480,7 @@ function clearPlannedResultsKeepSetup() {
   renderActivities();
   els.dayColumns.innerHTML = '';
   els.stagingArea.innerHTML = '';
-  els.itineraryGrid.innerHTML = '';
+  if (els.itineraryGrid) els.itineraryGrid.innerHTML = '';
   if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
   updateCalendarControls();
 }
@@ -7813,7 +8545,38 @@ els.downloadCalendarBtn?.addEventListener('click', () => {
   window.open(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/calendar.ics?metadata=${metadataMode}`, '_blank');
 });
 els.connectGoogleCalendarBtn?.addEventListener('click', connectGoogleCalendar);
-els.syncGoogleCalendarBtn?.addEventListener('click', syncGoogleCalendar);
+els.syncGoogleCalendarBtn?.addEventListener('click', () => {
+  if (!state.googleCalendarConnected) {
+    connectGoogleCalendar();
+    return;
+  }
+  syncGoogleCalendar();
+});
+document.getElementById('savePdfBtn')?.addEventListener('click', () => {
+  if (window.exportItineraryPdf) {
+    window.exportItineraryPdf().catch((err) => {
+      console.error('PDF export failed', err);
+      showToast(err?.message || 'PDF export failed', 'error');
+    });
+  } else {
+    window.print();
+  }
+});
+document.getElementById('shareTripLinkBtn')?.addEventListener('click', () => {
+  const id = state.currentItineraryId;
+  if (!id) { showToast('Save your trip first', 'info'); return; }
+  const url = `${window.location.origin}/trip/${encodeURIComponent(id)}`;
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(url).then(() => showToast('Link copied'));
+  } else {
+    showToast(`Share link: ${url}`);
+  }
+});
+document.getElementById('lockTripBtn')?.addEventListener('click', () => {
+  if (typeof openFinalizeModal === 'function') {
+    openFinalizeModal();
+  }
+});
 els.calendarMetadataMode?.addEventListener('change', (e) => {
   state.calendarMetadataMode = e.target.value === 'full' ? 'full' : 'compact';
   setCalendarStatus(`Metadata mode: ${state.calendarMetadataMode}`);
@@ -7828,7 +8591,7 @@ els.itineraryModeBtn?.addEventListener('click', () => setViewMode('itinerary'));
 // Delegated handler for itinerary item buttons
 els.itineraryModeList?.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
   const card = btn.closest('[data-activity-id]');
   if (!card) return;
   const activityId = card.dataset.activityId;
@@ -7842,6 +8605,27 @@ els.itineraryModeList?.addEventListener('click', (e) => {
     }
   } else if (action === 'view-files') {
     openAttachmentViewer(activityId);
+  } else if (action === 'navigate') {
+    const href = btn.dataset.href;
+    if (href) window.open(href, '_blank', 'noopener,noreferrer');
+  }
+});
+
+// Itinerary send-tile buttons (mirror Finalize handlers)
+document.getElementById('syncGoogleCalendarBtnItin')?.addEventListener('click', () => {
+  if (typeof syncGoogleCalendar === 'function') syncGoogleCalendar();
+});
+document.getElementById('shareTripLinkBtnItin')?.addEventListener('click', () => {
+  document.getElementById('shareTripLinkBtn')?.click();
+});
+document.getElementById('savePdfBtnItin')?.addEventListener('click', () => {
+  if (window.exportItineraryPdf) {
+    window.exportItineraryPdf().catch((err) => {
+      console.error('PDF export failed', err);
+      showToast(err?.message || 'PDF export failed', 'error');
+    });
+  } else {
+    window.print();
   }
 });
 
