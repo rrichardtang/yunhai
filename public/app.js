@@ -1169,38 +1169,6 @@ function buildChecklistFromState() {
     }
   });
 
-  // Accommodations per city
-  (state.cities || []).forEach((city) => {
-    const acc = city.accommodation || city.logistics?.accommodation;
-    if (!acc || acc.type === 'none') return;
-    const checkIn = acc.checkIn || city.startDate || '';
-    const checkOut = acc.checkOut || city.endDate || '';
-    const item = normalizeChecklistItem({ type: 'accommodation', name: '', accommodationCity: city.name || '', checkInDate: checkIn, checkOutDate: checkOut });
-    if (!existingKeys.has(keyOf(item))) {
-      items.push(item);
-      existingKeys.add(keyOf(item));
-    }
-  });
-
-  // Transportation per city (travel entry)
-  (state.cities || []).forEach((city) => {
-    const te = city.travelEntry;
-    if (!te) return;
-    const dt = te.dateTime || '';
-    const item = normalizeChecklistItem({
-      type: 'transportation',
-      name: '',
-      transportScope: 'entry_exit',
-      startLocation: te.entryPoint || '',
-      departureDate: dt ? dt.slice(0, 10) : '',
-      departureTime: dt && dt.length > 10 ? dt.slice(11, 16) : ''
-    });
-    if (!existingKeys.has(keyOf(item))) {
-      items.push(item);
-      existingKeys.add(keyOf(item));
-    }
-  });
-
   state.bookingChecklist = items;
   return items;
 }
@@ -1391,9 +1359,17 @@ function computeTripHealthLocal() {
 const checklistSearch = { query: '', containerCollapsed: {} };
 let checklistSearchRenderTimer = null;
 
+function checklistAttachmentKey(item) {
+  return item.type === 'activity' && item.activityId ? item.activityId : item.id;
+}
+
 function renderChecklistItemExpanded(item) {
   const hasSecondary = item.referenceNum || item.notes || item.budgetUsd != null;
   const showReferenceField = item.type !== 'activity' || !item.bookingNotRequired;
+  const attachmentKey = checklistAttachmentKey(item);
+  const fileCount = getItemAttachments(attachmentKey).length;
+  const filesDisabled = fileCount === 0 ? ' disabled' : '';
+  const filesCountHtml = fileCount > 0 ? ` <span class="count">${fileCount}</span>` : '';
 
   const primaryFields = (() => {
     if (item.type === 'transportation') {
@@ -1459,13 +1435,6 @@ function renderChecklistItemExpanded(item) {
           </label>
         </div>
         ` : ''}
-        <label class="cl-field">
-          <span class="cl-field-label">Budget Tracker scope</span>
-          <select data-cl="transportScope">
-            <option value="entry_exit" ${item.transportScope === 'entry_exit' ? 'selected' : ''}>Entry/exit travel (exclude)</option>
-            <option value="experience" ${item.transportScope !== 'entry_exit' ? 'selected' : ''}>Experience-linked travel (include)</option>
-          </select>
-        </label>
       `;
     }
     if (item.type === 'accommodation') {
@@ -1542,6 +1511,10 @@ function renderChecklistItemExpanded(item) {
             <span class="cl-field-label">Notes</span>
             <textarea data-cl="notes" rows="2" placeholder="Any details, reminders, links…">${esc(item.notes)}</textarea>
           </label>
+          <div class="cl-file-actions stop__actions">
+            <button type="button" class="stop-act" data-cl-action="view-files" data-cl-key="${esc(attachmentKey)}"${filesDisabled}><i class="ph-bold ph-folder-open"></i>View Files${filesCountHtml}</button>
+            <button type="button" class="stop-act" data-cl-action="upload-files" data-cl-key="${esc(attachmentKey)}"><i class="ph-bold ph-upload-simple"></i>Upload Files</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1898,6 +1871,26 @@ function bindChecklistEvents(el) {
           renderTripHealthBadge();
         });
       }
+    });
+  });
+
+  // Upload Files / View Files (per checklist item)
+  el.querySelectorAll('[data-cl-action="upload-files"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.clKey;
+      if (!key) return;
+      _pendingUploadActivityId = key;
+      _pendingUploadButton = btn;
+      if (els.attachmentFileInput) {
+        els.attachmentFileInput.value = '';
+        els.attachmentFileInput.click();
+      }
+    });
+  });
+  el.querySelectorAll('[data-cl-action="view-files"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.clKey;
+      if (key) openAttachmentViewer(key);
     });
   });
 
@@ -7249,7 +7242,10 @@ async function uploadActivityAttachments(activityId, fileList, buttonEl = null) 
     const added = Array.isArray(data?.attachments) ? data.attachments : [];
     setItemAttachments(activityId, [...getItemAttachments(activityId), ...added]);
     setUploadBtnState(buttonEl, 'success');
-    setTimeout(() => renderItineraryMode(), 1000);
+    setTimeout(() => {
+      renderItineraryMode();
+      if (els.checklistModal && !els.checklistModal.classList.contains('hidden')) renderChecklistModal();
+    }, 1000);
   } catch (err) {
     setUploadBtnState(buttonEl, 'idle');
     showToast(`Upload failed: ${err?.message || 'network error'}`, 'error');
