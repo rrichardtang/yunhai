@@ -2970,31 +2970,20 @@ function renderPreferencesModal() {
   const dotsHtml = (active, key) => {
     const dots = Array.from({ length: 5 }, (_, i) => {
       const v = i + 1;
-      return `<span class="dot-scale-dot${v === active ? ' active' : ''}" data-value="${v}" aria-label="${v}" role="button" tabindex="0"></span>`;
+      const cls = v === active ? 'active' : (v < active ? 'done' : '');
+      return `<span class="dot-scale-dot${cls ? ' ' + cls : ''}" data-value="${v}" aria-label="${v}" role="button" tabindex="0"></span>`;
     }).join('');
     const label = key === 'pace' ? pacePrefLabel(active) : profileLabel(active);
+    const isDefault = active === PROFILE_DEFAULT;
     return `
       <div class="dot-scale-wrap">
+        <span class="dot-scale-label${isDefault ? ' is-default' : ''}">${esc(label)}</span>
         <div class="dot-scale" data-rating>${dots}</div>
-        <span class="dot-scale-label">${esc(label)}</span>
       </div>
     `;
   };
 
-  els.profileQuestions.innerHTML = PROFILE_QUESTIONS.map((q) => {
-    if (q.type === 'text') {
-      const val = profile.answers[q.key] || '';
-      const inputId = `profileQ_${q.key}`;
-      return `
-        <div class="profile-question profile-question--text" data-question="${esc(q.key)}">
-          <p>${esc(q.label)}</p>
-          <div class="textarea-expand-wrap">
-            <textarea id="${inputId}" class="profile-text-answer profile-textarea-fixed" rows="5" placeholder="${esc(q.placeholder || '')}">${esc(val)}</textarea>
-            <button class="textarea-expand-btn" type="button" data-expand="${inputId}" data-title="${esc(q.label)}" aria-label="Expand ${esc(q.label)}"><i class="ph-bold ph-arrows-out-simple"></i></button>
-          </div>
-        </div>
-      `;
-    }
+  const scaleHtml = PROFILE_QUESTIONS.filter((q) => q.type !== 'text').map((q) => {
     const active = Math.max(PROFILE_MIN, Math.min(PROFILE_MAX, Number(profile.answers[q.key] || PROFILE_DEFAULT)));
     return `
       <div class="profile-question" data-question="${esc(q.key)}">
@@ -3003,6 +2992,25 @@ function renderPreferencesModal() {
       </div>
     `;
   }).join('');
+
+  const textHtml = PROFILE_QUESTIONS.filter((q) => q.type === 'text').map((q) => {
+    const val = profile.answers[q.key] || '';
+    const inputId = `profileQ_${q.key}`;
+    return `
+      <div class="profile-question profile-question--text" data-question="${esc(q.key)}">
+        <p>${esc(q.label)}</p>
+        <div class="textarea-expand-wrap">
+          <textarea id="${inputId}" class="profile-text-answer profile-textarea-fixed" rows="4" placeholder="${esc(q.placeholder || '')}">${esc(val)}</textarea>
+          <button class="textarea-expand-btn" type="button" data-expand="${inputId}" data-title="${esc(q.label)}" aria-label="Expand ${esc(q.label)}"><i class="ph-bold ph-arrows-out-simple"></i></button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const scaleHost = document.getElementById('pfScaleQs');
+  const textHost = document.getElementById('pfTextQs');
+  if (scaleHost) scaleHost.innerHTML = scaleHtml;
+  if (textHost) textHost.innerHTML = textHtml;
 
   bindTextareaExpandButtons(els.profileQuestions);
 
@@ -3051,9 +3059,16 @@ function renderPreferencesModal() {
         answers: { ...(state.profile?.answers || {}), [key]: nextAnswer }
       });
 
-      scaleEl.querySelectorAll('.dot-scale-dot').forEach((d) => d.classList.toggle('active', Number(d.dataset.value) === nextAnswer));
-      const labelEl = scaleEl.nextElementSibling;
-      if (labelEl) labelEl.textContent = key === 'pace' ? pacePrefLabel(nextAnswer) : profileLabel(nextAnswer);
+      scaleEl.querySelectorAll('.dot-scale-dot').forEach((d) => {
+        const v = Number(d.dataset.value);
+        d.classList.toggle('active', v === nextAnswer);
+        d.classList.toggle('done', v < nextAnswer);
+      });
+      const labelEl = scaleEl.parentElement?.querySelector('.dot-scale-label');
+      if (labelEl) {
+        labelEl.textContent = key === 'pace' ? pacePrefLabel(nextAnswer) : profileLabel(nextAnswer);
+        labelEl.classList.toggle('is-default', nextAnswer === PROFILE_DEFAULT);
+      }
     });
 
     scaleEl.addEventListener('keydown', (e) => {
@@ -3116,71 +3131,159 @@ function openProfileWizard(store, { forced = false } = {}) {
     }
   }
 
+  const SCALE_ENDS = {
+    museumPerson:     ['NOT FOR ME', 'LOVE THEM'],
+    foodTravel:       ['CASUAL EATS', 'FINE DINING'],
+    livePerformances: ['SKIP IT',    'FRONT ROW'],
+    outdoorNature:    ['INDOORS',    'ALL DAY OUT'],
+    nightlifeBars:    ['EARLY NIGHT','LATE NIGHT'],
+    structuredTours:  ['DIY',        'GUIDED'],
+    shoppingPerson:   ['NOT MY THING','BIG HAUL'],
+    pace:             ['RELAXED',    'NON-STOP']
+  };
+  const WHY_WE_ASK = {
+    museumPerson: 'Tells us how many cultural stops to weave in.',
+    foodTravel: 'Decides how many meal slots we flag for booking and how special they are.',
+    livePerformances: 'Helps us scout shows, concerts, and ticketed performances.',
+    outdoorNature: 'Calibrates how often we route through parks, trails, and the outdoors.',
+    nightlifeBars: 'Shapes evening plans — bars, late-night spots, or quiet wind-downs.',
+    structuredTours: 'Determines how much we lean on guided experiences vs. self-led exploration.',
+    shoppingPerson: 'Decides whether we carve out time for shopping districts and markets.',
+    pace: 'Sets how many activities we plan per day.',
+    dayStructure: 'Helps shape morning, afternoon, and evening blocks to match your rhythm.',
+    dietaryRestrictions: 'Lets us filter restaurants and meal suggestions.',
+    mobilityConsiderations: 'So we keep walking, stairs, and transit within your limits.',
+    budgetStyle: 'Calibrates how aggressively we suggest splurges or saves.',
+    travelCompanions: 'Helps the planner match the vibe of who you’re with.',
+    shoppingInterests: 'Lets us flag the right shops, markets, and neighborhoods.',
+    name: 'Names this profile so you can tell yours apart if you make more later.',
+    aboutMe: 'Free-form context the planner uses to tailor recommendations.'
+  };
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function pipLadderHtml(activeIndex) {
+    return Array.from({ length: totalSteps }, (_, i) => {
+      const cls = i === activeIndex ? 'current' : (i < activeIndex ? 'done' : '');
+      return `<span class="wizard-pip${cls ? ' ' + cls : ''}"></span>`;
+    }).join('');
+  }
+
   function render() {
     const { stepIndex } = wizardState;
-    const pct = Math.max(4, Math.round((stepIndex / (totalSteps - 1)) * 100));
+    const pct = Math.max(6, Math.round(((stepIndex + 1) / totalSteps) * 100));
 
     overlay.querySelector('.profile-wizard-progress-bar').style.width = `${pct}%`;
-    overlay.querySelector('.wizard-step-counter').textContent = `${stepIndex + 1} of ${totalSteps}`;
+
+    const ladder = overlay.querySelector('#wizardPipLadder');
+    if (ladder) ladder.innerHTML = pipLadderHtml(stepIndex);
+
+    const isAboutMe = stepIndex === aboutMeStepIndex;
+    const isName = stepIndex === 0;
+    const q = (!isName && !isAboutMe) ? PROFILE_QUESTIONS[stepIndex - 1] : null;
+
+    const eyebrowKey = isName ? 'PROFILE'
+      : isAboutMe ? 'ABOUT YOU'
+      : (q.summary || q.key).toUpperCase();
+    overlay.querySelector('.wizard-step-counter').innerHTML =
+      `<strong>STEP ${pad2(stepIndex + 1)}</strong> / ${pad2(totalSteps)}`;
 
     const backBtn = overlay.querySelector('#wizardBackBtn');
     const nextBtn = overlay.querySelector('#wizardNextBtn');
     backBtn.classList.toggle('hidden', stepIndex === 0);
-    nextBtn.textContent = stepIndex === totalSteps - 1 ? 'Finish' : 'Next';
+    nextBtn.innerHTML = isAboutMe
+      ? `Finish <i class="ph-bold ph-check"></i>`
+      : `Next <i class="ph-bold ph-arrow-right"></i>`;
 
-    let bodyHtml;
-    if (stepIndex === 0) {
-      bodyHtml = `
-        <p class="wizard-question-label">What would you like to name this profile?</p>
-        <input class="wizard-input wizard-text-input" type="text" maxlength="32"
+    const hintEl = overlay.querySelector('.profile-wizard-nav .wizard-hint');
+    if (hintEl) hintEl.innerHTML = `<kbd>↵</kbd> to ${isAboutMe ? 'finish' : 'continue'}`;
+
+    let titleHtml, subHtml = '', contentHtml;
+    if (isName) {
+      titleHtml = `What should we call this <span class="serif">profile</span>?`;
+      subHtml = `<p class="wizard-sub">Just a label — you can rename it later.</p>`;
+      contentHtml = `
+        <input class="wizard-input wizard-text-input wizard-name-input" type="text" maxlength="32"
           value="${esc(wizardState.name)}" placeholder="${esc(suggestedName)}" autocomplete="off" />
+        <div class="wizard-sub" style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-400);">
+          <span><span id="wizardNameCount">${wizardState.name.length}</span> / 32</span>
+          <span>Press Tab to advance</span>
+        </div>
       `;
-    } else if (stepIndex === aboutMeStepIndex) {
-      bodyHtml = `
-        <p class="wizard-question-label">Anything else we might have missed?</p>
-        <textarea class="wizard-input wizard-text-input wizard-textarea" rows="4"
+    } else if (isAboutMe) {
+      titleHtml = `Anything else we might have <span class="serif">missed?</span>`;
+      subHtml = `<p class="wizard-sub">Free-form context — quirks, constraints, anything that sharpens the plan.</p>`;
+      contentHtml = `
+        <textarea class="wizard-input wizard-text-input wizard-textarea" rows="5"
           placeholder="e.g. I'm not a morning person, I have a smaller budget, avoid things with lots of walking...">${esc(wizardState.aboutMe)}</textarea>
       `;
+    } else if (q.type === 'text') {
+      titleHtml = esc(q.label);
+      contentHtml = `
+        <textarea class="wizard-input wizard-text-input wizard-textarea" rows="4"
+          placeholder="${esc(q.placeholder || '')}">${esc(wizardState.answers[q.key] || '')}</textarea>
+      `;
     } else {
-      const q = PROFILE_QUESTIONS[stepIndex - 1];
-      if (q.type === 'text') {
-        bodyHtml = `
-          <p class="wizard-question-label">${esc(q.label)}</p>
-          <textarea class="wizard-input wizard-text-input wizard-textarea" rows="3"
-            placeholder="${esc(q.placeholder || '')}">${esc(wizardState.answers[q.key] || '')}</textarea>
-        `;
-      } else {
-        const active = Number(wizardState.answers[q.key]) || PROFILE_DEFAULT;
-        const dots = Array.from({ length: 5 }, (_, i) => {
-          const v = i + 1;
-          return `<span class="dot-scale-dot${v === active ? ' active' : ''}" data-value="${v}" role="button" tabindex="0" aria-label="${v}"></span>`;
-        }).join('');
-        const labelText = q.key === 'pace' ? pacePrefLabel(active) : profileLabel(active);
-        bodyHtml = `
-          <p class="wizard-question-label">${esc(q.label)}</p>
-          <div class="wizard-dot-scale-wrap">
-            <div class="dot-scale wizard-dot-scale" data-rating>${dots}</div>
-            <span class="dot-scale-label wizard-scale-label">${esc(labelText)}</span>
+      const active = Number(wizardState.answers[q.key]) || PROFILE_DEFAULT;
+      const dots = Array.from({ length: 5 }, (_, i) => {
+        const v = i + 1;
+        const cls = v === active ? 'active' : (v < active ? 'done' : '');
+        return `<span class="dot-scale-dot${cls ? ' ' + cls : ''}" data-value="${v}" role="button" tabindex="0" aria-label="${v}"></span>`;
+      }).join('');
+      const labelText = q.key === 'pace' ? pacePrefLabel(active) : profileLabel(active);
+      const ends = SCALE_ENDS[q.key] || ['LESS', 'MORE'];
+      const fillPct = ((active - 1) / 4) * 100;
+      titleHtml = esc(q.label);
+      contentHtml = `
+        <div class="wizard-dot-scale-wrap">
+          <div class="wizard-scale-head">
+            <span class="wizard-scale-value">${esc(labelText)}</span>
+            <span class="wizard-scale-index"><span class="js-scale-idx">${active}</span> of 5</span>
           </div>
-        `;
-      }
+          <div class="dot-scale wizard-dot-scale" data-rating style="--wiz-fill:${fillPct}%">${dots}</div>
+          <div class="wizard-scale-ends">
+            <span>${esc(ends[0])}</span>
+            <span>${esc(ends[1])}</span>
+          </div>
+        </div>
+      `;
     }
 
-    overlay.querySelector('#wizardCardBody').innerHTML = bodyHtml;
+    const whyKey = isName ? 'name' : (isAboutMe ? 'aboutMe' : q.key);
+    const whyText = WHY_WE_ASK[whyKey];
 
-    if (stepIndex > 0 && stepIndex < aboutMeStepIndex) {
-      const q = PROFILE_QUESTIONS[stepIndex - 1];
-      if (!q.type) {
-        overlay.querySelector('[data-rating]').addEventListener('click', (e) => {
-          const dot = e.target.closest('.dot-scale-dot');
-          if (!dot) return;
-          const v = Number(dot.dataset.value);
-          wizardState.answers[q.key] = v;
-          overlay.querySelectorAll('.dot-scale-dot').forEach((d) => d.classList.toggle('active', Number(d.dataset.value) === v));
-          const labelEl = overlay.querySelector('.wizard-scale-label');
-          if (labelEl) labelEl.textContent = q.key === 'pace' ? pacePrefLabel(v) : profileLabel(v);
+    overlay.querySelector('#wizardCardBody').innerHTML = `
+      <div class="wizard-body-eyebrow"><span class="key">STEP ${pad2(stepIndex + 1)}</span> ${esc(eyebrowKey)}</div>
+      <h2 class="wizard-question-label">${titleHtml}</h2>
+      ${subHtml}
+      ${contentHtml}
+      ${whyText ? `<div class="wizard-aside"><span class="key">Why we ask</span><span>${esc(whyText)}</span></div>` : ''}
+    `;
+
+    if (q && !q.type) {
+      const rail = overlay.querySelector('[data-rating]');
+      rail.addEventListener('click', (e) => {
+        const dot = e.target.closest('.dot-scale-dot');
+        if (!dot) return;
+        const v = Number(dot.dataset.value);
+        wizardState.answers[q.key] = v;
+        rail.querySelectorAll('.dot-scale-dot').forEach((d) => {
+          const dv = Number(d.dataset.value);
+          d.classList.toggle('active', dv === v);
+          d.classList.toggle('done', dv < v);
         });
-      }
+        rail.style.setProperty('--wiz-fill', `${((v - 1) / 4) * 100}%`);
+        const valEl = overlay.querySelector('.wizard-scale-value');
+        if (valEl) valEl.textContent = q.key === 'pace' ? pacePrefLabel(v) : profileLabel(v);
+        const idxEl = overlay.querySelector('.js-scale-idx');
+        if (idxEl) idxEl.textContent = String(v);
+      });
+    }
+
+    if (isName) {
+      const inp = overlay.querySelector('.wizard-name-input');
+      const counter = overlay.querySelector('#wizardNameCount');
+      if (inp && counter) inp.addEventListener('input', () => { counter.textContent = inp.value.length; });
     }
 
     const input = overlay.querySelector('.wizard-input');

@@ -303,17 +303,30 @@
     <div id="prefsModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Traveler Profile">
       <div class="modal-card">
         <div class="between">
-          <h3 id="prefsModalTitle">Traveler Profile</h3>
+          <div>
+            <div class="prefs-eyebrow"><span class="prefs-eyebrow-key">Profile</span> Traveler Profile</div>
+            <h3 id="prefsModalTitle">Traveler Profile</h3>
+          </div>
           <div class="modal-header-actions">
             <button id="profileEditBtn" class="icon-btn grey" type="button" title="Save profile"><i class="ph-bold ph-floppy-disk"></i></button>
             <button id="prefsClose" class="icon-btn red" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
           </div>
         </div>
 
-        <section class="prefs-section profile-section">
-          <div id="profileQuestions" class="profile-questions"></div>
+        <div id="profileQuestions">
+          <section class="prefs-section profile-section">
+            <h4>Travel style</h4>
+            <div id="pfScaleQs" class="profile-questions"></div>
+          </section>
 
-          <label class="profile-label" for="profileTravelNotes">Anything else we might have missed?</label>
+          <section class="prefs-section profile-section">
+            <h4>Specifics</h4>
+            <div id="pfTextQs" class="profile-questions"></div>
+          </section>
+        </div>
+
+        <section class="prefs-section profile-section">
+          <h4>Anything else we might have missed?</h4>
           <p class="ai-summary-hint">Any other preferences, quirks, or context the planner should know about you</p>
           <div class="textarea-expand-wrap">
             <textarea id="profileTravelNotes" rows="5" class="profile-textarea-fixed" placeholder="e.g. I'm not a morning person, I have a smaller budget, avoid things with lots of walking..."></textarea>
@@ -418,12 +431,14 @@
         <div class="profile-wizard-progress-bar-wrap">
           <div class="profile-wizard-progress-bar" id="wizardProgressBar"></div>
         </div>
+        <div class="wizard-pip-ladder" id="wizardPipLadder"></div>
         <div class="profile-wizard-card">
           <div id="wizardCardBody"></div>
         </div>
         <div class="profile-wizard-nav">
-          <button id="wizardBackBtn" class="btn-secondary hidden" type="button">Back</button>
-          <button id="wizardNextBtn" class="btn-primary" type="button">Next</button>
+          <button id="wizardBackBtn" class="hidden" type="button"><i class="ph-bold ph-arrow-left"></i> Back</button>
+          <span class="wizard-hint"><kbd>↵</kbd> to continue</span>
+          <button id="wizardNextBtn" type="button">Next <i class="ph-bold ph-arrow-right"></i></button>
         </div>
       </div>
     </div>
