@@ -6878,11 +6878,16 @@ function classifyStop(row) {
 
 function formatStopTime(timeLabel) {
   if (!timeLabel) return '<span class="end">—</span>';
-  const parts = String(timeLabel).split(/\s*[–-]\s*|\s*→\s*/);
-  if (parts.length >= 2) {
-    return `${esc(parts[0])}<span class="end">→ ${esc(parts[1])}</span>`;
+  const label = String(timeLabel);
+  const rangeParts = label.split(/\s*→\s*|\s+[–-]\s+/);
+  if (rangeParts.length >= 2) {
+    return `${esc(rangeParts[0])}<span class="end">→ ${esc(rangeParts[1])}</span>`;
   }
-  return esc(timeLabel);
+  const dateTimeParts = label.split(/,\s+/);
+  if (dateTimeParts.length >= 2) {
+    return `${esc(dateTimeParts[0])}<span class="end">${esc(dateTimeParts.slice(1).join(', '))}</span>`;
+  }
+  return esc(label);
 }
 
 function renderStop(row) {
