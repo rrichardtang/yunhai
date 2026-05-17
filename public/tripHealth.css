@@ -40,14 +40,42 @@
 .trip-health-popover p { margin: 6px 0; color: #1E293B; }
 .trip-health-popover strong { color: #0F172A; }
 
-/* Modal shell — scoped to #checklistModal so other modals (prefs, addActivity,
-   attachmentViewer, finalize) keep their existing shell from styles.css. */
-#checklistModal {
+/* GuideMe Booking Checklist — redesigned styles
+ *
+ * Drop-in replacement for the checklist module styles currently in
+ * public/tripHealth.css. The selectors below match the markup produced
+ * by renderChecklistModal() in public/app.js (and the modal shell in
+ * public/planner.html) 1:1 — no JS changes required.
+ *
+ * Token dependencies (defined in public/styles.css):
+ *   --paper-0, --paper-1, --paper-2, --hair, --hair-strong,
+ *   --text-900, --text-700, --text-500, --text-400,
+ *   --accent, --accent-soft, --accent-deep, --accent-hover,
+ *   --ok, --err, --r-sm, --r-md, --r-lg, --r-pill, --r-xl,
+ *   --sh-sm, --sh-md, --sh-lg, --dur-fast, --ease-out,
+ *   --font-mono
+ *
+ * If the codebase uses the older names from tripHealth.css
+ * (--base-light, --secondary-light, etc.), wire them through aliases.
+ */
+
+/* =====================================================================
+   BOOKING CHECKLIST — redesigned to GuideMe tokens
+   Selectors match public/js + public/tripHealth.css 1:1 so the live
+   renderChecklistModal() markup picks these up unchanged.
+   ===================================================================== */
+
+/* Modal shell (matches .modal / .modal-card from app + the .checklist-modal-card override) */
+.modal {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
   background: rgba(10, 22, 40, .42);
   backdrop-filter: blur(8px);
+  z-index: 1900;
   padding: 24px;
 }
-#checklistModal > .modal-card {
+.modal.hidden { display: none; }
+.modal-card {
   width: min(720px, 100%);
   max-height: calc(100vh - 48px);
   background: var(--paper-1);
@@ -57,7 +85,6 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 0;
 }
 
 .checklist-modal-card {
@@ -80,11 +107,6 @@
   letter-spacing: -0.02em;
   color: var(--text-900);
   line-height: 1.15;
-}
-.checklist-modal-header h3 .serif {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 400;
 }
 .checklist-modal-header .icon-btn {
   width: 32px; height: 32px;
