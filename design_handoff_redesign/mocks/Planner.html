@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GuideMe — Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/planner.css">
+</head>
+<body>
+
+<div class="planner">
+
+  <!-- TOPBAR -->
+  <header class="ptop">
+    <div class="ptop__brand">
+      <span class="name">Guide<span class="me">me</span></span>
+      <span class="sub">Personal AI itinerary builder</span>
+    </div>
+
+    <div class="ptop__actions">
+      <div class="mode" role="group" aria-label="View mode">
+        <button class="active" type="button">Planning</button>
+        <button type="button">Itinerary</button>
+      </div>
+
+      <button class="ptop__icon health-ready" type="button" title="Trip Health" aria-label="Trip Health">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12h3l2-5 4 10 2-5h7"/>
+        </svg>
+      </button>
+
+      <button class="ptop__checklist" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="17" rx="2"/>
+          <path d="m8 12 3 3 5-6"/>
+        </svg>
+        Checklist
+      </button>
+
+      <button class="ptop__icon" type="button" title="Profile" aria-label="Profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="pmain">
+
+    <!-- STEPPER -->
+    <nav class="steps" aria-label="Planning steps">
+      <button class="step done" type="button">
+        <span class="step__node"></span>
+        <span class="step__label">Setup</span>
+      </button>
+      <button class="step active" type="button">
+        <span class="step__node"><span>2</span></span>
+        <span class="step__label">Review</span>
+      </button>
+      <button class="step" type="button">
+        <span class="step__node"><span>3</span></span>
+        <span class="step__label">Arrange</span>
+      </button>
+      <button class="step" type="button">
+        <span class="step__node"><span>4</span></span>
+        <span class="step__label">Finalize</span>
+      </button>
+    </nav>
+
+    <!-- BUDGET TRACKER -->
+    <div class="budget-tracker" style="--pct: 61%">
+      <span class="label">
+        Budget Tracker
+        <span class="info" aria-hidden="true">i</span>
+      </span>
+      <span class="amount"><span class="spent">$910</span> / $1,500</span>
+      <button class="btn-opt" type="button" data-optimize-toggle>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/>
+        </svg>
+        <span class="btn-opt__label">Optimize</span>
+      </button>
+    </div>
+
+    <!-- REVIEW PANEL -->
+    <section class="panel">
+      <div class="panel__head">
+        <div>
+          <h2>Review <span class="serif">Activities</span></h2>
+          <p class="panel__sub">Approve what fits. Skip the rest. Tap <span class="acard__hint">↻</span> on any card for details and budget alternatives.</p>
+        </div>
+      </div>
+
+      <div class="review-toolbar">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="search" placeholder="Search activities, neighborhoods, cuisines…">
+        </div>
+        <select aria-label="Filter by city">
+          <option>All cities</option>
+          <option>Córdoba</option>
+          <option>Seville</option>
+          <option>Granada</option>
+        </select>
+        <select aria-label="Filter by state">
+          <option>All states</option>
+          <option>Unreviewed</option>
+          <option>Approved</option>
+          <option>Declined</option>
+        </select>
+        <button class="approve-all" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>
+          </svg>
+          Approve All
+        </button>
+      </div>
+
+      <div class="cards-grid" data-cards-grid>
+
+        <!-- ============ CARD 1 ============ -->
+        <article class="acard" data-card>
+          <div class="acard__inner">
+            <!-- FRONT -->
+            <div class="acard__face">
+              <div class="acard__media ph"><span class="ph-label">mezquita-catedral</span>
+                <button class="acard__flip" type="button" data-flip aria-label="Show details and alternatives" title="Details & alternatives">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><path d="M21 4v5h-5"/></svg>
+                </button>
+                <button class="acard__map-pin" type="button" title="Map" aria-label="View on map">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.5 7-13a7 7 0 0 0-14 0c0 5.5 7 13 7 13Z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                </button>
+              </div>
+              <div class="acard__tags">
+                <span class="tagpill">tour</span>
+                <span class="tagpill tagpill--recommend">Recommend</span>
+                <span class="tagpill tagpill--source">GetYourGuide</span>
+              </div>
+              <div class="acard__body">
+                <h3 class="acard__title">Mezquita-Catedral Guided Tour</h3>
+                <div class="acard__city"><strong>City:</strong> Córdoba, Spain</div>
+                <p class="acard__why"><strong>Why it fits:</strong> Already booked — this is the centerpiece of your Córdoba day. Morning slot avoids tour-group crush.</p>
+                <div class="acard__divider">
+                  <span>2h · English</span>
+                  <span class="cost">€22/ea</span>
+                </div>
+              </div>
+              <div class="acard__actions">
+                <button class="gm-btn gm-btn--ghost gm-btn--sm">Skip</button>
+                <button class="gm-btn gm-btn--primary gm-btn--sm">Approved ✓</button>
+              </div>
+            </div>
+            <!-- BACK -->
+                                    <div class="acard__back">
+              <div class="acard__back-head">
+                <h4 class="acard__back-title">Map view</h4>
+                <button class="acard__back-close" type="button" data-flip aria-label="Flip back" title="Flip back">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+                </button>
+              </div>
+              <p class="acard__back-subtitle">Mezquita-Catedral Guided Tour · Córdoba, Spain</p>
+              <a class="acard__map" href="https://www.google.com/maps/search/?api=1&query=Mezquita%20Catedral%20de%20C%C3%B3rdoba" target="_blank" rel="noopener" aria-label="Open Mezquita-Catedral Guided Tour in Google Maps">
+                <iframe src="https://www.google.com/maps?q=Mezquita%20Catedral%20de%20C%C3%B3rdoba&output=embed&z=15" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Mezquita-Catedral Guided Tour map"></iframe>
+                <span class="acard__map-fallback">Map preview</span>
+              </a>
+              <p class="acard__back-caption">Tap map to open full-screen itinerary map.</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ CARD 2 ============ -->
+        <article class="acard" data-card>
+          <div class="acard__inner">
+            <div class="acard__face">
+              <div class="acard__media ph"><span class="ph-label">dinner · choco</span>
+                <button class="acard__flip" type="button" data-flip aria-label="Show details and alternatives" title="Details & alternatives">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><path d="M21 4v5h-5"/></svg>
+                </button>
+                <button class="acard__map-pin" type="button" title="Map" aria-label="View on map">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.5 7-13a7 7 0 0 0-14 0c0 5.5 7 13 7 13Z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                </button>
+              </div>
+              <div class="acard__tags">
+                <span class="tagpill">dinner</span>
+                <span class="tagpill tagpill--caveat">Recommend with caveats</span>
+              </div>
+              <div class="acard__body">
+                <h3 class="acard__title">Dinner at Choco</h3>
+                <div class="acard__city"><strong>City:</strong> Córdoba, Spain</div>
+                <p class="acard__why"><strong>Why it fits:</strong> Chef Kisko García's Michelin-starred tasting menu. Reservation needed 3+ weeks out — flagged in your Checklist.</p>
+                <div class="acard__divider">
+                  <span>2.5h · tasting menu</span>
+                  <span class="cost">€135/ea</span>
+                </div>
+              </div>
+              <div class="acard__actions">
+                <button class="gm-btn gm-btn--ghost gm-btn--sm">Skip</button>
+                <button class="gm-btn gm-btn--accent gm-btn--sm">Approve</button>
+              </div>
+            </div>
+                                    <div class="acard__back">
+              <div class="acard__back-head">
+                <h4 class="acard__back-title">Map view</h4>
+                <button class="acard__back-close" type="button" data-flip aria-label="Flip back" title="Flip back">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+                </button>
+              </div>
+              <p class="acard__back-subtitle">Dinner at Choco · Córdoba, Spain</p>
+              <a class="acard__map" href="https://www.google.com/maps/search/?api=1&query=Choco%20C%C3%B3rdoba%20restaurant" target="_blank" rel="noopener" aria-label="Open Dinner at Choco in Google Maps">
+                <iframe src="https://www.google.com/maps?q=Choco%20C%C3%B3rdoba%20restaurant&output=embed&z=15" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Dinner at Choco map"></iframe>
+                <span class="acard__map-fallback">Map preview</span>
+              </a>
+              <p class="acard__back-caption">Tap map to open full-screen itinerary map.</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ CARD 3 ============ -->
+        <article class="acard" data-card>
+          <div class="acard__inner">
+            <div class="acard__face">
+              <div class="acard__media ph"><span class="ph-label">alcázar gardens</span>
+                <button class="acard__flip" type="button" data-flip aria-label="Show details and alternatives" title="Details & alternatives">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><path d="M21 4v5h-5"/></svg>
+                </button>
+                <button class="acard__map-pin" type="button" title="Map" aria-label="View on map">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.5 7-13a7 7 0 0 0-14 0c0 5.5 7 13 7 13Z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                </button>
+              </div>
+              <div class="acard__tags">
+                <span class="tagpill">outdoors</span>
+                <span class="tagpill tagpill--recommend">Recommend</span>
+              </div>
+              <div class="acard__body">
+                <h3 class="acard__title">Alcázar de los Reyes Cristianos</h3>
+                <div class="acard__city"><strong>City:</strong> Córdoba, Spain</div>
+                <p class="acard__why"><strong>Why it fits:</strong> Terraced gardens and Mudéjar architecture, 6-minute walk from Mezquita. Pairs well with your afternoon.</p>
+                <div class="acard__divider">
+                  <span>1.5h · self-guided</span>
+                  <span class="cost">€7/ea</span>
+                </div>
+              </div>
+              <div class="acard__actions">
+                <button class="gm-btn gm-btn--ghost gm-btn--sm">Skip</button>
+                <button class="gm-btn gm-btn--accent gm-btn--sm">Approve</button>
+              </div>
+            </div>
+                                    <div class="acard__back">
+              <div class="acard__back-head">
+                <h4 class="acard__back-title">Map view</h4>
+                <button class="acard__back-close" type="button" data-flip aria-label="Flip back" title="Flip back">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+                </button>
+              </div>
+              <p class="acard__back-subtitle">Alcázar de los Reyes Cristianos · Córdoba, Spain</p>
+              <a class="acard__map" href="https://www.google.com/maps/search/?api=1&query=Alc%C3%A1zar%20de%20los%20Reyes%20Cristianos%20C%C3%B3rdoba" target="_blank" rel="noopener" aria-label="Open Alcázar de los Reyes Cristianos in Google Maps">
+                <iframe src="https://www.google.com/maps?q=Alc%C3%A1zar%20de%20los%20Reyes%20Cristianos%20C%C3%B3rdoba&output=embed&z=15" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Alcázar de los Reyes Cristianos map"></iframe>
+                <span class="acard__map-fallback">Map preview</span>
+              </a>
+              <p class="acard__back-caption">Tap map to open full-screen itinerary map.</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ CARD 4 ============ -->
+        <article class="acard" data-card>
+          <div class="acard__inner">
+            <div class="acard__face">
+              <div class="acard__media ph"><span class="ph-label">patios walking tour</span>
+                <button class="acard__flip" type="button" data-flip aria-label="Show details and alternatives" title="Details & alternatives">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><path d="M21 4v5h-5"/></svg>
+                </button>
+                <button class="acard__map-pin" type="button" title="Map" aria-label="View on map">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.5 7-13a7 7 0 0 0-14 0c0 5.5 7 13 7 13Z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                </button>
+              </div>
+              <div class="acard__tags">
+                <span class="tagpill">walking</span>
+                <span class="tagpill tagpill--recommend">Recommend</span>
+                <span class="tagpill tagpill--source">GetYourGuide</span>
+              </div>
+              <div class="acard__body">
+                <h3 class="acard__title">Córdoba Patios Walking Tour</h3>
+                <div class="acard__city"><strong>City:</strong> Córdoba, Spain</div>
+                <p class="acard__why"><strong>Why it fits:</strong> UNESCO-listed flowered patios, best in May. Small-group format matches your "under 10 people" note.</p>
+                <div class="acard__divider">
+                  <span>2h · small group</span>
+                  <span class="cost">€28/ea</span>
+                </div>
+              </div>
+              <div class="acard__actions">
+                <button class="gm-btn gm-btn--ghost gm-btn--sm">Skip</button>
+                <button class="gm-btn gm-btn--accent gm-btn--sm">Approve</button>
+              </div>
+            </div>
+                                    <div class="acard__back">
+              <div class="acard__back-head">
+                <h4 class="acard__back-title">Map view</h4>
+                <button class="acard__back-close" type="button" data-flip aria-label="Flip back" title="Flip back">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+                </button>
+              </div>
+              <p class="acard__back-subtitle">Córdoba Patios Walking Tour · Córdoba, Spain</p>
+              <a class="acard__map" href="https://www.google.com/maps/search/?api=1&query=San%20Basilio%20C%C3%B3rdoba%20patios" target="_blank" rel="noopener" aria-label="Open Córdoba Patios Walking Tour in Google Maps">
+                <iframe src="https://www.google.com/maps?q=San%20Basilio%20C%C3%B3rdoba%20patios&output=embed&z=15" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Córdoba Patios Walking Tour map"></iframe>
+                <span class="acard__map-fallback">Map preview</span>
+              </a>
+              <p class="acard__back-caption">Tap map to open full-screen itinerary map.</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ CARD 5 ============ -->
+        <article class="acard" data-card>
+          <div class="acard__inner">
+            <div class="acard__face">
+              <div class="acard__media ph"><span class="ph-label">flamenco tablao</span>
+                <button class="acard__flip" type="button" data-flip aria-label="Show details and alternatives" title="Details & alternatives">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><path d="M21 4v5h-5"/></svg>
+                </button>
+                <button class="acard__map-pin" type="button" title="Map" aria-label="View on map">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.5 7-13a7 7 0 0 0-14 0c0 5.5 7 13 7 13Z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                </button>
+              </div>
+              <div class="acard__tags">
+                <span class="tagpill">evening</span>
+                <span class="tagpill tagpill--caveat">Recommend with caveats</span>
+              </div>
+              <div class="acard__body">
+                <h3 class="acard__title">Tablao Flamenco El Cardenal</h3>
+                <div class="acard__city"><strong>City:</strong> Córdoba, Spain</div>
+                <p class="acard__why"><strong>Why it fits:</strong> Intimate 80-seat venue. Heads up — 22:30 start means a late night; only approve if you're flexible on next day.</p>
+                <div class="acard__divider">
+                  <span>1.5h · 21:30</span>
+                  <span class="cost">€25/ea</span>
+                </div>
+              </div>
+              <div class="acard__actions">
+                <button class="gm-btn gm-btn--ghost gm-btn--sm">Skip</button>
+                <button class="gm-btn gm-btn--accent gm-btn--sm">Approve</button>
+              </div>
+            </div>
+                                    <div class="acard__back">
+              <div class="acard__back-head">
+                <h4 class="acard__back-title">Map view</h4>
+                <button class="acard__back-close" type="button" data-flip aria-label="Flip back" title="Flip back">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+                </button>
+              </div>
+              <p class="acard__back-subtitle">Tablao Flamenco El Cardenal · Córdoba, Spain</p>
+              <a class="acard__map" href="https://www.google.com/maps/search/?api=1&query=Tablao%20Flamenco%20El%20Cardenal%20C%C3%B3rdoba" target="_blank" rel="noopener" aria-label="Open Tablao Flamenco El Cardenal in Google Maps">
+                <iframe src="https://www.google.com/maps?q=Tablao%20Flamenco%20El%20Cardenal%20C%C3%B3rdoba&output=embed&z=15" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Tablao Flamenco El Cardenal map"></iframe>
+                <span class="acard__map-fallback">Map preview</span>
+              </a>
+              <p class="acard__back-caption">Tap map to open full-screen itinerary map.</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ CARD 6 ============ -->
+        <article class="acard" data-card>
+          <div class="acard__inner">
+            <div class="acard__face">
+              <div class="acard__media ph"><span class="ph-label">hammam · arab baths</span>
+                <button class="acard__flip" type="button" data-flip aria-label="Show details and alternatives" title="Details & alternatives">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><path d="M21 4v5h-5"/></svg>
+                </button>
+                <button class="acard__map-pin" type="button" title="Map" aria-label="View on map">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.5 7-13a7 7 0 0 0-14 0c0 5.5 7 13 7 13Z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                </button>
+              </div>
+              <div class="acard__tags">
+                <span class="tagpill">wellness</span>
+                <span class="tagpill tagpill--recommend">Recommend</span>
+              </div>
+              <div class="acard__body">
+                <h3 class="acard__title">Hammam Al Ándalus</h3>
+                <div class="acard__city"><strong>City:</strong> Córdoba, Spain</div>
+                <p class="acard__why"><strong>Why it fits:</strong> Candlelit Arab baths inside a 10th-century building. Good recovery slot between your walking-heavy days.</p>
+                <div class="acard__divider">
+                  <span>1.5h · with massage</span>
+                  <span class="cost">€45/ea</span>
+                </div>
+              </div>
+              <div class="acard__actions">
+                <button class="gm-btn gm-btn--ghost gm-btn--sm">Skip</button>
+                <button class="gm-btn gm-btn--accent gm-btn--sm">Approve</button>
+              </div>
+            </div>
+                                    <div class="acard__back">
+              <div class="acard__back-head">
+                <h4 class="acard__back-title">Map view</h4>
+                <button class="acard__back-close" type="button" data-flip aria-label="Flip back" title="Flip back">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+                </button>
+              </div>
+              <p class="acard__back-subtitle">Hammam Al Ándalus · Córdoba, Spain</p>
+              <a class="acard__map" href="https://www.google.com/maps/search/?api=1&query=Hammam%20Al%20%C3%81ndalus%20C%C3%B3rdoba" target="_blank" rel="noopener" aria-label="Open Hammam Al Ándalus in Google Maps">
+                <iframe src="https://www.google.com/maps?q=Hammam%20Al%20%C3%81ndalus%20C%C3%B3rdoba&output=embed&z=15" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Hammam Al Ándalus map"></iframe>
+                <span class="acard__map-fallback">Map preview</span>
+              </a>
+              <p class="acard__back-caption">Tap map to open full-screen itinerary map.</p>
+            </div>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FLOATING STEP NAV -->
+  <div class="step-nav">
+    <button type="button" title="Back" aria-label="Back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <button type="button" title="Save progress" aria-label="Save progress">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+    </button>
+    <button type="button" class="primary" title="Next" aria-label="Next">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+
+  <!-- CHAT BUBBLE -->
+  <button class="chat-bubble" type="button" aria-label="Open travel assistant">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.6-.8L3 21l1.8-5.4A8.38 8.38 0 0 1 4 11.5a8.5 8.5 0 0 1 17 0Z"/></svg>
+  </button>
+
+</div>
+
+<script>
+  // ----- Stepper click -----
+  document.querySelectorAll('.step').forEach(s => {
+    s.addEventListener('click', () => {
+      document.querySelectorAll('.step').forEach(x => x.classList.remove('active'));
+      s.classList.add('active');
+    });
+  });
+
+  // ----- Mode toggle -----
+  document.querySelectorAll('.mode button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.mode button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  // ----- Flippable card logic -----
+  // Single delegated handler so it survives DOM updates and works for
+  // any element with [data-flip] inside an .acard (front button, back
+  // close-chevron, "Back" footer button — all the same flip).
+  document.addEventListener('click', (e) => {
+    const flipTrigger = e.target.closest('[data-flip]');
+    if (flipTrigger) {
+      const card = flipTrigger.closest('.acard');
+      if (card) {
+        e.stopPropagation();
+        card.classList.toggle('is-flipped');
+      }
+      return;
+    }
+
+    // Optimize toggle in budget tracker — flips ALL cards to the
+    // alternatives side at once.
+    const optBtn = e.target.closest('[data-optimize-toggle]');
+    if (optBtn) {
+      const grid = document.querySelector('[data-cards-grid]');
+      const cards = document.querySelectorAll('.acard');
+      const isOptimizing = grid.classList.toggle('is-optimizing');
+      cards.forEach(c => c.classList.toggle('is-flipped', isOptimizing));
+      const label = optBtn.querySelector('.btn-opt__label');
+      if (label) label.textContent = isOptimizing ? 'Done optimizing' : 'Optimize';
+    }
+  });
+
+  // ----- Keyboard: Esc flips any open card back -----
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.acard.is-flipped').forEach(c => c.classList.remove('is-flipped'));
+      const grid = document.querySelector('[data-cards-grid]');
+      if (grid) grid.classList.remove('is-optimizing');
+      const label = document.querySelector('[data-optimize-toggle] .btn-opt__label');
+      if (label) label.textContent = 'Optimize';
+    }
+  });
+</script>
+
+</body>
+</html>
