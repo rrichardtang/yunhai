@@ -215,29 +215,30 @@
           <section class="fin-send" aria-label="Send your itinerary">
             <div class="fin-send__grid">
               <button id="syncGoogleCalendarBtn" class="send-tile" type="button">
-                <span class="send-tile__icon"><i class="ph ph-calendar-blank" aria-hidden="true"></i></span>
+                <span class="send-tile__icon"><i class="ph-bold ph-calendar-blank" aria-hidden="true"></i></span>
                 <span class="send-tile__body">
                   <span class="send-tile__title">Sync with Google Calendar</span>
                   <span class="send-tile__sub">One event per stop, with addresses and booking notes attached.</span>
                 </span>
-                <span class="send-tile__arrow" aria-hidden="true"><i class="ph ph-arrow-up-right"></i></span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph-bold ph-arrow-up-right"></i></span>
               </button>
-              <button id="downloadCalendarBtn" class="send-tile" type="button">
-                <span class="send-tile__icon"><i class="ph ph-file-text" aria-hidden="true"></i></span>
+              <button id="savePdfBtn" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph-bold ph-file-pdf" aria-hidden="true"></i></span>
                 <span class="send-tile__body">
-                  <span class="send-tile__title">Export as .ics</span>
-                  <span class="send-tile__sub">Print-ready calendar file with maps, bookings, and offline-friendly day pages.</span>
+                  <span class="send-tile__title">Save as PDF</span>
+                  <span class="send-tile__sub">Print-ready itinerary with maps, bookings, and offline-friendly day pages.</span>
                 </span>
-                <span class="send-tile__arrow" aria-hidden="true"><i class="ph ph-arrow-up-right"></i></span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph-bold ph-arrow-up-right"></i></span>
               </button>
               <button id="shareTripLinkBtn" class="send-tile" type="button">
-                <span class="send-tile__icon"><i class="ph ph-share-network" aria-hidden="true"></i></span>
+                <span class="send-tile__icon"><i class="ph-bold ph-share-network" aria-hidden="true"></i></span>
                 <span class="send-tile__body">
                   <span class="send-tile__title">Share with Friends</span>
                   <span class="send-tile__sub">A live link they can open on their phone — read-only, always current.</span>
                 </span>
-                <span class="send-tile__arrow" aria-hidden="true"><i class="ph ph-arrow-up-right"></i></span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph-bold ph-arrow-up-right"></i></span>
               </button>
+              <button id="downloadCalendarBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
             </div>
             <input type="hidden" id="calendarMetadataMode" value="compact" />
             <button id="connectGoogleCalendarBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
