@@ -4420,7 +4420,7 @@ select.gm-inp {
   letter-spacing: -0.005em; white-space: nowrap;
 }
 
-/* Send tiles — reuse the same look as Finalize */
+/* Send tiles — mirror Finalize's #step4 .send-tile exactly */
 .itin-send { margin-bottom: 32px; }
 .itin-send__grid {
   display: grid;
@@ -4428,41 +4428,55 @@ select.gm-inp {
   gap: 12px;
 }
 .itin-send .send-tile {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  position: relative;
+  text-align: left;
+  display: flex;
   align-items: center;
   gap: 12px;
-  text-align: left;
-  padding: 16px 20px;
-  border-radius: 16px;
+  padding: 14px 40px 14px 16px;
   background: var(--paper-1, #FAF8F4);
-  border: 1px solid var(--hair, rgba(10,22,40,.08));
-  color: var(--text-900, #0A1628);
+  border: 1px solid rgba(10,22,40,.16);
+  border-radius: 16px;
+  box-shadow: var(--sh-sm, 0 1px 2px rgba(10,22,40,.04));
   cursor: pointer;
-  transition: background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+  font-weight: 400;
+  min-height: 64px;
   font-family: var(--font-sans, 'Geist', system-ui, sans-serif);
+  color: var(--text-900, #0A1628);
+  transition: border-color .14s ease, transform .14s ease, box-shadow .14s ease;
 }
 .itin-send .send-tile:hover {
-  background: var(--ink-900, #0A1628);
-  color: var(--paper-0, #F4F1EC);
-  border-color: var(--ink-900, #0A1628);
+  border-color: var(--text-900, #0A1628);
+  transform: translateY(-1px);
+  box-shadow: var(--sh-md, 0 4px 18px rgba(10,22,40,.06));
 }
-.itin-send .send-tile:disabled { opacity: .55; cursor: not-allowed; }
+.itin-send .send-tile:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 .itin-send .send-tile__icon {
+  flex-shrink: 0;
   width: 32px; height: 32px;
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 50%;
   background: var(--paper-2, #EEEAE3);
-  color: var(--ink-900, #0A1628);
+  border-radius: 8px;
+  color: var(--text-900, #0A1628);
 }
-.itin-send .send-tile:hover .send-tile__icon { background: rgba(244,241,236,.14); color: var(--paper-0, #F4F1EC); }
 .itin-send .send-tile__icon i { font-size: 16px; line-height: 1; }
-.itin-send .send-tile__title { font-size: 14px; font-weight: 500; letter-spacing: -0.005em; }
-.itin-send .send-tile__arrow {
-  color: var(--text-500, #5A6679);
-  transition: transform .18s ease;
+.itin-send .send-tile__title {
+  flex: 1;
+  font-size: 14px; font-weight: 600;
+  color: var(--text-900, #0A1628);
+  letter-spacing: -0.005em; line-height: 1.3;
 }
-.itin-send .send-tile:hover .send-tile__arrow { transform: translate(2px, -2px); color: var(--paper-0, #F4F1EC); }
+.itin-send .send-tile__arrow {
+  position: absolute;
+  top: 14px; right: 14px;
+  color: var(--text-400, #8490A3);
+  font-size: 14px;
+  transition: transform .14s ease, color .14s ease;
+}
+.itin-send .send-tile:hover .send-tile__arrow {
+  transform: translate(2px, -2px);
+  color: var(--text-900, #0A1628);
+}
 @media (max-width: 720px) { .itin-send__grid { grid-template-columns: 1fr; } }
 
 /* City sections */
@@ -4554,6 +4568,27 @@ select.gm-inp {
 }
 .stop__body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .stop__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 10px; }
+.stop__kind {
+  font-family: var(--font-mono, 'Geist Mono', ui-monospace, monospace);
+  font-size: 9.5px; font-weight: 500;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-500, #5A6679);
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: var(--paper-2, #EEEAE3);
+  border: 1px solid var(--hair, rgba(10,22,40,.08));
+  white-space: nowrap;
+}
+.stop__kind.stop__kind--accent {
+  color: var(--accent-deep, #0B4AB8);
+  background: var(--accent-soft, #E6EFFE);
+  border-color: rgba(47,125,251,.18);
+}
+.stop__kind.stop__kind--travel {
+  background: var(--ink-900, #0A1628);
+  color: var(--paper-0, #F4F1EC);
+  border-color: var(--ink-900, #0A1628);
+}
 .stop__title {
   font-size: 15px; font-weight: 500;
   color: var(--text-900, #0A1628);
