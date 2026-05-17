@@ -1193,7 +1193,10 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 .modal-card {
   width: min(720px, calc(100% - 24px));
   max-height: calc(100vh - 24px);
-  overflow: auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   background: var(--base-light);
   border-radius: 24px;
   padding: 24px;
