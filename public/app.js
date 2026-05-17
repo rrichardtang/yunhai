@@ -6640,6 +6640,8 @@ function getCityAccomTravelRows(city, cityIdx) {
       id: `acc_${cityIdx}`,
       title: address || 'Accommodation',
       timeLabel,
+      date: logAcc.checkIn || '',
+      kindLabel: 'Stay',
       location: '',
       notes: '',
       referenceNum: '',
@@ -6654,6 +6656,8 @@ function getCityAccomTravelRows(city, cityIdx) {
       id: `arr_${cityIdx}`,
       title: loc ? `Arrival: ${loc}` : 'Arrival',
       timeLabel: formatDateTimeLabel(arrival.date, arrival.time),
+      date: arrival.date || '',
+      kindLabel: modeToLabel(arrival.mode),
       location: '',
       notes: '',
       referenceNum: '',
@@ -6668,6 +6672,8 @@ function getCityAccomTravelRows(city, cityIdx) {
       id: `dep_${cityIdx}`,
       title: loc ? `Departure: ${loc}` : 'Departure',
       timeLabel: formatDateTimeLabel(departure.date, departure.time),
+      date: departure.date || '',
+      kindLabel: modeToLabel(departure.mode),
       location: '',
       notes: '',
       referenceNum: '',
@@ -6677,6 +6683,16 @@ function getCityAccomTravelRows(city, cityIdx) {
   }
 
   return rows;
+}
+
+function modeToLabel(mode) {
+  switch (String(mode || '').toLowerCase()) {
+    case 'flight': return 'Flight';
+    case 'train': return 'Train';
+    case 'car': return 'Car';
+    case 'other': return 'Other';
+    default: return 'Travel';
+  }
 }
 
 function getConsolidatedConfirmations() {
@@ -6889,11 +6905,17 @@ function renderStop(row) {
     : '';
   const noteHtml = row.notes ? `<p class="stop__note">${esc(row.notes)}</p>` : '';
 
+  let kindHtml = '';
+  if (row.kindLabel) {
+    const kindMod = mod === 'is-travel' ? 'stop__kind--travel' : mod === 'is-lodging' ? 'stop__kind--accent' : '';
+    kindHtml = `<span class="stop__kind ${kindMod}">${esc(row.kindLabel)}</span>`;
+  }
+
   return `
     <div class="stop ${mod}" data-activity-id="${esc(row.id)}">
       <div class="stop__time">${formatStopTime(row.timeLabel)}</div>
       <div class="stop__body">
-        <div class="stop__head"><h4 class="stop__title">${esc(row.title || 'Untitled')}</h4></div>
+        <div class="stop__head">${kindHtml}<h4 class="stop__title">${esc(row.title || 'Untitled')}</h4></div>
         ${metaHtml}
         ${noteHtml}
         ${refHtml}
@@ -6955,35 +6977,35 @@ function renderItineraryMode() {
     const accomTravelRows = getCityAccomTravelRows(cityObj, cityIdx);
     const cityRows = rowsByCity[cityName] || [];
 
-    const accomTravelByDate = {};
-    accomTravelRows.forEach((row) => {
-      const dateMatch = String(row.timeLabel || '').match(/^([A-Z][a-z]{2}\s+\d+)/);
-      const dateKey = dateMatch ? dateMatch[1] : '__pinned__';
-      (accomTravelByDate[dateKey] = accomTravelByDate[dateKey] || []).push(row);
+    const dayGroups = {};
+    cityRows.forEach((row) => {
+      (dayGroups[row.date] = dayGroups[row.date] || []).push(row);
     });
 
-    const activityDayGroups = cityRows.reduce((acc, row) => {
-      (acc[row.date] = acc[row.date] || []).push(row);
-      return acc;
-    }, {});
-    const dayOrder = Object.keys(activityDayGroups).sort();
+    const orphanLogistics = [];
+    accomTravelRows.forEach((row) => {
+      const key = row.date || '';
+      if (key && dayGroups[key]) {
+        dayGroups[key].unshift(row);
+      } else if (key) {
+        dayGroups[key] = [row];
+      } else {
+        orphanLogistics.push(row);
+      }
+    });
 
-    const cityStart = dayOrder[0] ? formatDateShort(dayOrder[0]) : (accomTravelRows[0]?.timeLabel?.split('→')[0]?.trim() || '');
+    const dayOrder = Object.keys(dayGroups).sort();
+
+    const cityStart = dayOrder[0] ? formatDateShort(dayOrder[0]) : '';
     const cityEnd = dayOrder[dayOrder.length - 1] ? formatDateShort(dayOrder[dayOrder.length - 1]) : '';
     const nightsInCity = Math.max(1, dayOrder.length);
     const whenHtml = cityStart && cityEnd
       ? `<b>${esc(cityStart)}</b> → ${esc(cityEnd)} · ${nightsInCity} night${nightsInCity > 1 ? 's' : ''}`
       : esc(cityStart || cityEnd || '');
 
-    const pinnedAccomTravel = accomTravelByDate['__pinned__'] || [];
-
     const daysHtml = dayOrder.map((date) => {
       dayCounter += 1;
-      const stops = [];
-      pinnedAccomTravel.forEach((r) => stops.push(r));
-      delete accomTravelByDate['__pinned__'];
-      activityDayGroups[date].forEach((r) => stops.push(r));
-
+      const stops = dayGroups[date];
       const weekday = formatWeekday(date);
       const dateLabel = formatDateShort(date);
 
@@ -7000,9 +7022,8 @@ function renderItineraryMode() {
       `;
     }).join('');
 
-    const orphanRows = Object.values(accomTravelByDate).flat();
-    const orphanHtml = orphanRows.length
-      ? `<div class="day"><div class="day__when"><span class="day__date">Logistics</span><span class="day__weekday">&nbsp;</span></div><div class="stops">${orphanRows.map(renderStop).join('')}</div></div>`
+    const orphanHtml = orphanLogistics.length
+      ? `<div class="day"><div class="day__when"><span class="day__date">Logistics</span><span class="day__weekday">&nbsp;</span></div><div class="stops">${orphanLogistics.map(renderStop).join('')}</div></div>`
       : '';
 
     return `
