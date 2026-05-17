@@ -3558,7 +3558,6 @@ function computeApprovedCost(activities) {
 function computeBudgetLensBreakdown() {
   const checklist = buildChecklistFromState();
   let itineraryActivityTotal = 0;
-  let itineraryTransportTotal = 0;
   let entryExitTransportTotal = 0;
   let accommodationTotal = 0;
 
@@ -3572,22 +3571,20 @@ function computeBudgetLensBreakdown() {
     }
 
     if (item.type === 'transportation') {
-      if (item.transportScope === 'entry_exit') entryExitTransportTotal += cost;
-      else itineraryTransportTotal += cost;
+      entryExitTransportTotal += cost;
       return;
     }
 
     itineraryActivityTotal += cost;
   });
 
-  const budgetLensTotal = itineraryActivityTotal + itineraryTransportTotal;
+  const budgetLensTotal = itineraryActivityTotal;
   const absoluteTripTotal = budgetLensTotal + entryExitTransportTotal + accommodationTotal;
 
   return {
     budgetLensTotal,
     absoluteTripTotal,
     itineraryActivityTotal,
-    itineraryTransportTotal,
     entryExitTransportTotal,
     accommodationTotal
   };
