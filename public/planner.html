@@ -78,20 +78,39 @@
       </section>
 
       <section id="itineraryModeView" class="panel itinerary-mode-panel hidden" aria-live="polite">
-        <div class="between itinerary-mode-head">
-          <div>
-            <h2>Itinerary</h2>
-            <p class="muted-text">Lightweight, shareable, and ready offline.</p>
-          </div>
-          <div class="itinerary-mode-toolbar">
-            <button id="shareMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-share-network"></i> Share</button>
-            <button id="copyMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-clipboard"></i> Copy</button>
-            <button id="saveOfflineMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-download-simple"></i> Save Offline</button>
-            <button id="printMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-printer"></i> Print</button>
-          </div>
+        <div class="itin">
+          <header id="itineraryModeHero" class="itin-hero"></header>
+
+          <section class="itin-send" aria-label="Send your itinerary">
+            <div class="itin-send__grid">
+              <button id="syncGoogleCalendarBtnItin" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph-bold ph-calendar-blank" aria-hidden="true"></i></span>
+                <span class="send-tile__title">Sync with Google Calendar</span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph-bold ph-arrow-up-right"></i></span>
+              </button>
+              <button id="savePdfBtnItin" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph-bold ph-file-pdf" aria-hidden="true"></i></span>
+                <span class="send-tile__title">Save as PDF</span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph-bold ph-arrow-up-right"></i></span>
+              </button>
+              <button id="shareTripLinkBtnItin" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph-bold ph-share-network" aria-hidden="true"></i></span>
+                <span class="send-tile__title">Share with Friends</span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph-bold ph-arrow-up-right"></i></span>
+              </button>
+            </div>
+            <div id="itinSendStatus" class="muted-text"></div>
+          </section>
+
+          <div id="itineraryModeList" class="itin-list"></div>
+
+          <!-- Hidden legacy buttons (kept so prior handlers don't break) -->
+          <button id="shareMinimalBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
+          <button id="copyMinimalBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
+          <button id="saveOfflineMinimalBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
+          <button id="printMinimalBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
+          <div id="itineraryModeSummary" class="hidden" aria-hidden="true"></div>
         </div>
-        <div id="itineraryModeSummary" class="itinerary-mode-summary"></div>
-        <div id="itineraryModeList" class="itinerary-mode-list"></div>
       </section>
 
       <div id="attachmentViewerModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Activity attachments">
@@ -442,6 +461,9 @@
     <script src="/js/cityPlanner.js"></script>
     <script src="/js/profileWizard.js"></script>
     <script src="/js/arrangeView.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="/js/pdfExport.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>
