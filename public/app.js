@@ -6458,22 +6458,12 @@ function renderFinalizeTripCard() {
   const placedApproved = (state.activities || []).filter((a) => (
     state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId
   ));
-  const totalSpend = placedApproved.reduce((sum, a) => {
-    const cost = Number(actCostUsd(a) || 0);
-    return sum + cost;
-  }, 0);
-  const budget = Number(state.tripBudget) || 0;
-  const spendValue = budget
-    ? `$${Math.round(totalSpend).toLocaleString()} <span class="u">/ ${budget.toLocaleString()}</span>`
-    : `$${Math.round(totalSpend).toLocaleString()}`;
-
   const stats = [
     { k: 'Dates', v: datesValue },
     { k: 'Nights', v: String(nights || 0) },
     { k: 'Travelers', v: String(travelers) },
     { k: 'Cities', v: String(orderedCities.length || 0) },
-    { k: 'Activities', v: String(placedApproved.length) },
-    { k: 'Spend', v: spendValue }
+    { k: 'Activities', v: String(placedApproved.length) }
   ];
   statsEl.innerHTML = stats.map((s) => `
     <div class="fin-stat">
