@@ -26,7 +26,7 @@ app.post('/debug/client', (req, res) => {
   const scope = String(req.body?.scope || 'client').slice(0, 40);
   const message = typeof req.body?.message === 'string'
     ? req.body.message
-    : JSON.stringify(req.body?.message ?? req.body || {});
+    : JSON.stringify(req.body?.message ?? (req.body || {}));
   debugLog(scope, message);
   res.json({ ok: true });
 });
