@@ -4700,6 +4700,10 @@ function openTimeEditPopup(activityId, anchorEl) {
     }
     closeTimeEditPopup();
     renderArrange();
+    const editedDayId = state.placements[activityId]?.dayId;
+    if (editedDayId) {
+      updateCommutesForCityDays([editedDayId]).then(() => renderArrange()).catch(() => {});
+    }
   };
 
   popup.querySelector('.tep-btn.save').addEventListener('click', save);
@@ -4721,7 +4725,7 @@ function makePlacedCard(item, minTopFloor = null) {
   const placement = state.placements[item.id] || {};
   const time = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
   const durHours = actDurationHours(item);
-  const h = Math.max(28, durHours * PX_PER_HOUR);
+  const h = Math.max(56, durHours * PX_PER_HOUR);
   const rawY = yFromTime(time);
   const y = Number.isFinite(minTopFloor) ? Math.max(rawY, minTopFloor) : rawY;
   const typeLabel = formatTypeLabel(item.type);
@@ -4737,7 +4741,7 @@ function makePlacedCard(item, minTopFloor = null) {
       ${lockBadge}
       <div class="placed-body">
         <button type="button" class="placed-time" data-edit-time="${item.id}" aria-label="Edit timing">
-          <i class="ph ph-clock" aria-hidden="true"></i>
+          <i class="ph-bold ph-clock" aria-hidden="true"></i>
           <span>${esc(timeRangeLabel)}</span>
         </button>
         <div class="placed-head-row">
@@ -4813,7 +4817,7 @@ function renderCommuteSelector(fromId, toId, y) {
 function makeCommuteIndicator(currentItem, nextItem, currentTopOverride = null) {
   const placement = state.placements[currentItem.id] || {};
   const time = parseTimeTo24(placement.time || actPreferredTime(currentItem) || typeToTime(currentItem.type));
-  const h = Math.max(28, actDurationHours(currentItem) * PX_PER_HOUR);
+  const h = Math.max(56, actDurationHours(currentItem) * PX_PER_HOUR);
   const topY = Number.isFinite(currentTopOverride) ? currentTopOverride : yFromTime(time);
   return renderCommuteSelector(currentItem.id, nextItem.id, topY + h + 6);
 }
@@ -5140,7 +5144,7 @@ function renderArrange() {
     items.forEach((item, index) => {
       const placement = state.placements[item.id] || {};
       const itemTime = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
-      const itemH = Math.max(28, actDurationHours(item) * PX_PER_HOUR);
+      const itemH = Math.max(56, actDurationHours(item) * PX_PER_HOUR);
       const rawY = yFromTime(itemTime);
       const PILL_RESERVE = 44;
       const topFloor = prevBottom + PILL_RESERVE;
@@ -5269,6 +5273,9 @@ function renderArrange() {
         if (previousDayId === nextPlacement.dayId && previousTime === nextPlacement.time) return;
 
         renderArrange();
+
+        const affectedDays = [dayId, previousDayId].filter((v, i, arr) => v && arr.indexOf(v) === i);
+        updateCommutesForCityDays(affectedDays).then(() => renderArrange()).catch(() => {});
       }
     }));
   });
@@ -6188,7 +6195,10 @@ function bindPlacedCardInteractions() {
 
         card.classList.remove('resize-hover');
         currentDragMode = null;
-        if (isDragging) renderArrange();
+        if (isDragging) {
+          renderArrange();
+          updateCommutesForCityDays([dayId]).then(() => renderArrange()).catch(() => {});
+        }
       };
 
       activePlacedCardDragCleanup = () => {
