@@ -6257,31 +6257,271 @@ function renderItineraryInsights(approvedActivities) {
 }
 
 function renderItinerary() {
-  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
-  renderItineraryInsights(approved);
-  els.itineraryGrid.innerHTML = state.days.map((d) => {
-    const items = approved
-      .filter((a) => state.placements[a.id]?.dayId === d.id)
-      .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)))
-      .map((a) => `
-        <div class="item">
-          <h4>${esc(a.name)}</h4>
-          <p><strong>Time:</strong> ${esc(state.placements[a.id]?.time || parseTimeTo24(actPreferredTime(a) || typeToTime(a.type)))}</p>
-          <p><strong>Duration:</strong> ${esc(formatDuration(actDurationHours(a)))}</p>
-          <p><strong>Type:</strong> ${esc(a.type)}</p>
-          <p><strong>Why:</strong> ${esc(a.why_it_fits || '')}</p>
+  renderFinalize();
+  renderItineraryMode();
+  renderTripHealthBadge();
+}
+
+const FINALIZE_CAT_MAP = {
+  food: 'food', meal: 'food',
+  tour: 'tour',
+  museum: 'culture', landmark: 'culture', cultural: 'culture',
+  park: 'outdoor', walk: 'outdoor', neighborhood: 'outdoor', outdoor: 'outdoor',
+  nightlife: 'night', show: 'night',
+  sports: 'outdoor', shopping: 'tour',
+  arrival: 'transit', departure: 'transit', transit: 'transit'
+};
+const FINALIZE_CAT_LABEL = {
+  food: 'Food', tour: 'Tour', culture: 'Culture',
+  outdoor: 'Outdoor', night: 'Night', transit: 'Transit'
+};
+
+function mapTypeToFinalizeCat(type) {
+  const key = String(type || '').toLowerCase();
+  return FINALIZE_CAT_MAP[key] || 'tour';
+}
+
+function deriveDayTheme(day, dayIndex, allDays) {
+  if (allDays.length === 1) return 'Trip day';
+  if (dayIndex === 0) return 'Arrival';
+  if (dayIndex === allDays.length - 1) return 'Departure';
+  const firstForCity = !allDays.slice(0, dayIndex).some((d) => d.city === day.city);
+  const lastForCity = !allDays.slice(dayIndex + 1).some((d) => d.city === day.city);
+  if (firstForCity) return `To ${day.city}`;
+  if (lastForCity) return `Last in ${day.city}`;
+  return day.city;
+}
+
+function finalizeOpenChecklistItems() {
+  const list = Array.isArray(state.bookingChecklist) ? state.bookingChecklist : [];
+  return list.filter((item) => {
+    if (!item || item.bookingNotRequired) return false;
+    if (item.status === 'resolved') return false;
+    const ref = String(item.referenceNum || '').trim();
+    return !ref;
+  });
+}
+
+function activityHasPendingBooking(activityId) {
+  const list = Array.isArray(state.bookingChecklist) ? state.bookingChecklist : [];
+  return list.some((item) => (
+    item.type === 'activity'
+    && String(item.activityId) === String(activityId)
+    && !item.bookingNotRequired
+    && item.status !== 'resolved'
+    && !String(item.referenceNum || '').trim()
+  ));
+}
+
+function renderFinalize() {
+  renderFinalizeTripCard();
+  renderFinalizeOpenItems();
+  renderFinalizeDayByDay();
+  renderFinalizeFooter();
+}
+
+function renderFinalizeTripCard() {
+  const titleEl = document.getElementById('finTripTitle');
+  const routeEl = document.getElementById('finTripRoute');
+  const statsEl = document.getElementById('finTripStats');
+  if (!titleEl || !routeEl || !statsEl) return;
+
+  const cities = (state.cities || []).filter((c) => c.startDate && c.endDate);
+  const orderedCities = [...cities].sort((a, b) => parseYmdAsLocal(a.startDate) - parseYmdAsLocal(b.startDate));
+  const first = orderedCities[0];
+  const last = orderedCities[orderedCities.length - 1];
+  const start = first ? parseYmdAsLocal(first.startDate) : null;
+  const end = last ? parseYmdAsLocal(last.endDate) : null;
+  const nights = (start && end) ? Math.max(0, Math.round((end - start) / 86400000)) : 0;
+  const primaryCity = first?.name || 'your destination';
+
+  const rawTitle = (state.tripName || `${nights || 1} ${nights === 1 ? 'night' : 'nights'} in ${primaryCity}`).trim();
+  const titleParts = rawTitle.split(' ');
+  if (titleParts.length > 1) {
+    const last = titleParts.pop();
+    titleEl.innerHTML = `${esc(titleParts.join(' '))} <span class="serif">${esc(last)}</span>`;
+  } else {
+    titleEl.innerHTML = `<span class="serif">${esc(rawTitle)}</span>`;
+  }
+
+  if (orderedCities.length === 0) {
+    routeEl.innerHTML = '<span class="city">Add cities to see your route</span>';
+  } else {
+    routeEl.innerHTML = orderedCities
+      .map((c, i) => `${i ? '<span class="arrow">→</span>' : ''}<span class="city">${esc(c.name)}</span>`)
+      .join(' ');
+  }
+
+  const fmtMD = (d) => `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+  const datesValue = (start && end)
+    ? `${fmtMD(start)} <span class="u">→</span> ${fmtMD(end)}`
+    : '—';
+  const travelers = Number(state.numTravelers || 0) + Number(state.numChildren || 0) || 1;
+  const placedApproved = (state.activities || []).filter((a) => (
+    state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId
+  ));
+  const totalSpend = placedApproved.reduce((sum, a) => {
+    const cost = Number(actCostUsd(a) || 0);
+    return sum + cost;
+  }, 0);
+  const budget = Number(state.tripBudget) || 0;
+  const spendValue = budget
+    ? `$${Math.round(totalSpend).toLocaleString()} <span class="u">/ ${budget.toLocaleString()}</span>`
+    : `$${Math.round(totalSpend).toLocaleString()}`;
+
+  const stats = [
+    { k: 'Dates', v: datesValue },
+    { k: 'Nights', v: String(nights || 0) },
+    { k: 'Travelers', v: String(travelers) },
+    { k: 'Cities', v: String(orderedCities.length || 0) },
+    { k: 'Activities', v: String(placedApproved.length) },
+    { k: 'Spend', v: spendValue }
+  ];
+  statsEl.innerHTML = stats.map((s) => `
+    <div class="fin-stat">
+      <span class="k">${esc(s.k)}</span>
+      <span class="v">${s.v}</span>
+    </div>
+  `).join('');
+}
+
+function renderFinalizeOpenItems() {
+  const listEl = document.getElementById('finOpenList');
+  const countEl = document.getElementById('finOpenCount');
+  const attachAllBtn = document.getElementById('finAttachAllBtn');
+  if (!listEl || !countEl) return;
+
+  const open = finalizeOpenChecklistItems();
+  const n = open.length;
+  countEl.textContent = n === 0 ? 'All set' : `${n} open`;
+  countEl.classList.toggle('all-set', n === 0);
+  if (attachAllBtn) attachAllBtn.style.display = n === 0 ? 'none' : '';
+
+  if (n === 0) {
+    listEl.innerHTML = '<div class="fin-open__empty">Every booking has a reference. You\'re set.</div>';
+    return;
+  }
+
+  const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  listEl.innerHTML = open.map((item) => {
+    const linkedActivity = item.type === 'activity'
+      ? state.activities.find((a) => String(a.id) === String(item.activityId))
+      : null;
+    const placement = linkedActivity ? state.placements[linkedActivity.id] : null;
+    const day = placement?.dayId ? state.days.find((d) => d.id === placement.dayId) : null;
+    const dateStr = item.activityDate || item.date || day?.date || '';
+    let chipMonth = '—'; let chipDay = '—';
+    if (dateStr) {
+      const dt = parseYmdAsLocal(dateStr);
+      if (!Number.isNaN(dt.getTime())) {
+        chipMonth = MONTHS[dt.getMonth()];
+        chipDay = String(dt.getDate()).padStart(2, '0');
+      }
+    }
+    const chipTime = (item.activityTime || placement?.time || '').slice(0, 5) || '—';
+
+    const title = item.title || linkedActivity?.name || 'Untitled item';
+    const missingLabel = item.type === 'activity'
+      ? 'No booking ref'
+      : (item.type === 'flight' || item.type === 'transport' ? 'No confirmation' : 'No reservation');
+    const why = item.notes || linkedActivity?.why_it_fits || '';
+    const priceUsd = Number(actCostUsd(linkedActivity) || item.budgetUsd || 0);
+    const priceHtml = priceUsd > 0 ? ` <span class="price">$${Math.round(priceUsd).toLocaleString()}</span>` : '';
+
+    return `
+      <div class="open-item" data-checklist-id="${esc(item.id)}">
+        <div class="open-item__when">
+          <span class="d">${esc(chipMonth)}</span>
+          <span class="n">${esc(chipDay)}</span>
+          <span class="t">${esc(chipTime)}</span>
         </div>
-      `)
-      .join('');
-    const accommodation = getAccommodationForDay(d.city, d.date);
-    const accommodationInfo = accommodation
-      ? `<p class="muted-text"><strong>Accommodation:</strong> ${esc(accommodation.address || 'Address missing')}</p>`
-      : '';
-    return `<section class="day-col"><div class="day-head">${d.date} • ${esc(d.city)}</div><div class="list">${accommodationInfo}${items || '<em>No activities assigned.</em>'}</div></section>`;
+        <div class="open-item__body">
+          <div class="open-item__title">${esc(title)}<span class="open-item__missing">${esc(missingLabel)}</span></div>
+          ${why ? `<div class="open-item__why">${esc(why)}${priceHtml}</div>` : (priceHtml ? `<div class="open-item__why">${priceHtml}</div>` : '')}
+        </div>
+        <button class="open-item__cta" type="button" data-open-checklist="${esc(item.id)}">
+          Add confirmation <span class="arrow">→</span>
+        </button>
+      </div>
+    `;
   }).join('');
 
-  renderItineraryMode();
-  renderTripHealth();
+  listEl.querySelectorAll('[data-open-checklist]').forEach((btn) => {
+    btn.addEventListener('click', () => openChecklistModal());
+  });
+}
+
+function renderFinalizeDayByDay() {
+  const listEl = document.getElementById('finItinList');
+  const metaEl = document.getElementById('finItinMeta');
+  if (!listEl) return;
+
+  const days = Array.isArray(state.days) ? state.days : [];
+  const approved = (state.activities || []).filter((a) => state.reviewed[a.id]?.approved);
+
+  let totalStops = 0;
+  const citiesSet = new Set();
+
+  const html = days.map((day, idx) => {
+    citiesSet.add(day.city);
+    const items = approved
+      .filter((a) => state.placements[a.id]?.dayId === day.id)
+      .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+    totalStops += items.length;
+
+    const dt = parseYmdAsLocal(day.date);
+    const validDate = !Number.isNaN(dt.getTime());
+    const dayName = validDate
+      ? `${dt.toLocaleDateString(undefined, { weekday: 'short' })} · ${dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+      : day.date;
+
+    const theme = deriveDayTheme(day, idx, days);
+
+    const itemsHtml = items.map((a) => {
+      const placement = state.placements[a.id] || {};
+      const startMins = minutesFromTime(parseTimeTo24(placement.time || actPreferredTime(a) || typeToTime(a.type)));
+      const endMins = startMins + Math.round(actDurationHours(a) * 60);
+      const fmt = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+      const cat = mapTypeToFinalizeCat(a.type);
+      const pending = activityHasPendingBooking(a.id);
+      return `
+        <div class="item" data-activity-id="${esc(a.id)}">
+          <span class="item__time">${esc(fmt(startMins))}<span class="dash">–</span>${esc(fmt(endMins))}</span>
+          <span class="item__dot cat-${cat}" aria-hidden="true"></span>
+          <span class="item__title">${esc(a.name)}${pending ? '<span class="item__pending" role="img" aria-label="Booking confirmation needed" title="Booking confirmation needed">!</span>' : ''}</span>
+          <span class="item__cat">${esc(FINALIZE_CAT_LABEL[cat] || 'Stop')}</span>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <section class="day">
+        <div class="day__head">
+          <span class="day__num">Day ${String(idx + 1).padStart(2, '0')}</span>
+          <span class="day-name">${esc(dayName)}</span>
+          <span class="day__theme">${esc(theme)}</span>
+          <span class="day__city">${esc(day.city)}</span>
+        </div>
+        <div class="day__items">${itemsHtml}</div>
+      </section>
+    `;
+  }).join('');
+
+  listEl.innerHTML = html || '<div class="fin-open__empty">No days planned yet.</div>';
+  if (metaEl) {
+    metaEl.innerHTML = `${totalStops} stops<span class="pipe">·</span>${days.length} days<span class="pipe">·</span>${citiesSet.size} cities`;
+  }
+}
+
+function renderFinalizeFooter() {
+  const versionEl = document.getElementById('finVersionMeta');
+  const autosaveEl = document.getElementById('finAutosave');
+  if (versionEl) {
+    const days = (state.days || []).length;
+    const activities = (state.activities || []).filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId).length;
+    versionEl.innerHTML = `v 01<span class="pipe" style="color:var(--text-400);margin:0 6px;">·</span>${days} days<span class="pipe" style="color:var(--text-400);margin:0 6px;">·</span>${activities} activities`;
+  }
+  if (autosaveEl) autosaveEl.textContent = 'Auto-saved · just now';
 }
 
 function formatTimeRangeLabel(startMinutes, endMinutes) {
@@ -6914,7 +7154,7 @@ function renderSavedItineraries() {
         if (state.currentItineraryId === id) {
           state.currentItineraryId = null;
           state.itinerary = null;
-          els.itineraryGrid.innerHTML = '';
+          if (els.itineraryGrid) els.itineraryGrid.innerHTML = '';
           if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
           updateCalendarControls();
         }
@@ -7653,7 +7893,7 @@ function resetToFresh() {
   renderActivities();
   els.dayColumns.innerHTML = '';
   els.stagingArea.innerHTML = '';
-  els.itineraryGrid.innerHTML = '';
+  if (els.itineraryGrid) els.itineraryGrid.innerHTML = '';
   if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
   updateCalendarControls();
   renderChatMessages();
@@ -8026,7 +8266,7 @@ function clearPlannedResultsKeepSetup() {
   renderActivities();
   els.dayColumns.innerHTML = '';
   els.stagingArea.innerHTML = '';
-  els.itineraryGrid.innerHTML = '';
+  if (els.itineraryGrid) els.itineraryGrid.innerHTML = '';
   if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
   updateCalendarControls();
 }
@@ -8091,7 +8331,28 @@ els.downloadCalendarBtn?.addEventListener('click', () => {
   window.open(`/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/calendar.ics?metadata=${metadataMode}`, '_blank');
 });
 els.connectGoogleCalendarBtn?.addEventListener('click', connectGoogleCalendar);
-els.syncGoogleCalendarBtn?.addEventListener('click', syncGoogleCalendar);
+els.syncGoogleCalendarBtn?.addEventListener('click', () => {
+  if (!state.googleCalendarConnected) {
+    connectGoogleCalendar();
+    return;
+  }
+  syncGoogleCalendar();
+});
+document.getElementById('shareTripLinkBtn')?.addEventListener('click', () => {
+  const id = state.currentItineraryId;
+  if (!id) { showToast('Save your trip first', 'info'); return; }
+  const url = `${window.location.origin}/trip/${encodeURIComponent(id)}`;
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(url).then(() => showToast('Link copied'));
+  } else {
+    showToast(`Share link: ${url}`);
+  }
+});
+document.getElementById('lockTripBtn')?.addEventListener('click', () => {
+  if (typeof openFinalizeModal === 'function') {
+    openFinalizeModal();
+  }
+});
 els.calendarMetadataMode?.addEventListener('change', (e) => {
   state.calendarMetadataMode = e.target.value === 'full' ? 'full' : 'compact';
   setCalendarStatus(`Metadata mode: ${state.calendarMetadataMode}`);

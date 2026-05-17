@@ -205,44 +205,86 @@
       </section>
 
       <section id="step4" class="panel step-panel">
-        <div class="panel__head fin-h">
-          <div>
-            <h2>Quick health check, <span class="serif">then you're off.</span></h2>
-            <p class="panel__sub">We ran your itinerary against the usual suspects — overlapping dates, thin mornings, missing confirmations. Here's what wants a second look.</p>
-          </div>
-        </div>
-        <section class="fin-send">
-          <h3 class="fin-send__title">Send your itinerary</h3>
-          <div class="calendar-actions fin-send__grid">
-            <label for="calendarMetadataMode" class="muted-text calendar-metadata-label">Metadata</label>
-            <select id="calendarMetadataMode">
-              <option value="compact">Compact</option>
-              <option value="full">Full</option>
-            </select>
-            <button id="downloadCalendarBtn" class="secondary send-tile" type="button" disabled><span class="send-tile__icon"><i class="ph-bold ph-calendar"></i></span><span class="send-tile__body"><span class="send-tile__title">Export .ics</span><span class="send-tile__sub">Download a calendar file you can drop into any app.</span></span></button>
-            <button id="connectGoogleCalendarBtn" class="secondary send-tile" type="button"><span class="send-tile__icon"><i class="ph-bold ph-lock-key"></i></span><span class="send-tile__body"><span class="send-tile__title">Connect Google</span><span class="send-tile__sub">One-time auth so we can sync your trip.</span></span></button>
-            <button id="syncGoogleCalendarBtn" class="secondary send-tile" type="button" disabled><span class="send-tile__icon"><i class="ph-bold ph-arrows-clockwise"></i></span><span class="send-tile__body"><span class="send-tile__title">Sync Google</span><span class="send-tile__sub">Push every stop to your Google Calendar.</span></span></button>
-          </div>
-          <div id="calendarSyncStatus" class="muted-text"></div>
-        </section>
-        <div id="itineraryInsights" class="itinerary-insights"></div>
-        <div id="itineraryGrid" class="day-columns"></div>
-        <section class="saved-itineraries-panel">
-          <div class="panel__head"><h3>Saved Itineraries</h3></div>
-          <div id="savedItineraries" class="saved-itineraries-list"></div>
-        </section>
-        <section id="tripHealthSection" class="trip-health-inline-panel fin-issues">
-          <div class="fin-issues__head"><h3>Trip Health</h3></div>
-          <div id="tripHealthSummary" class="trip-health-summary"></div>
-          <section class="trip-health-issues-panel">
-            <div class="fin-issues__head"><h3>Things to look at</h3></div>
-            <p class="panel__sub">Review each flagged issue and choose an action: fix, verify, dismiss, or add context.</p>
-            <div id="tripHealthIssues" class="trip-health-issues-list fin-issues__list"></div>
+        <div class="fin">
+          <header class="fin-h">
+            <div class="gm-eyebrow">Step 04 — Finalize</div>
+            <h1 id="finHeadline">Here it is, <span class="serif">end to end.</span></h1>
+            <p class="fin-h__lead">Your trip, laid out day by day. Take one last read, then send it where you'll need it.</p>
+          </header>
+
+          <section class="fin-send" aria-label="Send your itinerary">
+            <div class="fin-send__grid">
+              <button id="syncGoogleCalendarBtn" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph ph-calendar-blank" aria-hidden="true"></i></span>
+                <span class="send-tile__body">
+                  <span class="send-tile__title">Sync with Google Calendar</span>
+                  <span class="send-tile__sub">One event per stop, with addresses and booking notes attached.</span>
+                </span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph ph-arrow-up-right"></i></span>
+              </button>
+              <button id="downloadCalendarBtn" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph ph-file-text" aria-hidden="true"></i></span>
+                <span class="send-tile__body">
+                  <span class="send-tile__title">Export as .ics</span>
+                  <span class="send-tile__sub">Print-ready calendar file with maps, bookings, and offline-friendly day pages.</span>
+                </span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph ph-arrow-up-right"></i></span>
+              </button>
+              <button id="shareTripLinkBtn" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph ph-share-network" aria-hidden="true"></i></span>
+                <span class="send-tile__body">
+                  <span class="send-tile__title">Share with Friends</span>
+                  <span class="send-tile__sub">A live link they can open on their phone — read-only, always current.</span>
+                </span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph ph-arrow-up-right"></i></span>
+              </button>
+            </div>
+            <input type="hidden" id="calendarMetadataMode" value="compact" />
+            <button id="connectGoogleCalendarBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
+            <div id="calendarSyncStatus" class="muted-text"></div>
           </section>
-        </section>
+
+          <section class="fin-trip" aria-label="Trip overview">
+            <div class="fin-trip__title">
+              <div class="gm-eyebrow">Trip</div>
+              <h2 id="finTripTitle"></h2>
+              <div id="finTripRoute" class="fin-trip__route"></div>
+            </div>
+            <div id="finTripStats" class="fin-trip__stats"></div>
+          </section>
+
+          <section class="fin-open" aria-label="Open items">
+            <div class="fin-open__head">
+              <div class="fin-open__head-left">
+                <h3>Needs a confirmation number</h3>
+                <p>Ticketed activities you've planned but haven't booked yet. Attach a reference so we can include it in your day-of pass.</p>
+              </div>
+              <div class="fin-open__head-right">
+                <span id="finOpenCount" class="fin-open__count">0 open</span>
+                <button id="finAttachAllBtn" class="fin-open__action" type="button">Attach all →</button>
+              </div>
+            </div>
+            <div id="finOpenList" class="fin-open__list"></div>
+          </section>
+
+          <section class="fin-itin" aria-label="Day-by-day itinerary">
+            <div class="fin-itin__head">
+              <h3>Day-by-day <span class="serif">itinerary</span></h3>
+              <div id="finItinMeta" class="fin-itin__meta"></div>
+            </div>
+            <div id="finItinList" class="fin-itin__list"></div>
+          </section>
+
+          <footer class="fin-foot">
+            <span class="meta meta--left"><span class="dot"></span> <span id="finAutosave">Auto-saved · just now</span></span>
+            <span id="finVersionMeta" class="meta meta--right"></span>
+          </footer>
+        </div>
+
         <div class="step-nav sticky-nav step-nav-split">
           <button id="editBtn" class="icon-btn nav-secondary" type="button" data-nav-back="4" title="Back" aria-label="Back"><i class="ph-bold ph-arrow-left"></i></button>
           <button class="icon-btn grey save-progress-btn" type="button" title="Save Progress"><i class="ph-bold ph-floppy-disk"></i></button>
+          <button id="lockTripBtn" class="icon-btn primary" type="button" title="Lock trip" aria-label="Lock trip"><i class="ph-bold ph-lock"></i></button>
         </div>
       </section>
     </main>
