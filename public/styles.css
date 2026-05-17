@@ -945,7 +945,7 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 /* ── Schedule columns ── */
 .schedule-col { min-width: 220px; max-width: 220px; }
 .schedule-col .day-head small { display: block; margin-top: 4px; color: var(--gray); font-weight: 600; }
-.day-grid-wrap { position: relative; height: 1200px; }
+.day-grid-wrap { position: relative; height: 1600px; }
 .hour-grid { position: absolute; inset: 0; }
 .hour-line { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid rgba(0,0,0,0.06); }
 .hour-line span { position: absolute; top: -9px; left: 6px; font-size: 11px; color: var(--gray); background: rgba(255,255,255,0.95); padding: 0 4px; }
@@ -3419,7 +3419,7 @@ select.gm-inp {
   box-shadow:
     0 1px 2px rgba(10,22,40,.04),
     0 4px 10px rgba(10,22,40,.06);
-  padding: 10px 14px;
+  padding: 6px 12px;
   overflow: hidden;
   transition: box-shadow var(--dur-fast), border-color var(--dur-fast);
 }
@@ -3431,7 +3431,9 @@ select.gm-inp {
 }
 #step3 .placed-card .placed-body {
   padding: 0;
-  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   text-align: left;
 }
 #step3 .placed-card .placed-head-row {
@@ -3503,6 +3505,9 @@ select.gm-inp {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  align-self: flex-start;
   font-family: var(--font-mono);
   font-size: 10.5px;
   letter-spacing: 0.02em;
@@ -3510,7 +3515,7 @@ select.gm-inp {
   background: transparent;
   border: 0;
   padding: 1px 6px 1px 4px;
-  margin: 0 0 4px -4px;
+  margin: 0 0 2px -4px;
   border-radius: 4px;
   cursor: pointer;
   transition: background var(--dur-fast), color var(--dur-fast);
