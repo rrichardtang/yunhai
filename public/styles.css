@@ -3989,18 +3989,21 @@ select.gm-inp {
 #step3 .placed-card .placed-time {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   width: fit-content;
   max-width: 100%;
   align-self: flex-start;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 10px;
+  line-height: 1;
   letter-spacing: 0.02em;
   color: var(--text-500);
   background: transparent;
   border: 0;
-  padding: 1px 6px 1px 4px;
-  margin: 0 0 2px -4px;
+  padding: 0 4px;
+  margin: 0 0 0 -4px;
+  height: 16px;
+  min-height: 0;
   border-radius: 4px;
   cursor: pointer;
   transition: background var(--dur-fast), color var(--dur-fast);
