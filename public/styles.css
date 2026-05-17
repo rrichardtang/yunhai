@@ -1211,9 +1211,8 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
   box-shadow: var(--sh-lg);
   padding: 0;
   color: var(--text-900);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 #prefsModal .modal-card > .between {
   padding: 22px 28px 18px;
