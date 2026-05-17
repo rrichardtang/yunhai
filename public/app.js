@@ -4615,22 +4615,119 @@ function makeStagingCard(item) {
 
 // formatTypeLabel, formatDurationHoursLong provided by /js/arrangeView.js
 
+function closeTimeEditPopup() {
+  const existing = document.getElementById('time-edit-popup');
+  if (existing) existing.remove();
+  document.removeEventListener('mousedown', timeEditOutsideHandler, true);
+}
+
+function timeEditOutsideHandler(e) {
+  const popup = document.getElementById('time-edit-popup');
+  if (popup && !popup.contains(e.target)) closeTimeEditPopup();
+}
+
+function openTimeEditPopup(activityId, anchorEl) {
+  closeTimeEditPopup();
+  const item = state.activities.find((a) => String(a.id) === String(activityId));
+  if (!item) return;
+  const placement = state.placements[activityId] || {};
+  const startTime = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
+  const durHours = actDurationHours(item);
+  const startMins = minutesFromTime(startTime);
+  const endTime = timeFromMinutes(startMins + Math.round(durHours * 60));
+
+  const rect = anchorEl.getBoundingClientRect();
+  const left = Math.min(rect.left, window.innerWidth - 240);
+  const top = Math.min(rect.bottom + 6, window.innerHeight - 240);
+
+  const popup = document.createElement('div');
+  popup.id = 'time-edit-popup';
+  popup.className = 'time-edit-popup';
+  popup.style.left = `${left}px`;
+  popup.style.top = `${top}px`;
+  popup.innerHTML = `
+    <div class="tep-label">Edit timing</div>
+    <div class="tep-title">${esc(item.name)}</div>
+    <label class="tep-field">
+      <span class="tep-label">Start time</span>
+      <input type="time" class="tep-start" step="900" value="${startTime}">
+    </label>
+    <label class="tep-field">
+      <span class="tep-label">End time</span>
+      <input type="time" class="tep-end" step="900" value="${endTime}">
+    </label>
+    <div class="tep-actions">
+      <button type="button" class="tep-btn cancel">Cancel</button>
+      <button type="button" class="tep-btn save">Save</button>
+    </div>
+  `;
+  document.body.appendChild(popup);
+
+  const startInput = popup.querySelector('.tep-start');
+  const endInput = popup.querySelector('.tep-end');
+  startInput.focus();
+  startInput.select();
+
+  const save = () => {
+    const newStart = startInput.value;
+    const newEnd = endInput.value;
+    const sMin = minutesFromTime(newStart);
+    const eMin = minutesFromTime(newEnd);
+    if (!Number.isFinite(sMin) || !Number.isFinite(eMin) || eMin <= sMin) {
+      showToast('End time must be after start time');
+      return;
+    }
+    const newDurHours = (eMin - sMin) / 60;
+    state.placements[activityId] = {
+      ...(state.placements[activityId] || {}),
+      time: newStart
+    };
+    if (Math.abs(newDurHours - durHours) > 0.01) {
+      item.duration_hours = newDurHours;
+      if (item.timing) item.timing.duration_minutes = eMin - sMin;
+    }
+    closeTimeEditPopup();
+    renderArrange();
+  };
+
+  popup.querySelector('.tep-btn.save').addEventListener('click', save);
+  popup.querySelector('.tep-btn.cancel').addEventListener('click', closeTimeEditPopup);
+  [startInput, endInput].forEach((inp) => {
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') save();
+      if (e.key === 'Escape') closeTimeEditPopup();
+    });
+  });
+
+  setTimeout(() => {
+    document.addEventListener('mousedown', timeEditOutsideHandler, true);
+  }, 0);
+}
+
 function makePlacedCard(item, minTopFloor = null) {
   const { icon, colorClass } = getActivityStyle(item.type);
   const placement = state.placements[item.id] || {};
   const time = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
-  const h = Math.max(28, actDurationHours(item) * PX_PER_HOUR);
+  const durHours = actDurationHours(item);
+  const h = Math.max(28, durHours * PX_PER_HOUR);
   const rawY = yFromTime(time);
   const y = Number.isFinite(minTopFloor) ? Math.max(rawY, minTopFloor) : rawY;
   const typeLabel = formatTypeLabel(item.type);
-  const durationLabel = formatDurationHoursLong(actDurationHours(item));
+  const durationLabel = formatDurationHoursLong(durHours);
   const activeCity = state.arrangeCity;
   const isLocked = (state.lastFinalizeLocks[activeCity] || []).some((e) => String(e.activity.id) === String(item.id));
   const lockBadge = isLocked ? '<span class="placed-lock-badge" title="Locked"><i class="ph-bold ph-lock-simple" aria-hidden="true"></i></span>' : '';
+  const startMins = minutesFromTime(time);
+  const endMins = startMins + Math.round(durHours * 60);
+  const timeRangeLabel = formatTimeRangeLabel(startMins, endMins);
   return `
     <article class="placed-card ${colorClass}${isLocked ? ' placed-card--locked' : ''}" data-id="${item.id}" style="height:${h}px;top:${y}px;">
       ${lockBadge}
       <div class="placed-body">
+        <button type="button" class="placed-time" data-edit-time="${item.id}" aria-label="Edit timing">
+          <i class="ph ph-clock" aria-hidden="true"></i>
+          <span>${esc(timeRangeLabel)}</span>
+        </button>
         <div class="placed-head-row">
           <h4>
             <button
@@ -5967,6 +6064,16 @@ function bindPlacedCardInteractions() {
       infoWrap.addEventListener('focus', () => showPlacedTooltip(infoWrap));
       infoWrap.addEventListener('mouseleave', hidePlacedTooltip);
       infoWrap.addEventListener('blur', hidePlacedTooltip);
+    }
+
+    const timeBtn = card.querySelector('.placed-time');
+    if (timeBtn) {
+      timeBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+      timeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        openTimeEditPopup(id, timeBtn);
+      });
     }
 
     card.addEventListener('mousedown', (e) => {

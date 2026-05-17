@@ -945,7 +945,7 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 /* ── Schedule columns ── */
 .schedule-col { min-width: 220px; max-width: 220px; }
 .schedule-col .day-head small { display: block; margin-top: 4px; color: var(--gray); font-weight: 600; }
-.day-grid-wrap { position: relative; height: 1080px; }
+.day-grid-wrap { position: relative; height: 1200px; }
 .hour-grid { position: absolute; inset: 0; }
 .hour-line { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid rgba(0,0,0,0.06); }
 .hour-line span { position: absolute; top: -9px; left: 6px; font-size: 11px; color: var(--gray); background: rgba(255,255,255,0.95); padding: 0 4px; }
@@ -3498,6 +3498,96 @@ select.gm-inp {
 #step3 .placed-card.activity-walk         { background: linear-gradient(to right, #D9F0DC 0 4px, var(--paper-0) 4px); border-left-color: #2BA158; }
 #step3 .placed-card.activity-show         { background: linear-gradient(to right, #FBD0E1 0 4px, var(--paper-0) 4px); border-left-color: #CF3273; }
 #step3 .placed-card.activity-default      { background: linear-gradient(to right, #DEE2E8 0 4px, var(--paper-0) 4px); border-left-color: #6F7886; }
+
+#step3 .placed-card .placed-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-500);
+  background: transparent;
+  border: 0;
+  padding: 1px 6px 1px 4px;
+  margin: 0 0 4px -4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+#step3 .placed-card .placed-time:hover {
+  background: rgba(47,125,251,.10);
+  color: var(--accent);
+}
+#step3 .placed-card .placed-time i { font-size: 11px; opacity: 0.7; }
+
+.time-edit-popup {
+  position: fixed;
+  z-index: 200;
+  background: var(--paper-0);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(10,22,40,.16), 0 2px 6px rgba(10,22,40,.08);
+  display: flex; flex-direction: column; gap: 10px;
+  width: 220px;
+}
+.time-edit-popup .tep-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-500);
+}
+.time-edit-popup .tep-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-900);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.time-edit-popup .tep-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.time-edit-popup input[type="time"] {
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--hair-strong);
+  background: var(--paper-1);
+  padding: 0 10px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text-900);
+  outline: none;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.time-edit-popup input[type="time"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(47,125,251,.14);
+}
+.time-edit-popup .tep-actions {
+  display: flex; gap: 6px;
+}
+.time-edit-popup .tep-btn {
+  flex: 1; height: 30px; border-radius: var(--r-pill);
+  font-size: 12px; font-weight: 500; letter-spacing: -0.005em;
+  cursor: pointer; transition: all var(--dur-fast);
+  border: 0;
+}
+.time-edit-popup .tep-btn.save {
+  background: var(--ink-900); color: var(--paper-0);
+}
+.time-edit-popup .tep-btn.save:hover { background: var(--ink-800); }
+.time-edit-popup .tep-btn.cancel {
+  background: var(--paper-2); color: var(--text-700);
+  border: 1px solid var(--hair);
+}
+.time-edit-popup .tep-btn.cancel:hover { border-color: var(--text-900); }
 
 #step3 .staging-card { position: relative; padding-left: 22px; }
 #step3 .staging-card::before {
