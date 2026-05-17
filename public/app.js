@@ -73,6 +73,11 @@ const state = {
   bookingChecklistIssueMeta: {},
   lastFinalizeLocks: {}
 };
+window.state = state;
+window.addEventListener('DOMContentLoaded', () => {
+  if (typeof showToast === 'function') window.showToast = showToast;
+  if (typeof setViewMode === 'function') window.setViewMode = setViewMode;
+});
 
 let budgetOptState = null;
 
@@ -6798,67 +6803,123 @@ async function shareMinimalItinerary() {
     .catch(() => showToast('Could not copy share link.', 'error'));
 }
 
-function renderItineraryModeSummary(payload) {
-  if (!els.itineraryModeSummary) return;
-  const range = payload.firstDate && payload.lastDate ? `${payload.firstDate} → ${payload.lastDate}` : 'No date range';
-  els.itineraryModeSummary.innerHTML = `
-    <article class="itinerary-mode-summary-card">
-      <h4>Trip</h4>
-      <p>${esc(payload.tripName)}</p>
-    </article>
-    <article class="itinerary-mode-summary-card">
-      <h4>Dates</h4>
-      <p>${esc(range)}</p>
-    </article>
-    <article class="itinerary-mode-summary-card">
-      <h4>Cities</h4>
-      <p>${esc(payload.cities.join(', ') || '—')}</p>
-    </article>
-    <article class="itinerary-mode-summary-card">
-      <h4>Items</h4>
-      <p>${payload.itemCount}</p>
-    </article>
+function renderItineraryModeSummary() { /* legacy no-op; hero replaces this */ }
+
+function formatItinHeroDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return String(dateStr);
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function daysBetween(a, b) {
+  if (!a || !b) return 0;
+  const d1 = new Date(`${a}T12:00:00`);
+  const d2 = new Date(`${b}T12:00:00`);
+  if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return 0;
+  return Math.max(0, Math.round((d2 - d1) / 86400000));
+}
+
+function renderItineraryHero(payload) {
+  const heroEl = document.getElementById('itineraryModeHero');
+  if (!heroEl) return;
+  const tripName = String(payload.tripName || 'Untitled Trip').trim();
+  const lastWord = tripName.split(/\s+/).pop();
+  const head = tripName.slice(0, tripName.length - lastWord.length).trim();
+  const titleHtml = head
+    ? `${esc(head)} <span class="serif">${esc(lastWord)}</span>`
+    : `<span class="serif">${esc(tripName)}</span>`;
+  const dates = payload.firstDate && payload.lastDate
+    ? `${formatItinHeroDate(payload.firstDate)} → ${formatItinHeroDate(payload.lastDate)}`
+    : '—';
+  const nights = daysBetween(payload.firstDate, payload.lastDate);
+  const travelers = (Number(state.numTravelers || 0) + Number(state.numChildren || 0)) || 1;
+  const routeCities = payload.cities || [];
+  const routeHtml = routeCities.length
+    ? routeCities.map((c, i) => `${i > 0 ? '<span class="arrow">→</span>' : ''}<span class="city">${esc(c)}</span>`).join(' ')
+    : '<span class="city">—</span>';
+  heroEl.innerHTML = `
+    <div class="itin-hero__title">
+      <span class="eyebrow">Itinerary · v ${esc(String((state.itineraryVersion || 1)).padStart(2, '0'))}</span>
+      <h1>${titleHtml}</h1>
+      <div class="route">${routeHtml}</div>
+    </div>
+    <div class="itin-hero__meta">
+      <div><span class="k">Dates</span><span class="v">${esc(dates)}</span></div>
+      <div><span class="k">Nights</span><span class="v">${nights}</span></div>
+      <div><span class="k">Travelers</span><span class="v">${travelers}</span></div>
+      <div><span class="k">Items</span><span class="v">${payload.itemCount}</span></div>
+    </div>
   `;
 }
 
-function renderItineraryItemCard(row) {
+function classifyStop(row) {
+  const id = String(row.id || '');
+  if (id.startsWith('arr_') || id.startsWith('dep_')) return 'is-travel';
+  if (id.startsWith('acc_')) return 'is-lodging';
+  return '';
+}
+
+function formatStopTime(timeLabel) {
+  if (!timeLabel) return '<span class="end">—</span>';
+  const parts = String(timeLabel).split(/\s*[–-]\s*|\s*→\s*/);
+  if (parts.length >= 2) {
+    return `${esc(parts[0])}<span class="end">→ ${esc(parts[1])}</span>`;
+  }
+  return esc(timeLabel);
+}
+
+function renderStop(row) {
+  const mod = classifyStop(row);
   const hasRef = Boolean(row.referenceNum);
-  const refText = hasRef ? row.referenceNum : 'No reference #';
-  const viewDisabled = row.fileCount === 0;
-  const fileCountText = row.fileCount ? ` (${row.fileCount})` : '';
-  const navigateBtn = row.navigateHref
-    ? `<a class="btn-ghost" href="${esc(row.navigateHref)}" target="_blank" rel="noopener noreferrer" data-action="navigate"><i class="ph-bold ph-navigation-arrow"></i> Navigate</a>`
+  const refHtml = hasRef
+    ? `<span class="stop__ref">Confirmation <code>${esc(row.referenceNum)}</code></span>`
+    : `<span class="stop__ref is-empty">No booking attached</span>`;
+  const fileCount = Number(row.fileCount || 0);
+  const filesDisabled = fileCount === 0 ? ' disabled' : '';
+  const filesCountHtml = fileCount > 0 ? ` <span class="count">${fileCount}</span>` : '';
+  const navDisabled = row.navigateHref ? '' : ' disabled';
+  const navigateAttr = row.navigateHref ? ` data-href="${esc(row.navigateHref)}"` : '';
+
+  const metaParts = [];
+  if (row.location) metaParts.push(esc(row.location));
+  if (row.priceTier) metaParts.push(`<b>${'$'.repeat(row.priceTier)}</b>`);
+  const metaHtml = metaParts.length
+    ? `<div class="stop__meta">${metaParts.join(' <span class="sep">·</span> ')}</div>`
     : '';
+  const noteHtml = row.notes ? `<p class="stop__note">${esc(row.notes)}</p>` : '';
+
   return `
-    <article class="itinerary-item" data-activity-id="${esc(row.id)}">
-      <header class="itinerary-item-head">
-        <h3 class="itinerary-title">${esc(row.title)}</h3>
-        <time class="itinerary-time">${esc(row.timeLabel || '')}</time>
-      </header>
-      ${row.location || row.priceTier ? `<div class="itinerary-subtitle">${esc(row.location || '')}${row.priceTier ? `${row.location ? ' · ' : ''}<span class="itinerary-price-tier">${'$'.repeat(row.priceTier)}</span>` : ''}</div>` : ''}
-      ${row.notes ? `<p class="itinerary-notes">${esc(row.notes)}</p>` : ''}
-      <div class="itinerary-reference${hasRef ? ' has-value' : ''}">
-        <i class="ph-bold ph-ticket" aria-hidden="true"></i>
-        <span>${esc(refText)}</span>
+    <div class="stop ${mod}" data-activity-id="${esc(row.id)}">
+      <div class="stop__time">${formatStopTime(row.timeLabel)}</div>
+      <div class="stop__body">
+        <div class="stop__head"><h4 class="stop__title">${esc(row.title || 'Untitled')}</h4></div>
+        ${metaHtml}
+        ${noteHtml}
+        ${refHtml}
+        <div class="stop__actions">
+          <button type="button" class="stop-act" data-action="navigate"${navigateAttr}${navDisabled}><i class="ph-bold ph-navigation-arrow"></i>Navigate</button>
+          <button type="button" class="stop-act" data-action="view-files"${filesDisabled}><i class="ph-bold ph-folder-open"></i>View Files${filesCountHtml}</button>
+          <button type="button" class="stop-act" data-action="upload-files"><i class="ph-bold ph-upload-simple"></i>Upload Tickets</button>
+        </div>
       </div>
-      <div class="itinerary-file-actions">
-        <button class="btn-ghost" type="button" data-action="upload-files">
-          <i class="ph-bold ph-upload-simple"></i> Upload tickets
-        </button>
-        <button class="btn-ghost" type="button" data-action="view-files"${viewDisabled ? ' disabled' : ''}>
-          <i class="ph-bold ph-folder-open"></i> View files${fileCountText}
-        </button>
-        ${navigateBtn}
-      </div>
-    </article>
+      <div class="stop__cost"></div>
+    </div>
   `;
+}
+
+function formatWeekday(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-US', { weekday: 'short' });
 }
 
 function renderItineraryMode() {
   if (!els.itineraryModeList) return;
   const payload = getMinimalPayload();
   const rows = payload.itineraryRows;
-  renderItineraryModeSummary(payload);
+  renderItineraryHero(payload);
 
   const cityOrder = [];
   const cityIdxByName = new Map();
@@ -6876,7 +6937,7 @@ function renderItineraryMode() {
   });
 
   if (!cityOrder.length) {
-    els.itineraryModeList.innerHTML = '<p class="muted-text">No scheduled itinerary yet. Build your plan in Planning Mode first.</p>';
+    els.itineraryModeList.innerHTML = '<p class="itin-empty">No scheduled itinerary yet. Build your plan in Planning Mode first.</p>';
     return;
   }
 
@@ -6885,36 +6946,74 @@ function renderItineraryMode() {
     return acc;
   }, {});
 
-  const html = cityOrder.map((cityName) => {
+  const totalCities = cityOrder.length;
+  let dayCounter = 0;
+
+  const html = cityOrder.map((cityName, cityIdxInOrder) => {
     const cityIdx = cityIdxByName.get(cityName);
     const cityObj = (state.cities || []).find((c) => String(c?.name || '').trim() === cityName) || {};
     const accomTravelRows = getCityAccomTravelRows(cityObj, cityIdx);
     const cityRows = rowsByCity[cityName] || [];
-    const dayGroups = cityRows.reduce((acc, row) => {
+
+    const accomTravelByDate = {};
+    accomTravelRows.forEach((row) => {
+      const dateMatch = String(row.timeLabel || '').match(/^([A-Z][a-z]{2}\s+\d+)/);
+      const dateKey = dateMatch ? dateMatch[1] : '__pinned__';
+      (accomTravelByDate[dateKey] = accomTravelByDate[dateKey] || []).push(row);
+    });
+
+    const activityDayGroups = cityRows.reduce((acc, row) => {
       (acc[row.date] = acc[row.date] || []).push(row);
       return acc;
     }, {});
-    const dayOrder = Object.keys(dayGroups).sort();
+    const dayOrder = Object.keys(activityDayGroups).sort();
 
-    const accomTravelHtml = accomTravelRows.length
-      ? `<section class="itinerary-city-block">
-          <h4 class="itinerary-block-head">Accommodation &amp; Travel</h4>
-          ${accomTravelRows.map(renderItineraryItemCard).join('')}
-        </section>`
+    const cityStart = dayOrder[0] ? formatDateShort(dayOrder[0]) : (accomTravelRows[0]?.timeLabel?.split('→')[0]?.trim() || '');
+    const cityEnd = dayOrder[dayOrder.length - 1] ? formatDateShort(dayOrder[dayOrder.length - 1]) : '';
+    const nightsInCity = Math.max(1, dayOrder.length);
+    const whenHtml = cityStart && cityEnd
+      ? `<b>${esc(cityStart)}</b> → ${esc(cityEnd)} · ${nightsInCity} night${nightsInCity > 1 ? 's' : ''}`
+      : esc(cityStart || cityEnd || '');
+
+    const pinnedAccomTravel = accomTravelByDate['__pinned__'] || [];
+
+    const daysHtml = dayOrder.map((date) => {
+      dayCounter += 1;
+      const stops = [];
+      pinnedAccomTravel.forEach((r) => stops.push(r));
+      delete accomTravelByDate['__pinned__'];
+      activityDayGroups[date].forEach((r) => stops.push(r));
+
+      const weekday = formatWeekday(date);
+      const dateLabel = formatDateShort(date);
+
+      return `
+        <div class="day">
+          <div class="day__when">
+            <span class="day__date">${esc(weekday)} · ${esc(dateLabel)}</span>
+            <span class="day__weekday">Day<span class="num">Day ${String(dayCounter).padStart(2, '0')}</span></span>
+          </div>
+          <div class="stops">
+            ${stops.map(renderStop).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const orphanRows = Object.values(accomTravelByDate).flat();
+    const orphanHtml = orphanRows.length
+      ? `<div class="day"><div class="day__when"><span class="day__date">Logistics</span><span class="day__weekday">&nbsp;</span></div><div class="stops">${orphanRows.map(renderStop).join('')}</div></div>`
       : '';
 
-    const daysHtml = dayOrder.map((date) => `
-      <section class="itinerary-city-block">
-        <h4 class="itinerary-block-head">${esc(formatDateShort(date))}</h4>
-        ${dayGroups[date].map(renderItineraryItemCard).join('')}
-      </section>
-    `).join('');
-
     return `
-      <section class="itinerary-city-group">
-        <h3 class="itinerary-city-title">${esc(cityName)}</h3>
-        ${accomTravelHtml}
+      <section class="city-section">
+        <header class="city-head">
+          <span class="city-head__index">${String(cityIdxInOrder + 1).padStart(2, '0')} / ${String(totalCities).padStart(2, '0')}</span>
+          <h2 class="city-head__name">${esc(cityName)}</h2>
+          <span class="city-head__when">${whenHtml}</span>
+        </header>
         ${daysHtml}
+        ${orphanHtml}
       </section>
     `;
   }).join('');
@@ -8339,7 +8438,14 @@ els.syncGoogleCalendarBtn?.addEventListener('click', () => {
   syncGoogleCalendar();
 });
 document.getElementById('savePdfBtn')?.addEventListener('click', () => {
-  window.print();
+  if (window.exportItineraryPdf) {
+    window.exportItineraryPdf().catch((err) => {
+      console.error('PDF export failed', err);
+      showToast(err?.message || 'PDF export failed', 'error');
+    });
+  } else {
+    window.print();
+  }
 });
 document.getElementById('shareTripLinkBtn')?.addEventListener('click', () => {
   const id = state.currentItineraryId;
@@ -8370,7 +8476,7 @@ els.itineraryModeBtn?.addEventListener('click', () => setViewMode('itinerary'));
 // Delegated handler for itinerary item buttons
 els.itineraryModeList?.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
   const card = btn.closest('[data-activity-id]');
   if (!card) return;
   const activityId = card.dataset.activityId;
@@ -8384,6 +8490,27 @@ els.itineraryModeList?.addEventListener('click', (e) => {
     }
   } else if (action === 'view-files') {
     openAttachmentViewer(activityId);
+  } else if (action === 'navigate') {
+    const href = btn.dataset.href;
+    if (href) window.open(href, '_blank', 'noopener,noreferrer');
+  }
+});
+
+// Itinerary send-tile buttons (mirror Finalize handlers)
+document.getElementById('syncGoogleCalendarBtnItin')?.addEventListener('click', () => {
+  if (typeof syncGoogleCalendar === 'function') syncGoogleCalendar();
+});
+document.getElementById('shareTripLinkBtnItin')?.addEventListener('click', () => {
+  document.getElementById('shareTripLinkBtn')?.click();
+});
+document.getElementById('savePdfBtnItin')?.addEventListener('click', () => {
+  if (window.exportItineraryPdf) {
+    window.exportItineraryPdf().catch((err) => {
+      console.error('PDF export failed', err);
+      showToast(err?.message || 'PDF export failed', 'error');
+    });
+  } else {
+    window.print();
   }
 });
 

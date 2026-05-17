@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GuideMe — Traveler Profile</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+  <style>
+    /* ============================================================
+       TRAVELER PROFILE MODAL
+       Mirrors the production prefsModal in planner.html — the view a
+       user gets when they click the topbar profile icon → "My Profile".
+       Same data, same sections, same hidden-when-empty AI surfaces.
+       ============================================================ */
+
+    html, body { height: 100%; }
+    body { overflow: hidden; }
+
+    /* ---------- Faux planner page behind the overlay ---------- */
+    .stage { position: fixed; inset: 0; background: var(--paper-0); overflow: hidden; }
+    .stage__topbar {
+      height: 56px;
+      background: var(--ink-900);
+      color: var(--paper-0);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--ink-700);
+    }
+    .stage__topbar .left { display: flex; align-items: center; gap: 18px; }
+    .stage__topbar .nm {
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      font-size: 16.5px;
+    }
+    .stage__topbar .nm .me {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 400;
+      margin-left: 1px;
+      font-size: 1.05em;
+    }
+    .stage__topbar .sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      color: rgba(244,241,236,.55);
+      text-transform: uppercase;
+    }
+    .stage__topbar .right { display: flex; align-items: center; gap: 12px; }
+    .stage__topbar .checklist {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(244,241,236,.7);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .stage__topbar .profile-icon {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      border: 1px solid rgba(244,241,236,.18);
+      display: inline-flex; align-items: center; justify-content: center;
+      color: rgba(244,241,236,.8);
+      background: rgba(47,125,251,.12);
+      box-shadow: 0 0 0 3px rgba(47,125,251,.16);
+    }
+    .stage__topbar .profile-icon i { font-size: 16px; }
+
+    .stage__page {
+      padding: 36px 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    .stage__block {
+      background: var(--paper-1);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-lg);
+      height: 160px;
+      box-shadow: var(--sh-sm);
+    }
+    .stage__block.tall { height: 240px; }
+    .stage__block.wide { grid-column: span 2; }
+
+    /* ---------- Overlay scrim ---------- */
+    .pf-overlay {
+      position: fixed; inset: 0;
+      background: rgba(7, 11, 18, 0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 32px 24px;
+      overflow-y: auto;
+      z-index: 100;
+      animation: pfFade 280ms var(--ease-out);
+    }
+    @keyframes pfFade { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ---------- Modal ---------- */
+    .pf {
+      width: 100%;
+      max-width: 680px;
+      background: var(--paper-1);
+      border-radius: var(--r-xl);
+      box-shadow: var(--sh-lg);
+      border: 1px solid var(--hair);
+      overflow: hidden;
+      position: relative;
+      animation: pfRise 360ms var(--ease-out) both;
+    }
+    @keyframes pfRise {
+      from { opacity: 0; transform: translateY(14px) scale(.985); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ---------- Header ---------- */
+    .pf__head {
+      padding: 22px 28px 18px;
+      border-bottom: 1px solid var(--hair);
+      background: var(--paper-1);
+      position: sticky; top: 0; z-index: 2;
+    }
+    .pf__head-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .pf__eyebrow {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-500);
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .pf__eyebrow .key {
+      color: var(--accent-deep);
+      background: var(--accent-soft);
+      padding: 2px 7px;
+      border-radius: 999px;
+      letter-spacing: 0.1em;
+    }
+
+    .pf__actions { display: flex; gap: 8px; align-items: center; }
+    .pf-icon-btn {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      border: 1px solid var(--hair);
+      background: transparent;
+      color: var(--text-500);
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all var(--dur-fast);
+    }
+    .pf-icon-btn:hover { background: var(--paper-2); color: var(--text-900); border-color: var(--hair-strong); }
+    .pf-icon-btn.danger:hover { background: rgba(192,54,44,.08); color: var(--err); border-color: rgba(192,54,44,.25); }
+    .pf-icon-btn i { font-size: 12px; }
+
+    .pf__title {
+      font-size: 26px;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+      color: var(--text-900);
+      line-height: 1.1;
+    }
+    .pf__title .serif {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    /* Profile switcher */
+    .pf__profiles {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    .pf-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 28px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: var(--paper-2);
+      border: 1px solid var(--hair);
+      font-size: 12.5px;
+      color: var(--text-700);
+      cursor: pointer;
+      transition: all var(--dur-fast);
+      letter-spacing: -0.005em;
+    }
+    .pf-chip:hover { border-color: var(--hair-strong); color: var(--text-900); }
+    .pf-chip.active {
+      background: var(--ink-900);
+      color: var(--paper-0);
+      border-color: var(--ink-900);
+    }
+    .pf-chip.active::before {
+      content: '';
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px rgba(47,125,251,.25);
+    }
+    .pf-chip--add {
+      background: transparent;
+      border: 1px dashed var(--hair-strong);
+      color: var(--text-500);
+    }
+    .pf-chip--add:hover { color: var(--accent-deep); border-color: var(--accent); background: var(--accent-soft); }
+    .pf-chip--add i { font-size: 11px; }
+    .pf__profiles-meta {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-400);
+      margin-left: 4px;
+    }
+
+    /* ---------- Body ---------- */
+    .pf__body { padding: 6px 28px 18px; }
+
+    /* Section heading */
+    .pf-section { padding: 18px 0 10px; border-bottom: 1px solid var(--hair); }
+    .pf-section:last-of-type { border-bottom: 0; }
+    .pf-section__head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .pf-section__title {
+      font-size: 13.5px;
+      font-weight: 500;
+      letter-spacing: -0.005em;
+      color: var(--text-900);
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .pf-section__title .num {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-500);
+    }
+    .pf-section__hint {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-400);
+    }
+
+    /* Question row — dot scale */
+    .pf-q {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 14px 18px;
+      align-items: center;
+      padding: 9px 0;
+    }
+    .pf-q + .pf-q { border-top: 1px dashed var(--hair); }
+    .pf-q__label {
+      font-size: 13.5px;
+      color: var(--text-700);
+      letter-spacing: -0.005em;
+      line-height: 1.4;
+    }
+    .pf-q__answer {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      justify-content: flex-end;
+    }
+    .pf-scale {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      order: 2;
+      flex-shrink: 0;
+    }
+    .pf-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--paper-3);
+      border: 1px solid var(--hair-strong);
+      cursor: pointer;
+      transition: all var(--dur-fast);
+      position: relative;
+    }
+    .pf-dot:hover { transform: scale(1.1); border-color: var(--text-900); }
+    .pf-dot.done { background: var(--ink-900); border-color: var(--ink-900); }
+    .pf-dot.now {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(47,125,251,.16);
+    }
+    .pf-scale__label {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-700);
+      flex: 1;
+      min-width: 0;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      order: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pf-scale__label.is-default { color: var(--text-400); }
+
+    /* Question row — text */
+    .pf-qt {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 0;
+    }
+    .pf-qt + .pf-qt { border-top: 1px dashed var(--hair); }
+    .pf-qt__label {
+      font-size: 13.5px;
+      color: var(--text-900);
+      font-weight: 500;
+      letter-spacing: -0.005em;
+    }
+    .pf-textarea-wrap {
+      background: var(--paper-0);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-md);
+      padding: 12px 14px;
+      transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+      position: relative;
+    }
+    .pf-textarea-wrap:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(47,125,251,.12);
+    }
+    .pf-textarea {
+      width: 100%;
+      border: 0;
+      outline: none;
+      background: transparent;
+      resize: vertical;
+      min-height: 56px;
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: var(--text-900);
+      letter-spacing: -0.005em;
+    }
+    .pf-textarea::placeholder { color: var(--text-400); font-style: italic; }
+
+    /* Footer */
+    .pf__foot {
+      padding: 18px 28px 22px;
+      border-top: 1px solid var(--hair);
+      background: var(--paper-2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .pf__foot-left {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-500);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pf__foot-left .ok {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 0 3px rgba(31,157,85,.18);
+    }
+    .pf__foot-right { display: flex; gap: 10px; align-items: center; }
+
+    .pf-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 36px;
+      padding: 0 16px;
+      border-radius: 999px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: -0.005em;
+      cursor: pointer;
+      transition: all var(--dur-fast);
+      border: 1px solid transparent;
+    }
+    .pf-btn--ghost {
+      background: transparent;
+      color: var(--text-700);
+      border-color: var(--hair-strong);
+    }
+    .pf-btn--ghost:hover { background: var(--paper-1); color: var(--text-900); border-color: var(--text-900); }
+    .pf-btn--ghost.danger { color: var(--err); border-color: rgba(192,54,44,.25); }
+    .pf-btn--ghost.danger:hover { background: rgba(192,54,44,.06); color: var(--err); border-color: var(--err); }
+    .pf-btn--primary {
+      background: var(--ink-900);
+      color: var(--paper-0);
+    }
+    .pf-btn--primary:hover { background: var(--ink-800); box-shadow: var(--sh-md); }
+    .pf-btn i { font-size: 12px; }
+
+    /* AI surfaces — collapsed but documented */
+    .pf-collapsed-note {
+      padding: 14px 16px;
+      background: var(--paper-2);
+      border: 1px dashed var(--hair-strong);
+      border-radius: var(--r-md);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      color: var(--text-500);
+      display: flex; align-items: center; gap: 10px;
+      margin: 12px 0;
+    }
+    .pf-collapsed-note .glyph {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 16px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .pf-collapsed-note .lbl b {
+      color: var(--text-700);
+      font-weight: 500;
+      letter-spacing: 0.08em;
+    }
+
+    @media (max-width: 640px) {
+      .stage__page { display: none; }
+      .pf { border-radius: var(--r-lg); }
+      .pf__head, .pf__body, .pf__foot { padding-left: 18px; padding-right: 18px; }
+      .pf__title { font-size: 22px; }
+      .pf-q { grid-template-columns: 1fr; gap: 8px; }
+      .pf-q__answer { justify-content: space-between; }
+      .pf-scale__label { flex: 0 1 auto; text-align: left; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============ Faux planner page behind ============ -->
+  <div class="stage" aria-hidden="true">
+    <div class="stage__topbar">
+      <div class="left">
+        <span class="nm">Guide<span class="me">me</span></span>
+        <span class="sub">Personal AI itinerary builder</span>
+      </div>
+      <div class="right">
+        <span class="checklist"><i class="ph-bold ph-check-square"></i> Checklist</span>
+        <span class="profile-icon"><i class="ph-bold ph-user-circle"></i></span>
+      </div>
+    </div>
+    <div class="stage__page">
+      <div class="stage__block tall wide"></div>
+      <div class="stage__block tall"></div>
+      <div class="stage__block"></div>
+      <div class="stage__block"></div>
+      <div class="stage__block"></div>
+      <div class="stage__block wide"></div>
+      <div class="stage__block"></div>
+    </div>
+  </div>
+
+  <!-- ============ Profile modal ============ -->
+  <div class="pf-overlay" role="dialog" aria-modal="true" aria-label="Traveler Profile">
+    <div class="pf" id="pf">
+
+      <!-- Header -->
+      <header class="pf__head">
+        <div class="pf__head-top">
+          <span class="pf__eyebrow">
+            <span class="key">Profile</span>
+            Traveler Profile
+          </span>
+          <div class="pf__actions">
+            <button class="pf-icon-btn" type="button" title="Save profile" aria-label="Save profile"><i class="ph-bold ph-floppy-disk"></i></button>
+            <button class="pf-icon-btn danger" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
+          </div>
+        </div>
+        <h2 class="pf__title">
+          <span class="serif">My Profile</span>’s Traveler Profile
+        </h2>
+
+        <!-- Profile switcher (up to 3 profiles supported) -->
+        <div class="pf__profiles">
+          <button class="pf-chip active" type="button">My Profile</button>
+          <button class="pf-chip pf-chip--add" type="button"><i class="ph-bold ph-plus"></i> New profile</button>
+          <span class="pf__profiles-meta">1 / 3</span>
+        </div>
+      </header>
+
+      <!-- Body -->
+      <div class="pf__body" id="pfBody">
+        <!-- Section A — Travel style (dot scale questions) -->
+        <section class="pf-section">
+          <div class="pf-section__head">
+            <span class="pf-section__title">
+              <span class="num">A</span>
+              Travel style
+            </span>
+            <span class="pf-section__hint">Tap a dot to set</span>
+          </div>
+          <div id="pfScaleQs"></div>
+        </section>
+
+        <!-- Section B — Specifics (text questions) -->
+        <section class="pf-section">
+          <div class="pf-section__head">
+            <span class="pf-section__title">
+              <span class="num">B</span>
+              Specifics
+            </span>
+            <span class="pf-section__hint">Free text · optional</span>
+          </div>
+          <div id="pfTextQs"></div>
+        </section>
+
+        <!-- Section C — About me -->
+        <section class="pf-section">
+          <div class="pf-section__head">
+            <span class="pf-section__title">
+              <span class="num">C</span>
+              Anything else we might have missed?
+            </span>
+          </div>
+          <p style="font-size:12.5px;color:var(--text-500);margin-bottom:10px;letter-spacing:-0.005em;">
+            Any other preferences, quirks, or context the planner should know about you.
+          </p>
+          <div class="pf-textarea-wrap">
+            <textarea class="pf-textarea" id="pfAbout" rows="5"
+              placeholder="e.g. I'm not a morning person, I have a smaller budget, avoid things with lots of walking..."></textarea>
+          </div>
+        </section>
+
+        <!-- Section D — Hidden AI surfaces (shown as collapsed notes when no data yet) -->
+        <section class="pf-section">
+          <div class="pf-collapsed-note">
+            <span class="glyph">∴</span>
+            <span class="lbl"><b>AI SUMMARY</b> · Will appear after you save this profile.</span>
+          </div>
+          <div class="pf-collapsed-note">
+            <span class="glyph">∴</span>
+            <span class="lbl"><b>LEARNED BY AI</b> · Builds up as the planner picks things up from your decisions.</span>
+          </div>
+        </section>
+      </div>
+
+      <!-- Footer -->
+      <div class="pf__foot">
+        <span class="pf__foot-left">
+          <span class="ok"></span>
+          Autosaved · last edit just now
+        </span>
+        <div class="pf__foot-right">
+          <button class="pf-btn pf-btn--ghost danger" type="button" title="Delete profile">
+            <i class="ph-bold ph-trash"></i>
+            Delete profile
+          </button>
+          <button class="pf-btn pf-btn--primary" type="button">
+            <i class="ph-bold ph-floppy-disk"></i>
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Render ============ -->
+  <script>
+    /* Identical PROFILE_QUESTIONS, scale labels, and defaults as
+       public/js/profileWizard.js. We only render — no data is invented. */
+
+    const PROFILE_DEFAULT = 3;
+    const GENERIC_LABELS = ['Not interested at all', 'Slightly interested', 'Neutral', 'Very interested', 'Love this'];
+    const PACE_LABELS    = ['Very relaxed', 'Easy-going', 'Moderate', 'Active', 'Non-stop'];
+
+    const PROFILE_QUESTIONS = [
+      { key: 'museumPerson',          label: 'Are you a museum person?',                                       summary: 'Museum person' },
+      { key: 'foodTravel',            label: 'Do you travel for food?',                                        summary: 'Travels for food' },
+      { key: 'livePerformances',      label: 'Do you enjoy live performances?',                                summary: 'Live performances' },
+      { key: 'outdoorNature',         label: 'Do you enjoy outdoor / nature activities?',                      summary: 'Outdoor / nature activities' },
+      { key: 'nightlifeBars',         label: 'Are you into nightlife and bars?',                               summary: 'Nightlife and bars' },
+      { key: 'structuredTours',       label: 'Do you like guided tours?',                                      summary: 'Structured tours' },
+      { key: 'shoppingPerson',        label: 'Do you enjoy shopping while traveling?',                         summary: 'Shopping' },
+      { key: 'pace',                  label: 'How packed do you like your days?',                              summary: 'Trip pace' },
+      { key: 'dayStructure',          label: 'How do you like your days structured?',                          type: 'text', placeholder: 'e.g. I like to start early and wrap up by 9pm',                 summary: 'Day structure' },
+      { key: 'dietaryRestrictions',   label: 'Do you have any dietary restrictions or food preferences?',      type: 'text', placeholder: "e.g. I'm vegetarian and avoid shellfish",                       summary: 'Dietary restrictions' },
+      { key: 'mobilityConsiderations',label: 'Any mobility or physical considerations we should know about?',  type: 'text', placeholder: 'e.g. I avoid lots of walking or stairs',                         summary: 'Mobility' },
+      { key: 'budgetStyle',           label: 'How would you describe your spending style while traveling?',    type: 'text', placeholder: 'e.g. I prefer mid-range, splurge on food but save on activities', summary: 'Budget style' },
+      { key: 'travelCompanions',      label: 'Who are you typically traveling with?',                          type: 'text', placeholder: 'e.g. My partner and two kids aged 8 and 11',                     summary: 'Travel companions' },
+      { key: 'shoppingInterests',     label: 'What do you like to shop for while traveling?',                  type: 'text', placeholder: 'e.g. fragrance, fashion, vinyl, vintage, food souvenirs',        summary: 'Shopping interests' }
+    ];
+
+    /* Loaded profile state — defaults exactly as defaultProfile() produces.
+       No fabricated answers; every dot-scale sits at the production default (3),
+       every text field is empty and shows its production placeholder. */
+    const state = {
+      answers: Object.fromEntries(
+        PROFILE_QUESTIONS.map(q => [q.key, q.type === 'text' ? '' : PROFILE_DEFAULT])
+      ),
+      aboutMe: ''
+    };
+
+    function scaleLabelFor(key, value) {
+      const arr = key === 'pace' ? PACE_LABELS : GENERIC_LABELS;
+      return arr[value - 1];
+    }
+    function escape(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+    function renderScale(key, value) {
+      const dots = Array.from({ length: 5 }, (_, i) => {
+        const v = i + 1;
+        let cls = '';
+        if (v < value) cls = 'done';
+        else if (v === value) cls = 'now';
+        return `<button class="pf-dot ${cls}" data-v="${v}" type="button" aria-label="${v} of 5"></button>`;
+      }).join('');
+      const lbl = scaleLabelFor(key, value);
+      const isDefault = value === PROFILE_DEFAULT;
+      return `
+        <div class="pf-q" data-key="${key}">
+          <span class="pf-q__label">${escape(PROFILE_QUESTIONS.find(q => q.key === key).label)}</span>
+          <span class="pf-q__answer">
+            <span class="pf-scale">${dots}</span>
+            <span class="pf-scale__label ${isDefault ? 'is-default' : ''}" data-label>${escape(lbl)}</span>
+          </span>
+        </div>
+      `;
+    }
+
+    function renderText(q) {
+      const val = state.answers[q.key] || '';
+      return `
+        <div class="pf-qt" data-key="${q.key}">
+          <span class="pf-qt__label">${escape(q.label)}</span>
+          <div class="pf-textarea-wrap">
+            <textarea class="pf-textarea" rows="2" placeholder="${escape(q.placeholder || '')}">${escape(val)}</textarea>
+          </div>
+        </div>
+      `;
+    }
+
+    function render() {
+      const scaleRoot = document.getElementById('pfScaleQs');
+      const textRoot = document.getElementById('pfTextQs');
+      scaleRoot.innerHTML = PROFILE_QUESTIONS
+        .filter(q => q.type !== 'text')
+        .map(q => renderScale(q.key, state.answers[q.key]))
+        .join('');
+      textRoot.innerHTML = PROFILE_QUESTIONS
+        .filter(q => q.type === 'text')
+        .map(renderText)
+        .join('');
+
+      // Bind dot clicks
+      scaleRoot.querySelectorAll('.pf-q').forEach(row => {
+        const key = row.dataset.key;
+        row.querySelectorAll('.pf-dot').forEach(dot => {
+          dot.addEventListener('click', () => {
+            const v = Number(dot.dataset.v);
+            state.answers[key] = v;
+            row.querySelectorAll('.pf-dot').forEach((d, idx) => {
+              const dv = idx + 1;
+              d.classList.toggle('done', dv < v);
+              d.classList.toggle('now', dv === v);
+            });
+            const lblEl = row.querySelector('[data-label]');
+            lblEl.textContent = scaleLabelFor(key, v);
+            lblEl.classList.toggle('is-default', v === PROFILE_DEFAULT);
+          });
+        });
+      });
+    }
+
+    render();
+  </script>
+</body>
+</html>
