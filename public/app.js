@@ -2717,7 +2717,10 @@ function renderCities() {
     const head = row.querySelector('.gm-city__head');
     head?.addEventListener('click', (e) => {
       if (!readyForDetails) return;
-      if (e.target.closest('[data-stop]') && !e.target.closest('[data-toggle-details]')) return;
+      const stopEl = e.target.closest('[data-stop]');
+      if (stopEl && head.contains(stopEl) && stopEl !== head) return;
+      const explicitToggle = e.target.closest('[data-toggle-details]');
+      if (explicitToggle && explicitToggle !== head && !head.contains(explicitToggle)) return;
       city.detailsExpanded = !city.detailsExpanded;
       renderCities();
     });
