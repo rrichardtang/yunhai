@@ -1,0 +1,998 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GuideMe — Arrange</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/planner.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <style>
+    /* arrange-specific */
+    .arrange-wrap {
+      background: var(--paper-1);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-lg);
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 2px rgba(10,22,40,.04);
+    }
+    .arrange-head {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .arrange-head h2 {
+      font-size: 24px; font-weight: 500; letter-spacing: -0.025em;
+      color: var(--text-900); line-height: 1.1;
+    }
+    .arrange-head h2 .serif { font-family: var(--font-display); font-style: italic; font-weight: 400; }
+    .arrange-head p { font-size: 13.5px; color: var(--text-500); margin-top: 6px; }
+
+    .arrange-toolbar {
+      display: flex; gap: 10px; align-items: center;
+    }
+    .arrange-btn {
+      height: 36px; padding: 0 16px;
+      border-radius: var(--r-pill);
+      background: var(--paper-0);
+      border: 1px solid var(--hair-strong);
+      font-size: 13px; font-weight: 500; color: var(--text-900);
+      display: inline-flex; align-items: center; gap: 8px;
+      cursor: pointer; transition: all var(--dur-fast);
+      letter-spacing: -0.005em;
+    }
+    .arrange-btn:hover { border-color: var(--text-900); background: var(--paper-0); box-shadow: var(--sh-sm); }
+    .arrange-btn.primary { background: var(--ink-900); color: var(--paper-0); border-color: var(--ink-900); }
+    .arrange-btn.primary:hover { background: var(--ink-800); }
+    .arrange-btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .arrange-btn.accent:hover { background: var(--accent-deep); }
+    .arrange-btn svg { width: 14px; height: 14px; }
+
+    .timeline-scroll {
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 8px;
+      margin: 0 -4px;
+    }
+    .timeline-scroll::-webkit-scrollbar { height: 8px; }
+    .timeline-scroll::-webkit-scrollbar-track { background: transparent; }
+    .timeline-scroll::-webkit-scrollbar-thumb { background: var(--hair-strong); border-radius: 4px; }
+
+    .timeline {
+      display: flex;
+      gap: 16px;
+      padding: 0 4px;
+      min-width: min-content;
+    }
+    .hour-ruler {
+      flex-shrink: 0;
+      width: 64px;
+      position: sticky;
+      left: 0;
+      background: var(--paper-1);
+      z-index: 5;
+      padding-top: 44px; /* match day header height */
+    }
+    .hour-tick {
+      height: var(--arr-pph, 60px);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-500);
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      text-align: right;
+      padding: 3px 10px 0 0;
+      border-top: 1px solid var(--hair);
+      line-height: 1;
+    }
+    .hour-tick:last-child { border-bottom: 1px solid var(--hair); }
+
+    .day-col {
+      flex-shrink: 0;
+      width: 280px;
+      display: flex;
+      flex-direction: column;
+    }
+    .day-head {
+      height: 44px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 14px;
+      background: var(--paper-0);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-md) var(--r-md) 0 0;
+      border-bottom: none;
+    }
+    .day-head .left { display: flex; align-items: baseline; gap: 8px; }
+    .day-head .day-num {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-500);
+    }
+    .day-head .day-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-900);
+      letter-spacing: -0.005em;
+    }
+    .day-head .day-count {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.08em;
+      color: var(--text-500);
+      padding: 2px 8px;
+      background: var(--paper-2);
+      border-radius: var(--r-pill);
+    }
+
+    .day-body {
+      position: relative !important;
+      background: var(--paper-0);
+      border: 1px solid var(--hair);
+      border-top: 1px solid var(--hair);
+      border-radius: 0 0 var(--r-md) var(--r-md);
+      overflow: hidden;
+      transition: background var(--dur-fast), border-color var(--dur-fast);
+    }
+    .day-body.drop-target {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+    }
+    .day-body.drop-target .hour-line {
+      border-top-color: rgba(47,125,251,.12);
+    }
+
+    .hour-line {
+      height: var(--arr-pph, 60px);
+      border-top: 1px dashed var(--hair);
+      position: relative;
+      transition: border-color var(--dur-fast);
+    }
+    .hour-line:first-child { border-top: none; }
+
+    .evt {
+      position: absolute;
+      left: 6px; right: 6px;
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: var(--paper-0);
+      border: 1px solid rgba(10,22,40,.12);
+      box-shadow:
+        0 1px 2px rgba(10,22,40,.04),
+        0 4px 10px rgba(10,22,40,.06);
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+      transition: box-shadow var(--dur-fast), border-color var(--dur-fast), opacity 120ms;
+      overflow: hidden;
+    }
+    .evt:hover {
+      border-color: rgba(10,22,40,.22);
+      box-shadow:
+        0 2px 4px rgba(10,22,40,.06),
+        0 8px 20px rgba(10,22,40,.10);
+    }
+    .evt:active { cursor: grabbing; }
+    .evt.is-dragging { opacity: 0.3; pointer-events: none; }
+    .evt.cat-food    { background: linear-gradient(to right, #FFF4E6 0 3px, var(--paper-0) 3px); }
+    .evt.cat-tour    { background: linear-gradient(to right, #E6F0FE 0 3px, var(--paper-0) 3px); }
+    .evt.cat-culture { background: linear-gradient(to right, #F3E9FF 0 3px, var(--paper-0) 3px); }
+    .evt.cat-outdoor { background: linear-gradient(to right, #E6F7EA 0 3px, var(--paper-0) 3px); }
+    .evt.cat-night   { background: linear-gradient(to right, #FCE9F1 0 3px, var(--paper-0) 3px); }
+    .evt.cat-transit { background: linear-gradient(to right, #EAEDF2 0 3px, var(--paper-0) 3px); opacity: 0.75; }
+
+    /* transit pill between activities */
+    .transit-pill-wrap {
+      position: absolute;
+      left: 0; right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 4;
+    }
+    .transit-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      height: 24px;
+      padding: 0 10px;
+      border-radius: var(--r-pill);
+      background: var(--paper-0);
+      border: 1.5px solid var(--hair-strong);
+      font-size: 12px;
+      font-family: var(--font-mono);
+      letter-spacing: 0.02em;
+      color: var(--text-700);
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(10,22,40,.08);
+      transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+      white-space: nowrap;
+      user-select: none;
+    }
+    .transit-pill:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(47,125,251,.15); }
+    .transit-pill.open { border-color: var(--accent); }
+    .transit-pill .chev { font-size: 8px; opacity: 0.5; margin-left: 2px; }
+
+    .transit-dropdown {
+      position: fixed;
+      z-index: 300;
+      background: var(--paper-0);
+      border: 1px solid var(--hair-strong);
+      border-radius: 12px;
+      padding: 6px;
+      box-shadow: 0 8px 24px rgba(10,22,40,.14), 0 2px 6px rgba(10,22,40,.08);
+      min-width: 200px;
+    }
+    .transit-opt {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      color: var(--text-900);
+      cursor: pointer;
+      transition: background var(--dur-fast);
+    }
+    .transit-opt:hover { background: var(--paper-2); }
+    .transit-opt .left { display: flex; align-items: center; gap: 10px; }
+    .transit-opt .check { color: var(--accent); font-size: 14px; }
+    .transit-opt .mins { color: var(--text-500); font-size: 13px; }
+
+    .evt__time {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-500);
+      letter-spacing: 0.02em;
+      margin-bottom: 2px;
+      display: inline-flex; align-items: center; gap: 5px;
+      cursor: pointer;
+      border-radius: 3px;
+      padding: 1px 4px 1px 2px;
+      margin-left: -2px;
+      transition: background var(--dur-fast), color var(--dur-fast);
+    }
+    .evt__time:hover { background: rgba(47,125,251,.1); color: var(--accent); }
+    .evt__time svg { width: 10px; height: 10px; opacity: 0.6; flex-shrink: 0; }
+
+    .time-edit-popup {
+      position: fixed;
+      z-index: 200;
+      background: var(--paper-0);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 8px 24px rgba(10,22,40,.16), 0 2px 6px rgba(10,22,40,.08);
+      display: flex; flex-direction: column; gap: 10px;
+      width: 220px;
+    }
+    .time-edit-popup .tep-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-500);
+    }
+    .time-edit-popup .tep-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-900);
+      letter-spacing: -0.005em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .time-edit-popup input[type="time"] {
+      width: 100%;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--hair-strong);
+      background: var(--paper-1);
+      padding: 0 10px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--text-900);
+      outline: none;
+      transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+    }
+    .time-edit-popup input[type="time"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(47,125,251,.14);
+    }
+    .time-edit-popup .tep-actions {
+      display: flex; gap: 6px;
+    }
+    .time-edit-popup .tep-btn {
+      flex: 1; height: 30px; border-radius: var(--r-pill);
+      font-size: 12px; font-weight: 500; letter-spacing: -0.005em;
+      cursor: pointer; transition: all var(--dur-fast);
+    }
+    .time-edit-popup .tep-btn.save {
+      background: var(--ink-900); color: var(--paper-0);
+    }
+    .time-edit-popup .tep-btn.save:hover { background: var(--ink-800); }
+    .time-edit-popup .tep-btn.cancel {
+      background: var(--paper-2); color: var(--text-700);
+      border: 1px solid var(--hair);
+    }
+    .time-edit-popup .tep-btn.cancel:hover { border-color: var(--text-900); }
+    .evt__title {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text-900);
+      letter-spacing: -0.005em;
+      line-height: 1.3;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+    .evt__meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-500);
+      margin-top: 4px;
+      letter-spacing: 0.02em;
+    }
+
+    /* drop indicator — the blue insertion line + time chip */
+    .drop-indicator {
+      position: absolute;
+      left: 4px; right: 4px;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 2px;
+      pointer-events: none;
+      box-shadow: 0 0 0 3px rgba(47,125,251,.15);
+      z-index: 3;
+    }
+    .drop-indicator::before {
+      content: attr(data-time);
+      position: absolute;
+      right: 0; top: -22px;
+      background: var(--accent);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: var(--r-pill);
+      letter-spacing: 0.04em;
+    }
+
+    /* floating ghost */
+    .drag-ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 200;
+      width: 268px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--paper-0);
+      border: 1px solid rgba(10,22,40,.2);
+      box-shadow:
+        0 8px 20px rgba(10,22,40,.15),
+        0 20px 40px rgba(10,22,40,.12);
+      transform: rotate(-1.5deg);
+      transition: transform 160ms var(--ease-out);
+    }
+
+    .arrange-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 20px;
+      padding: 16px 20px;
+      background: var(--ink-900);
+      color: var(--paper-0);
+      border-radius: var(--r-md);
+    }
+    .arrange-summary .cell {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .arrange-summary .k {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(244,241,236,.55);
+    }
+    .arrange-summary .v {
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: -0.015em;
+      color: var(--paper-0);
+    }
+    .arrange-summary .v .unit { font-family: var(--font-mono); font-size: 11px; color: rgba(244,241,236,.55); margin-left: 4px; letter-spacing: 0.04em; }
+
+    .hint {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 14px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(47,125,251,.22);
+      border-radius: var(--r-pill);
+      font-size: 12px;
+      color: var(--accent-deep);
+      font-family: var(--font-mono);
+      letter-spacing: 0.02em;
+    }
+    .hint .kbd {
+      background: #fff;
+      border: 1px solid rgba(47,125,251,.3);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+
+    /* ---- Column width via CSS var ---- */
+    .day-col { width: var(--arr-col-width, 280px); }
+    .drag-ghost { width: calc(var(--arr-col-width, 280px) - 12px); }
+
+    /* ---- Card style: filled ---- */
+    body.card-filled .evt.cat-food    { background: #FFF1D8 !important; border-color: rgba(210,140,0,.22) !important; }
+    body.card-filled .evt.cat-tour    { background: #DCE9FF !important; border-color: rgba(47,125,251,.22) !important; }
+    body.card-filled .evt.cat-culture { background: #EDE0FF !important; border-color: rgba(120,60,210,.2) !important; }
+    body.card-filled .evt.cat-outdoor { background: #D8F2DD !important; border-color: rgba(31,157,85,.2) !important; }
+    body.card-filled .evt.cat-night   { background: #FFD9EB !important; border-color: rgba(207,50,115,.2) !important; }
+    body.card-filled .evt.cat-transit { background: #E6E8EC !important; border-color: rgba(10,22,40,.1) !important; }
+
+    /* ---- Card style: mono ---- */
+    body.card-mono .evt,
+    body.card-mono .evt[class*="cat-"] {
+      background: var(--paper-1) !important;
+      border-color: var(--hair-strong) !important;
+    }
+    body.card-mono .evt__title { color: var(--text-900); }
+    body.card-mono .evt__time  { color: var(--text-500); }
+  </style>
+</head>
+<body>
+
+<div class="planner">
+  <!-- TOPBAR (same chrome) -->
+  <header class="ptop">
+    <div class="ptop__brand">
+      <span class="name">Guide<span class="me">me</span></span>
+      <span class="sub">Personal AI itinerary builder</span>
+    </div>
+    <div class="ptop__actions">
+      <div class="mode" role="group">
+        <button class="active">Planning</button>
+        <button>Itinerary</button>
+      </div>
+      <button class="ptop__icon health-ready" title="Trip Health">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2-5 4 10 2-5h7"/></svg>
+      </button>
+      <button class="ptop__checklist">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8 12 3 3 5-6"/></svg>
+        Checklist
+      </button>
+      <button class="ptop__icon" title="Profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="pmain">
+    <!-- STEPPER -->
+    <nav class="steps">
+      <button class="step done"><span class="step__node"></span><span class="step__label">Setup</span></button>
+      <button class="step done"><span class="step__node"></span><span class="step__label">Review</span></button>
+      <button class="step active"><span class="step__node"><span>3</span></span><span class="step__label">Arrange</span></button>
+      <button class="step"><span class="step__node"><span>4</span></span><span class="step__label">Finalize</span></button>
+    </nav>
+
+    <div id="root"></div>
+  </main>
+
+  <!-- FLOATING STEP NAV -->
+  <div class="step-nav">
+    <button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg></button>
+    <button type="button" class="primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+  </div>
+</div>
+
+<script type="text/babel">
+const HOUR_START = 7;
+const HOUR_END   = 23;
+let PX_PER_HOUR = 60;
+const SNAP_MIN   = 15; // snap drops to 15 min
+
+const HOURS = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
+
+const fmt = (h) => {
+  const hh = Math.floor(h);
+  const mm = Math.round((h - hh) * 60);
+  return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+};
+
+const initialDays = [
+  {
+    id: 'd1', num: '01', date: 'Mon · May 04', city: 'Barcelona',
+    items: [
+      { id: 'a1', title: 'Hotel check-in',        cat: 'transit', start: 9.0,  dur: 0.75 },
+      { id: 'a2', title: 'Gothic Quarter walk',   cat: 'tour',    start: 10.5, dur: 2.0 },
+      { id: 'a3', title: 'Lunch · El Xampanyet',  cat: 'food',    start: 13.0, dur: 1.25 },
+      { id: 'a4', title: 'Picasso Museum',        cat: 'culture', start: 15.0, dur: 2.0 },
+      { id: 'a5', title: 'Tapas crawl',           cat: 'night',   start: 20.0, dur: 2.5 },
+    ],
+  },
+  {
+    id: 'd2', num: '02', date: 'Tue · May 05', city: 'Barcelona',
+    items: [
+      { id: 'b1', title: 'Sagrada Família tour',  cat: 'culture', start: 9.5,  dur: 2.0 },
+      { id: 'b2', title: 'Park Güell',            cat: 'outdoor', start: 12.0, dur: 1.75 },
+      { id: 'b3', title: 'Lunch · Gràcia',        cat: 'food',    start: 14.25, dur: 1.25 },
+      { id: 'b4', title: 'Bunkers sunset',        cat: 'outdoor', start: 19.0, dur: 1.5 },
+    ],
+  },
+  {
+    id: 'd3', num: '03', date: 'Wed · May 06', city: 'Barcelona',
+    items: [
+      { id: 'c1', title: 'Paella cooking class',  cat: 'food',    start: 10.0, dur: 3.0 },
+      { id: 'c2', title: 'Barceloneta beach',     cat: 'outdoor', start: 14.5, dur: 2.0 },
+      { id: 'c3', title: 'Flamenco · Tablao',     cat: 'night',   start: 21.5, dur: 1.5 },
+    ],
+  },
+  {
+    id: 'd4', num: '04', date: 'Thu · May 07', city: 'Madrid',
+    items: [
+      { id: 'e1', title: 'AVE · BCN → MAD',       cat: 'transit', start: 8.0,  dur: 3.0 },
+      { id: 'e2', title: 'Prado Museum',          cat: 'culture', start: 12.0, dur: 2.5 },
+      { id: 'e3', title: 'Lunch · Mercado',       cat: 'food',    start: 15.0, dur: 1.25 },
+      { id: 'e4', title: 'Retiro Park stroll',    cat: 'outdoor', start: 17.0, dur: 1.5 },
+    ],
+  },
+];
+
+const yFromHour = (h) => (h - HOUR_START) * PX_PER_HOUR;
+const hourFromY = (y) => HOUR_START + (y / PX_PER_HOUR);
+
+function snapHour(h) {
+  const step = SNAP_MIN / 60;
+  return Math.max(HOUR_START, Math.min(HOUR_END - 0.25,
+    Math.round(h / step) * step));
+}
+
+function totalHours(day) {
+  return day.items.reduce((s, it) => s + it.dur, 0);
+}
+
+function App() {
+  // ---- Tweak integration ----
+  const [tweakVer, setTweakVer] = React.useState(0);
+  React.useEffect(() => {
+    const h = () => {
+      // Read new density from window globals set by tweaks panel
+      PX_PER_HOUR = window.__arrPxPerHour || 60;
+      document.documentElement.style.setProperty('--arr-col-width', (window.__arrColWidth || 280) + 'px');
+      setTweakVer(v => v + 1);
+    };
+    window.addEventListener('arrange-tweak', h);
+    return () => window.removeEventListener('arrange-tweak', h);
+  }, []);
+  const showTransit = window.__arrShowTransit !== false;
+  // ---- End tweak integration ----
+
+  const [days, setDays] = React.useState(initialDays);
+  const [drag, setDrag] = React.useState(null);
+  const [dropTarget, setDropTarget] = React.useState(null);
+  const [editing, setEditing] = React.useState(null); // { id, dayId, x, y }
+  const [editStart, setEditStart] = React.useState('');
+  const [editEnd, setEditEnd] = React.useState('');
+  const [transitModes, setTransitModes] = React.useState({});
+  const [openTransit, setOpenTransit] = React.useState(null);
+  const dayBodyRefs = React.useRef({});
+
+  // pointer handlers on window while dragging
+  React.useEffect(() => {
+    if (!drag) return;
+    const onMove = (e) => {
+      setDrag(d => d ? { ...d, ptrX: e.clientX, ptrY: e.clientY } : d);
+      // hit-test day columns
+      let found = null;
+      for (const [dayId, el] of Object.entries(dayBodyRefs.current)) {
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+          const y = e.clientY - r.top - (drag.offsetY || 0);
+          const h = snapHour(hourFromY(y));
+          found = { dayId, hour: h };
+          break;
+        }
+      }
+      setDropTarget(found);
+    };
+    const onUp = (e) => {
+      if (drag && dropTarget) {
+        setDays(prev => {
+          const next = prev.map(d => ({ ...d, items: d.items.filter(it => it.id !== drag.id) }));
+          const item = prev.flatMap(d => d.items).find(it => it.id === drag.id);
+          if (item) {
+            const target = next.find(d => d.id === dropTarget.dayId);
+            const newItem = { ...item, start: dropTarget.hour };
+            target.items.push(newItem);
+            target.items.sort((a,b) => a.start - b.start);
+          }
+          return next;
+        });
+      }
+      setDrag(null);
+      setDropTarget(null);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setDrag(null);
+        setDropTarget(null);
+        setEditing(null);
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [drag, dropTarget]);
+
+  const openEdit = (e, item, dayId) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const r = e.currentTarget.closest('.evt').getBoundingClientRect();
+    const h = Math.floor(item.start);
+    const m = Math.round((item.start - h) * 60);
+    setEditStart(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+    // duration as HH:MM string
+    const eh = Math.floor(item.start + item.dur);
+    const em = Math.round((item.start + item.dur - Math.floor(item.start + item.dur)) * 60);
+    setEditEnd(`${String(eh).padStart(2,'0')}:${String(em).padStart(2,'0')}`);  
+    // position popup to the right of the card, or left if near edge
+    const x = r.right + 8;
+    const y = r.top;
+    setEditing({ id: item.id, dayId, x, y, title: item.title });
+  };
+
+  const saveEdit = () => {
+    if (!editing) return;
+    const [sh, sm] = editStart.split(':').map(Number);
+    const newStart = snapHour(sh + sm / 60);
+    const [eh, em] = editEnd.split(':').map(Number);
+    const endHour = eh + em / 60;
+    const newDur = Math.max(0.25, endHour - newStart);
+    setDays(prev => prev.map(d => d.id !== editing.dayId ? d : {
+      ...d,
+      items: d.items
+        .map(it => it.id === editing.id ? { ...it, start: newStart, dur: newDur } : it)
+        .sort((a, b) => a.start - b.start),
+    }));
+    setEditing(null);
+  };
+
+  const cancelEdit = () => setEditing(null);
+
+  const startDrag = (e, item, dayId) => {
+    if (editing) return; // don't drag while editing
+    e.preventDefault();
+    const r = e.currentTarget.getBoundingClientRect();
+    setDrag({
+      id: item.id, srcDayId: dayId,
+      offsetY: e.clientY - r.top,
+      w: r.width, h: Math.max(34, item.dur * PX_PER_HOUR - 4),
+      title: item.title, cat: item.cat, dur: item.dur,
+      ptrX: e.clientX, ptrY: e.clientY,
+    });
+  };
+
+  const autoArrange = () => {
+    // demo: sort each day by start, compress gaps
+    setDays(prev => prev.map(d => {
+      const sorted = [...d.items].sort((a,b) => a.start - b.start);
+      let cursor = 9; // 09:00 start
+      const compressed = sorted.map(it => {
+        const placed = { ...it, start: snapHour(cursor) };
+        cursor += it.dur + 0.5; // 30 min buffer
+        if (cursor > 14 && cursor < 18) cursor = Math.max(cursor, 19); // evening gap
+        return placed;
+      });
+      return { ...d, items: compressed };
+    }));
+  };
+
+  const totalActivities = days.reduce((s, d) => s + d.items.length, 0);
+  const totalHrs = days.reduce((s, d) => s + totalHours(d), 0);
+
+  return (
+    <div className="arrange-wrap">
+      <div className="arrange-head">
+        <div>
+          <h2>Arrange your <span className="serif">days</span>.</h2>
+          <p>Drag activities across days and times. The timeline shows real hours — conflicts become visible.</p>
+        </div>
+        <div className="arrange-toolbar">
+          <span className="hint">drag · <span className="kbd">esc</span> cancel</span>
+          <button className="arrange-btn" onClick={autoArrange}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>
+            Auto-arrange
+          </button>
+          <button className="arrange-btn primary">
+            Continue to Finalize →
+          </button>
+        </div>
+      </div>
+
+      <div className="timeline-scroll">
+        <div className="timeline">
+          {/* HOUR RULER */}
+          <div className="hour-ruler">
+            {HOURS.map(h => (
+              <div key={h} className="hour-tick">{String(h).padStart(2,'0')}:00</div>
+            ))}
+          </div>
+
+          {/* DAY COLUMNS */}
+          {days.map(day => (
+            <div key={day.id} className="day-col">
+              <div className="day-head">
+                <div className="left">
+                  <span className="day-num">DAY {day.num}</span>
+                  <span className="day-name">{day.date}</span>
+                </div>
+                <span className="day-count">{day.items.length} · {totalHours(day).toFixed(1)}h</span>
+              </div>
+              <div
+                className={`day-body ${dropTarget && dropTarget.dayId === day.id ? 'drop-target' : ''}`}
+                ref={el => dayBodyRefs.current[day.id] = el}
+                style={{ height: (HOUR_END - HOUR_START) * PX_PER_HOUR }}
+              >
+                {HOURS.map(h => (<div key={h} className="hour-line" />))}
+
+                {/* TRANSIT PILLS */}
+                {showTransit && day.items.slice(0, -1).map((it, idx) => {
+                  const next = day.items[idx + 1];
+                  const gapStart = it.start + it.dur;
+                  const gapEnd = next.start;
+                  const gapMins = Math.round((gapEnd - gapStart) * 60);
+                  if (gapMins < 3) return null;
+                  const midY = yFromHour(gapStart) + (gapEnd - gapStart) * PX_PER_HOUR / 2 - 12;
+                  const key = `${day.id}-${it.id}`;
+                  const mode = transitModes[key] || 'driving';
+                  const MODES = {
+                    transit: { icon: 'ph-train',              label: 'Transit', factor: 1.4 },
+                    driving: { icon: 'ph-car',                label: 'Driving', factor: 1.0 },
+                    walking: { icon: 'ph-person-simple-walk', label: 'Walking', factor: 3.5 },
+                  };
+                  const mins = Math.max(1, Math.round(gapMins * MODES[mode].factor * 0.6));
+                  const openPill = (e) => {
+                    e.stopPropagation();
+                    const r = e.currentTarget.getBoundingClientRect();
+                    const opts = Object.entries(MODES).map(([k, v]) => ({
+                      key: k, icon: v.icon, label: v.label,
+                      mins: Math.max(1, Math.round(gapMins * v.factor * 0.6)),
+                    }));
+                    setOpenTransit(t => t && t.key === key ? null : { key, x: r.left, y: r.bottom + 4, opts });
+                  };
+                  return (
+                    <div key={key} className="transit-pill-wrap" style={{ top: midY }}>
+                      <div
+                        className={`transit-pill ${openTransit && openTransit.key === key ? 'open' : ''}`}
+                        onPointerDown={e => e.stopPropagation()}
+                        onClick={openPill}
+                      >
+                        <i className={`ph ${MODES[mode].icon}`} style={{fontSize:13,lineHeight:1}} />
+                        <span>{mins} min</span>
+                        <span className="chev">▼</span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {day.items.map(it => {
+                  const top = yFromHour(it.start);
+                  const height = Math.max(34, it.dur * PX_PER_HOUR - 4);
+                  const isBeingDragged = drag && drag.id === it.id;
+                  const isEditing = editing && editing.id === it.id;
+                  return (
+                    <div
+                      key={it.id}
+                      className={`evt cat-${it.cat} ${isBeingDragged ? 'is-dragging' : ''}`}
+                      style={{ top, height, zIndex: isEditing ? 10 : 1 }}
+                      onPointerDown={(e) => !isEditing && startDrag(e, it, day.id)}
+                    >
+                      <div
+                        className="evt__time"
+                        onPointerDown={e => e.stopPropagation()}
+                        onClick={(e) => openEdit(e, it, day.id)}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                        {fmt(it.start)} – {fmt(it.start + it.dur)}
+                      </div>
+                      <div className="evt__title">{it.title}</div>
+                      {height > 56 && <div className="evt__meta">{it.dur}h</div>}
+
+                    </div>
+                  );
+                })}
+
+                {/* drop indicator */}
+                {dropTarget && dropTarget.dayId === day.id && drag && (
+                  <div
+                    className="drop-indicator"
+                    style={{ top: yFromHour(dropTarget.hour) }}
+                    data-time={fmt(dropTarget.hour)}
+                  />
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* summary ribbon */}
+      <div className="arrange-summary">
+        <div className="cell"><span className="k">Total days</span><span className="v">{days.length}</span></div>
+        <div className="cell"><span className="k">Activities</span><span className="v">{totalActivities}</span></div>
+        <div className="cell"><span className="k">Planned time</span><span className="v">{totalHrs.toFixed(1)}<span className="unit">hrs</span></span></div>
+        <div className="cell"><span className="k">Avg / day</span><span className="v">{(totalHrs / days.length).toFixed(1)}<span className="unit">hrs</span></span></div>
+        <div className="cell"><span className="k">Conflicts</span><span className="v" style={{color: '#6EDB96'}}>0</span></div>
+      </div>
+
+      {/* floating ghost */}
+      {drag && (
+        <div
+          className="drag-ghost"
+          style={{
+            left: drag.ptrX + 8,
+            top: drag.ptrY - (drag.offsetY || 0),
+            height: drag.h,
+          }}
+        >
+          <div className="evt__time">{dropTarget ? `${fmt(dropTarget.hour)} – ${fmt(dropTarget.hour + drag.dur)}` : 'drop on a day…'}</div>
+          <div className="evt__title">{drag.title}</div>
+        </div>
+      )}
+      {/* TIME EDIT PORTAL */}
+      {editing && ReactDOM.createPortal(
+        <div
+          className="time-edit-popup"
+          style={{ left: Math.min(editing.x, window.innerWidth - 240), top: Math.min(editing.y, window.innerHeight - 240) }}
+          onPointerDown={e => e.stopPropagation()}
+        >
+          <div className="tep-label">Edit timing</div>
+          <div className="tep-title">{editing.title}</div>
+          <label style={{ display:'flex', flexDirection:'column', gap:4 }}>
+            <span className="tep-label">Start time</span>
+            <input
+              type="time" value={editStart} step="900" autoFocus
+              onChange={e => setEditStart(e.target.value)}
+              onKeyDown={e => { if (e.key==='Enter') saveEdit(); if (e.key==='Escape') cancelEdit(); }}
+            />
+          </label>
+          <label style={{ display:'flex', flexDirection:'column', gap:4 }}>
+            <span className="tep-label">End time</span>
+            <input
+              type="time" value={editEnd} step="900"
+              onChange={e => setEditEnd(e.target.value)}
+              onKeyDown={e => { if (e.key==='Enter') saveEdit(); if (e.key==='Escape') cancelEdit(); }}
+            />
+          </label>
+          <div className="tep-actions">
+            <button className="tep-btn cancel" onClick={cancelEdit}>Cancel</button>
+            <button className="tep-btn save" onClick={saveEdit}>Save</button>
+          </div>
+        </div>,
+        document.body
+      )}
+      {/* TRANSIT DROPDOWN PORTAL */}
+      {openTransit && ReactDOM.createPortal(
+        <>
+          <div style={{ position:'fixed', inset:0, zIndex:299 }} onClick={() => setOpenTransit(null)} />
+          <div className="transit-dropdown" style={{ left: openTransit.x, top: openTransit.y }}>
+            {openTransit.opts.map(opt => {
+              const selected = (transitModes[openTransit.key] || 'driving') === opt.key;
+              return (
+                <div key={opt.key} className="transit-opt" onClick={() => {
+                  setTransitModes(m => ({ ...m, [openTransit.key]: opt.key }));
+                  setOpenTransit(null);
+                }}>
+                  <span className="left">
+                    <i className={`ph ${opt.icon}`} style={{fontSize:15,lineHeight:1}} />
+                    <span>{opt.label} – {opt.mins} min</span>
+                  </span>
+                  {selected && <span className="check">✓</span>}
+                </div>
+              );
+            })}
+          </div>
+        </>,
+        document.body
+      )}
+
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+
+<!-- Tweaks mount -->
+<div id="tweaks-root"></div>
+
+<script type="text/babel">
+  const ARRANGE_TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "scale": "regular",
+    "cardStyle": "strip",
+    "showTransit": true
+  }/*EDITMODE-END*/;
+
+  const SCALE_MAP = {
+    compact: { px: 44, col: 220 },
+    regular: { px: 60, col: 280 },
+    roomy:   { px: 90, col: 360 },
+  };
+
+  function ArrangeTweaks() {
+    const [t, setTweak] = useTweaks(ARRANGE_TWEAK_DEFAULTS);
+
+    React.useEffect(() => {
+      // Scale → JS density + CSS column width
+      const s = SCALE_MAP[t.scale] || SCALE_MAP.regular;
+      window.__arrPxPerHour = s.px;
+      window.__arrColWidth  = s.col;
+
+      // Card style → body class
+      document.body.classList.remove('card-filled', 'card-mono');
+      if (t.cardStyle === 'filled') document.body.classList.add('card-filled');
+      if (t.cardStyle === 'mono')   document.body.classList.add('card-mono');
+
+      // Transit visibility
+      window.__arrShowTransit = t.showTransit;
+
+      // Tell the App to re-read everything
+      window.dispatchEvent(new CustomEvent('arrange-tweak'));
+    }, [t.scale, t.cardStyle, t.showTransit]);
+
+    return (
+      <TweaksPanel>
+        <TweakSection label="Scale" />
+        <TweakRadio
+          label="Timeline density"
+          value={t.scale}
+          options={['compact', 'regular', 'roomy']}
+          onChange={v => setTweak('scale', v)}
+        />
+
+        <TweakSection label="Cards" />
+        <TweakRadio
+          label="Color style"
+          value={t.cardStyle}
+          options={['strip', 'filled', 'mono']}
+          onChange={v => setTweak('cardStyle', v)}
+        />
+
+        <TweakSection label="Detail" />
+        <TweakToggle
+          label="Transit labels"
+          value={t.showTransit}
+          onChange={v => setTweak('showTransit', v)}
+        />
+      </TweaksPanel>
+    );
+  }
+
+  const _mount = () => {
+    if (typeof TweaksPanel === 'undefined' || typeof useTweaks === 'undefined') {
+      return setTimeout(_mount, 50);
+    }
+    ReactDOM.createRoot(document.getElementById('tweaks-root')).render(<ArrangeTweaks />);
+  };
+  _mount();
+</script>
+
+</body>
+</html>
