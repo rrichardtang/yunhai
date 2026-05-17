@@ -6,16 +6,17 @@
     <title>TravelPlanner</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/tripHealth.css" />
     <style>
-      .topbar-actions .trip-health-badge { border: 1px solid rgba(245,240,235,.2); border-radius: 999px; width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: rgba(245,240,235,.1); color: rgba(245,240,235,.7); }
+      .topbar-actions .trip-health-badge { border: 1px solid rgba(244,241,236,.10); border-radius: 50%; width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: rgba(244,241,236,.08); color: rgba(244,241,236,.7); transition: background 140ms, color 140ms, border-color 140ms; cursor: pointer; }
+      .topbar-actions .trip-health-badge:hover { background: rgba(244,241,236,.14); color: var(--paper-0); }
       .topbar-actions .trip-health-badge i { font-size: 18px; }
-      .topbar-actions .trip-health-badge.ready { color: #166534; border-color: #86efac; background: #dcfce7; }
-      .topbar-actions .trip-health-badge.needs-review { color: #92400e; border-color: #fcd34d; background: #fef3c7; }
-      .topbar-actions .trip-health-badge.conflicts-found { color: #991b1b; border-color: #fda4af; background: #fee2e2; }
-      .topbar-actions .trip-health-badge.missing-details { color: #9f1239; border-color: #fda4af; background: #ffe4e6; }
+      .topbar-actions .trip-health-badge.ready { color: #6EDB96; border-color: rgba(31,157,85,.35); background: rgba(31,157,85,.15); }
+      .topbar-actions .trip-health-badge.needs-review { color: #E6B84A; border-color: rgba(192,139,16,.35); background: rgba(192,139,16,.15); }
+      .topbar-actions .trip-health-badge.conflicts-found { color: #E89189; border-color: rgba(192,54,44,.35); background: rgba(192,54,44,.15); }
+      .topbar-actions .trip-health-badge.missing-details { color: #E89189; border-color: rgba(192,54,44,.35); background: rgba(192,54,44,.15); }
       .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
       .trip-health-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
       .trip-health-summary-card, .trip-health-issues-panel { border: 1px solid var(--secondary-light, #E2E8F0); border-radius: 16px; background: var(--base-light, #FAF8F5); padding: 14px; box-shadow: var(--shadow-sm, 0 1px 3px rgba(11,37,69,.06)); }
@@ -30,7 +31,7 @@
     <header class="topbar">
       <div class="topbar-row">
         <div>
-          <h1>GuideMe</h1>
+          <h1>Guide<span class="serif">me</span></h1>
           <p>Personal AI itinerary builder</p>
         </div>
         <div class="topbar-actions">
@@ -77,20 +78,39 @@
       </section>
 
       <section id="itineraryModeView" class="panel itinerary-mode-panel hidden" aria-live="polite">
-        <div class="between itinerary-mode-head">
-          <div>
-            <h2>Itinerary</h2>
-            <p class="muted-text">Lightweight, shareable, and ready offline.</p>
-          </div>
-          <div class="itinerary-mode-toolbar">
-            <button id="shareMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-share-network"></i> Share</button>
-            <button id="copyMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-clipboard"></i> Copy</button>
-            <button id="saveOfflineMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-download-simple"></i> Save Offline</button>
-            <button id="printMinimalBtn" class="secondary" type="button"><i class="ph-bold ph-printer"></i> Print</button>
-          </div>
+        <div class="itin">
+          <header id="itineraryModeHero" class="itin-hero"></header>
+
+          <section class="itin-send" aria-label="Send your itinerary">
+            <div class="itin-send__grid">
+              <button id="syncGoogleCalendarBtnItin" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph-bold ph-calendar-blank" aria-hidden="true"></i></span>
+                <span class="send-tile__title">Sync with Google Calendar</span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph-bold ph-arrow-up-right"></i></span>
+              </button>
+              <button id="savePdfBtnItin" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph-bold ph-file-pdf" aria-hidden="true"></i></span>
+                <span class="send-tile__title">Save as PDF</span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph-bold ph-arrow-up-right"></i></span>
+              </button>
+              <button id="shareTripLinkBtnItin" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph-bold ph-share-network" aria-hidden="true"></i></span>
+                <span class="send-tile__title">Share with Friends</span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph-bold ph-arrow-up-right"></i></span>
+              </button>
+            </div>
+            <div id="itinSendStatus" class="muted-text"></div>
+          </section>
+
+          <div id="itineraryModeList" class="itin-list"></div>
+
+          <!-- Hidden legacy buttons (kept so prior handlers don't break) -->
+          <button id="shareMinimalBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
+          <button id="copyMinimalBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
+          <button id="saveOfflineMinimalBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
+          <button id="printMinimalBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
+          <div id="itineraryModeSummary" class="hidden" aria-hidden="true"></div>
         </div>
-        <div id="itineraryModeSummary" class="itinerary-mode-summary"></div>
-        <div id="itineraryModeList" class="itinerary-mode-list"></div>
       </section>
 
       <div id="attachmentViewerModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Activity attachments">
@@ -106,25 +126,28 @@
       <input id="attachmentFileInput" type="file" accept="application/pdf,image/png,image/jpeg,image/webp,image/heic" multiple class="hidden" />
 
       <nav class="steps" id="stepIndicator">
-        <div class="step active">1. Setup</div>
-        <div class="step">2. Review</div>
-        <div class="step">3. Arrange</div>
-        <div class="step">4. Finalize</div>
+        <div class="step active" data-step-label="Setup">1. Setup</div>
+        <div class="step" data-step-label="Review">2. Review</div>
+        <div class="step" data-step-label="Arrange">3. Arrange</div>
+        <div class="step" data-step-label="Finalize">4. Finalize</div>
       </nav>
 
       <section id="step1" class="panel step-panel active">
-        <h2>Trip Setup</h2>
+        <h2>Build your <span class="serif">trip</span></h2>
         <label>Trip Name <input id="tripName" placeholder="Spain Spring Escape" /></label>
         <div class="trip-meta-row">
           <label>Total Budget (USD) <input id="tripBudget" type="number" min="0" placeholder="e.g. 2000 (optional)" /></label>
           <label>Adults <input id="numTravelers" type="number" min="1" value="1" /></label>
           <label>Children <input id="numChildren" type="number" min="0" value="0" /></label>
         </div>
-        <div class="setup-actions">
-          <button id="addCityBtn" class="secondary">+ Add City</button>
-          <button id="sortCitiesBtn" class="secondary" type="button"><i class="ph-bold ph-arrows-down-up"></i> Sort cities by date</button>
+        <div class="cities-section-head">
+          <h3 class="cities-title">Cities <span class="cities-count" id="citiesCount">0 legs</span></h3>
+          <div class="cities-actions setup-actions">
+            <button id="sortCitiesBtn" class="secondary" type="button"><i class="ph-bold ph-arrows-down-up"></i> Sort by date</button>
+            <button id="addCityBtn" class="primary"><i class="ph-bold ph-plus"></i> Add city</button>
+          </div>
         </div>
-        <div id="citiesContainer"></div>
+        <div id="citiesContainer" class="cities-stack"></div>
         <div id="locationValidationError" class="muted-text warn hidden"></div>
 
         <div id="setupInsights" class="setup-insights muted-text"></div>
@@ -143,11 +166,17 @@
       </section>
 
       <section id="step2" class="panel step-panel">
-        <div class="between">
-          <h2>Review Activities</h2>
+        <div class="panel__head">
+          <div>
+            <h2>Review <span class="serif">Activities</span></h2>
+            <p class="panel__sub">Approve what fits. Skip the rest. Tap any card for details and budget alternatives.</p>
+          </div>
         </div>
         <div class="review-toolbar">
-          <input id="reviewSearch" type="search" placeholder="Search activities, neighborhoods, cuisines..." />
+          <div class="search">
+            <i class="ph-bold ph-magnifying-glass" aria-hidden="true"></i>
+            <input id="reviewSearch" type="search" placeholder="Search activities, neighborhoods, cuisines..." />
+          </div>
           <select id="reviewCityFilter" aria-label="Filter by city">
             <option value="">All cities</option>
           </select>
@@ -157,7 +186,7 @@
             <option value="approved">Approved</option>
             <option value="declined">Declined</option>
           </select>
-          <button id="approveVisibleBtn" class="secondary" type="button"><i class="ph-bold ph-check-circle"></i> Approve All</button>
+          <button id="approveVisibleBtn" class="approve-all" type="button"><i class="ph-bold ph-check-circle"></i> Approve All</button>
         </div>
         <div id="activitiesGrid" class="cards-grid"></div>
         <div class="step-nav sticky-nav step-nav-split">
@@ -169,8 +198,11 @@
       </section>
 
       <section id="step3" class="panel step-panel">
-        <div class="between arrange-header">
-          <h2>Arrange Approved Activities</h2>
+        <div class="panel__head between arrange-header">
+          <div>
+            <h2>Arrange your <span class="serif">days</span>.</h2>
+            <p class="panel__sub">Drag activities across days and times. The timeline shows real hours — conflicts become visible.</p>
+          </div>
           <div class="arrange-actions">
             <button id="autoArrangeBtn" class="secondary auto-arrange-btn" type="button"><i class="ph-bold ph-magic-wand"></i> Draft</button>
             <button id="finalizeArrangeBtn" class="primary auto-arrange-btn" type="button" disabled><i class="ph-bold ph-lock"></i> Finalize</button>
@@ -178,11 +210,11 @@
         </div>
         <div id="arrangeCityNav" class="arrange-city-nav"></div>
         <div id="arrangeDiagnostics" class="muted-text"></div>
-        <div>
-          <h3>Staging</h3>
+        <div class="staging-section">
+          <h3 class="arrange-section-title">Staging</h3>
           <div id="stagingArea" class="staging list"></div>
         </div>
-        <h3>Days</h3>
+        <h3 class="arrange-section-title">Days</h3>
         <div id="dayColumns" class="day-columns"></div>
         <div class="step-nav sticky-nav step-nav-split">
           <button id="backToReviewBtn" class="icon-btn nav-secondary" type="button" data-nav-back="3" title="Back" aria-label="Back"><i class="ph-bold ph-arrow-left"></i></button>
@@ -192,40 +224,78 @@
       </section>
 
       <section id="step4" class="panel step-panel">
-        <div class="between">
-          <h2>Finalize</h2>
-          <div class="calendar-actions">
-            <label for="calendarMetadataMode" class="muted-text">Metadata</label>
-            <select id="calendarMetadataMode">
-              <option value="compact">Compact</option>
-              <option value="full">Full</option>
-            </select>
-            <button id="downloadCalendarBtn" class="secondary" type="button" disabled><i class="ph-bold ph-calendar"></i> Export .ics</button>
-            <button id="connectGoogleCalendarBtn" class="secondary" type="button"><i class="ph-bold ph-lock-key"></i> Connect Google</button>
-            <button id="syncGoogleCalendarBtn" class="secondary" type="button" disabled><i class="ph-bold ph-arrows-clockwise"></i> Sync Google</button>
-          </div>
-        </div>
-        <div id="calendarSyncStatus" class="muted-text"></div>
-        <div id="itineraryInsights" class="itinerary-insights"></div>
-        <div id="itineraryGrid" class="day-columns"></div>
-        <section class="saved-itineraries-panel">
-          <div class="between">
-            <h3>Saved Itineraries</h3>
-          </div>
-          <div id="savedItineraries" class="saved-itineraries-list"></div>
-        </section>
-        <section id="tripHealthSection" class="trip-health-inline-panel">
-          <div class="between"><h3>Trip Health</h3></div>
-          <div id="tripHealthSummary" class="trip-health-summary"></div>
-          <section class="card-panel trip-health-issues-panel">
-            <div class="between"><h3>Issue review</h3></div>
-            <p class="muted-text">Review each flagged issue and choose an action: fix, verify, dismiss, or add context.</p>
-            <div id="tripHealthIssues" class="trip-health-issues-list"></div>
+        <div class="fin">
+          <header class="fin-h">
+            <div class="gm-eyebrow">Step 04 — Finalize</div>
+            <h1 id="finHeadline">Here it is, <span class="serif">end to end.</span></h1>
+            <p class="fin-h__lead">Your trip, laid out day by day. Take one last read, then send it where you'll need it.</p>
+          </header>
+
+          <section class="fin-send" aria-label="Send your itinerary">
+            <div class="fin-send__grid">
+              <button id="syncGoogleCalendarBtn" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph-bold ph-calendar-blank" aria-hidden="true"></i></span>
+                <span class="send-tile__title">Sync with Google Calendar</span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph-bold ph-arrow-up-right"></i></span>
+              </button>
+              <button id="savePdfBtn" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph-bold ph-file-pdf" aria-hidden="true"></i></span>
+                <span class="send-tile__title">Save as PDF</span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph-bold ph-arrow-up-right"></i></span>
+              </button>
+              <button id="shareTripLinkBtn" class="send-tile" type="button">
+                <span class="send-tile__icon"><i class="ph-bold ph-share-network" aria-hidden="true"></i></span>
+                <span class="send-tile__title">Share with Friends</span>
+                <span class="send-tile__arrow" aria-hidden="true"><i class="ph-bold ph-arrow-up-right"></i></span>
+              </button>
+              <button id="downloadCalendarBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
+            </div>
+            <input type="hidden" id="calendarMetadataMode" value="compact" />
+            <button id="connectGoogleCalendarBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
+            <div id="calendarSyncStatus" class="muted-text"></div>
           </section>
-        </section>
+
+          <section class="fin-trip" aria-label="Trip overview">
+            <div class="fin-trip__title">
+              <div class="gm-eyebrow">Trip</div>
+              <h2 id="finTripTitle"></h2>
+              <div id="finTripRoute" class="fin-trip__route"></div>
+            </div>
+            <div id="finTripStats" class="fin-trip__stats"></div>
+          </section>
+
+          <section class="fin-open" aria-label="Open items">
+            <div class="fin-open__head">
+              <div class="fin-open__head-left">
+                <h3>Needs a confirmation number</h3>
+                <p>Ticketed activities you've planned but haven't booked yet. Attach a reference so we can include it in your day-of pass.</p>
+              </div>
+              <div class="fin-open__head-right">
+                <span id="finOpenCount" class="fin-open__count">0 open</span>
+                <button id="finAttachAllBtn" class="fin-open__action" type="button">Attach all →</button>
+              </div>
+            </div>
+            <div id="finOpenList" class="fin-open__list"></div>
+          </section>
+
+          <section class="fin-itin" aria-label="Day-by-day itinerary">
+            <div class="fin-itin__head">
+              <h3>Day-by-day <span class="serif">itinerary</span></h3>
+              <div id="finItinMeta" class="fin-itin__meta"></div>
+            </div>
+            <div id="finItinList" class="fin-itin__list"></div>
+          </section>
+
+          <footer class="fin-foot">
+            <span class="meta meta--left"><span class="dot"></span> <span id="finAutosave">Auto-saved · just now</span></span>
+            <span id="finVersionMeta" class="meta meta--right"></span>
+          </footer>
+        </div>
+
         <div class="step-nav sticky-nav step-nav-split">
           <button id="editBtn" class="icon-btn nav-secondary" type="button" data-nav-back="4" title="Back" aria-label="Back"><i class="ph-bold ph-arrow-left"></i></button>
           <button class="icon-btn grey save-progress-btn" type="button" title="Save Progress"><i class="ph-bold ph-floppy-disk"></i></button>
+          <button id="lockTripBtn" class="icon-btn primary" type="button" title="Lock trip" aria-label="Lock trip"><i class="ph-bold ph-lock"></i></button>
         </div>
       </section>
     </main>
@@ -233,17 +303,30 @@
     <div id="prefsModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Traveler Profile">
       <div class="modal-card">
         <div class="between">
-          <h3 id="prefsModalTitle">Traveler Profile</h3>
+          <div>
+            <div class="prefs-eyebrow"><span class="prefs-eyebrow-key">Profile</span> Traveler Profile</div>
+            <h3 id="prefsModalTitle">Traveler Profile</h3>
+          </div>
           <div class="modal-header-actions">
             <button id="profileEditBtn" class="icon-btn grey" type="button" title="Save profile"><i class="ph-bold ph-floppy-disk"></i></button>
             <button id="prefsClose" class="icon-btn red" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
           </div>
         </div>
 
-        <section class="prefs-section profile-section">
-          <div id="profileQuestions" class="profile-questions"></div>
+        <div id="profileQuestions">
+          <section class="prefs-section profile-section">
+            <h4>Travel style</h4>
+            <div id="pfScaleQs" class="profile-questions"></div>
+          </section>
 
-          <label class="profile-label" for="profileTravelNotes">Anything else we might have missed?</label>
+          <section class="prefs-section profile-section">
+            <h4>Specifics</h4>
+            <div id="pfTextQs" class="profile-questions"></div>
+          </section>
+        </div>
+
+        <section class="prefs-section profile-section">
+          <h4>Anything else we might have missed?</h4>
           <p class="ai-summary-hint">Any other preferences, quirks, or context the planner should know about you</p>
           <div class="textarea-expand-wrap">
             <textarea id="profileTravelNotes" rows="5" class="profile-textarea-fixed" placeholder="e.g. I'm not a morning person, I have a smaller budget, avoid things with lots of walking..."></textarea>
@@ -288,7 +371,7 @@
     <div id="checklistModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Booking Checklist">
       <div class="modal-card checklist-modal-card">
         <div class="between checklist-modal-header">
-          <h3>Booking Checklist</h3>
+          <h3>Booking <span class="serif">Checklist</span></h3>
           <div style="display:flex;gap:8px;align-items:center;">
             <button id="checklistModalSave" class="icon-btn grey" type="button" title="Save Progress" aria-label="Save"><i class="ph-bold ph-floppy-disk"></i></button>
             <button id="checklistModalClose" class="icon-btn red" type="button" title="Close" aria-label="Close"><i class="ph-bold ph-x"></i></button>
@@ -348,12 +431,14 @@
         <div class="profile-wizard-progress-bar-wrap">
           <div class="profile-wizard-progress-bar" id="wizardProgressBar"></div>
         </div>
+        <div class="wizard-pip-ladder" id="wizardPipLadder"></div>
         <div class="profile-wizard-card">
           <div id="wizardCardBody"></div>
         </div>
         <div class="profile-wizard-nav">
-          <button id="wizardBackBtn" class="btn-secondary hidden" type="button">Back</button>
-          <button id="wizardNextBtn" class="btn-primary" type="button">Next</button>
+          <button id="wizardBackBtn" class="hidden" type="button"><i class="ph-bold ph-arrow-left"></i> Back</button>
+          <span class="wizard-hint"><kbd>↵</kbd> to continue</span>
+          <button id="wizardNextBtn" type="button">Next <i class="ph-bold ph-arrow-right"></i></button>
         </div>
       </div>
     </div>
@@ -391,6 +476,9 @@
     <script src="/js/cityPlanner.js"></script>
     <script src="/js/profileWizard.js"></script>
     <script src="/js/arrangeView.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="/js/pdfExport.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

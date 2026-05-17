@@ -20,7 +20,16 @@ app.get('/planner.html', (_req, res) => {
     .replaceAll('__CLERK_FAPI_DOMAIN__', fapiDomain));
 });
 
-const { readDebugLog, clearDebugLog } = require('./services/debugLog');
+const { readDebugLog, clearDebugLog, debugLog } = require('./services/debugLog');
+
+app.post('/debug/client', (req, res) => {
+  const scope = String(req.body?.scope || 'client').slice(0, 40);
+  const message = typeof req.body?.message === 'string'
+    ? req.body.message
+    : JSON.stringify(req.body?.message ?? (req.body || {}));
+  debugLog(scope, message);
+  res.json({ ok: true });
+});
 
 app.get('/debug', (req, res) => {
   const log = readDebugLog();

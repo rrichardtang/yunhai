@@ -149,6 +149,10 @@ HARD CONSTRAINTS (the only valid reasons to leave something unplaced):
 2. Placing it would require overlapping a LOCKED activity
 3. There is no remaining time slot of its duration on any day window — only after attempting placement on every day
 
+PHYSICAL RULES (these are NOT preferences — violating them produces an invalid schedule):
+- DAY WINDOW: every placement's start AND end must fall inside that day's window. If a day's window ends at 18:00, you may NOT place a 90-minute activity starting at 17:30 (it would end at 19:00). Move it to another day or to unplaced.
+- OPENING HOURS END: for activities with opening_hours, start + duration must be ≤ the closing time. A venue closing at 17:00 cannot host a 90-minute activity starting at 16:00 — that ends at 17:30, past closing. Place it earlier in the day or move it.
+
 NOT VALID REASONS to leave something unplaced:
 - "redundant with another activity" — the traveler chose both, place both
 - "all slots are claimed" — claim slots aggressively, that's the job
@@ -167,7 +171,7 @@ PLACEMENT STRATEGY:
 - COMMUTE GAPS: When two activities appear in the COMMUTE TIMES block and are scheduled on the same day, the later one's start time must be at least (previous activity's duration + commute minutes + 10 min buffer) after the earlier one's start time. Do not place activities back-to-back without leaving room for travel. For pairs not in COMMUTE TIMES (walking distance), a 10-minute gap between activity end and next activity start is sufficient.
 - Lunch and dinner anchor the day; non-meal activities fit between them.
 - A typical full day has 4–8 activities depending on pace.
-- Distribute activities evenly across days. A day with 0–2 activities while another has 8+ is poor balance — move overflow to the lighter day before pushing anything to unplaced.
+- DAY LOAD BALANCE: with N flexible activities across M days, target roughly N/M per day (within ±2). A day with 10 activities while another has 4 is poor balance — redistribute before pushing anything to unplaced. This is a strong guideline, not a physical rule: a single long tour or full-day excursion may legitimately leave a day with fewer entries.
 
 DAYS:
 ${daysText}
