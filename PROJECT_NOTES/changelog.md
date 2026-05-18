@@ -4,6 +4,23 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-18] Fix arrival/accommodation logistics-card overlap on arrange timeline
+
+After Finalize, the arrival logistics card and the accommodation logistics card on the same day visually overlapped (e.g. "Arrive: Hanedakuko" 09:00 vs "1-8 Maihama" 09:28). The commute pill between them was also hidden — buried beneath the accommodation card at the same y-coordinate.
+
+Root cause: `renderArrangeTimeline` in `public/app.js` placed both cards at raw `yFromTime(time)` with no minimum-gap floor between them, while a 28-min commute = ~37 px (PX_PER_HOUR=80) is less than the card height (36 px) + pill height + gap.
+
+- `public/app.js` `makeLogisticsCard`: added optional `topOverride` arg.
+- `public/app.js` `makeLogisticsCommuteIndicator`: added optional `baseYOverride` arg.
+- `public/app.js` `renderArrangeTimeline` arrival branch: compute `yAcc = max(yFromTime(accArrivalTime), yArr + LOGISTICS_STACK_STEP)`. Seed `prevBottom = yAcc + cardH` so the first activity also can't collide with the accommodation card.
+- `public/app.js` `renderArrangeTimeline` departure branch: compute `yAccDep = min(yFromTime(accDepartureTime), yDep - LOGISTICS_STACK_STEP)`. Anchor the prior commute pill above the floored accommodation card.
+
+Constants used: `COMMUTE_PILL_RESERVE = 36`, `LOGISTICS_GAP = 8`, derived `LOGISTICS_STACK_STEP = cardH + 36 + 8 = 80`.
+
+97/97 tests still pass.
+
+---
+
 ## [2026-05-15] End-to-end debugLog coverage for activity-creation pipeline
 
 Stop the whack-a-mole pattern of adding one log at a time. Every step in the trip planning, enrichment, persistence, and arrange pipelines now emits debug log lines visible at `/debug?tail=N` (or `/debug?scope=foo`).
