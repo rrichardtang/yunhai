@@ -5263,6 +5263,11 @@ function renderArrange() {
   const activeCity = state.arrangeCity;
   const activeDays = state.days.filter((d) => cityMatches(d.city, activeCity));
 
+  sendDebug('render-arrange-locks', {
+    activeCity,
+    lockKeys: Object.keys(state.lastFinalizeLocks || {}),
+    lockedIdsForActive: (state.lastFinalizeLocks[activeCity] || []).map((e) => e.activity?.id)
+  });
 
   const unplaced = approved.filter((a) => cityMatches(a.city, activeCity) && !state.placements[a.id]?.dayId);
   els.stagingArea.innerHTML = unplaced.length
@@ -6170,7 +6175,12 @@ async function autoArrangeActiveCity(opts = {}) {
 
   if (finalize) {
     state.lastFinalizeLocks[activeCity] = lockedSet;
-    console.debug('[arrange] finalize locks set', { activeCity, count: lockedSet.length, ids: lockedSet.map((e) => e.activity?.id) });
+    sendDebug('finalize-locks', {
+      activeCity,
+      count: lockedSet.length,
+      ids: lockedSet.map((e) => e.activity?.id),
+      names: lockedSet.map((e) => e.activity?.name)
+    });
   } else {
     delete state.lastFinalizeLocks[activeCity];
   }
