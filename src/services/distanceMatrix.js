@@ -1,5 +1,6 @@
 const commuteCache = require('./commuteCache');
 const { debugLog } = require('./debugLog');
+const { arrivalBufferMins, departureBufferMins } = require('../../shared/arrangeBuffers');
 
 const DISTANCE_MATRIX_BASE_URL = 'https://maps.googleapis.com/maps/api/distancematrix/json';
 const COMMUTE_MODE_ICON = {
@@ -201,10 +202,12 @@ async function buildCityTravelTiming(cities = []) {
       const arrivalDateTime = `${arrivalDate}T${arrivalTime}:00`;
       const leg = await estimateTravelMinutes({ origin: arrivalOrigin, destination, departureDateTime: arrivalDateTime, arrivalDateTime });
       if (leg?.durationMinutes) {
+        const procBuf = arrivalBufferMins(logistics?.arrival?.mode, logistics?.arrival?.international);
         timing.arrivalTravelMinutes = leg.durationMinutes;
-        timing.arrivalAvailableTime = timeFromMinutes(parseMinutesFromTime(arrivalTime) + leg.durationMinutes);
+        timing.arrivalProceduralBufferMinutes = procBuf;
+        timing.arrivalAvailableTime = timeFromMinutes(parseMinutesFromTime(arrivalTime) + procBuf + leg.durationMinutes);
         const locationLabel = logistics?.arrival?.location || city?.travelEntry?.entryPoint || cityName;
-        timing.arrivalSummary = `User arrives at ${locationLabel} at ${arrivalTime}, ${leg.durationMinutes} min travel to accommodation, available for activities at ${timing.arrivalAvailableTime}.`;
+        timing.arrivalSummary = `User arrives at ${locationLabel} at ${arrivalTime}; ${procBuf} min deplaning/customs/transfer + ${leg.durationMinutes} min travel to accommodation; available for activities at ${timing.arrivalAvailableTime}.`;
       }
     }
 
@@ -222,9 +225,11 @@ async function buildCityTravelTiming(cities = []) {
       const departureDateTime = departureDate ? `${departureDate}T${departureTime}:00` : '';
       const leg = await estimateTravelMinutes({ origin, destination: departureLocation, arrivalDateTime: departureDateTime });
       if (leg?.durationMinutes) {
+        const procBuf = departureBufferMins(logistics?.departure?.mode, logistics?.departure?.international);
         timing.departureTravelMinutes = leg.durationMinutes;
-        timing.departureMustLeaveTime = timeFromMinutes(parseMinutesFromTime(departureTime) - leg.durationMinutes);
-        timing.departureSummary = `User must depart by ${timing.departureMustLeaveTime} to reach departure point by ${departureTime}.`;
+        timing.departureProceduralBufferMinutes = procBuf;
+        timing.departureMustLeaveTime = timeFromMinutes(parseMinutesFromTime(departureTime) - procBuf - leg.durationMinutes);
+        timing.departureSummary = `User must depart accommodation by ${timing.departureMustLeaveTime} to reach departure point and clear ${procBuf} min check-in/security by ${departureTime}.`;
       }
     }
 

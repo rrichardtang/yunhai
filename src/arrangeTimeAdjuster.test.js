@@ -113,3 +113,21 @@ test('adjuster skips commute padding when matrix value is below walking threshol
   assert.strictEqual(result.placements.B.time, '09:50');
   assert.strictEqual(result.drops.length, 0);
 });
+
+test('adjuster respects a locked-only day (no flexible placements, no crash)', () => {
+  const arrivalDay = { date: '2026-05-19', windowStart: '11:43', windowEnd: '22:00', arrivalAvailableTime: '11:43' };
+  const fullDay = { date: '2026-05-20', windowStart: '09:00', windowEnd: '22:00' };
+  const activitiesById = {
+    A: act('A', 'Activity on day 2', 60, '09:00-22:00')
+  };
+  const placements = {
+    A: { date: '2026-05-20', time: '09:00' }
+  };
+  const lockedActivities = [
+    { id: 'arrival', date: '2026-05-19', time: '09:00', duration_minutes: 163, name: 'Arrive: Haneda' },
+    { id: 'checkin', date: '2026-05-19', time: '11:43', duration_minutes: 30, name: 'Hotel check-in' }
+  ];
+  const result = adjust({ placements, days: [arrivalDay, fullDay], activitiesById, lockedActivities, commuteMatrix: {} });
+  assert.strictEqual(result.placements.A.time, '09:00');
+  assert.strictEqual(result.drops.length, 0);
+});

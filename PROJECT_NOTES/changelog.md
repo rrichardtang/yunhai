@@ -4,6 +4,24 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-18] Make arrival + lodging real locked anchors with full transit + procedural buffers
+
+Replaces the earlier visual-floor hack (which desynchronized y from time). The previous fix's `prevBottom` cascade meant Yoyogi Park 9–10am visually extended to ~12pm. Root cause was deeper: arrival and lodging were never modeled as locked anchors and the procedural arrival buffer (deplaning/customs/baggage) was never enforced.
+
+- `public/app.js renderArrangeTimeline`: reverted the y-floor hack (no more `prevBottom = yAcc + cardH`, no more `topOverride`/`baseYOverride` params, no more `LOGISTICS_STACK_STEP`). Strict y=time invariant restored.
+- `public/app.js getLogisticsForDay`: arrival/departure cards now display the **raw flight time** (from `logistics.arrival.time`), and expose `arrivalMode/arrivalInternational/departureMode/departureInternational` for downstream buffer calculations.
+- `public/app.js renderArrangeTimeline` accommodation card: now positioned at `flightTime + arrivalBufferMins(mode, international) + commute` (so an intl flight at 09:00 with 28-min commute → 11:43, not 09:28). Symmetric for departure.
+- `public/app.js autoArrangeActiveCity`: appends 2–4 synthetic locked anchors per arrange call (`logistics-arrival-<slug>`, `logistics-acc-arrival-<slug>`, `logistics-acc-departure-<slug>`, `logistics-departure-<slug>`) with `type: 'logistics'`. Times derived from `arrivalBufferMins`/`departureBufferMins` + commute. These reach the LLM prompt as `LOCKED:` lines and reach the validator/adjuster as obstacle entries.
+- `public/app.js dayPayload`: explicitly sets `arrivalAvailableTime` and `departureMustLeaveTime` per day so `effectiveDayStart`/`effectiveDayEnd` in the validator enforce them.
+- `src/services/distanceMatrix.js`: `arrivalAvailableTime` now includes `arrivalBufferMins(mode, international)`; `departureMustLeaveTime` includes `departureBufferMins(...)`. Single source of truth, matches the frontend formula.
+- `src/arrangeValidator.js validate()`: outer loop now iterates `days[]` (not just dates with placements) so locked-only days are validated. New `lock_lock_overlap` issue type catches overlapping locked anchors on the same date.
+- `src/services/arrangeTimeAdjuster.js adjust()`: same widening — iterates `days[]` so `ADJUSTER_DAY_START` logs even for locked-only days; orphan-date placements (no matching day) handled separately.
+- Tests: +1 in `src/arrangeValidator.test.js` (locks-only-day lock_lock_overlap), +1 in `src/arrangeTimeAdjuster.test.js` (locked-only arrival day, no crash, non-arrival day still places normally). 99/99 passing.
+
+End-to-end effect: Yoyogi Park can no longer be scheduled at 09:00 on an arrival day. The LLM sees the arrival + check-in as immovable locks; the validator/adjuster enforce the day's `arrivalAvailableTime` floor; the accommodation card on the timeline shows the realistic check-in-complete time.
+
+---
+
 ## [2026-05-18] Fix arrival/accommodation logistics-card overlap on arrange timeline
 
 After Finalize, the arrival logistics card and the accommodation logistics card on the same day visually overlapped (e.g. "Arrive: Hanedakuko" 09:00 vs "1-8 Maihama" 09:28). The commute pill between them was also hidden — buried beneath the accommodation card at the same y-coordinate.

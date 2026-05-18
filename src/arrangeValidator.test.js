@@ -43,6 +43,22 @@ test('detects lock overlap', () => {
   assert.ok(v.issues.some((i) => i.type === 'lock_overlap'));
 });
 
+test('detects lock-vs-lock overlap on a day with no flexible placements', () => {
+  const v = validate({
+    placements: {},
+    lockedActivities: [
+      { id: 'arrival', date: '2026-05-03', time: '09:00', duration_minutes: 163 },
+      { id: 'checkin', date: '2026-05-03', time: '09:28', duration_minutes: 30 }
+    ],
+    days,
+    activitiesById: {}
+  });
+  assert.equal(v.ok, false);
+  const issue = v.issues.find((i) => i.type === 'lock_lock_overlap');
+  assert.ok(issue, 'expected a lock_lock_overlap issue');
+  assert.deepEqual(issue.ids.sort(), ['arrival', 'checkin']);
+});
+
 test('detects window violation', () => {
   const a = mkAct('a', { duration: 60 });
   const v = validate({

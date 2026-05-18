@@ -84,8 +84,13 @@ function validate({ placements, lockedActivities = [], days, activitiesById, com
     byDate[entry.date].push(entry);
   }
 
-  for (const [date, entries] of Object.entries(byDate)) {
-    const day = days.find((d) => d.date === date);
+  const dateList = Array.isArray(days) && days.length
+    ? days.map((d) => d.date)
+    : Object.keys(byDate);
+
+  for (const date of dateList) {
+    const entries = byDate[date] || [];
+    const day = (days || []).find((d) => d.date === date);
 
     for (let i = 0; i < entries.length; i += 1) {
       for (let j = i + 1; j < entries.length; j += 1) {
@@ -106,6 +111,18 @@ function validate({ placements, lockedActivities = [], days, activitiesById, com
         const startMin = minutesFromTime(l.time || '00:00');
         return { id: l.id, name: l.name, startMin, endMin: startMin + (Number(l.duration_minutes) || 60) };
       });
+    for (let i = 0; i < lockEntries.length; i += 1) {
+      for (let j = i + 1; j < lockEntries.length; j += 1) {
+        if (overlaps(lockEntries[i], lockEntries[j])) {
+          issues.push({
+            type: 'lock_lock_overlap',
+            day: date,
+            ids: [lockEntries[i].id, lockEntries[j].id],
+            message: `Locked anchor "${lockEntries[i].name}" overlaps locked anchor "${lockEntries[j].name}" on ${date}`
+          });
+        }
+      }
+    }
     for (const e of entries) {
       for (const l of lockEntries) {
         if (overlaps(e, l)) {
