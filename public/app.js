@@ -5100,6 +5100,168 @@ function hasOverlapInDay(activityId, dayId, placementOverride = null) {
   return dayActivities.some((other) => rangesOverlap(droppedRange, getPlacementTimeRange(other)));
 }
 
+const HOTEL_CHECKIN_MIN = 30;
+
+function transitMinsForCommutePair(fromId, toId, fallbackMode) {
+  const commute = state.commutes[commutePairKey(fromId, toId)] || null;
+  const mins = resolveSelectedCommuteDetails(commute)?.durationMinutes;
+  if (Number.isFinite(mins)) return mins;
+  return TRANSIT_FALLBACK_MINS[fallbackMode] ?? 30;
+}
+
+function logisticsAnchorsForCityDay(cityPlan, date) {
+  if (!cityPlan || !date) return [];
+  const logistics = cityPlan.logistics || {};
+  const anchors = [];
+  const cityName = cityPlan.name;
+
+  if (cityPlan.startDate === date && logistics.arrival?.time) {
+    const arrStart = minutesFromTime(logistics.arrival.time);
+    const buf = arrivalBufferMins(logistics.arrival.mode, logistics.arrival.international);
+    const transit = transitMinsForCommutePair(logisticsArrivalId(cityName), logisticsAccommodationArrivalId(cityName), logistics.arrival.mode);
+    anchors.push({
+      kind: 'arrival',
+      start: arrStart,
+      end: arrStart + buf + transit,
+      name: `Arrive: ${logistics.arrival.location || 'arrival'}`
+    });
+    anchors.push({
+      kind: 'acc-arrival',
+      start: arrStart + buf + transit,
+      end: arrStart + buf + transit + HOTEL_CHECKIN_MIN,
+      name: getAccommodationLabel(cityName, date) || 'Accommodation check-in'
+    });
+  }
+
+  if (cityPlan.endDate === date && logistics.departure?.time) {
+    const depEnd = minutesFromTime(logistics.departure.time);
+    const buf = departureBufferMins(logistics.departure.mode, logistics.departure.international);
+    const transit = transitMinsForCommutePair(logisticsAccommodationDepartureId(cityName), logisticsDepartureId(cityName), logistics.departure.mode);
+    const accStart = Math.max(0, depEnd - buf - transit - HOTEL_CHECKIN_MIN);
+    anchors.push({
+      kind: 'acc-departure',
+      start: accStart,
+      end: accStart + HOTEL_CHECKIN_MIN,
+      name: getAccommodationLabel(cityName, date) || 'Accommodation checkout'
+    });
+    anchors.push({
+      kind: 'departure',
+      start: Math.max(0, depEnd - buf - transit),
+      end: depEnd,
+      name: `Depart: ${logistics.departure.location || 'departure'}`
+    });
+  }
+
+  return anchors;
+}
+
+function blockedBandsForDay(dayId, draggingActivityId) {
+  const day = state.days.find((d) => d.id === dayId);
+  const city = day ? state.cities.find((c) => cityMatches(c.name, day.city)) : null;
+  if (!day) return { dayStart: DAY_START_HOUR * 60, dayEnd: DAY_END_HOUR * 60, blocks: [] };
+
+  const dayStart = city ? getCityDayWindowStart(city, day.date) : DAY_START_HOUR * 60;
+  const dayEnd = city ? getCityDayWindowEnd(city, day.date) : DAY_END_HOUR * 60;
+
+  const blocks = [];
+  for (const a of state.activities) {
+    if (String(a.id) === String(draggingActivityId)) continue;
+    if (!state.reviewed[a.id]?.approved) continue;
+    if (state.placements[a.id]?.dayId !== dayId) continue;
+    const r = getPlacementTimeRange(a);
+    blocks.push({ start: r.startMinutes, end: r.endMinutes, name: a.name, kind: 'activity' });
+  }
+  for (const anchor of logisticsAnchorsForCityDay(city, day.date)) {
+    blocks.push({ start: anchor.start, end: anchor.end, name: anchor.name, kind: anchor.kind });
+  }
+  blocks.sort((a, b) => a.start - b.start);
+  return { dayStart, dayEnd, blocks };
+}
+
+function nearestLegalSlot(dayId, draggingActivityId, cursorY, durationMin) {
+  const { dayStart, dayEnd, blocks } = blockedBandsForDay(dayId, draggingActivityId);
+  const cursorMin = (DAY_START_HOUR * 60) + Math.max(0, Math.min(GRID_HEIGHT, cursorY)) * 60 / PX_PER_HOUR;
+  const dur = Math.max(15, Number(durationMin) || 60);
+
+  // Build legal gaps: [dayStart..first.start], [block[i].end..block[i+1].start], [last.end..dayEnd]
+  const gaps = [];
+  let cursor = dayStart;
+  for (const b of blocks) {
+    if (b.start > cursor) gaps.push({ start: cursor, end: Math.min(b.start, dayEnd) });
+    cursor = Math.max(cursor, b.end);
+  }
+  if (cursor < dayEnd) gaps.push({ start: cursor, end: dayEnd });
+
+  // Find a gap that fits and is closest to cursorMin (snapped to 30-min grid)
+  const snap = (m) => Math.round(m / 30) * 30;
+  let best = null;
+  for (const g of gaps) {
+    if (g.end - g.start < dur) continue;
+    const earliest = g.start;
+    const latest = g.end - dur;
+    const candidate = Math.min(latest, Math.max(earliest, snap(cursorMin)));
+    const distance = Math.abs(candidate - cursorMin);
+    if (!best || distance < best.distance) {
+      best = { startMin: candidate, distance };
+    }
+  }
+  if (!best) return null;
+  const time = timeFromMinutes(best.startMin);
+  const y = (best.startMin - DAY_START_HOUR * 60) * PX_PER_HOUR / 60;
+  return { time, y, startMin: best.startMin };
+}
+
+function getDraggingActivityDuration(activityId) {
+  const a = state.activities.find((x) => String(x.id) === String(activityId));
+  if (!a) return 60;
+  return Math.max(15, getPlacementTimeRange(a).endMinutes - getPlacementTimeRange(a).startMinutes);
+}
+
+function bandStyle(startMin, endMin) {
+  const top = (startMin - DAY_START_HOUR * 60) * PX_PER_HOUR / 60;
+  const height = Math.max(2, (endMin - startMin) * PX_PER_HOUR / 60);
+  return `top:${top}px;height:${height}px;`;
+}
+
+function paintDropOverlaysForDrag(draggingActivityId) {
+  for (const day of state.days) {
+    const overlay = document.getElementById(`drop-overlay-${day.id}`);
+    if (!overlay) continue;
+    const { dayStart, dayEnd, blocks } = blockedBandsForDay(day.id, draggingActivityId);
+    const dayMin = DAY_START_HOUR * 60;
+    const dayMax = DAY_END_HOUR * 60;
+
+    const parts = [];
+    if (dayStart > dayMin) {
+      parts.push(`<div class="drop-band drop-band--out-of-window" style="${bandStyle(dayMin, dayStart)}"></div>`);
+    }
+    if (dayEnd < dayMax) {
+      parts.push(`<div class="drop-band drop-band--out-of-window" style="${bandStyle(dayEnd, dayMax)}"></div>`);
+    }
+
+    let cursor = dayStart;
+    for (const b of blocks) {
+      const blockStart = Math.max(b.start, dayStart);
+      const blockEnd = Math.min(b.end, dayEnd);
+      if (blockEnd <= blockStart) continue;
+      if (blockStart > cursor) {
+        parts.push(`<div class="drop-band drop-band--ok" style="${bandStyle(cursor, blockStart)}"></div>`);
+      }
+      parts.push(`<div class="drop-band drop-band--blocked" data-name="${esc(b.name || '')}" style="${bandStyle(blockStart, blockEnd)}"></div>`);
+      cursor = Math.max(cursor, blockEnd);
+    }
+    if (cursor < dayEnd) {
+      parts.push(`<div class="drop-band drop-band--ok" style="${bandStyle(cursor, dayEnd)}"></div>`);
+    }
+
+    overlay.innerHTML = parts.join('');
+  }
+}
+
+function clearDropOverlays() {
+  document.querySelectorAll('.drop-zone-overlay').forEach((el) => { el.innerHTML = ''; });
+}
+
 function closeAllCommuteMenus(except = null) {
   document.querySelectorAll('.commute-selector.open').forEach((selector) => {
     if (except && selector === except) return;
@@ -5201,6 +5363,7 @@ function renderArrange() {
         <div class="day-head"><div>${label}</div><small>${esc(d.city)}</small></div>
         <div class="day-grid-wrap">
           <div class="hour-grid">${hourLines}</div>
+          <div class="drop-zone-overlay" id="drop-overlay-${d.id}" aria-hidden="true"></div>
           <div class="day-schedule" id="schedule-${d.id}"></div>
         </div>
       </section>
@@ -5288,18 +5451,27 @@ function renderArrange() {
 
   bindCommuteInteractions();
 
+  const onDragStartShared = (evt) => {
+    _sortableDragging = true;
+    const id = evt.item?.dataset.id;
+    if (!id) return;
+    evt.item.dataset.dragActivityId = id;
+    document.body.classList.add('is-dragging-activity');
+    paintDropOverlaysForDrag(id);
+  };
+
+  const finishDrag = () => {
+    _sortableDragging = false;
+    document.body.classList.remove('is-dragging-activity');
+    clearDropOverlays();
+  };
+
   _arrangeSortables.push(new Sortable(els.stagingArea, {
     group: 'itinerary',
     sort: false,
     animation: 120,
-    onStart: (evt) => {
-      _sortableDragging = true;
-      const id = evt.item?.dataset.id;
-      if (!id) return;
-      evt.item.dataset.dragActivityId = id;
-      evt.item.dataset.prevPlacement = JSON.stringify(state.placements[id] || { dayId: null, time: null });
-    },
-    onEnd: () => { _sortableDragging = false; }
+    onStart: onDragStartShared,
+    onEnd: () => { finishDrag(); }
   }));
 
   document.querySelectorAll('.day-schedule').forEach((zone) => {
@@ -5307,78 +5479,69 @@ function renderArrange() {
       group: 'itinerary',
       sort: false,
       animation: 120,
-      onStart: (evt) => {
-        _sortableDragging = true;
-        const id = evt.item?.dataset.id;
-        if (!id) return;
-        evt.item.dataset.dragActivityId = id;
-        evt.item.dataset.prevPlacement = JSON.stringify(state.placements[id] || { dayId: null, time: null });
+      onStart: onDragStartShared,
+      onMove: (evt) => {
+        const target = evt.to;
+        if (!target || !target.classList.contains('day-schedule')) return true;
+        const id = evt.dragged?.dataset?.id;
+        if (!id) return true;
+        const dayId = target.id.replace('schedule-', '');
+        const cursorY = (evt.originalEvent?.clientY ?? 0) - target.getBoundingClientRect().top;
+        const duration = getDraggingActivityDuration(id);
+        const slot = nearestLegalSlot(dayId, id, cursorY, duration);
+        if (!slot) {
+          target.removeAttribute('data-pending-time');
+          target.classList.add('is-no-legal-slot');
+          return false;
+        }
+        target.classList.remove('is-no-legal-slot');
+        target.dataset.pendingTime = slot.time;
+        target.dataset.pendingY = String(slot.y);
+        return true;
       },
       onEnd: (evt) => {
-        _sortableDragging = false;
-        if (evt.item) {
-          if (Sortable?.utils?.deselect) Sortable.utils.deselect(evt.item);
-          evt.item.style.transform = '';
-          evt.item.style.opacity = '';
-        }
-
-        clearActivePlacedCardDrag();
-
-        const id = evt.item?.dataset.id;
-        if (!id) return;
-
-        if (evt.to !== zone || evt.item?.parentElement !== zone) {
-          delete evt.item.dataset.prevPlacement;
-          return;
-        }
-
-        if (evt.item.dataset.dropHandled === '1') {
-          delete evt.item.dataset.prevPlacement;
-          return;
-        }
-        evt.item.dataset.dropHandled = '1';
-        setTimeout(() => {
-          if (evt.item) delete evt.item.dataset.dropHandled;
-        }, 0);
-
-        const dayId = zone.id.replace('schedule-', '');
-        const prevPlacement = (() => {
-          try {
-            return JSON.parse(evt.item.dataset.prevPlacement || 'null');
-          } catch {
-            return null;
+        const id = evt.item?.dataset?.id;
+        const cleanup = () => {
+          if (evt.item) {
+            if (Sortable?.utils?.deselect) Sortable.utils.deselect(evt.item);
+            evt.item.style.transform = '';
+            evt.item.style.opacity = '';
           }
-        })() || { ...(state.placements[id] || {}), dayId: null, time: null };
-
-        const y = (evt.originalEvent?.clientY || evt.item.getBoundingClientRect().top) - zone.getBoundingClientRect().top;
-        const nextPlacement = {
-          ...(state.placements[id] || {}),
-          dayId,
-          time: timeFromY(y)
+          clearActivePlacedCardDrag();
+          finishDrag();
+          document.querySelectorAll('.day-schedule').forEach((z) => {
+            z.removeAttribute('data-pending-time');
+            z.removeAttribute('data-pending-y');
+            z.classList.remove('is-no-legal-slot');
+          });
         };
 
-        if (hasOverlapInDay(id, dayId, nextPlacement)) {
-          state.placements[id] = {
-            ...(state.placements[id] || {}),
-            dayId: prevPlacement.dayId || null,
-            time: prevPlacement.time || parseTimeTo24(actPreferredTime(state.activities.find((a) => a.id === id)) || typeToTime(state.activities.find((a) => a.id === id)?.type))
-          };
-          showToast('Overlap detected, placement reverted', 'info');
-          delete evt.item.dataset.prevPlacement;
+        if (!id) { cleanup(); return; }
+        if (evt.to !== zone || evt.item?.parentElement !== zone) { cleanup(); return; }
+
+        const dayId = zone.id.replace('schedule-', '');
+        const pendingTime = zone.dataset.pendingTime;
+
+        if (!pendingTime) {
+          // Drop occurred outside any legal slot — revert without changing state.
           renderArrange();
+          cleanup();
           return;
         }
 
         const previousDayId = state.placements[id]?.dayId || null;
         const previousTime = state.placements[id]?.time || null;
+        const nextPlacement = { ...(state.placements[id] || {}), dayId, time: pendingTime };
 
         state.placements[id] = nextPlacement;
-        delete evt.item.dataset.prevPlacement;
 
-        if (previousDayId === nextPlacement.dayId && previousTime === nextPlacement.time) return;
+        if (previousDayId === nextPlacement.dayId && previousTime === nextPlacement.time) {
+          cleanup();
+          return;
+        }
 
         renderArrange();
-
+        cleanup();
         const affectedDays = [dayId, previousDayId].filter((v, i, arr) => v && arr.indexOf(v) === i);
         updateCommutesForCityDays(affectedDays).then(() => renderArrange()).catch(() => {});
       }
@@ -5994,52 +6157,25 @@ async function autoArrangeActiveCity(opts = {}) {
       };
     });
 
-    const HOTEL_CHECKIN_MIN = 30;
-    const arrivalDate = cityPlan?.startDate;
-    const departureDate = cityPlan?.endDate;
+    const ANCHOR_ID_BY_KIND = {
+      arrival: logisticsArrivalId(activeCity),
+      'acc-arrival': logisticsAccommodationArrivalId(activeCity),
+      'acc-departure': logisticsAccommodationDepartureId(activeCity),
+      departure: logisticsDepartureId(activeCity)
+    };
     const activeDateSet = new Set(activeDays.map((d) => d.date));
-
-    if (arrivalDate && activeDateSet.has(arrivalDate) && cityLogistics.arrival?.time) {
-      const arrTimeMin = minutesFromTime(cityLogistics.arrival.time);
-      const arrBuf = arrivalBufferMins(cityLogistics.arrival.mode, cityLogistics.arrival.international);
-      lockedActivities.push({
-        id: logisticsArrivalId(activeCity),
-        date: arrivalDate,
-        time: cityLogistics.arrival.time,
-        duration_minutes: arrBuf + arrivalTransitMins,
-        type: 'logistics',
-        name: `Arrive: ${cityLogistics.arrival.location || 'arrival'}`
-      });
-      lockedActivities.push({
-        id: logisticsAccommodationArrivalId(activeCity),
-        date: arrivalDate,
-        time: timeFromMinutes(arrTimeMin + arrBuf + arrivalTransitMins),
-        duration_minutes: HOTEL_CHECKIN_MIN,
-        type: 'logistics',
-        name: getAccommodationLabel(activeCity, arrivalDate) || 'Accommodation check-in'
-      });
-    }
-
-    if (departureDate && activeDateSet.has(departureDate) && cityLogistics.departure?.time) {
-      const depTimeMin = minutesFromTime(cityLogistics.departure.time);
-      const depBuf = departureBufferMins(cityLogistics.departure.mode, cityLogistics.departure.international);
-      const accDepStart = depTimeMin - departureTransitMins - depBuf - HOTEL_CHECKIN_MIN;
-      lockedActivities.push({
-        id: logisticsAccommodationDepartureId(activeCity),
-        date: departureDate,
-        time: timeFromMinutes(Math.max(0, accDepStart)),
-        duration_minutes: HOTEL_CHECKIN_MIN,
-        type: 'logistics',
-        name: getAccommodationLabel(activeCity, departureDate) || 'Accommodation checkout'
-      });
-      lockedActivities.push({
-        id: logisticsDepartureId(activeCity),
-        date: departureDate,
-        time: timeFromMinutes(Math.max(0, depTimeMin - departureTransitMins - depBuf)),
-        duration_minutes: departureTransitMins + depBuf,
-        type: 'logistics',
-        name: `Depart: ${cityLogistics.departure.location || 'departure'}`
-      });
+    for (const date of [cityPlan?.startDate, cityPlan?.endDate]) {
+      if (!date || !activeDateSet.has(date)) continue;
+      for (const anchor of logisticsAnchorsForCityDay(cityPlan, date)) {
+        lockedActivities.push({
+          id: ANCHOR_ID_BY_KIND[anchor.kind],
+          date,
+          time: timeFromMinutes(anchor.start),
+          duration_minutes: anchor.end - anchor.start,
+          type: 'logistics',
+          name: anchor.name
+        });
+      }
     }
 
     let commuteMatrix = {};
