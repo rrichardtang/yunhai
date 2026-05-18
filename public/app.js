@@ -6170,6 +6170,7 @@ async function autoArrangeActiveCity(opts = {}) {
 
   if (finalize) {
     state.lastFinalizeLocks[activeCity] = lockedSet;
+    console.debug('[arrange] finalize locks set', { activeCity, count: lockedSet.length, ids: lockedSet.map((e) => e.activity?.id) });
   } else {
     delete state.lastFinalizeLocks[activeCity];
   }
