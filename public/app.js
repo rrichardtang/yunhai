@@ -5521,11 +5521,14 @@ function renderArrange() {
     });
   };
 
-  const onZoneDropEnd = (zone) => (evt) => {
+  // Unified end-of-drag handler: fires on the SOURCE list's Sortable (Sortable.js semantics).
+  // We inspect evt.to to determine where the item landed.
+  const onDragEndUnified = (evt) => {
     const id = evt.item?.dataset?.id;
-    const zoneId = zone.id;
-    const evtToId = evt.to?.id || evt.to?.className || 'none';
-    const itemParentId = evt.item?.parentElement?.id || evt.item?.parentElement?.className || 'none';
+    const toEl = evt.to;
+    const fromEl = evt.from;
+    const toId = toEl?.id || toEl?.className || 'none';
+    const fromId = fromEl?.id || fromEl?.className || 'none';
     const cursorClientY = _dragCursorClientY;
     const moveCount = _dragMoveCount;
 
@@ -5539,30 +5542,33 @@ function renderArrange() {
       finishDrag();
     };
 
-    if (!id) {
-      sendDebug('drag', { ev: 'end-no-id', zone: zoneId });
-      cleanup();
-      return;
-    }
-    if (evt.to !== zone || evt.item?.parentElement !== zone) {
-      sendDebug('drag', { ev: 'end-wrong-zone', id, zoneId, evtToId, itemParentId });
+    sendDebug('drag', { ev: 'end', id, toId, fromId, moveCount, cursorClientY });
+
+    if (!id) { cleanup(); return; }
+
+    // Dropped back into staging (or any non-day-schedule container).
+    if (!toEl || !toEl.classList.contains('day-schedule')) {
+      const prev = state.placements[id] || {};
+      if (prev.dayId) {
+        state.placements[id] = { dayId: null, time: null };
+        sendDebug('drag', { ev: 'drop-to-staging', id, fromDayId: prev.dayId });
+      }
+      renderArrange();
       cleanup();
       return;
     }
 
-    const dayId = zone.id.replace('schedule-', '');
-
-    // Compute pendingTime from the final cursor Y (more reliable than onMove dataset).
-    let pendingTime = zone.dataset.pendingTime || null;
+    // Dropped into a day column.
+    const dayId = toEl.id.replace('schedule-', '');
+    let pendingTime = toEl.dataset.pendingTime || null;
     let fallbackUsed = false;
     if (!pendingTime && cursorClientY != null) {
-      const rect = zone.getBoundingClientRect();
+      const rect = toEl.getBoundingClientRect();
       const cursorY = cursorClientY - rect.top;
       const slot = nearestLegalSlot(dayId, id, cursorY, getDraggingActivityDuration(id));
       if (slot) { pendingTime = slot.time; fallbackUsed = true; }
       sendDebug('drag', {
-        ev: 'end-fallback',
-        id, zoneId, dayId,
+        ev: 'end-fallback', id, dayId,
         cursorClientY, rectTop: rect.top, cursorY,
         rectHeight: rect.height,
         slot: slot || null,
@@ -5573,11 +5579,9 @@ function renderArrange() {
 
     if (!pendingTime) {
       sendDebug('drag', {
-        ev: 'end-revert-no-slot',
-        id, zoneId, dayId,
-        datasetPendingTime: zone.dataset.pendingTime || null,
-        cursorClientY,
-        moveCount,
+        ev: 'end-revert-no-slot', id, dayId,
+        datasetPendingTime: toEl.dataset.pendingTime || null,
+        cursorClientY, moveCount,
         bands: blockedBandsForDay(dayId, id)
       });
       renderArrange();
@@ -5590,17 +5594,15 @@ function renderArrange() {
     const nextPlacement = { ...(state.placements[id] || {}), dayId, time: pendingTime };
 
     sendDebug('drag', {
-      ev: 'end-accept',
-      id, zoneId, dayId,
-      pendingTime,
-      fallbackUsed,
-      previousDayId, previousTime,
-      moveCount
+      ev: 'end-accept', id, dayId,
+      pendingTime, fallbackUsed,
+      previousDayId, previousTime, moveCount
     });
 
     state.placements[id] = nextPlacement;
 
     if (previousDayId === nextPlacement.dayId && previousTime === nextPlacement.time) {
+      renderArrange(); // still re-render to wipe stale staging-card DOM
       cleanup();
       return;
     }
@@ -5616,7 +5618,7 @@ function renderArrange() {
     sort: false,
     animation: 120,
     onStart: onDragStartShared,
-    onEnd: () => { finishDrag(); }
+    onEnd: onDragEndUnified
   }));
 
   document.querySelectorAll('.day-schedule').forEach((zone) => {
@@ -5625,7 +5627,7 @@ function renderArrange() {
       sort: false,
       animation: 120,
       onStart: onDragStartShared,
-      onEnd: onZoneDropEnd(zone)
+      onEnd: onDragEndUnified
     }));
   });
 
