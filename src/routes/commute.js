@@ -127,10 +127,15 @@ function register(app) {
       }
 
       const commutes = [];
+      const sourceCounts = {};
       for (let i = 0; i < activities.length - 1; i += 1) {
         const fromActivity = activities[i];
         const toActivity = activities[i + 1];
         const commute = await getCommuteBetweenActivities(fromActivity, toActivity);
+
+        for (const s of (commute.sources || [])) {
+          sourceCounts[s] = (sourceCounts[s] || 0) + 1;
+        }
 
         commutes.push({
           fromId: fromActivity.id,
@@ -143,7 +148,8 @@ function register(app) {
         });
       }
 
-      debugLog('commute', `RETURN commutes=${commutes.length} elapsed_ms=${Date.now() - tStart}`);
+      const sourceSummary = Object.entries(sourceCounts).map(([k, v]) => `${k}=${v}`).join(' ') || 'no-sources';
+      debugLog('commute', `SUMMARY pairs=${commutes.length} ${sourceSummary} elapsed_ms=${Date.now() - tStart}`);
       return res.json({ commutes });
     } catch (err) {
       debugLog('commute', `ERROR msg="${err?.message || err}" elapsed_ms=${Date.now() - tStart}`);

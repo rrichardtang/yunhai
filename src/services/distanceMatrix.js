@@ -383,7 +383,8 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
       modes: {},
       selectedMode: 'walking',
       durationMinutes: null,
-      modeIcon: COMMUTE_MODE_ICON.walking
+      modeIcon: COMMUTE_MODE_ICON.walking,
+      sources: ['no-coords']
     };
   }
 
@@ -395,16 +396,20 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
       selectedMode: 'walking',
       durationMinutes: null,
       modeIcon: COMMUTE_MODE_ICON.walking,
-      isWalkingDistance: true
+      isWalkingDistance: true,
+      sources: ['walking-skip']
     };
   }
 
+  const sources = [];
   const modeResults = await Promise.all(
     COMMUTE_MODE_PRIORITY.map(async (mode) => {
       try {
-        const { minutes } = await fetchDistanceMatrixDuration({ origin, destination, mode });
-        return { mode, durationMinutes: minutes };
+        const result = await fetchDistanceMatrixDuration({ origin, destination, mode });
+        sources.push(result.source);
+        return { mode, durationMinutes: result.minutes };
       } catch {
+        sources.push('exception');
         return { mode, durationMinutes: null };
       }
     })
@@ -429,7 +434,8 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
     modes,
     selectedMode,
     durationMinutes: modes[selectedMode]?.durationMinutes ?? null,
-    modeIcon: modes[selectedMode]?.modeIcon || COMMUTE_MODE_ICON.walking
+    modeIcon: modes[selectedMode]?.modeIcon || COMMUTE_MODE_ICON.walking,
+    sources
   };
 }
 
