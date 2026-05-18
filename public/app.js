@@ -5796,15 +5796,17 @@ function openFinalizeModal() {
   modal.id = 'finalizeModal';
   modal.className = 'modal';
   modal.innerHTML = `
-    <div class="modal-card finalize-modal-card">
-      <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div class="modal-card finalize-modal-card" style="display:flex;flex-direction:column;padding:0;overflow:hidden;">
+      <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:24px 24px 12px;flex:0 0 auto;">
         <h3 style="margin:0">Finalize Arrangement</h3>
         <button type="button" id="finalizeCloseBtn" class="icon-btn" aria-label="Close">✕</button>
       </div>
-      <p class="muted-text" style="margin:0 0 16px">Lock activities to their current times. Unlocked activities will be scheduled by AI.</p>
-      <div id="finalizeRows"></div>
-      <div id="finalizeConflictBanner" class="finalize-conflict-banner" hidden></div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+      <p class="muted-text" style="margin:0;padding:0 24px 16px;flex:0 0 auto;">Lock activities to their current times. Unlocked activities will be scheduled by AI.</p>
+      <div style="flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 24px;overscroll-behavior:contain;">
+        <div id="finalizeRows"></div>
+        <div id="finalizeConflictBanner" class="finalize-conflict-banner" hidden></div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 24px 24px;flex:0 0 auto;border-top:1px solid var(--hair,rgba(10,22,40,.08));">
         <button type="button" class="secondary" id="finalizeCancelBtn">Cancel</button>
         <button type="button" id="finalizeConfirmBtn">Confirm &amp; Arrange</button>
       </div>
