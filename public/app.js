@@ -5453,11 +5453,9 @@ function renderArrange() {
 
   let _dragCursorClientY = null;
   let _dragActivityId = null;
-  let _dragMoveCount = 0;
 
   const onPointerMoveDuringDrag = (ev) => {
     _dragCursorClientY = ev.clientY;
-    _dragMoveCount += 1;
     if (!_dragActivityId) return;
     // Live highlight: mark which zone the cursor is over with the snap-target y for visual feedback.
     document.querySelectorAll('.day-schedule').forEach((zone) => {
@@ -5490,20 +5488,11 @@ function renderArrange() {
     if (!id) return;
     _dragActivityId = id;
     _dragCursorClientY = null;
-    _dragMoveCount = 0;
     evt.item.dataset.dragActivityId = id;
     document.body.classList.add('is-dragging-activity');
     paintDropOverlaysForDrag(id);
     document.addEventListener('pointermove', onPointerMoveDuringDrag, true);
     document.addEventListener('dragover', onPointerMoveDuringDrag, true);
-    sendDebug('drag', {
-      ev: 'start',
-      id,
-      from: evt.from?.id || evt.from?.className || 'unknown',
-      itemTag: evt.item?.tagName,
-      itemClass: evt.item?.className,
-      prevPlacement: state.placements[id] || null
-    });
   };
 
   const finishDrag = () => {
@@ -5526,11 +5515,7 @@ function renderArrange() {
   const onDragEndUnified = (evt) => {
     const id = evt.item?.dataset?.id;
     const toEl = evt.to;
-    const fromEl = evt.from;
-    const toId = toEl?.id || toEl?.className || 'none';
-    const fromId = fromEl?.id || fromEl?.className || 'none';
     const cursorClientY = _dragCursorClientY;
-    const moveCount = _dragMoveCount;
 
     const cleanup = () => {
       if (evt.item) {
@@ -5542,8 +5527,6 @@ function renderArrange() {
       finishDrag();
     };
 
-    sendDebug('drag', { ev: 'end', id, toId, fromId, moveCount, cursorClientY });
-
     if (!id) { cleanup(); return; }
 
     // Dropped back into staging (or any non-day-schedule container).
@@ -5551,7 +5534,6 @@ function renderArrange() {
       const prev = state.placements[id] || {};
       if (prev.dayId) {
         state.placements[id] = { dayId: null, time: null };
-        sendDebug('drag', { ev: 'drop-to-staging', id, fromDayId: prev.dayId });
       }
       renderArrange();
       cleanup();
@@ -5561,29 +5543,14 @@ function renderArrange() {
     // Dropped into a day column.
     const dayId = toEl.id.replace('schedule-', '');
     let pendingTime = toEl.dataset.pendingTime || null;
-    let fallbackUsed = false;
     if (!pendingTime && cursorClientY != null) {
       const rect = toEl.getBoundingClientRect();
       const cursorY = cursorClientY - rect.top;
       const slot = nearestLegalSlot(dayId, id, cursorY, getDraggingActivityDuration(id));
-      if (slot) { pendingTime = slot.time; fallbackUsed = true; }
-      sendDebug('drag', {
-        ev: 'end-fallback', id, dayId,
-        cursorClientY, rectTop: rect.top, cursorY,
-        rectHeight: rect.height,
-        slot: slot || null,
-        duration: getDraggingActivityDuration(id),
-        moveCount
-      });
+      if (slot) pendingTime = slot.time;
     }
 
     if (!pendingTime) {
-      sendDebug('drag', {
-        ev: 'end-revert-no-slot', id, dayId,
-        datasetPendingTime: toEl.dataset.pendingTime || null,
-        cursorClientY, moveCount,
-        bands: blockedBandsForDay(dayId, id)
-      });
       renderArrange();
       cleanup();
       return;
@@ -5592,12 +5559,6 @@ function renderArrange() {
     const previousDayId = state.placements[id]?.dayId || null;
     const previousTime = state.placements[id]?.time || null;
     const nextPlacement = { ...(state.placements[id] || {}), dayId, time: pendingTime };
-
-    sendDebug('drag', {
-      ev: 'end-accept', id, dayId,
-      pendingTime, fallbackUsed,
-      previousDayId, previousTime, moveCount
-    });
 
     state.placements[id] = nextPlacement;
 
