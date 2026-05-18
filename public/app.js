@@ -5451,19 +5451,113 @@ function renderArrange() {
 
   bindCommuteInteractions();
 
+  let _dragCursorClientY = null;
+  let _dragActivityId = null;
+
+  const onPointerMoveDuringDrag = (ev) => {
+    _dragCursorClientY = ev.clientY;
+    if (!_dragActivityId) return;
+    // Live highlight: mark which zone the cursor is over with the snap-target y for visual feedback.
+    document.querySelectorAll('.day-schedule').forEach((zone) => {
+      const rect = zone.getBoundingClientRect();
+      const inside = ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom;
+      if (!inside) {
+        zone.classList.remove('is-no-legal-slot', 'is-hot');
+        zone.removeAttribute('data-pending-time');
+        return;
+      }
+      const dayId = zone.id.replace('schedule-', '');
+      const cursorY = ev.clientY - rect.top;
+      const slot = nearestLegalSlot(dayId, _dragActivityId, cursorY, getDraggingActivityDuration(_dragActivityId));
+      if (!slot) {
+        zone.classList.add('is-no-legal-slot');
+        zone.classList.remove('is-hot');
+        zone.removeAttribute('data-pending-time');
+      } else {
+        zone.classList.add('is-hot');
+        zone.classList.remove('is-no-legal-slot');
+        zone.dataset.pendingTime = slot.time;
+        zone.dataset.pendingY = String(slot.y);
+      }
+    });
+  };
+
   const onDragStartShared = (evt) => {
     _sortableDragging = true;
     const id = evt.item?.dataset.id;
     if (!id) return;
+    _dragActivityId = id;
+    _dragCursorClientY = null;
     evt.item.dataset.dragActivityId = id;
     document.body.classList.add('is-dragging-activity');
     paintDropOverlaysForDrag(id);
+    document.addEventListener('pointermove', onPointerMoveDuringDrag, true);
+    document.addEventListener('dragover', onPointerMoveDuringDrag, true);
   };
 
   const finishDrag = () => {
     _sortableDragging = false;
+    _dragActivityId = null;
+    _dragCursorClientY = null;
     document.body.classList.remove('is-dragging-activity');
     clearDropOverlays();
+    document.removeEventListener('pointermove', onPointerMoveDuringDrag, true);
+    document.removeEventListener('dragover', onPointerMoveDuringDrag, true);
+    document.querySelectorAll('.day-schedule').forEach((z) => {
+      z.classList.remove('is-no-legal-slot', 'is-hot');
+      z.removeAttribute('data-pending-time');
+      z.removeAttribute('data-pending-y');
+    });
+  };
+
+  const onZoneDropEnd = (zone) => (evt) => {
+    const id = evt.item?.dataset?.id;
+    const cleanup = () => {
+      if (evt.item) {
+        if (Sortable?.utils?.deselect) Sortable.utils.deselect(evt.item);
+        evt.item.style.transform = '';
+        evt.item.style.opacity = '';
+      }
+      clearActivePlacedCardDrag();
+      finishDrag();
+    };
+
+    if (!id) { cleanup(); return; }
+    if (evt.to !== zone || evt.item?.parentElement !== zone) { cleanup(); return; }
+
+    const dayId = zone.id.replace('schedule-', '');
+
+    // Compute pendingTime from the final cursor Y (more reliable than onMove dataset).
+    let pendingTime = zone.dataset.pendingTime || null;
+    if (!pendingTime && _dragCursorClientY != null) {
+      const rect = zone.getBoundingClientRect();
+      const cursorY = _dragCursorClientY - rect.top;
+      const slot = nearestLegalSlot(dayId, id, cursorY, getDraggingActivityDuration(id));
+      if (slot) pendingTime = slot.time;
+    }
+
+    if (!pendingTime) {
+      // Final cursor wasn't over a legal slot — revert.
+      renderArrange();
+      cleanup();
+      return;
+    }
+
+    const previousDayId = state.placements[id]?.dayId || null;
+    const previousTime = state.placements[id]?.time || null;
+    const nextPlacement = { ...(state.placements[id] || {}), dayId, time: pendingTime };
+
+    state.placements[id] = nextPlacement;
+
+    if (previousDayId === nextPlacement.dayId && previousTime === nextPlacement.time) {
+      cleanup();
+      return;
+    }
+
+    renderArrange();
+    cleanup();
+    const affectedDays = [dayId, previousDayId].filter((v, i, arr) => v && arr.indexOf(v) === i);
+    updateCommutesForCityDays(affectedDays).then(() => renderArrange()).catch(() => {});
   };
 
   _arrangeSortables.push(new Sortable(els.stagingArea, {
@@ -5480,71 +5574,7 @@ function renderArrange() {
       sort: false,
       animation: 120,
       onStart: onDragStartShared,
-      onMove: (evt) => {
-        const target = evt.to;
-        if (!target || !target.classList.contains('day-schedule')) return true;
-        const id = evt.dragged?.dataset?.id;
-        if (!id) return true;
-        const dayId = target.id.replace('schedule-', '');
-        const cursorY = (evt.originalEvent?.clientY ?? 0) - target.getBoundingClientRect().top;
-        const duration = getDraggingActivityDuration(id);
-        const slot = nearestLegalSlot(dayId, id, cursorY, duration);
-        if (!slot) {
-          target.removeAttribute('data-pending-time');
-          target.classList.add('is-no-legal-slot');
-          return false;
-        }
-        target.classList.remove('is-no-legal-slot');
-        target.dataset.pendingTime = slot.time;
-        target.dataset.pendingY = String(slot.y);
-        return true;
-      },
-      onEnd: (evt) => {
-        const id = evt.item?.dataset?.id;
-        const cleanup = () => {
-          if (evt.item) {
-            if (Sortable?.utils?.deselect) Sortable.utils.deselect(evt.item);
-            evt.item.style.transform = '';
-            evt.item.style.opacity = '';
-          }
-          clearActivePlacedCardDrag();
-          finishDrag();
-          document.querySelectorAll('.day-schedule').forEach((z) => {
-            z.removeAttribute('data-pending-time');
-            z.removeAttribute('data-pending-y');
-            z.classList.remove('is-no-legal-slot');
-          });
-        };
-
-        if (!id) { cleanup(); return; }
-        if (evt.to !== zone || evt.item?.parentElement !== zone) { cleanup(); return; }
-
-        const dayId = zone.id.replace('schedule-', '');
-        const pendingTime = zone.dataset.pendingTime;
-
-        if (!pendingTime) {
-          // Drop occurred outside any legal slot — revert without changing state.
-          renderArrange();
-          cleanup();
-          return;
-        }
-
-        const previousDayId = state.placements[id]?.dayId || null;
-        const previousTime = state.placements[id]?.time || null;
-        const nextPlacement = { ...(state.placements[id] || {}), dayId, time: pendingTime };
-
-        state.placements[id] = nextPlacement;
-
-        if (previousDayId === nextPlacement.dayId && previousTime === nextPlacement.time) {
-          cleanup();
-          return;
-        }
-
-        renderArrange();
-        cleanup();
-        const affectedDays = [dayId, previousDayId].filter((v, i, arr) => v && arr.indexOf(v) === i);
-        updateCommutesForCityDays(affectedDays).then(() => renderArrange()).catch(() => {});
-      }
+      onEnd: onZoneDropEnd(zone)
     }));
   });
 
