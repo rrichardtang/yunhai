@@ -5587,6 +5587,13 @@ function renderArrange() {
       group: 'itinerary',
       sort: false,
       animation: 120,
+      // Block drag-start when the user clicks an interactive child of a placed card,
+      // or anywhere on a locked card. The placed-card mousedown handler also stops
+      // propagation in the top/bottom resize edge so Sortable never starts there.
+      filter: '.placed-time, .commute-selector, .commute-selector-trigger, .commute-indicator, .placed-card--locked',
+      preventOnFilter: false,
+      delay: 80,
+      delayOnTouchOnly: false,
       onStart: onDragStartShared,
       onEnd: onDragEndUnified
     }));
@@ -6445,46 +6452,39 @@ function bindPlacedCardInteractions() {
     }
 
     card.addEventListener('mousedown', (e) => {
-      e.stopPropagation();
       if (e.button !== 0) return;
 
       const activeCity = state.arrangeCity;
-      if ((state.lastFinalizeLocks[activeCity] || []).some((entry) => String(entry.activity.id) === id)) {
+      const isLocked = (state.lastFinalizeLocks[activeCity] || []).some((entry) => String(entry.activity.id) === id);
+      if (isLocked) {
+        e.stopPropagation();
         e.preventDefault();
         showToast('This activity is locked. Re-open Finalize to unlock.');
         return;
       }
 
+      // Resize gesture: mousedown in the top/bottom edge of the card. Handled here.
+      // Move gesture: mousedown in the middle. Let the event bubble to Sortable.
+      if (!inResizeEdge(e.clientY)) {
+        return;
+      }
+
+      e.stopPropagation();
       e.preventDefault();
       hidePlacedTooltip();
 
       clearActivePlacedCardDrag();
 
-      const cardRect = card.getBoundingClientRect();
-      const clickY = e.clientY;
-      const isNearBottom = clickY > (cardRect.bottom - RESIZE_EDGE_PX);
-      const isNearTop = clickY < (cardRect.top + RESIZE_EDGE_PX);
-      currentDragMode = (isNearBottom || isNearTop) ? 'resize' : 'move';
-
-      const rect = schedule.getBoundingClientRect();
-      const startX = e.clientX;
       const startY = e.clientY;
       const startHeight = card.offsetHeight;
       const currentTop = Number.parseFloat(card.style.top) || yFromTime(state.placements[id]?.time);
       const maxHeight = Math.max(28, GRID_HEIGHT - currentTop);
       let holdReady = false;
-      let isDragging = false;
+      let isResizing = false;
 
       const holdTimer = setTimeout(() => {
         holdReady = true;
       }, HOLD_DELAY_MS);
-
-      const updateCardPosition = (ev) => {
-        const y = ev.clientY - rect.top;
-        state.placements[id] = { ...(state.placements[id] || {}), dayId, time: timeFromY(y) };
-        const nextY = yFromTime(state.placements[id].time);
-        card.style.top = `${nextY}px`;
-      };
 
       const updateCardDuration = (ev) => {
         const rawHeight = startHeight + (ev.clientY - startY);
@@ -6507,20 +6507,12 @@ function bindPlacedCardInteractions() {
 
       const move = (ev) => {
         ev.stopPropagation();
-        const dx = ev.clientX - startX;
         const dy = ev.clientY - startY;
-        const movedDistance = Math.hypot(dx, dy);
-
-        if (!isDragging) {
-          if (!holdReady || movedDistance < MOVE_THRESHOLD_PX) return;
-          isDragging = true;
+        if (!isResizing) {
+          if (!holdReady || Math.abs(dy) < MOVE_THRESHOLD_PX) return;
+          isResizing = true;
         }
-
-        if (currentDragMode === 'resize') {
-          updateCardDuration(ev);
-        } else {
-          updateCardPosition(ev);
-        }
+        updateCardDuration(ev);
       };
 
       const up = (ev) => {
@@ -6532,7 +6524,7 @@ function bindPlacedCardInteractions() {
 
         card.classList.remove('resize-hover');
         currentDragMode = null;
-        if (isDragging) {
+        if (isResizing) {
           renderArrange();
           updateCommutesForCityDays([dayId]).then(() => renderArrange()).catch(() => {});
         }
@@ -6546,6 +6538,7 @@ function bindPlacedCardInteractions() {
         currentDragMode = null;
       };
 
+      currentDragMode = 'resize';
       document.addEventListener('mousemove', move);
       document.addEventListener('mouseup', up);
     });
