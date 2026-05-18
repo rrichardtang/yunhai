@@ -5178,88 +5178,10 @@ function blockedBandsForDay(dayId, draggingActivityId) {
   return { dayStart, dayEnd, blocks };
 }
 
-function nearestLegalSlot(dayId, draggingActivityId, cursorY, durationMin) {
-  const { dayStart, dayEnd, blocks } = blockedBandsForDay(dayId, draggingActivityId);
-  const cursorMin = (DAY_START_HOUR * 60) + Math.max(0, Math.min(GRID_HEIGHT, cursorY)) * 60 / PX_PER_HOUR;
-  const dur = Math.max(15, Number(durationMin) || 60);
-
-  // Build legal gaps: [dayStart..first.start], [block[i].end..block[i+1].start], [last.end..dayEnd]
-  const gaps = [];
-  let cursor = dayStart;
-  for (const b of blocks) {
-    if (b.start > cursor) gaps.push({ start: cursor, end: Math.min(b.start, dayEnd) });
-    cursor = Math.max(cursor, b.end);
-  }
-  if (cursor < dayEnd) gaps.push({ start: cursor, end: dayEnd });
-
-  // Find a gap that fits and is closest to cursorMin (snapped to 30-min grid)
-  const snap = (m) => Math.round(m / 30) * 30;
-  let best = null;
-  for (const g of gaps) {
-    if (g.end - g.start < dur) continue;
-    const earliest = g.start;
-    const latest = g.end - dur;
-    const candidate = Math.min(latest, Math.max(earliest, snap(cursorMin)));
-    const distance = Math.abs(candidate - cursorMin);
-    if (!best || distance < best.distance) {
-      best = { startMin: candidate, distance };
-    }
-  }
-  if (!best) return null;
-  const time = timeFromMinutes(best.startMin);
-  const y = (best.startMin - DAY_START_HOUR * 60) * PX_PER_HOUR / 60;
-  return { time, y, startMin: best.startMin };
-}
-
-function getDraggingActivityDuration(activityId) {
-  const a = state.activities.find((x) => String(x.id) === String(activityId));
-  if (!a) return 60;
-  return Math.max(15, getPlacementTimeRange(a).endMinutes - getPlacementTimeRange(a).startMinutes);
-}
-
 function bandStyle(startMin, endMin) {
   const top = (startMin - DAY_START_HOUR * 60) * PX_PER_HOUR / 60;
   const height = Math.max(2, (endMin - startMin) * PX_PER_HOUR / 60);
   return `top:${top}px;height:${height}px;`;
-}
-
-function paintDropOverlaysForDrag(draggingActivityId) {
-  for (const day of state.days) {
-    const overlay = document.getElementById(`drop-overlay-${day.id}`);
-    if (!overlay) continue;
-    const { dayStart, dayEnd, blocks } = blockedBandsForDay(day.id, draggingActivityId);
-    const dayMin = DAY_START_HOUR * 60;
-    const dayMax = DAY_END_HOUR * 60;
-
-    const parts = [];
-    if (dayStart > dayMin) {
-      parts.push(`<div class="drop-band drop-band--out-of-window" style="${bandStyle(dayMin, dayStart)}"></div>`);
-    }
-    if (dayEnd < dayMax) {
-      parts.push(`<div class="drop-band drop-band--out-of-window" style="${bandStyle(dayEnd, dayMax)}"></div>`);
-    }
-
-    let cursor = dayStart;
-    for (const b of blocks) {
-      const blockStart = Math.max(b.start, dayStart);
-      const blockEnd = Math.min(b.end, dayEnd);
-      if (blockEnd <= blockStart) continue;
-      if (blockStart > cursor) {
-        parts.push(`<div class="drop-band drop-band--ok" style="${bandStyle(cursor, blockStart)}"></div>`);
-      }
-      parts.push(`<div class="drop-band drop-band--blocked" data-name="${esc(b.name || '')}" style="${bandStyle(blockStart, blockEnd)}"></div>`);
-      cursor = Math.max(cursor, blockEnd);
-    }
-    if (cursor < dayEnd) {
-      parts.push(`<div class="drop-band drop-band--ok" style="${bandStyle(cursor, dayEnd)}"></div>`);
-    }
-
-    overlay.innerHTML = parts.join('');
-  }
-}
-
-function clearDropOverlays() {
-  document.querySelectorAll('.drop-zone-overlay').forEach((el) => { el.innerHTML = ''; });
 }
 
 function closeAllCommuteMenus(except = null) {
@@ -5324,15 +5246,13 @@ function bindCommuteInteractions() {
   document.addEventListener('click', closeAllCommuteMenus, { once: true });
 }
 
-let _arrangeSortables = [];
-let _sortableDragging = false;
+const ARRANGE_BUFFER_MIN = 30;
+const ARRANGE_SNAP_MIN = 15;
+let _arrangeDragState = null;
+let _arrangeDragListenersBound = false;
+
 function renderArrange() {
-  _arrangeSortables.forEach((s) => {
-    try {
-      if (_sortableDragging) { s.option('disabled', true); } else { s.destroy(); }
-    } catch {}
-  });
-  if (!_sortableDragging) _arrangeSortables = [];
+  if (_arrangeDragState) cancelArrangeDrag();
 
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
   const cityGroups = getArrangeCities();
@@ -5344,14 +5264,21 @@ function renderArrange() {
   const activeDays = state.days.filter((d) => cityMatches(d.city, activeCity));
 
 
-  els.stagingArea.innerHTML = approved
-    .filter((a) => cityMatches(a.city, activeCity) && !state.placements[a.id]?.dayId)
-    .map(makeStagingCard)
-    .join('');
+  const unplaced = approved.filter((a) => cityMatches(a.city, activeCity) && !state.placements[a.id]?.dayId);
+  els.stagingArea.innerHTML = unplaced.length
+    ? unplaced.map(makeStagingCard).join('')
+    : '<div class="staging__empty">All activities placed.</div>';
+  const stagingCountEl = document.getElementById('stagingCount');
+  if (stagingCountEl) stagingCountEl.textContent = String(unplaced.length);
 
   els.dayColumns.innerHTML = activeDays.map((d) => {
     const dt = parseYmdAsLocal(d.date);
     const label = dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const dayCount = approved.filter((a) => state.placements[a.id]?.dayId === d.id).length;
+    const dayHours = approved
+      .filter((a) => state.placements[a.id]?.dayId === d.id)
+      .reduce((sum, a) => sum + actDurationHours(a), 0);
+    const dayPill = `<span class="day-head__pill">${dayCount} · ${dayHours.toFixed(1)}h</span>`;
     const hourLines = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }, (_, i) => {
       const hour = DAY_START_HOUR + i;
       const y = i * PX_PER_HOUR;
@@ -5360,10 +5287,9 @@ function renderArrange() {
     }).join('');
     return `
       <section class="day-col schedule-col" data-day="${d.id}">
-        <div class="day-head"><div>${label}</div><small>${esc(d.city)}</small></div>
+        <div class="day-head"><div class="day-head__main"><div>${label}</div><small>${esc(d.city)}</small></div>${dayPill}</div>
         <div class="day-grid-wrap">
           <div class="hour-grid">${hourLines}</div>
-          <div class="drop-zone-overlay" id="drop-overlay-${d.id}" aria-hidden="true"></div>
           <div class="day-schedule" id="schedule-${d.id}"></div>
         </div>
       </section>
@@ -5450,156 +5376,324 @@ function renderArrange() {
   });
 
   bindCommuteInteractions();
-
-  let _dragCursorClientY = null;
-  let _dragActivityId = null;
-
-  const onPointerMoveDuringDrag = (ev) => {
-    _dragCursorClientY = ev.clientY;
-    if (!_dragActivityId) return;
-    // Live highlight: mark which zone the cursor is over with the snap-target y for visual feedback.
-    document.querySelectorAll('.day-schedule').forEach((zone) => {
-      const rect = zone.getBoundingClientRect();
-      const inside = ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom;
-      if (!inside) {
-        zone.classList.remove('is-no-legal-slot', 'is-hot');
-        zone.removeAttribute('data-pending-time');
-        return;
-      }
-      const dayId = zone.id.replace('schedule-', '');
-      const cursorY = ev.clientY - rect.top;
-      const slot = nearestLegalSlot(dayId, _dragActivityId, cursorY, getDraggingActivityDuration(_dragActivityId));
-      if (!slot) {
-        zone.classList.add('is-no-legal-slot');
-        zone.classList.remove('is-hot');
-        zone.removeAttribute('data-pending-time');
-      } else {
-        zone.classList.add('is-hot');
-        zone.classList.remove('is-no-legal-slot');
-        zone.dataset.pendingTime = slot.time;
-        zone.dataset.pendingY = String(slot.y);
-      }
-    });
-  };
-
-  const onDragStartShared = (evt) => {
-    _sortableDragging = true;
-    const id = evt.item?.dataset.id;
-    if (!id) return;
-    _dragActivityId = id;
-    _dragCursorClientY = null;
-    evt.item.dataset.dragActivityId = id;
-    document.body.classList.add('is-dragging-activity');
-    paintDropOverlaysForDrag(id);
-    document.addEventListener('pointermove', onPointerMoveDuringDrag, true);
-    document.addEventListener('dragover', onPointerMoveDuringDrag, true);
-  };
-
-  const finishDrag = () => {
-    _sortableDragging = false;
-    _dragActivityId = null;
-    _dragCursorClientY = null;
-    document.body.classList.remove('is-dragging-activity');
-    clearDropOverlays();
-    document.removeEventListener('pointermove', onPointerMoveDuringDrag, true);
-    document.removeEventListener('dragover', onPointerMoveDuringDrag, true);
-    document.querySelectorAll('.day-schedule').forEach((z) => {
-      z.classList.remove('is-no-legal-slot', 'is-hot');
-      z.removeAttribute('data-pending-time');
-      z.removeAttribute('data-pending-y');
-    });
-  };
-
-  // Unified end-of-drag handler: fires on the SOURCE list's Sortable (Sortable.js semantics).
-  // We inspect evt.to to determine where the item landed.
-  const onDragEndUnified = (evt) => {
-    const id = evt.item?.dataset?.id;
-    const toEl = evt.to;
-    const cursorClientY = _dragCursorClientY;
-
-    const cleanup = () => {
-      if (evt.item) {
-        if (Sortable?.utils?.deselect) Sortable.utils.deselect(evt.item);
-        evt.item.style.transform = '';
-        evt.item.style.opacity = '';
-      }
-      clearActivePlacedCardDrag();
-      finishDrag();
-    };
-
-    if (!id) { cleanup(); return; }
-
-    // Dropped back into staging (or any non-day-schedule container).
-    if (!toEl || !toEl.classList.contains('day-schedule')) {
-      const prev = state.placements[id] || {};
-      if (prev.dayId) {
-        state.placements[id] = { dayId: null, time: null };
-      }
-      renderArrange();
-      cleanup();
-      return;
-    }
-
-    // Dropped into a day column.
-    const dayId = toEl.id.replace('schedule-', '');
-    let pendingTime = toEl.dataset.pendingTime || null;
-    if (!pendingTime && cursorClientY != null) {
-      const rect = toEl.getBoundingClientRect();
-      const cursorY = cursorClientY - rect.top;
-      const slot = nearestLegalSlot(dayId, id, cursorY, getDraggingActivityDuration(id));
-      if (slot) pendingTime = slot.time;
-    }
-
-    if (!pendingTime) {
-      renderArrange();
-      cleanup();
-      return;
-    }
-
-    const previousDayId = state.placements[id]?.dayId || null;
-    const previousTime = state.placements[id]?.time || null;
-    const nextPlacement = { ...(state.placements[id] || {}), dayId, time: pendingTime };
-
-    state.placements[id] = nextPlacement;
-
-    if (previousDayId === nextPlacement.dayId && previousTime === nextPlacement.time) {
-      renderArrange(); // still re-render to wipe stale staging-card DOM
-      cleanup();
-      return;
-    }
-
-    renderArrange();
-    cleanup();
-    const affectedDays = [dayId, previousDayId].filter((v, i, arr) => v && arr.indexOf(v) === i);
-    updateCommutesForCityDays(affectedDays).then(() => renderArrange()).catch(() => {});
-  };
-
-  _arrangeSortables.push(new Sortable(els.stagingArea, {
-    group: 'itinerary',
-    sort: false,
-    animation: 120,
-    onStart: onDragStartShared,
-    onEnd: onDragEndUnified
-  }));
-
-  document.querySelectorAll('.day-schedule').forEach((zone) => {
-    _arrangeSortables.push(new Sortable(zone, {
-      group: 'itinerary',
-      sort: false,
-      animation: 120,
-      // Block drag-start when the user clicks an interactive child of a placed card,
-      // or anywhere on a locked card. The placed-card mousedown handler also stops
-      // propagation in the top/bottom resize edge so Sortable never starts there.
-      filter: '.placed-time, .commute-selector, .commute-selector-trigger, .commute-indicator, .placed-card--locked',
-      preventOnFilter: false,
-      delay: 80,
-      delayOnTouchOnly: false,
-      onStart: onDragStartShared,
-      onEnd: onDragEndUnified
-    }));
-  });
-
+  bindArrangeDrag();
   bindPlacedCardInteractions();
+}
+
+function isActivityLocked(id) {
+  const activeCity = state.arrangeCity;
+  return (state.lastFinalizeLocks[activeCity] || []).some((e) => String(e.activity.id) === String(id));
+}
+
+function arrangeDayBodies() {
+  return Array.from(document.querySelectorAll('#dayColumns .day-grid-wrap'));
+}
+
+function dayIdFromGridWrap(el) {
+  const sched = el.querySelector('.day-schedule');
+  return sched ? sched.id.replace('schedule-', '') : null;
+}
+
+// Half-open overlap with ±BUFFER applied to every block.
+function arrangeIsValidDrop(dayId, dragId, startMin, durMin) {
+  const day = state.days.find((d) => d.id === dayId);
+  if (!day) return false;
+  const city = state.cities.find((c) => cityMatches(c.name, day.city));
+  const dayStart = city ? getCityDayWindowStart(city, day.date) : DAY_START_HOUR * 60;
+  const dayEnd = city ? getCityDayWindowEnd(city, day.date) : DAY_END_HOUR * 60;
+  if (startMin < dayStart || startMin + durMin > dayEnd) return false;
+
+  const { blocks } = blockedBandsForDay(dayId, dragId);
+  const aStart = startMin;
+  const aEnd = startMin + durMin;
+  for (const b of blocks) {
+    const bStart = b.start - ARRANGE_BUFFER_MIN;
+    const bEnd = b.end + ARRANGE_BUFFER_MIN;
+    if (aStart < bEnd && bStart < aEnd) return false;
+  }
+  return true;
+}
+
+function snapMinutesToGrid(mins) {
+  const step = ARRANGE_SNAP_MIN;
+  return Math.round(mins / step) * step;
+}
+
+function arrangeDragDurationMin(activityId) {
+  const a = state.activities.find((x) => String(x.id) === String(activityId));
+  if (!a) return 60;
+  return Math.max(ARRANGE_SNAP_MIN, Math.round(actDurationHours(a) * 60));
+}
+
+function pickupAllowed(target) {
+  if (!target) return false;
+  if (target.closest('.placed-time, .commute-selector, .commute-selector-trigger, .commute-indicator, .activity-icon-wrap, .placed-info-wrap')) return false;
+  return true;
+}
+
+function bindArrangeDrag() {
+  const stagingArea = els.stagingArea;
+  const dayColumns = els.dayColumns;
+  if (!stagingArea || !dayColumns) return;
+
+  const onPointerDown = (e) => {
+    if (e.button !== 0) return;
+    const card = e.target.closest('.staging-card, .placed-card');
+    if (!card) return;
+    if (card.classList.contains('placed-card--locked')) return;
+    if (!pickupAllowed(e.target)) return;
+
+    // Allow resize gesture on .placed-card top/bottom edge to win.
+    if (card.classList.contains('placed-card')) {
+      const r = card.getBoundingClientRect();
+      const RESIZE_EDGE_PX = 14;
+      if (e.clientY <= r.top + RESIZE_EDGE_PX || e.clientY >= r.bottom - RESIZE_EDGE_PX) return;
+    }
+
+    const id = card.dataset.id;
+    if (!id) return;
+    if (isActivityLocked(id)) return;
+    const item = state.activities.find((a) => String(a.id) === String(id));
+    if (!item) return;
+
+    const isStaging = card.classList.contains('staging-card');
+    const srcDayId = isStaging ? '__staging' : (card.closest('.day-schedule')?.id.replace('schedule-', '') || null);
+    const cardRect = card.getBoundingClientRect();
+    const durMin = arrangeDragDurationMin(id);
+
+    e.preventDefault();
+    startArrangeDrag({
+      id,
+      srcDayId,
+      item,
+      offsetY: isStaging ? 8 : (e.clientY - cardRect.top),
+      w: cardRect.width,
+      h: Math.max(56, durMin * PX_PER_HOUR / 60),
+      durMin,
+      ptrX: e.clientX,
+      ptrY: e.clientY,
+      cardEl: card
+    });
+  };
+
+  stagingArea.addEventListener('pointerdown', onPointerDown);
+  dayColumns.addEventListener('pointerdown', onPointerDown);
+}
+
+function startArrangeDrag(drag) {
+  _arrangeDragState = { ...drag, dropTarget: null, rafPending: false };
+  drag.cardEl?.classList.add('is-dragging');
+  document.body.classList.add('is-dragging-activity');
+
+  // Mark every day-grid-wrap as drag-active so overlays render.
+  arrangeDayBodies().forEach((wrap) => wrap.classList.add('drag-active'));
+
+  // Render persistent blocked-range overlays (one set per day, updated only on render).
+  renderArrangeBlockedRanges(drag.id);
+
+  // Floating ghost.
+  const ghost = document.createElement('div');
+  ghost.className = 'drag-ghost';
+  ghost.id = 'arrange-drag-ghost';
+  const { icon, colorClass } = getActivityStyle(drag.item.type);
+  ghost.innerHTML = `
+    <div class="drag-ghost__inner ${colorClass}">
+      <div class="drag-ghost__time">drop on a day…</div>
+      <div class="drag-ghost__title"><span class="drag-ghost__icon">${icon}</span><span>${esc(drag.item.name)}</span></div>
+    </div>`;
+  document.body.appendChild(ghost);
+  positionGhost(drag);
+
+  if (!_arrangeDragListenersBound) {
+    window.addEventListener('pointermove', onArrangePointerMove, true);
+    window.addEventListener('pointerup', onArrangePointerUp, true);
+    window.addEventListener('keydown', onArrangeKeyDown, true);
+    _arrangeDragListenersBound = true;
+  }
+}
+
+function positionGhost(drag) {
+  const ghost = document.getElementById('arrange-drag-ghost');
+  if (!ghost) return;
+  ghost.style.left = `${drag.ptrX + 8}px`;
+  ghost.style.top = `${drag.ptrY - (drag.offsetY || 0)}px`;
+  ghost.style.height = `${drag.h}px`;
+  ghost.style.width = `${Math.min(260, drag.w || 220)}px`;
+}
+
+function renderArrangeBlockedRanges(dragId) {
+  arrangeDayBodies().forEach((wrap) => {
+    const dayId = dayIdFromGridWrap(wrap);
+    if (!dayId) return;
+    let layer = wrap.querySelector('.blocked-layer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'blocked-layer';
+      wrap.appendChild(layer);
+    }
+    const { dayStart, dayEnd, blocks } = blockedBandsForDay(dayId, dragId);
+    const dayMin = DAY_START_HOUR * 60;
+    const dayMax = DAY_END_HOUR * 60;
+    const parts = [];
+    if (dayStart > dayMin) parts.push(`<div class="blocked-out" style="${bandStyle(dayMin, dayStart)}"></div>`);
+    if (dayEnd < dayMax) parts.push(`<div class="blocked-out" style="${bandStyle(dayEnd, dayMax)}"></div>`);
+    for (const b of blocks) {
+      const coreStart = Math.max(dayStart, b.start);
+      const coreEnd = Math.min(dayEnd, b.end);
+      const bufBefore = Math.max(dayStart, b.start - ARRANGE_BUFFER_MIN);
+      const bufAfter = Math.min(dayEnd, b.end + ARRANGE_BUFFER_MIN);
+      if (bufBefore < coreStart) parts.push(`<div class="blocked-buffer" style="${bandStyle(bufBefore, coreStart)}"></div>`);
+      if (coreEnd > coreStart) parts.push(`<div class="blocked-core" style="${bandStyle(coreStart, coreEnd)}"></div>`);
+      if (bufAfter > coreEnd) parts.push(`<div class="blocked-buffer" style="${bandStyle(coreEnd, bufAfter)}"></div>`);
+    }
+    layer.innerHTML = parts.join('');
+  });
+}
+
+function clearArrangeBlockedRanges() {
+  arrangeDayBodies().forEach((wrap) => {
+    wrap.classList.remove('drag-active', 'drop-target');
+    const layer = wrap.querySelector('.blocked-layer');
+    if (layer) layer.remove();
+    const indicator = wrap.querySelector('.drop-indicator');
+    if (indicator) indicator.remove();
+  });
+}
+
+function onArrangePointerMove(e) {
+  if (!_arrangeDragState) return;
+  _arrangeDragState.ptrX = e.clientX;
+  _arrangeDragState.ptrY = e.clientY;
+  if (_arrangeDragState.rafPending) return;
+  _arrangeDragState.rafPending = true;
+  requestAnimationFrame(() => {
+    if (!_arrangeDragState) return;
+    _arrangeDragState.rafPending = false;
+    updateArrangeDropTarget();
+    positionGhost(_arrangeDragState);
+    updateArrangeGhostLabel();
+  });
+}
+
+function updateArrangeDropTarget() {
+  const drag = _arrangeDragState;
+  if (!drag) return;
+  let found = null;
+  for (const wrap of arrangeDayBodies()) {
+    const r = wrap.getBoundingClientRect();
+    if (drag.ptrX >= r.left && drag.ptrX <= r.right && drag.ptrY >= r.top && drag.ptrY <= r.bottom) {
+      const dayId = dayIdFromGridWrap(wrap);
+      if (!dayId) break;
+      const yInside = drag.ptrY - r.top - (drag.offsetY || 0);
+      const cursorMin = (DAY_START_HOUR * 60) + (yInside * 60 / PX_PER_HOUR);
+      const snapped = snapMinutesToGrid(cursorMin);
+      const valid = arrangeIsValidDrop(dayId, drag.id, snapped, drag.durMin);
+      found = { dayId, startMin: snapped, valid, wrap };
+      break;
+    }
+  }
+  drag.dropTarget = found;
+
+  // Update DOM: drop-target highlight + indicator per day.
+  arrangeDayBodies().forEach((wrap) => {
+    const isTarget = found && wrap === found.wrap;
+    wrap.classList.toggle('drop-target', isTarget && found.valid);
+    let indicator = wrap.querySelector('.drop-indicator');
+    if (!isTarget) {
+      if (indicator) indicator.remove();
+      return;
+    }
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.className = 'drop-indicator';
+      wrap.appendChild(indicator);
+    }
+    const top = (found.startMin - DAY_START_HOUR * 60) * PX_PER_HOUR / 60;
+    indicator.style.top = `${top}px`;
+    indicator.style.height = `${Math.max(34, drag.durMin * PX_PER_HOUR / 60)}px`;
+    indicator.classList.toggle('invalid', !found.valid);
+    const label = formatTimeRangeLabel(found.startMin, found.startMin + drag.durMin);
+    indicator.dataset.time = found.valid ? label : `${label} · busy`;
+  });
+}
+
+function updateArrangeGhostLabel() {
+  const ghost = document.getElementById('arrange-drag-ghost');
+  if (!ghost || !_arrangeDragState) return;
+  const timeEl = ghost.querySelector('.drag-ghost__time');
+  if (!timeEl) return;
+  const t = _arrangeDragState.dropTarget;
+  if (!t) { timeEl.textContent = 'drop on a day…'; timeEl.classList.remove('invalid'); return; }
+  if (!t.valid) { timeEl.textContent = "can't drop here — busy"; timeEl.classList.add('invalid'); return; }
+  timeEl.textContent = formatTimeRangeLabel(t.startMin, t.startMin + _arrangeDragState.durMin);
+  timeEl.classList.remove('invalid');
+}
+
+function onArrangeKeyDown(e) {
+  if (e.key === 'Escape' && _arrangeDragState) {
+    e.preventDefault();
+    cancelArrangeDrag();
+  }
+}
+
+function teardownArrangeDrag() {
+  const drag = _arrangeDragState;
+  if (drag?.cardEl) drag.cardEl.classList.remove('is-dragging');
+  document.body.classList.remove('is-dragging-activity');
+  document.getElementById('arrange-drag-ghost')?.remove();
+  clearArrangeBlockedRanges();
+  if (_arrangeDragListenersBound) {
+    window.removeEventListener('pointermove', onArrangePointerMove, true);
+    window.removeEventListener('pointerup', onArrangePointerUp, true);
+    window.removeEventListener('keydown', onArrangeKeyDown, true);
+    _arrangeDragListenersBound = false;
+  }
+  _arrangeDragState = null;
+}
+
+function cancelArrangeDrag() {
+  teardownArrangeDrag();
+}
+
+function onArrangePointerUp() {
+  const drag = _arrangeDragState;
+  if (!drag) return;
+  const target = drag.dropTarget;
+  const srcDayId = drag.srcDayId;
+
+  // Outside any day -> return to staging (only if it was placed).
+  if (!target) {
+    if (srcDayId && srcDayId !== '__staging') {
+      state.placements[drag.id] = { dayId: null, time: null };
+      teardownArrangeDrag();
+      renderArrange();
+      updateCommutesForCityDays([srcDayId]).then(() => renderArrange()).catch(() => {});
+      return;
+    }
+    teardownArrangeDrag();
+    return;
+  }
+
+  if (!target.valid) {
+    teardownArrangeDrag();
+    return;
+  }
+
+  const newTime = timeFromMinutes(target.startMin);
+  const prevDayId = srcDayId === '__staging' ? null : srcDayId;
+  const prevTime = state.placements[drag.id]?.time || null;
+  state.placements[drag.id] = { ...(state.placements[drag.id] || {}), dayId: target.dayId, time: newTime };
+
+  teardownArrangeDrag();
+
+  if (prevDayId === target.dayId && prevTime === newTime) {
+    renderArrange();
+    return;
+  }
+
+  renderArrange();
+  const affectedDays = [target.dayId, prevDayId].filter((v, i, arr) => v && arr.indexOf(v) === i);
+  updateCommutesForCityDays(affectedDays).then(() => renderArrange()).catch(() => {});
 }
 
 async function fetchCommutesForActivities(activities = []) {
@@ -6463,11 +6557,7 @@ function bindPlacedCardInteractions() {
         return;
       }
 
-      // Resize gesture: mousedown in the top/bottom edge of the card. Handled here.
-      // Move gesture: mousedown in the middle. Let the event bubble to Sortable.
-      if (!inResizeEdge(e.clientY)) {
-        return;
-      }
+      if (!inResizeEdge(e.clientY)) return;
 
       e.stopPropagation();
       e.preventDefault();

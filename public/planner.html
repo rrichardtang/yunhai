@@ -211,7 +211,13 @@
         <div id="arrangeCityNav" class="arrange-city-nav"></div>
         <div id="arrangeDiagnostics" class="muted-text"></div>
         <div class="staging-section">
-          <h3 class="arrange-section-title">Staging</h3>
+          <div class="staging__head">
+            <div class="staging__head-left">
+              <h3 class="arrange-section-title">Unplaced activities</h3>
+              <span class="staging__count" id="stagingCount">0</span>
+            </div>
+            <span class="staging__hint">drag a card onto a day to schedule it</span>
+          </div>
           <div id="stagingArea" class="staging list"></div>
         </div>
         <h3 class="arrange-section-title">Days</h3>
@@ -458,7 +464,6 @@
       </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
     <script>
       window.TRAVELPLANNER_GOOGLE_MAPS_SDK_BASE_URL = 'https://maps.googleapis.com/maps/api/js?libraries=places,marker&v=beta&loading=async';

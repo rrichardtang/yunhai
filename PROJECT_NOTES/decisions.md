@@ -4,6 +4,22 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-18] Replace Sortable.js with custom pointer-driven drag for Arrange step; enforce 30-min buffer
+
+**Decision:** Remove Sortable.js for the Arrange step. Implement custom delegated `pointerdown`/`pointermove`/`pointerup` handlers on `#stagingArea` + `#dayColumns`. Snap to 15-min grid. Enforce a 30-minute buffer before and after every existing item — both in collision detection (`arrangeIsValidDrop`) and visually via `.blocked-buffer` strips around `.blocked-core` in the drag overlay.
+
+**Reasoning:** The design handoff (`design_handoff_arrange_drag/`) calls for first-class validation feedback (red drop indicator, blocked-range overlays, floating ghost with live time chip) that Sortable's `onMove`-return-false flow doesn't render cleanly. Custom pointer flow is ~250 LOC and gives precise control over snap, buffer, and rAF-throttled overlay rendering. User explicitly requested the 30-min buffer to prevent containers from sitting adjacent.
+
+**Alternatives rejected:**
+- **Keep Sortable, layer overlays on top**: handoff warns Sortable's snap + no-overlap guarantees are weaker than this; layering overlays inside its placeholder lifecycle is fiddly.
+- **Skip buffer, rely on adjacency rules in auto-arrange only**: drag wouldn't enforce it, defeating the visual feedback goal.
+
+**Tradeoffs:**
+- Lose Sortable's edge-auto-scroll while dragging in a horizontal scroller — acceptable for v1; flagged in risks.
+- Buffer makes valid slots scarcer on packed days; user accepts this as the explicit goal.
+
+---
+
 ## [2026-05-12] Distance Matrix: Haversine pre-filter + cluster-centroid pairs over Mapbox migration or Finalize-deferral
 
 **Decision:** Keep Google Distance Matrix and feed Sonnet real commute data at arrange time, but cut call volume via (1) Haversine pre-filter at 1.5 km (sub-threshold pairs skipped — prompt already ignores <15-min walking pairs), (2) greedy 2 km clustering with single inter-cluster representative pair fanned out to all member-pairs, (3) cache TTL 30d → 365d, (4) per-leg UI pills stay live during drafting now that arrange cost is bounded.

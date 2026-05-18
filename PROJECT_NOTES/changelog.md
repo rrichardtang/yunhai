@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-18] Custom pointer-driven Arrange drag with 30-min buffer + blocked-range overlay
+
+- `public/app.js`: replaced Sortable.js wiring in `renderArrange()` with delegated pointerdown on `#stagingArea` + `#dayColumns`. New helpers: `bindArrangeDrag`, `startArrangeDrag`, `onArrangePointerMove`, `onArrangePointerUp`, `cancelArrangeDrag`, `renderArrangeBlockedRanges`, `arrangeIsValidDrop`, `arrangeDragDurationMin`, `isActivityLocked`. 15-min snap, 30-min collision buffer. rAF-throttled move + ghost positioning.
+- `public/app.js`: removed orphans `nearestLegalSlot`, `paintDropOverlaysForDrag`, `clearDropOverlays`, `getDraggingActivityDuration`, `_arrangeSortables`, `_sortableDragging`, and the `.drop-zone-overlay` markup.
+- `public/planner.html`: added `.staging__head` (label + count pill `#stagingCount` + hint). Removed `sortablejs` CDN script.
+- `public/styles.css`: appended Arrange drag-overhaul CSS — staging head, day-head pill, `.blocked-layer`/`.blocked-core`/`.blocked-buffer`/`.blocked-out`, `.drop-indicator(.invalid)`, `.drag-ghost`, `.day-grid-wrap.drag-active`/`.drop-target`.
+- Day-head now shows count + total-hours pill per column.
+
+---
+
 ## [2026-05-18] Make arrival + lodging real locked anchors with full transit + procedural buffers
 
 Replaces the earlier visual-floor hack (which desynchronized y from time). The previous fix's `prevBottom` cascade meant Yoyogi Park 9–10am visually extended to ~12pm. Root cause was deeper: arrival and lodging were never modeled as locked anchors and the procedural arrival buffer (deplaning/customs/baggage) was never enforced.
