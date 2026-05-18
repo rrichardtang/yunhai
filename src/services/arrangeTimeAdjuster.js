@@ -65,15 +65,17 @@ function adjust({ placements, days, activitiesById, lockedActivities = [], commu
     byDate[p.date].push({ id, llmStart: minutesFromTime(p.time || '00:00') });
   }
 
-  for (const [date, entries] of Object.entries(byDate)) {
-    const day = (days || []).find((d) => d.date === date);
-    if (!day) {
-      for (const { id } of entries) {
-        newPlacements[id] = placements[id];
-      }
-      debugLog('arrange', `ADJUSTER_DAY_SKIP date=${date} reason=day_not_found entries=${entries.length}`);
-      continue;
+  const orphanDates = Object.keys(byDate).filter((date) => !(days || []).some((d) => d.date === date));
+  for (const date of orphanDates) {
+    for (const { id } of byDate[date]) {
+      newPlacements[id] = placements[id];
     }
+    debugLog('arrange', `ADJUSTER_DAY_SKIP date=${date} reason=day_not_found entries=${byDate[date].length}`);
+  }
+
+  for (const day of (days || [])) {
+    const date = day.date;
+    const entries = byDate[date] || [];
 
     const dayStart = effectiveDayStart(day);
     const dayEnd = effectiveDayEnd(day);

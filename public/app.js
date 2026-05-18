@@ -4923,8 +4923,8 @@ function makeCommuteIndicator(currentItem, nextItem, currentTopOverride = null) 
   return renderCommuteSelector(currentItem.id, nextItem.id, topY + h + 6);
 }
 
-function makeLogisticsCard(label, icon, time, subtitle = '', topOverride) {
-  const y = Number.isFinite(topOverride) ? topOverride : yFromTime(time);
+function makeLogisticsCard(label, icon, time, subtitle = '') {
+  const y = yFromTime(time);
   const subtitleHtml = subtitle ? `<span class="logistics-card-sub">${esc(subtitle)}</span>` : '';
   return `
     <div class="logistics-card" style="top:${y}px;" aria-label="${esc(label)}">
@@ -4951,16 +4951,18 @@ function getLogisticsForDay(city, date) {
 
   const result = { isArrival: false, isDeparture: false };
   if (dateStr === arrivalDate) {
-    const time = city.travelTiming?.arrivalAvailableTime || '09:00';
     result.isArrival = true;
-    result.arrivalTime = time;
+    result.arrivalTime = String(logistics.arrival?.time || logistics.arrival?.customTime || '09:00');
     result.arrivalLocation = String(logistics.arrival?.location || '').trim();
+    result.arrivalMode = String(logistics.arrival?.mode || 'flight');
+    result.arrivalInternational = Boolean(logistics.arrival?.international);
   }
   if (dateStr === departureDate) {
-    const time = city.travelTiming?.departureMustLeaveTime || '18:00';
     result.isDeparture = true;
-    result.departureTime = time;
+    result.departureTime = String(logistics.departure?.time || logistics.departure?.customTime || '18:00');
     result.departureLocation = String(logistics.departure?.location || '').trim();
+    result.departureMode = String(logistics.departure?.mode || 'flight');
+    result.departureInternational = Boolean(logistics.departure?.international);
   }
   return result;
 }
@@ -5045,9 +5047,8 @@ function buildLogisticsPseudoActivities(cityObj, date, cityName) {
   return { arrival, arrivalAccommodation, departure, departureAccommodation };
 }
 
-function makeLogisticsCommuteIndicator(fromId, toId, baseTime, cardHeight, baseYOverride) {
-  const baseY = Number.isFinite(baseYOverride) ? baseYOverride : yFromTime(baseTime);
-  return renderCommuteSelector(fromId, toId, baseY + cardHeight + 6);
+function makeLogisticsCommuteIndicator(fromId, toId, baseTime, cardHeight) {
+  return renderCommuteSelector(fromId, toId, yFromTime(baseTime) + cardHeight + 6);
 }
 
 function getPlacementTimeRange(activity, placementOverride = null) {
@@ -5223,32 +5224,27 @@ function renderArrange() {
     const cardH = getLogisticsCardHeight();
 
     let html = '';
-    const COMMUTE_PILL_RESERVE = 36;
-    const LOGISTICS_GAP = 8;
-    const LOGISTICS_STACK_STEP = cardH + COMMUTE_PILL_RESERVE + LOGISTICS_GAP;
-    let prevBottom = -Infinity;
 
     if (dayLogistics?.isArrival) {
       const arrivalLabel = dayLogistics.arrivalLocation || 'Arrival';
-      const yArr = yFromTime(dayLogistics.arrivalTime);
       // 1. Arrival location card
-      html += makeLogisticsCard(`Arrive: ${arrivalLabel}`, '<i class="ph-bold ph-airplane-landing" aria-hidden="true"></i>', dayLogistics.arrivalTime, '', yArr);
+      html += makeLogisticsCard(`Arrive: ${arrivalLabel}`, '<i class="ph-bold ph-airplane-landing" aria-hidden="true"></i>', dayLogistics.arrivalTime);
       // 2. Commute: arrival → accommodation
-      html += makeLogisticsCommuteIndicator(arrId, arrAccId, dayLogistics.arrivalTime, cardH, yArr);
-      // 3. Accommodation card (positioned after arrival + commute, floored to avoid overlap)
+      html += makeLogisticsCommuteIndicator(arrId, arrAccId, dayLogistics.arrivalTime, cardH);
+      // 3. Accommodation card (positioned after arrival + procedural buffer + commute)
       const arrToAccCommute = state.commutes[commutePairKey(arrId, arrAccId)] || null;
       const arrToAccMins = resolveSelectedCommuteDetails(arrToAccCommute)?.durationMinutes || 0;
-      const accArrivalMins = minutesFromTime(dayLogistics.arrivalTime) + arrToAccMins;
+      const procBuf = arrivalBufferMins(dayLogistics.arrivalMode, dayLogistics.arrivalInternational);
+      const accArrivalMins = minutesFromTime(dayLogistics.arrivalTime) + procBuf + arrToAccMins;
       const accArrivalTime = timeFromMinutes(accArrivalMins);
-      const yAcc = Math.max(yFromTime(accArrivalTime), yArr + LOGISTICS_STACK_STEP);
-      html += makeLogisticsCard(accLabel, '<i class="ph-bold ph-bed" aria-hidden="true"></i>', accArrivalTime, '', yAcc);
+      html += makeLogisticsCard(accLabel, '<i class="ph-bold ph-bed" aria-hidden="true"></i>', accArrivalTime);
       // 4. Commute: accommodation → first activity
       if (items.length > 0) {
-        html += makeLogisticsCommuteIndicator(arrAccId, items[0].id, accArrivalTime, cardH, yAcc);
+        html += makeLogisticsCommuteIndicator(arrAccId, items[0].id, accArrivalTime, cardH);
       }
-      prevBottom = yAcc + cardH;
     }
 
+    let prevBottom = -Infinity;
     items.forEach((item, index) => {
       const placement = state.placements[item.id] || {};
       const itemTime = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
@@ -5266,31 +5262,25 @@ function renderArrange() {
 
     if (dayLogistics?.isDeparture) {
       const departureLabel = dayLogistics.departureLocation || 'Departure';
-      const accToDepCommute = state.commutes[commutePairKey(depAccId, depId)] || null;
-      const accToDepMins = resolveSelectedCommuteDetails(accToDepCommute)?.durationMinutes || 0;
-      const accDepartureMins = minutesFromTime(dayLogistics.departureTime) - accToDepMins;
-      const accDepartureTime = timeFromMinutes(Math.max(0, accDepartureMins));
-
-      const yDep = yFromTime(dayLogistics.departureTime);
-      // Accommodation card must sit above the departure card with room for the pill between them.
-      // If the natural (time-based) y would collide with the departure card, push it up.
-      const yAccDepCap = yDep - cardH - COMMUTE_PILL_RESERVE - LOGISTICS_GAP;
-      const yAccDep = Math.min(yFromTime(accDepartureTime), yAccDepCap);
-
       if (items.length > 0) {
         const lastItem = items[items.length - 1];
         const lastPlacement = state.placements[lastItem.id] || {};
         const lastTime = parseTimeTo24(lastPlacement.time || actPreferredTime(lastItem) || typeToTime(lastItem.type));
         const lastEndMins = minutesFromTime(lastTime) + Math.max(30, actDurationHours(lastItem) * 60);
-        // 1. Commute: last activity → accommodation (anchored above the accommodation card)
-        html += makeLogisticsCommuteIndicator(lastItem.id, depAccId, timeFromMinutes(lastEndMins), 0, yAccDep - COMMUTE_PILL_RESERVE);
+        // 1. Commute: last activity → accommodation
+        html += makeLogisticsCommuteIndicator(lastItem.id, depAccId, timeFromMinutes(lastEndMins), 0);
       }
-      // 2. Accommodation card (positioned before departure - commute, capped to avoid overlap)
-      html += makeLogisticsCard(accLabel, '<i class="ph-bold ph-bed" aria-hidden="true"></i>', accDepartureTime, '', yAccDep);
+      // 2. Accommodation card (positioned before departure - procedural buffer - commute)
+      const accToDepCommute = state.commutes[commutePairKey(depAccId, depId)] || null;
+      const accToDepMins = resolveSelectedCommuteDetails(accToDepCommute)?.durationMinutes || 0;
+      const depProcBuf = departureBufferMins(dayLogistics.departureMode, dayLogistics.departureInternational);
+      const accDepartureMins = minutesFromTime(dayLogistics.departureTime) - depProcBuf - accToDepMins;
+      const accDepartureTime = timeFromMinutes(Math.max(0, accDepartureMins));
+      html += makeLogisticsCard(accLabel, '<i class="ph-bold ph-bed" aria-hidden="true"></i>', accDepartureTime);
       // 3. Commute: accommodation → departure
-      html += makeLogisticsCommuteIndicator(depAccId, depId, accDepartureTime, cardH, yAccDep);
+      html += makeLogisticsCommuteIndicator(depAccId, depId, accDepartureTime, cardH);
       // 4. Departure location card
-      html += makeLogisticsCard(`Depart: ${departureLabel}`, '<i class="ph-bold ph-airplane-takeoff" aria-hidden="true"></i>', dayLogistics.departureTime, '', yDep);
+      html += makeLogisticsCard(`Depart: ${departureLabel}`, '<i class="ph-bold ph-airplane-takeoff" aria-hidden="true"></i>', dayLogistics.departureTime);
     }
 
     schedule.innerHTML = html;
@@ -5888,23 +5878,17 @@ async function autoArrangeActiveCity(opts = {}) {
 
   const diagnostics = [];
 
-  let arrivalTransitMins;
   const arrCommute = resolveSelectedCommuteDetails(arrivalCommutes[0]);
-  if (arrCommute && Number.isFinite(arrCommute.durationMinutes)) {
-    arrivalTransitMins = arrCommute.durationMinutes;
-  } else {
-    arrivalTransitMins = TRANSIT_FALLBACK_MINS[cityLogistics.arrival?.mode] ?? 30;
-    diagnostics.push(`Distance Matrix unavailable for arrival — used ${arrivalTransitMins}min fallback`);
+  if (!arrCommute || !Number.isFinite(arrCommute.durationMinutes)) {
+    diagnostics.push(`Distance Matrix unavailable for arrival — using ${TRANSIT_FALLBACK_MINS[cityLogistics.arrival?.mode] ?? 30}min fallback`);
   }
+  const arrivalTransitMins = arrCommute?.durationMinutes ?? (TRANSIT_FALLBACK_MINS[cityLogistics.arrival?.mode] ?? 30);
 
-  let departureTransitMins;
   const depCommute = resolveSelectedCommuteDetails(departureCommutes[0]);
-  if (depCommute && Number.isFinite(depCommute.durationMinutes)) {
-    departureTransitMins = depCommute.durationMinutes;
-  } else {
-    departureTransitMins = TRANSIT_FALLBACK_MINS[cityLogistics.departure?.mode] ?? 30;
-    diagnostics.push(`Distance Matrix unavailable for departure — used ${departureTransitMins}min fallback`);
+  if (!depCommute || !Number.isFinite(depCommute.durationMinutes)) {
+    diagnostics.push(`Distance Matrix unavailable for departure — using ${TRANSIT_FALLBACK_MINS[cityLogistics.departure?.mode] ?? 30}min fallback`);
   }
+  const departureTransitMins = depCommute?.durationMinutes ?? (TRANSIT_FALLBACK_MINS[cityLogistics.departure?.mode] ?? 30);
 
   const dayPayload = activeDays.map((day) => {
     const startMins = getCityDayWindowStart(cityPlan, day.date);
@@ -5916,21 +5900,29 @@ async function autoArrangeActiveCity(opts = {}) {
       : isDeparture ? 'departure day'
       : 'full day';
 
-    const arrBuf = isArrival
-      ? arrivalBufferMins(cityLogistics.arrival.mode, cityLogistics.arrival.international)
-      : 0;
-    const depBuf = isDeparture
-      ? departureBufferMins(cityLogistics.departure.mode, cityLogistics.departure.international)
-      : 0;
+    // getCityDayWindow{Start,End} already returns the buffered travelTiming values for arrival/departure days,
+    // so windowStart === arrivalAvailableTime and windowEnd === departureMustLeaveTime on those days.
+    // We pass them through explicitly so the server validator's effectiveDayStart/End enforces them.
+    const arrivalAvailableTime = isArrival ? timeFromMinutes(startMins) : null;
+    const departureMustLeaveTime = isDeparture ? timeFromMinutes(endMins) : null;
 
     const fixedStart = isArrival
-      ? { label: `Arrival + ${cityLogistics.arrival.mode} buffer → accommodation`, time: timeFromMinutes(startMins + arrivalTransitMins + arrBuf) }
+      ? { label: `Arrival + ${cityLogistics.arrival.mode} buffer → accommodation`, time: arrivalAvailableTime }
       : null;
     const fixedEnd = isDeparture
-      ? { label: `Depart for ${departureLocation}`, time: timeFromMinutes(endMins - departureTransitMins - depBuf) }
+      ? { label: `Depart for ${departureLocation}`, time: departureMustLeaveTime }
       : null;
 
-    return { date: day.date, label, windowStart: timeFromMinutes(startMins), windowEnd: timeFromMinutes(endMins), fixedStart, fixedEnd };
+    return {
+      date: day.date,
+      label,
+      windowStart: timeFromMinutes(startMins),
+      windowEnd: timeFromMinutes(endMins),
+      arrivalAvailableTime,
+      departureMustLeaveTime,
+      fixedStart,
+      fixedEnd
+    };
   });
 
   const sameDayEntry = dayPayload.find(d => d.fixedStart && d.fixedEnd);
@@ -6001,6 +5993,54 @@ async function autoArrangeActiveCity(opts = {}) {
         name: entry.activity.name
       };
     });
+
+    const HOTEL_CHECKIN_MIN = 30;
+    const arrivalDate = cityPlan?.startDate;
+    const departureDate = cityPlan?.endDate;
+    const activeDateSet = new Set(activeDays.map((d) => d.date));
+
+    if (arrivalDate && activeDateSet.has(arrivalDate) && cityLogistics.arrival?.time) {
+      const arrTimeMin = minutesFromTime(cityLogistics.arrival.time);
+      const arrBuf = arrivalBufferMins(cityLogistics.arrival.mode, cityLogistics.arrival.international);
+      lockedActivities.push({
+        id: logisticsArrivalId(activeCity),
+        date: arrivalDate,
+        time: cityLogistics.arrival.time,
+        duration_minutes: arrBuf + arrivalTransitMins,
+        type: 'logistics',
+        name: `Arrive: ${cityLogistics.arrival.location || 'arrival'}`
+      });
+      lockedActivities.push({
+        id: logisticsAccommodationArrivalId(activeCity),
+        date: arrivalDate,
+        time: timeFromMinutes(arrTimeMin + arrBuf + arrivalTransitMins),
+        duration_minutes: HOTEL_CHECKIN_MIN,
+        type: 'logistics',
+        name: getAccommodationLabel(activeCity, arrivalDate) || 'Accommodation check-in'
+      });
+    }
+
+    if (departureDate && activeDateSet.has(departureDate) && cityLogistics.departure?.time) {
+      const depTimeMin = minutesFromTime(cityLogistics.departure.time);
+      const depBuf = departureBufferMins(cityLogistics.departure.mode, cityLogistics.departure.international);
+      const accDepStart = depTimeMin - departureTransitMins - depBuf - HOTEL_CHECKIN_MIN;
+      lockedActivities.push({
+        id: logisticsAccommodationDepartureId(activeCity),
+        date: departureDate,
+        time: timeFromMinutes(Math.max(0, accDepStart)),
+        duration_minutes: HOTEL_CHECKIN_MIN,
+        type: 'logistics',
+        name: getAccommodationLabel(activeCity, departureDate) || 'Accommodation checkout'
+      });
+      lockedActivities.push({
+        id: logisticsDepartureId(activeCity),
+        date: departureDate,
+        time: timeFromMinutes(Math.max(0, depTimeMin - departureTransitMins - depBuf)),
+        duration_minutes: departureTransitMins + depBuf,
+        type: 'logistics',
+        name: `Depart: ${cityLogistics.departure.location || 'departure'}`
+      });
+    }
 
     let commuteMatrix = {};
     if (flexible.length >= 2) {
