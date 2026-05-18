@@ -5431,10 +5431,13 @@ function pickupAllowed(target) {
   return true;
 }
 
+let _arrangeDragBound = false;
 function bindArrangeDrag() {
+  if (_arrangeDragBound) return;
   const stagingArea = els.stagingArea;
   const dayColumns = els.dayColumns;
   if (!stagingArea || !dayColumns) return;
+  _arrangeDragBound = true;
 
   const onPointerDown = (e) => {
     if (e.button !== 0) return;
@@ -5481,6 +5484,8 @@ function bindArrangeDrag() {
 }
 
 function startArrangeDrag(drag) {
+  if (_arrangeDragState) teardownArrangeDrag();
+  document.getElementById('arrange-drag-ghost')?.remove();
   _arrangeDragState = { ...drag, dropTarget: null, rafPending: false };
   drag.cardEl?.classList.add('is-dragging');
   document.body.classList.add('is-dragging-activity');
@@ -5507,6 +5512,7 @@ function startArrangeDrag(drag) {
   if (!_arrangeDragListenersBound) {
     window.addEventListener('pointermove', onArrangePointerMove, true);
     window.addEventListener('pointerup', onArrangePointerUp, true);
+    window.addEventListener('pointercancel', cancelArrangeDrag, true);
     window.addEventListener('keydown', onArrangeKeyDown, true);
     _arrangeDragListenersBound = true;
   }
@@ -5645,6 +5651,7 @@ function teardownArrangeDrag() {
   if (_arrangeDragListenersBound) {
     window.removeEventListener('pointermove', onArrangePointerMove, true);
     window.removeEventListener('pointerup', onArrangePointerUp, true);
+    window.removeEventListener('pointercancel', cancelArrangeDrag, true);
     window.removeEventListener('keydown', onArrangeKeyDown, true);
     _arrangeDragListenersBound = false;
   }
