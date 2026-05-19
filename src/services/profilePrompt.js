@@ -19,7 +19,6 @@ function formatProfileForEnrichment(profile = {}) {
     ['shoppingPerson', 'Shopping while traveling']
   ];
   const textQuestions = [
-    ['dayStructure', 'Day structure'],
     ['dietaryRestrictions', 'Dietary restrictions'],
     ['mobilityConsiderations', 'Mobility considerations'],
     ['budgetStyle', 'Budget style'],

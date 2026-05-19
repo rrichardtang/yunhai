@@ -71,7 +71,8 @@ const state = {
   bookingChecklistNotificationPrefs: { emailSummary: false, reminderBeforeDeparture: false },
   tripHealthIssueSignatures: [],
   bookingChecklistIssueMeta: {},
-  lastFinalizeLocks: {}
+  lastFinalizeLocks: {},
+  schedulingPrefs: null
 };
 window.state = state;
 window.addEventListener('DOMContentLoaded', () => {
@@ -82,6 +83,7 @@ window.addEventListener('DOMContentLoaded', () => {
 let budgetOptState = null;
 
 const PROFILES_KEY = 'travelplanner_profiles_v1';
+const SCHEDULING_PREFS_KEY = 'travelplanner_scheduling_prefs_v1';
 const LEGACY_PROFILE_KEY = 'travelplanner_profile_v1';
 const USER_ID_KEY = 'travelplanner_user_id';
 // PROFILE_QUESTIONS, PROFILE_MIN, PROFILE_MAX, PROFILE_DEFAULT, profileLabel,
@@ -159,6 +161,7 @@ const els = {
   profileEditBtn: document.getElementById('profileEditBtn'),
 
   autoArrangeBtn: document.getElementById('autoArrangeBtn'),
+  schedulingWizardBtn: document.getElementById('schedulingWizardBtn'),
   finalizeArrangeBtn: document.getElementById('finalizeArrangeBtn'),
   myTripsPanel: document.getElementById('myTripsPanel'),
   myTripsList: document.getElementById('myTripsList'),
@@ -851,6 +854,26 @@ function saveProfile(profile) {
   state.profilesStore = saveProfiles(nextStore);
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   return normalized;
+}
+
+function loadSchedulingPrefs() {
+  try {
+    const raw = localStorage.getItem(SCHEDULING_PREFS_KEY);
+    if (raw) return normalizeSchedulingPrefs(JSON.parse(raw));
+  } catch {}
+  return defaultSchedulingPrefs();
+}
+
+function saveSchedulingPrefs(prefs) {
+  const normalized = normalizeSchedulingPrefs(prefs);
+  try { localStorage.setItem(SCHEDULING_PREFS_KEY, JSON.stringify(normalized)); } catch {}
+  state.schedulingPrefs = normalized;
+  return normalized;
+}
+
+function clearSchedulingPrefs() {
+  try { localStorage.removeItem(SCHEDULING_PREFS_KEY); } catch {}
+  state.schedulingPrefs = defaultSchedulingPrefs();
 }
 
 const LOADING_MESSAGES = [
@@ -3146,7 +3169,6 @@ function openProfileWizard(store, { forced = false } = {}) {
     structuredTours: 'Determines how much we lean on guided experiences vs. self-led exploration.',
     shoppingPerson: 'Decides whether we carve out time for shopping districts and markets.',
     pace: 'Sets how many activities we plan per day.',
-    dayStructure: 'Helps shape morning, afternoon, and evening blocks to match your rhythm.',
     dietaryRestrictions: 'Lets us filter restaurants and meal suggestions.',
     mobilityConsiderations: 'So we keep walking, stairs, and transit within your limits.',
     budgetStyle: 'Calibrates how aggressively we suggest splurges or saves.',
@@ -6204,11 +6226,18 @@ async function autoArrangeActiveCity(opts = {}) {
   }
   const departureTransitMins = depCommute?.durationMinutes ?? (TRANSIT_FALLBACK_MINS[cityLogistics.departure?.mode] ?? 30);
 
+  const prefs = state.schedulingPrefs || defaultSchedulingPrefs();
+  const prefStartMins = minutesFromTime(prefs.dayStartTime);
+  const prefEndMins = minutesFromTime(prefs.dayEndTime);
+
   const dayPayload = activeDays.map((day) => {
-    const startMins = getCityDayWindowStart(cityPlan, day.date);
-    const endMins = getCityDayWindowEnd(cityPlan, day.date);
+    const rawStart = getCityDayWindowStart(cityPlan, day.date);
+    const rawEnd = getCityDayWindowEnd(cityPlan, day.date);
     const isArrival = day.date === cityPlan?.startDate;
     const isDeparture = day.date === cityPlan?.endDate;
+    // Clamp by user preferences only on full days — arrival/departure days keep their travel-time bounds.
+    const startMins = isArrival ? rawStart : Math.max(rawStart, prefStartMins);
+    const endMins = isDeparture ? rawEnd : Math.min(rawEnd, prefEndMins);
     const label = isArrival && isDeparture ? 'arrival + departure day'
       : isArrival ? 'arrival day'
       : isDeparture ? 'departure day'
@@ -6361,7 +6390,8 @@ async function autoArrangeActiveCity(opts = {}) {
         userId: ensureUserId(),
         profile: getProfilePayload(),
         numTravelers: state.numTravelers,
-        numChildren: state.numChildren
+        numChildren: state.numChildren,
+        schedulingPrefs: state.schedulingPrefs || defaultSchedulingPrefs()
       })
     });
 
@@ -7742,6 +7772,9 @@ async function loadItineraryById(id) {
     state.reviewed = itinerary.reviewed || {};
     state.placements = itinerary.placements || {};
     state.commutes = normalizeCommuteStateMap(itinerary.commutes || {});
+    state.schedulingPrefs = itinerary.schedulingPrefs
+      ? saveSchedulingPrefs(itinerary.schedulingPrefs)
+      : loadSchedulingPrefs();
     hydrateTravelIntoCities();
     renderCities();
     state.lastPlannedFingerprint = step1Fingerprint();
@@ -7951,7 +7984,8 @@ async function generateItinerary() {
       checklist: state.bookingChecklist,
       notificationPrefs: state.bookingChecklistNotificationPrefs,
       issueMeta: state.bookingChecklistIssueMeta
-    }
+    },
+    schedulingPrefs: state.schedulingPrefs || defaultSchedulingPrefs()
   };
   let res;
   if (state.currentItineraryId) {
@@ -8393,7 +8427,8 @@ function saveSnapshot({ silent = false } = {}) {
           checklist: state.bookingChecklist,
           notificationPrefs: state.bookingChecklistNotificationPrefs,
           issueMeta: state.bookingChecklistIssueMeta
-        }
+        },
+        schedulingPrefs: state.schedulingPrefs || defaultSchedulingPrefs()
       })
     }).catch(() => {});
   }
@@ -8422,6 +8457,7 @@ function resetToFresh() {
   state.tripHealth = null;
   state.tripHealthIssueSignatures = [];
   state.bookingChecklistIssueMeta = {};
+  clearSchedulingPrefs();
 
   els.tripName.value = '';
   if (els.reviewSearch) els.reviewSearch.value = '';
@@ -8890,7 +8926,23 @@ els.reviewVerdictFilter?.addEventListener('change', (e) => {
 els.approveVisibleBtn?.addEventListener('click', () => applyVerdictToVisibleActivities(true));
 
 document.querySelectorAll('.save-progress-btn').forEach((btn) => btn.addEventListener('click', saveSnapshot));
-els.autoArrangeBtn?.addEventListener('click', autoArrangeActiveCity);
+els.autoArrangeBtn?.addEventListener('click', () => {
+  if (!state.schedulingPrefs?._userConfirmed) {
+    openSchedulingWizard(state.schedulingPrefs, {
+      onSave: (saved) => {
+        saveSchedulingPrefs(saved);
+        autoArrangeActiveCity();
+      }
+    });
+    return;
+  }
+  autoArrangeActiveCity();
+});
+els.schedulingWizardBtn?.addEventListener('click', () => {
+  openSchedulingWizard(state.schedulingPrefs, {
+    onSave: (saved) => { saveSchedulingPrefs(saved); }
+  });
+});
 els.finalizeArrangeBtn?.addEventListener('click', openFinalizeModal);
 els.downloadCalendarBtn?.addEventListener('click', () => {
   if (!state.currentItineraryId) return;
@@ -9226,6 +9278,7 @@ history.replaceState({ spa: true, step: 1 }, '');
 
   state.profilesStore = loadProfiles();
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
+  state.schedulingPrefs = loadSchedulingPrefs();
   mountPlanningOverlay();
   mountActivityMapOverlay();
   mountToastHost();

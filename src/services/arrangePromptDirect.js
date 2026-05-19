@@ -112,6 +112,26 @@ function buildCommuteBlock(commuteMatrix, flexible, locked) {
   return `\n\nCOMMUTE TIMES (real Google Maps durations between activity venues; minutes via fastest mode). Use these as ground truth — when scheduling two of these venues on the same day, the gap between their start times must accommodate the previous activity's duration PLUS this commute. Pairs not listed are walking distance (under 15 min) and need no special planning:\n${lines.join('\n')}`;
 }
 
+function buildSchedulingPrefsBlock(prefs) {
+  if (!prefs || typeof prefs !== 'object') return '';
+  const breaksLabels = ['back-to-back', 'short breaks', 'moderate breaks', 'generous breaks', 'lots of downtime'];
+  const breaks = Math.max(1, Math.min(5, Math.round(Number(prefs.breaksBetween) || 3)));
+  const lines = [];
+  if (prefs.dayStartTime && prefs.dayEndTime) {
+    lines.push(`- Preferred day window: ${prefs.dayStartTime}–${prefs.dayEndTime} (already reflected in DAYS windows above; do not push to edges without reason)`);
+  }
+  if (prefs.tourTiming) {
+    lines.push(`- Tour timing preference: ${prefs.tourTiming}${prefs.tourTiming === 'morning' ? ' (schedule tour-type activities before noon when possible)' : prefs.tourTiming === 'afternoon' ? ' (schedule tour-type activities after noon when possible)' : ''}`);
+  }
+  if (prefs.lunchTime) lines.push(`- Preferred lunch start: around ${prefs.lunchTime} (±90 min within the 11:00–14:30 lunch window)`);
+  if (prefs.dinnerTime) lines.push(`- Preferred dinner start: around ${prefs.dinnerTime} (±90 min within the 17:00–22:00 dinner window)`);
+  lines.push(`- Pacing between activities: ${breaksLabels[breaks - 1]}`);
+  const notes = String(prefs.notes || '').trim();
+  if (notes) lines.push(`- Additional notes from traveler: "${notes}"`);
+  if (!lines.length) return '';
+  return `\n\nSCHEDULING PREFERENCES (traveler-stated, treat as strong soft constraints — choose between valid placements to honor these):\n${lines.join('\n')}`;
+}
+
 function buildDirectArrangePrompt({
   days,
   flexible,
@@ -121,7 +141,8 @@ function buildDirectArrangePrompt({
   numTravelers,
   numChildren,
   cityName = '',
-  commuteMatrix = null
+  commuteMatrix = null,
+  schedulingPrefs = null
 }) {
   const locksByDate = {};
   for (const l of locked) {
@@ -139,6 +160,7 @@ function buildDirectArrangePrompt({
 
   const travelerBlock = `${numTravelers || 1} adult(s)${numChildren ? `, ${numChildren} child(ren)` : ''}`;
   const profileBlock = prefSummary ? `\nTRAVELER PROFILE:\n${prefSummary}\n` : '';
+  const schedPrefsBlock = buildSchedulingPrefsBlock(schedulingPrefs);
 
   return `You are scheduling a trip${cityName ? ` in ${cityName}` : ''}. Build a day-by-day schedule with concrete start times.
 
@@ -180,7 +202,7 @@ ACTIVITIES TO SCHEDULE:
 ${activitiesText}${commuteText}${clusterText}
 
 TRAVELERS: ${travelerBlock}
-PACE: ${paceDesc}${profileBlock}
+PACE: ${paceDesc}${profileBlock}${schedPrefsBlock}
 
 OUTPUT — strict JSON only:
 {

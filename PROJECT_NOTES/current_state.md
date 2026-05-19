@@ -1,23 +1,23 @@
 # Current State
 
-_Last updated: 2026-05-18_
+_Last updated: 2026-05-19_
 
 ## Objective
-None active. Last completed work: Google Calendar sync UX fix (deployed to staging, verified working end-to-end).
+Add a per-trip "Schedule Preferences" wizard that feeds the Arrange step with explicit, structured scheduling inputs (day start/end, lunch/dinner times, tour timing, pacing) so the LLM-generated draft actually honors the traveler's day-shape preferences.
 
 ## Active Workstream
-Idle. Branch `feature/google-calendar-sync-fix` is pushed and deployed on staging via Docker Compose.
+Branch `feature/scheduling-wizard-arrange` — implementation complete locally, tests pass (99/99). Awaiting push + staging verification.
 
 ## Constraints
-- Staging OAuth consent screen is in "Testing" mode — only listed test users can authorize Google Calendar. Test user grants expire every 7 days.
-- Google Calendar API quotas apply.
+- Per-trip scope: prefs stored on itinerary + localStorage; not per-profile (a beach trip ≠ a museum trip).
+- Window clamps must apply ONLY to the arrange POST payload, not to the global timeline UI — manual drag/drop still works across the full day range.
+- Arrival/departure days keep their travel-time bounds (clamp does not narrow them further).
 
 ## Risks
-- Google OAuth client secret was briefly exposed in chat (file name pasted, file contains the secret). **Should be rotated** in Google Cloud Console → Credentials → Reset secret, then updated in VPS `.env` and container restarted.
-- `client_secret_*.json` is in repo root and not in `.gitignore` — should be added before next commit.
+- (Carried over) Google OAuth client secret was briefly exposed; should be rotated.
+- (Carried over) `client_secret_*.json` should be added to `.gitignore`.
 
 ## Next Actions
-- Rotate Google OAuth client secret and update staging `.env`.
-- Add `client_secret_*.json` to `.gitignore`.
-- Merge `feature/google-calendar-sync-fix` into `main` when ready.
-- For production launch: submit OAuth consent screen for Google verification to remove the "Access blocked: unverified app" wall.
+- Push `feature/scheduling-wizard-arrange` and verify on staging.
+- Open the wizard from Draft on a fresh trip; confirm window clamps and prompt block reach the LLM.
+- Rotate Google OAuth secret + .gitignore the client_secret file (deferred from prior session).

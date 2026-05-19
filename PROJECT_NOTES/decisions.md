@@ -4,6 +4,23 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-19] Per-trip scheduling prefs feed Arrange via dual channel: hard window clamp + soft prompt block
+
+**Decision:** A new Scheduling Preferences wizard captures structured scheduling inputs per-trip. The prefs reach the Arrange LLM via two mechanisms simultaneously: (1) **hard window clamps** narrow `day.windowStart/End` in the `/api/arrange` payload (the LLM cannot place outside them), and (2) a **soft `SCHEDULING PREFERENCES` prompt block** lists tour timing, lunch/dinner targets, pacing, and free-text notes as strong soft constraints. The free-text `dayStructure` question on the profile wizard is removed (superseded).
+
+**Reasoning:** The previous design relied on a Haiku-generated profile summary mentioning vague day-structure prose. The Sonnet arrange model routinely ignored it. Hard payload-level clamps make the window physically un-violable; the soft prompt block handles nuances (tour timing, pacing) that aren't expressible as a single window. Splitting "personality" (pace, food prefs — profile-level) from "this trip's day shape" (start/end times — trip-level) maps to how travelers actually think.
+
+**Alternatives rejected:**
+- **Soft prompt only:** weak — exactly the failure mode being fixed.
+- **Hard window clamp only:** loses ability to express tour-timing and pacing preferences.
+- **Per-profile (not per-trip) scope:** a beach trip and a museum trip have different ideal day shapes; per-profile would force re-entry or compromise.
+- **Modify global `getCityDayWindowStart/End`:** would also clamp the timeline UI and break manual drag-and-drop outside preferred hours. Inline-clamp at the arrange POST site only.
+- **Persist as part of itinerary save only:** Draft happens repeatedly before Finalize, when there may be no itinerary id yet — added localStorage layer with itinerary as authoritative on load.
+
+**Tradeoffs:** Two persistence stores (localStorage + itinerary) need to stay in sync — on load, itinerary wins. Locked manual placements may sit outside the clamped window; the existing locked-activity handling already treats them as fixed anchors that the LLM works around, so no conflict.
+
+---
+
 ## [2026-05-18] Google Calendar OAuth stays separate from Clerk auth
 
 **Decision:** Keep the dedicated `/api/calendar/google/auth-url` flow as the only path to grant Google Calendar access. Do not attempt to reuse the Google OAuth token Clerk obtains during Google sign-in.
