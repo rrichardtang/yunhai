@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-18] Fix Google Calendar sync UX — Finalize button no longer dead
+
+- `public/app.js`: `updateCalendarControls()` no longer gates `syncGoogleCalendarBtn.disabled` on `googleCalendarConnected` — only on `hasItinerary`. The previous gating made the Finalize Sync tile permanently dead because the only path to connect (`connectGoogleCalendarBtn`) is hidden in markup.
+- `public/app.js`: `connectGoogleCalendar()` now opens OAuth in a sized popup, polls `/api/calendar/google/status` every 2s (2-min deadline), and auto-invokes `syncGoogleCalendar()` on success. Handles popup-closed and timeout cases.
+- `public/app.js`: `syncGoogleCalendarBtnItin` handler now mirrors Finalize — calls `connectGoogleCalendar()` first if not connected, instead of throwing a 401.
+- VPS: added `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI=https://staging.travelplanner.srv1553531.hstgr.cloud/api/calendar/google/oauth/callback` to staging `.env`. Created OAuth client in Google Cloud (Web application type) with that exact redirect URI; enabled Google Calendar API; added test user to OAuth consent screen (Testing mode).
+- Verified end-to-end on staging: popup opens, consent granted, events created in Google Calendar.
+
+---
+
 ## [2026-05-18] Custom pointer-driven Arrange drag with 30-min buffer + blocked-range overlay
 
 - `public/app.js`: replaced Sortable.js wiring in `renderArrange()` with delegated pointerdown on `#stagingArea` + `#dayColumns`. New helpers: `bindArrangeDrag`, `startArrangeDrag`, `onArrangePointerMove`, `onArrangePointerUp`, `cancelArrangeDrag`, `renderArrangeBlockedRanges`, `arrangeIsValidDrop`, `arrangeDragDurationMin`, `isActivityLocked`. 15-min snap, 30-min collision buffer. rAF-throttled move + ghost positioning.

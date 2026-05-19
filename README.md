@@ -32,7 +32,7 @@ If keys are missing, app still loads and shows clear warnings in UI.
 
 Minimal two-environment layout:
 
-- **Production URL:** `travelplanner.srv1553531.hstgr.cloud`
+- **Production URL:** `https://yunhai.io`
 - **Shared staging URL:** `staging.travelplanner.srv1553531.hstgr.cloud`
 
 Compose files:
