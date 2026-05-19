@@ -8,7 +8,6 @@
     { key: 'structuredTours', label: 'Do you like guided tours?', summary: 'Structured tours' },
     { key: 'shoppingPerson', label: 'Do you enjoy shopping while traveling?', summary: 'Shopping' },
     { key: 'pace', label: 'How packed do you like your days?', summary: 'Trip pace' },
-    { key: 'dayStructure', label: 'How do you like your days structured?', summary: 'Day structure', type: 'text', placeholder: 'e.g. I like to start early and wrap up by 9pm' },
     { key: 'dietaryRestrictions', label: 'Do you have any dietary restrictions or food preferences?', summary: 'Dietary restrictions', type: 'text', placeholder: 'e.g. I\'m vegetarian and avoid shellfish' },
     { key: 'mobilityConsiderations', label: 'Any mobility or physical considerations we should know about?', summary: 'Mobility', type: 'text', placeholder: 'e.g. I avoid lots of walking or stairs' },
     { key: 'budgetStyle', label: 'How would you describe your spending style while traveling?', summary: 'Budget style', type: 'text', placeholder: 'e.g. I prefer mid-range, splurge on food but save on activities' },

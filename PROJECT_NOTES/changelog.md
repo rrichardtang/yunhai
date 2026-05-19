@@ -4,6 +4,20 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-19] Add per-trip Scheduling Preferences wizard for Arrange step
+
+- New module `public/js/schedulingWizard.js`: single-page modal with day start/end times, tour timing radio (morning/afternoon/flexible), lunch/dinner times, breaks-between slider, and notes textarea. Exposes `defaultSchedulingPrefs`, `normalizeSchedulingPrefs`, `openSchedulingWizard`.
+- `public/planner.html`: added Schedule button before Draft in `.arrange-actions`, scheduling wizard overlay, and `<script>` include.
+- `public/styles.css`: minimal `.sched-*` styling for the new modal fields.
+- `public/app.js`: `state.schedulingPrefs` field; `loadSchedulingPrefs`/`saveSchedulingPrefs`/`clearSchedulingPrefs` (localStorage `travelplanner_scheduling_prefs_v1`); hydrate from `itinerary.schedulingPrefs` on load; include in itinerary save payload and incremental save-progress PUT; clear on `resetToFresh`. Draft button auto-opens wizard on first use (gated on `_userConfirmed`).
+- `public/app.js`: arrange POST payload clamps `day.windowStart/End` by user prefs **only on non-arrival/non-departure days** (arrival/departure travel-time bounds win); `schedulingPrefs` added to `/api/arrange` request body. Global `getCityDayWindowStart/End` helpers untouched so timeline UI still spans the full day for manual edits.
+- `src/routes/activities.js`: `/api/arrange` accepts `schedulingPrefs` and forwards to prompt builder.
+- `src/services/arrangePromptDirect.js`: `buildSchedulingPrefsBlock` injects a `SCHEDULING PREFERENCES` block (strong soft constraints) after the PACE line.
+- Removed free-text `dayStructure` profile question (superseded by structured wizard): deleted from `public/js/profileWizard.js` `PROFILE_QUESTIONS`, `public/app.js` `WHY_WE_ASK` tooltip, and `src/services/profilePrompt.js` text-question list. No migration of legacy answers.
+- Tests: 99/99 pass.
+
+---
+
 ## [2026-05-18] Fix Google Calendar sync UX — Finalize button no longer dead
 
 - `public/app.js`: `updateCalendarControls()` no longer gates `syncGoogleCalendarBtn.disabled` on `googleCalendarConnected` — only on `hasItinerary`. The previous gating made the Finalize Sync tile permanently dead because the only path to connect (`connectGoogleCalendarBtn`) is hidden in markup.

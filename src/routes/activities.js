@@ -357,7 +357,7 @@ Return ONLY valid JSON (no markdown fences):
       return res.status(503).json({ error: 'Anthropic API key not configured' });
     }
 
-    const { days, activities, lockedActivities, commuteMatrix, profile, numTravelers, numChildren } = req.body || {};
+    const { days, activities, lockedActivities, commuteMatrix, profile, numTravelers, numChildren, schedulingPrefs } = req.body || {};
     debugLog('arrange', `INBOUND activities=${Array.isArray(activities) ? activities.length : 'N/A'} locked=${Array.isArray(lockedActivities) ? lockedActivities.length : 0} days=${Array.isArray(days) ? days.length : 'N/A'} city="${Array.isArray(days) ? (days[0]?.city || '') : ''}"`);
     if (!Array.isArray(days) || !Array.isArray(activities)) {
       return res.status(400).json({ error: 'days and activities are required arrays' });
@@ -487,7 +487,8 @@ Return ONLY valid JSON (no markdown fences):
         numTravelers,
         numChildren,
         cityName,
-        commuteMatrix: matrix
+        commuteMatrix: matrix,
+        schedulingPrefs
       });
       const hasClusterBlock = prompt.includes('WALKING NEIGHBORS');
       const hasCommuteBlock = prompt.includes('COMMUTE TIMES');

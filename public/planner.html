@@ -204,6 +204,7 @@
             <p class="panel__sub">Drag activities across days and times. The timeline shows real hours — conflicts become visible.</p>
           </div>
           <div class="arrange-actions">
+            <button id="schedulingWizardBtn" class="secondary auto-arrange-btn" type="button" title="Schedule preferences for this trip"><i class="ph-bold ph-calendar-dots"></i> Schedule</button>
             <button id="autoArrangeBtn" class="secondary auto-arrange-btn" type="button"><i class="ph-bold ph-magic-wand"></i> Draft</button>
             <button id="finalizeArrangeBtn" class="primary auto-arrange-btn" type="button" disabled><i class="ph-bold ph-lock"></i> Finalize</button>
           </div>
@@ -428,6 +429,22 @@
 
     <div id="budgetOptOverlay" class="budget-opt-overlay hidden" role="dialog" aria-modal="true" aria-label="Budget Optimization"></div>
 
+    <div id="schedulingWizardOverlay" class="profile-wizard-overlay hidden" role="dialog" aria-modal="true" aria-label="Schedule Preferences">
+      <div class="profile-wizard-shell scheduling-wizard-shell">
+        <div class="profile-wizard-header">
+          <span class="wizard-step-counter"><strong>SCHEDULE</strong> / PREFERENCES</span>
+          <button id="schedulingWizardCancel" class="wizard-cancel-btn" type="button" aria-label="Cancel"><i class="ph-bold ph-x"></i></button>
+        </div>
+        <div class="profile-wizard-card">
+          <div id="schedulingWizardBody"></div>
+        </div>
+        <div class="profile-wizard-nav">
+          <span class="wizard-hint">Applies to this trip only</span>
+          <button id="schedulingWizardSave" type="button">Save <i class="ph-bold ph-check"></i></button>
+        </div>
+      </div>
+    </div>
+
     <div id="profileWizardOverlay" class="profile-wizard-overlay hidden" role="dialog" aria-modal="true" aria-label="Create Profile">
       <div class="profile-wizard-shell">
         <div class="profile-wizard-header">
@@ -480,6 +497,7 @@
     <script src="/js/bookingChecklist.js"></script>
     <script src="/js/cityPlanner.js"></script>
     <script src="/js/profileWizard.js"></script>
+    <script src="/js/schedulingWizard.js"></script>
     <script src="/js/arrangeView.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
