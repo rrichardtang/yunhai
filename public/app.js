@@ -8663,7 +8663,7 @@ function renderAuthUi() {
 function updateCalendarControls() {
   const hasItinerary = Boolean(state.currentItineraryId);
   if (els.downloadCalendarBtn) els.downloadCalendarBtn.disabled = !hasItinerary;
-  if (els.syncGoogleCalendarBtn) els.syncGoogleCalendarBtn.disabled = !(hasItinerary && state.googleCalendarConnected);
+  if (els.syncGoogleCalendarBtn) els.syncGoogleCalendarBtn.disabled = !hasItinerary;
   if (els.connectGoogleCalendarBtn) {
     els.connectGoogleCalendarBtn.innerHTML = state.googleCalendarConnected
       ? '<i class="ph-bold ph-check-circle" aria-hidden="true"></i> Google Connected'
@@ -8681,8 +8681,36 @@ async function connectGoogleCalendar() {
     const res = await apiFetch('/api/calendar/google/auth-url');
     const data = await res.json();
     if (!res.ok || !data?.authUrl) throw new Error(data.error || 'Failed to start Google OAuth');
-    window.open(data.authUrl, '_blank', 'noopener,noreferrer');
-    setCalendarStatus('Google OAuth opened. After connecting, return and click Sync Google.');
+
+    const popup = window.open(data.authUrl, 'googleCalendarOAuth', 'width=520,height=640,noopener=no');
+    setCalendarStatus('Waiting for Google authorization…');
+
+    const deadline = Date.now() + (2 * 60 * 1000);
+    const poll = async () => {
+      let connected = false;
+      try {
+        const statusRes = await apiFetch('/api/calendar/google/status');
+        if (statusRes.ok) connected = Boolean((await statusRes.json())?.connected);
+      } catch {}
+
+      if (connected) {
+        state.googleCalendarConnected = true;
+        updateCalendarControls();
+        try { popup?.close(); } catch {}
+        await syncGoogleCalendar();
+        return;
+      }
+      if (Date.now() > deadline) {
+        setCalendarStatus('Google connection timed out. Please try again.');
+        return;
+      }
+      if (popup && popup.closed) {
+        setCalendarStatus('Google connection cancelled.');
+        return;
+      }
+      setTimeout(poll, 2000);
+    };
+    setTimeout(poll, 2000);
   } catch (error) {
     setCalendarStatus(error?.message || 'Failed to connect Google Calendar');
   }
@@ -8938,7 +8966,11 @@ els.itineraryModeList?.addEventListener('click', (e) => {
 
 // Itinerary send-tile buttons (mirror Finalize handlers)
 document.getElementById('syncGoogleCalendarBtnItin')?.addEventListener('click', () => {
-  if (typeof syncGoogleCalendar === 'function') syncGoogleCalendar();
+  if (!state.googleCalendarConnected) {
+    connectGoogleCalendar();
+    return;
+  }
+  syncGoogleCalendar();
 });
 document.getElementById('shareTripLinkBtnItin')?.addEventListener('click', () => {
   document.getElementById('shareTripLinkBtn')?.click();
