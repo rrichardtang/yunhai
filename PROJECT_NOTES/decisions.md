@@ -4,6 +4,19 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-18] Google Calendar OAuth stays separate from Clerk auth
+
+**Decision:** Keep the dedicated `/api/calendar/google/auth-url` flow as the only path to grant Google Calendar access. Do not attempt to reuse the Google OAuth token Clerk obtains during Google sign-in.
+
+**Reasoning:** Clerk's default Google OAuth scopes are `email profile openid` — it never receives `calendar.events` consent, so the underlying token is useless for Calendar API calls. Even with custom Clerk OAuth scope config, retrieving the raw provider token requires the `getUserOauthAccessToken` admin API and dashboard rework. The existing dedicated flow already handles consent, token storage (`/data/google-calendar-tokens.json`), refresh, and fingerprint-deduplicated sync.
+
+**Alternatives rejected:**
+- **Pre-grant Calendar scope via Clerk Google sign-in**: would force every signup through Google OAuth and add scope-management complexity; users signing up via email/password still need a separate consent step anyway.
+
+**Tradeoffs:** Users see two consent screens over their lifetime (Clerk sign-in, then Google Calendar connect). Acceptable — the second one only fires when they click Sync.
+
+---
+
 ## [2026-05-18] Replace Sortable.js with custom pointer-driven drag for Arrange step; enforce 30-min buffer
 
 **Decision:** Remove Sortable.js for the Arrange step. Implement custom delegated `pointerdown`/`pointermove`/`pointerup` handlers on `#stagingArea` + `#dayColumns`. Snap to 15-min grid. Enforce a 30-minute buffer before and after every existing item — both in collision detection (`arrangeIsValidDrop`) and visually via `.blocked-buffer` strips around `.blocked-core` in the drag overlay.
