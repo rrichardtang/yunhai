@@ -136,6 +136,7 @@ function tryParseJsonObject(raw = '') {
 
 function register(app) {
   app.get('/api/places/resolve', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
     const q = String(req.query.q || '').trim();
     const city = String(req.query.city || '').trim();
     if (!q) return res.status(400).json({ error: 'Missing q parameter' });
