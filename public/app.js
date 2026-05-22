@@ -542,44 +542,47 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
   };
   dbg(`attach: field=${element.dataset.field || element.dataset.accommodationField || element.dataset.logistics || '?'} hasShadow=${!!placeAutocomplete.shadowRoot}`);
 
-  const boundShadowInputs = new WeakSet();
-  const onShadowInput = (event) => {
+  const boundInternalInputs = new WeakSet();
+  const onInternalInput = (event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement)) return;
-    dbg(`shadowInput: "${target.value}"`);
+    dbg(`internalInput fired: "${target.value}"`);
     element.value = target.value;
     element.dispatchEvent(new Event('input', { bubbles: true }));
     if (typeof onInput === 'function') onInput();
   };
-  const bindShadowInputListener = () => {
-    const sr = placeAutocomplete.shadowRoot;
-    if (!sr) return;
-    const inputs = sr.querySelectorAll('input');
+  const findInternalInputs = () => {
+    const fromShadow = placeAutocomplete.shadowRoot ? Array.from(placeAutocomplete.shadowRoot.querySelectorAll('input')) : [];
+    const fromLight = Array.from(placeAutocomplete.querySelectorAll('input'));
+    return [...fromShadow, ...fromLight];
+  };
+  const bindInternalInputs = () => {
+    const inputs = findInternalInputs();
     if (inputs.length === 0) return;
     inputs.forEach((inner) => {
-      if (boundShadowInputs.has(inner)) return;
-      boundShadowInputs.add(inner);
-      inner.addEventListener('input', onShadowInput);
-      dbg(`bound shadow input (count=${inputs.length})`);
+      if (boundInternalInputs.has(inner)) return;
+      boundInternalInputs.add(inner);
+      inner.addEventListener('input', onInternalInput);
+      dbg(`bound internal input (total=${inputs.length}, where=${inner.getRootNode() === placeAutocomplete.shadowRoot ? 'shadow' : 'light'})`);
     });
   };
 
-  const runShadowSetup = () => { styleShadowInput(); bindShadowInputListener(); };
+  const runShadowSetup = () => { styleShadowInput(); bindInternalInputs(); };
   runShadowSetup();
   requestAnimationFrame(runShadowSetup);
   setTimeout(runShadowSetup, 200);
   setTimeout(runShadowSetup, 500);
+  setTimeout(() => { dbg(`late check: hasShadow=${!!placeAutocomplete.shadowRoot} lightInputs=${placeAutocomplete.querySelectorAll('input').length} children=${placeAutocomplete.children.length} html=${placeAutocomplete.outerHTML.slice(0,200)}`); bindInternalInputs(); }, 1500);
 
+  new MutationObserver(() => { bindInternalInputs(); }).observe(placeAutocomplete, {
+    childList: true,
+    subtree: true
+  });
   if (placeAutocomplete.shadowRoot) {
-    new MutationObserver(() => {
-      dbg('shadow mutation');
-      bindShadowInputListener();
-    }).observe(placeAutocomplete.shadowRoot, {
+    new MutationObserver(() => { bindInternalInputs(); }).observe(placeAutocomplete.shadowRoot, {
       childList: true,
       subtree: true
     });
-  } else {
-    dbg('no shadowRoot at attach time');
   }
 
 
