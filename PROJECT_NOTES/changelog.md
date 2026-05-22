@@ -4,6 +4,14 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-21] Fix Setup city input — freely-typed names now persist
+
+- `public/app.js` `attachPlaceAutocompleteElement` (~L534): bind an `input` listener directly to the shadow-DOM input inside Google's `PlaceAutocompleteElement`. Mirrors typed text into the hidden fallback input and dispatches `input` so the row-level `data-field` handler runs. Google's web component does not bubble shadow input events to its host, so typed text was previously lost unless a suggestion was selected.
+- `public/app.js` row-level `data-field="name"` handler (~L2702): re-render the city row via `renderCities()` (and restore focus) when `city.name` flips between empty and non-empty. The expand caret's `disabled` attribute is baked into the row HTML via `cityIsReadyForDetails`, so a re-render is needed to unlock it.
+- `public/app.js` city-name `onResolved` (~L2787): also re-render on the empty→filled transition when a Google suggestion is picked.
+- `public/app.js` accommodation autocomplete `onInput` (~L2823): persist the freely-typed address (same root cause; no row-level handler for `data-accommodation-field`).
+- Branch `feature/setup-city-input-fix`, pushed. 99/99 tests still passing.
+
 ## [2026-05-21] Redesign concierge chat widget per design_handoff_concierge spec
 
 - `public/planner.html`: rebuilt `#chatWidget` markup — FAB with halo ripple + glint pulse, expanded panel with avatar (gradient + pulsing ring), Concierge/me identity, ONLINE status row, rotating close button, input pill, send circle, AI legal microtext.
