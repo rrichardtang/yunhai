@@ -536,24 +536,6 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
   setTimeout(styleShadowInput, 200);
   setTimeout(styleShadowInput, 500);
 
-  const dbg = (msg) => {
-    try {
-      fetch('/debug/client', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope: 'place-ac', message: `[${element.dataset.field || '?'}] ${msg}` })
-      });
-    } catch {}
-  };
-
-  ['input', 'change', 'keydown', 'keyup', 'beforeinput', 'focus', 'blur', 'gmp-select', 'gmp-placeselect', 'gmp-error'].forEach((evt) => {
-    placeAutocomplete.addEventListener(evt, (e) => {
-      const v = typeof placeAutocomplete.value === 'string' ? placeAutocomplete.value : '?';
-      dbg(`evt=${evt} target=${e.target?.tagName || '?'} composed=${e.composed} widget.value="${v}"`);
-    }, true);
-  });
-
-
   const getWidgetValue = () => {
     if (typeof placeAutocomplete.value === 'string') return placeAutocomplete.value;
     const internalInput = placeAutocomplete.shadowRoot?.querySelector('input');
@@ -2786,30 +2768,20 @@ function renderCities() {
     });
 
     const cityNameInput = row.querySelector('[data-field="name"]');
-    if (cityNameInput && isGooglePlacesReady()) {
-      attachPlaceAutocompleteElement(cityNameInput, {
-        onResolved: ({ formattedAddress, placeId, lat, lng }) => {
-          const wasEmpty = !String(city.name || '').trim();
-          city.name = formattedAddress;
-          city.placeId = placeId;
-          city.latitude = lat;
-          city.longitude = lng;
-          cityNameInput.value = formattedAddress;
-          clearLocationValidationError();
-          if (wasEmpty) renderCities();
-          else renderSetupInsights();
-        },
-        onInput: () => {
-          city.placeId = '';
-          city.latitude = null;
-          city.longitude = null;
-        },
-        onInvalid: () => {
-          city.placeId = '';
-          city.latitude = null;
-          city.longitude = null;
-          showLocationValidationError('City location is invalid. Please choose a Google Places suggestion.');
-        }
+    if (cityNameInput) {
+      cityNameInput.addEventListener('blur', async () => {
+        const query = cityNameInput.value.trim();
+        if (!query) return;
+        try {
+          const res = await fetch(`/api/places/resolve?q=${encodeURIComponent(query)}&city=${encodeURIComponent(query)}`);
+          if (!res.ok) return;
+          const place = await res.json();
+          if (place?.placeId && Number.isFinite(place?.lat) && Number.isFinite(place?.lng)) {
+            city.placeId = place.placeId;
+            city.latitude = place.lat;
+            city.longitude = place.lng;
+          }
+        } catch {}
       });
     }
     bindTextareaExpandButtons(row);
