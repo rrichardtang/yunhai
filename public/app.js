@@ -8016,22 +8016,22 @@ const STEP_LABELS = { 1: 'setup', 2: 'reviewing activities', 3: 'arranging sched
 
 const STEP_SUGGESTED_QUESTIONS = {
   'setup': [
-    { icon: 'ph-map-pin', text: "How do I add a city to my trip?" },
+    { icon: 'ph-sparkle', text: "What should I prioritize on this trip?" },
     { icon: 'ph-clock', text: "What does the 'leave time' field do?" },
     { icon: 'ph-house', text: "Where do I put my hotel address?" }
   ],
   'reviewing activities': [
-    { icon: 'ph-sparkle', text: "How do I get more activity suggestions?" },
+    { icon: 'ph-fork-knife', text: "What's a must-try local dish here?" },
     { icon: 'ph-currency-dollar', text: "What is Budget Optimization?" },
     { icon: 'ph-question', text: "Why was this activity recommended for me?" }
   ],
   'arranging schedule': [
-    { icon: 'ph-lock', text: "How do I lock an activity to a specific time?" },
+    { icon: 'ph-sun', text: "What's the best time of day for outdoor activities here?" },
     { icon: 'ph-arrows-out-cardinal', text: "Can I drag activities to reorder them?" },
     { icon: 'ph-magic-wand', text: "What does the Draft button do?" }
   ],
   'itinerary finalized': [
-    { icon: 'ph-calendar-blank', text: "How do I export to Google Calendar?" },
+    { icon: 'ph-cloud-rain', text: "What can I swap if it rains on one of my days?" },
     { icon: 'ph-airplane-takeoff', text: "Where do I add my flight bookings?" },
     { icon: 'ph-heartbeat', text: "What does 'Needs booking' mean in Trip Health?" }
   ]
@@ -8120,10 +8120,10 @@ function renderChatMessages() {
 function renderChatSuggestions() {
   const container = els.chatSuggestions;
   if (!container) return;
-  const hasUserMessage = state.chatHistory.some((m) => m.role === 'user');
   const label = STEP_LABELS[state.step];
   const questions = STEP_SUGGESTED_QUESTIONS[label];
-  if (hasUserMessage || !questions) {
+  const suppressed = state.chatSuggestionsSuppressedForStep === state.step;
+  if (suppressed || !questions) {
     container.classList.add('hidden');
     container.innerHTML = '';
     return;
@@ -8180,6 +8180,7 @@ async function sendChatMessage() {
   if (!message || state.chatLoading) return;
 
   state.chatHistory.push({ role: 'user', content: message });
+  state.chatSuggestionsSuppressedForStep = state.step;
   els.chatInput.value = '';
   state.chatLoading = true;
   renderChatMessages();
@@ -8226,6 +8227,7 @@ async function resetChatSession() {
   state.currentItineraryId = null;
   state.chatHistory = [];
   state.chatLoading = false;
+  state.chatSuggestionsSuppressedForStep = null;
   renderChatMessages();
 }
 
