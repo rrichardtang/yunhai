@@ -8941,6 +8941,35 @@ async function initClerkAuth() {
   }
 }
 
+function initEmbedMode() {
+  document.body.classList.add('is-embed');
+  state.authReady = true;
+  state.maxStep = 4;
+  state.authUserId = 'demo-embed';
+  state.authUserEmail = 'demo@yunhai.app';
+  state.profilesStore = loadProfiles();
+  state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
+  state.schedulingPrefs = loadSchedulingPrefs();
+  mountToastHost();
+
+  state.tripName = 'Andalucía Spring';
+  els.tripName.value = state.tripName;
+  addCityRow({
+    id: uid(),
+    name: 'Córdoba, Spain',
+    startDate: '2026-04-24',
+    endDate: '2026-04-26',
+    leaveTime: '18:00',
+    notes: '',
+    detailsExpanded: false
+  });
+
+  window.setStep = setStep;
+  window.addCityRow = addCityRow;
+  window.renderCities = renderCities;
+  window.uid = uid;
+}
+
 function clearPlannedResultsKeepSetup() {
   state.activities = [];
   state.reviewed = {};
@@ -9354,6 +9383,11 @@ els.steps.forEach((el, i) => {
 history.replaceState({ spa: true, step: 1 }, '');
 
 (async function init() {
+  if (new URLSearchParams(location.search).has('embed')) {
+    initEmbedMode();
+    return;
+  }
+
   try {
     await initClerkAuth();
   } catch (error) {

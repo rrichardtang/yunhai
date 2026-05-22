@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-22] YunHai landing page + live-product demo reel
+
+- `public/index.html`: rewrote as the new YunHai marketing landing (nav, hero with animated stage, marquee, demo reel section, pricing with Free + Pro $14.99/mo cards, trust band, FAQ, footer). Replaces the previous Tailwind-CDN landing.
+- `public/styles/landing/{tokens,landing,landing-demo,landing-pricing}.css`: copied from `design_handoff_landing/styles/` and namespaced under `/styles/landing/` so they don't collide with planner CSS.
+- `public/js/landing-reel.js`: new single-iframe demo engine. 4 beats matching the real app's 4 setup steps (Setup → Review → Arrange → Finalize). Setup is fully scripted with 7 substeps targeting real selectors (`#addCityBtn`, `.city-row:last-child [data-field=…]`, `[data-logistics=…]`, `[data-tab=…]`, `[data-accommodation-field=…]`); other 3 beats are scroll-tours with one narration each. Engine uses `iframe.contentWindow.setStep(n)` to jump between steps.
+- `public/planner.html`: title and topbar wordmark renamed `TravelPlanner`/`Guideme` → `YunHai`. Inline `<style>` gained a `body.is-embed` rule set that hides topbar, chat widget, my-trips panel, banners, and save-progress buttons when planner is embedded as an iframe.
+- `public/app.js`: `init()` now branches on `?embed=1`. New `initEmbedMode()` skips Clerk, sets `state.authReady=true` and `state.maxStep=4`, mounts the toast host, sets the trip name, and seeds a single Córdoba city as the Setup beat's baseline.
+- Demo script honesty: real Cities-step transport-mode select has no Bus option (only flight/train/car/other) — Setup beat uses `train` for arrival and `other` for departure; narrator copy says "ground transit." Marquee relabeled to "Built for travelers who plan with" with aspirational tooling wordmarks instead of fake user logos.
+- Branch `feature/yunhai-landing`. 99/99 tests still passing.
+
 ## [2026-05-21] Fix Setup city input — freely-typed names now persist
 
 - `public/app.js` `attachPlaceAutocompleteElement` (~L534): bind an `input` listener directly to the shadow-DOM input inside Google's `PlaceAutocompleteElement`. Mirrors typed text into the hidden fallback input and dispatches `input` so the row-level `data-field` handler runs. Google's web component does not bubble shadow input events to its host, so typed text was previously lost unless a suggestion was selected.
