@@ -13,12 +13,30 @@ function ensureStoreFile() {
   }
 }
 
+function migrateActivityPriceField(activity) {
+  if (activity && activity.price_tier !== undefined) {
+    if (activity.price_level === undefined) activity.price_level = activity.price_tier;
+    delete activity.price_tier;
+  }
+}
+
+function migrateItineraryInPlace(itinerary) {
+  if (!itinerary) return;
+  if (Array.isArray(itinerary.activities)) itinerary.activities.forEach(migrateActivityPriceField);
+  if (Array.isArray(itinerary.days)) {
+    itinerary.days.forEach((day) => {
+      if (Array.isArray(day?.activities)) day.activities.forEach(migrateActivityPriceField);
+    });
+  }
+}
+
 function readStore() {
   ensureStoreFile();
   try {
     const raw = fs.readFileSync(STORE_PATH, 'utf8');
     const parsed = JSON.parse(raw);
     const items = Array.isArray(parsed.items) ? parsed.items : [];
+    items.forEach(migrateItineraryInPlace);
     const latestByUser = parsed.latestByUser && typeof parsed.latestByUser === 'object' ? parsed.latestByUser : {};
     return { latestByUser, items };
   } catch {
