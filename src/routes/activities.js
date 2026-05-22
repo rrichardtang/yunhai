@@ -148,35 +148,62 @@ function register(app) {
     if (cached) return res.json(cached);
 
     const input = city ? `${q}, ${city}` : q;
-    const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id,geometry,name,price_level,rating,user_ratings_total,formatted_address&key=${apiKey}`;
+    const findPlaceUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id,geometry,name,price_level,rating,user_ratings_total,formatted_address&key=${apiKey}`;
+    const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(input)}&key=${apiKey}`;
 
     try {
-      const r = await fetch(url);
+      const r = await fetch(findPlaceUrl);
       if (!r.ok) {
-        console.warn(`[places] lookup failed ${r.status} for "${input}"`);
-        return res.json({ error: 'lookup_failed' });
+        debugLog('places-resolve', `findplace_http=${r.status} input="${input}"`);
+      } else {
+        const data = await r.json();
+        debugLog('places-resolve', `findplace status=${data.status} candidates=${(data.candidates || []).length} input="${input}"`);
+        const candidate = Array.isArray(data.candidates) ? data.candidates[0] : null;
+        if (candidate) {
+          const response = {
+            placeId: candidate.place_id || null,
+            lat: candidate.geometry?.location?.lat ?? null,
+            lng: candidate.geometry?.location?.lng ?? null,
+            name: candidate.name || null,
+            formattedAddress: candidate.formatted_address || null,
+            priceLevel: typeof candidate.price_level === 'number' ? candidate.price_level : null,
+            rating: typeof candidate.rating === 'number' ? candidate.rating : null,
+            userRatingsTotal: typeof candidate.user_ratings_total === 'number' ? candidate.user_ratings_total : null
+          };
+          placesCacheSet(cacheKey, response);
+          return res.json(response);
+        }
       }
-      const data = await r.json();
-      const candidate = Array.isArray(data.candidates) ? data.candidates[0] : null;
-      if (!candidate) {
+
+      const gr = await fetch(geocodeUrl);
+      if (!gr.ok) {
+        debugLog('places-resolve', `geocode_http=${gr.status} input="${input}"`);
+        const response = { placeId: null };
+        placesCacheSet(cacheKey, response);
+        return res.json(response);
+      }
+      const gdata = await gr.json();
+      debugLog('places-resolve', `geocode status=${gdata.status} results=${(gdata.results || []).length} input="${input}"`);
+      const result = Array.isArray(gdata.results) ? gdata.results[0] : null;
+      if (!result) {
         const response = { placeId: null };
         placesCacheSet(cacheKey, response);
         return res.json(response);
       }
       const response = {
-        placeId: candidate.place_id || null,
-        lat: candidate.geometry?.location?.lat ?? null,
-        lng: candidate.geometry?.location?.lng ?? null,
-        name: candidate.name || null,
-        formattedAddress: candidate.formatted_address || null,
-        priceLevel: typeof candidate.price_level === 'number' ? candidate.price_level : null,
-        rating: typeof candidate.rating === 'number' ? candidate.rating : null,
-        userRatingsTotal: typeof candidate.user_ratings_total === 'number' ? candidate.user_ratings_total : null
+        placeId: result.place_id || null,
+        lat: result.geometry?.location?.lat ?? null,
+        lng: result.geometry?.location?.lng ?? null,
+        name: null,
+        formattedAddress: result.formatted_address || null,
+        priceLevel: null,
+        rating: null,
+        userRatingsTotal: null
       };
       placesCacheSet(cacheKey, response);
       return res.json(response);
     } catch (err) {
-      console.warn(`[places] exception for "${input}": ${err.message}`);
+      debugLog('places-resolve', `exception input="${input}" error=${err.message}`);
       return res.json({ error: 'lookup_failed' });
     }
   });
