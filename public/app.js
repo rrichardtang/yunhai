@@ -13,6 +13,9 @@ function sendDebug(scope, payload) {
   } catch {}
 }
 
+const APP_BUILD_ID = 'sw-network-first-v2';
+sendDebug('boot', `build=${APP_BUILD_ID} loaded=${new Date().toISOString()} sw=${navigator.serviceWorker?.controller ? 'controlled' : 'uncontrolled'}`);
+
 ['prefsModal', 'checklistModal', 'budgetOptOverlay', 'addActivityModal',
  'attachmentViewerModal',
  'planningOverlay', 'textareaExpandModal', 'confirmDialog']
