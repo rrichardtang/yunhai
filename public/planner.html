@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TravelPlanner</title>
+    <title>YunHai</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
@@ -25,13 +25,23 @@
       .trip-health-issue-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
       .trip-health-issue-card textarea { width: 100%; border: 1px solid var(--secondary, #C4CDD5); border-radius: 10px; padding: 8px 10px; background: var(--base-light, #FAF8F5); }
       @media (max-width: 1100px) { .trip-health-summary { grid-template-columns: 1fr; } }
+
+      /* Embed mode — hides chrome when planner.html is loaded as an iframe (?embed=1) for the landing reel */
+      body.is-embed .topbar,
+      body.is-embed #chatWidget,
+      body.is-embed .my-trips-panel,
+      body.is-embed #apiBanner,
+      body.is-embed #forwardingPanel,
+      body.is-embed .save-progress-btn,
+      body.is-embed .step-nav .nav-hint { display: none !important; }
+      body.is-embed main.container { padding-top: 24px; }
     </style>
   </head>
   <body>
     <header class="topbar">
       <div class="topbar-row">
         <div>
-          <h1>Guide<span class="serif">me</span></h1>
+          <h1>Yun<span class="serif">Hai</span></h1>
           <p>Personal AI itinerary builder</p>
         </div>
         <div class="topbar-actions">

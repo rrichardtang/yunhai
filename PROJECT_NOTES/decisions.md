@@ -4,6 +4,22 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-22] Landing demo reel drives the real `planner.html` via `?embed=1` iframe — no static screenshots, no separate demo screens
+
+**Decision:** The marketing landing's "See it in motion" demo embeds the real `planner.html` in an iframe (`?embed=1` mode) and reaches into the same-origin DOM at scripted timestamps to move a synthetic cursor, fire real clicks, type into real inputs, and jump between the app's 4 setup steps via `iframe.contentWindow.setStep(n)`. `?embed=1` bypasses Clerk, hides topbar/chat/banner chrome, unlocks `state.maxStep=4`, and seeds a baseline Córdoba city so the Setup beat has something to add to.
+
+**Reasoning:** The design handoff assumed 6 standalone HTML screens (`Setup.html`, `ProfileWizard.html`, etc.) which the real codebase doesn't have — the app is a single-page workflow inside `planner.html`. Driving the real app preserves the handoff's "the product, actually running" pitch with zero drift risk: when the planner UI changes, the demo updates automatically. Selectors target the *existing* stable data attributes (`#addCityBtn`, `[data-field]`, `[data-logistics]`, `[data-tab]`, `[data-accommodation-field]`) so no instrumentation lives in the production CSS/HTML purely for the demo.
+
+**Alternatives rejected:**
+- *Build 6 standalone HTML snapshots.* Higher drift risk and double maintenance — the demo would visually diverge from the real app the moment we ship any planner UI change.
+- *Pre-recorded video / screenshot loop.* Loses the "real product" credibility and contradicts the section's headline.
+- *Add `data-demo-anchor` attributes throughout planner.html.* Adds attributes to production code purely for marketing. Existing data attributes are already stable enough.
+
+**Tradeoffs:**
+- Same-origin requirement: the marketing landing must live on the same origin as the planner so the engine can read `iframe.contentDocument`. We already serve both from one Express app, so this is fine indefinitely.
+- Embed mode is a fork in `init()` — every future addition to the planner's init flow must consider whether the embedded demo should run it. Mitigated by keeping `initEmbedMode()` as a small, focused function that intentionally skips Clerk, server sync, and profile-wizard auto-open.
+- The iframe re-renders the cities container on every tab switch (real app behavior). Selectors use `.city-row:last-child` to survive re-renders; visible cursor jitter is accepted as honest UI feedback rather than papered over.
+
 ## [2026-05-19] Per-trip scheduling prefs feed Arrange via dual channel: hard window clamp + soft prompt block
 
 **Decision:** A new Scheduling Preferences wizard captures structured scheduling inputs per-trip. The prefs reach the Arrange LLM via two mechanisms simultaneously: (1) **hard window clamps** narrow `day.windowStart/End` in the `/api/arrange` payload (the LLM cannot place outside them), and (2) a **soft `SCHEDULING PREFERENCES` prompt block** lists tour timing, lunch/dinner targets, pacing, and free-text notes as strong soft constraints. The free-text `dayStructure` question on the profile wizard is removed (superseded).

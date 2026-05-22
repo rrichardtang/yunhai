@@ -1,0 +1,1401 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GuideMe — Setup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/planner.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+  <style>
+    /* ============ SETUP ============ */
+
+    /* Page header */
+    .setup-h {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 24px; flex-wrap: wrap;
+      margin-bottom: 22px;
+    }
+    .setup-h h1 {
+      font-size: 32px; font-weight: 500; letter-spacing: -0.025em; line-height: 1.05;
+      color: var(--text-900);
+    }
+    .setup-h h1 .serif { font-family: var(--font-display); font-style: italic; font-weight: 400; }
+    .setup-h p {
+      font-size: 13.5px; color: var(--text-500); margin-top: 8px;
+      letter-spacing: -0.005em; max-width: 520px;
+    }
+    .setup-h .save {
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em;
+      color: var(--text-500);
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .setup-h .save .dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--ok);
+      box-shadow: 0 0 0 3px rgba(31,157,85,.18);
+    }
+
+    /* Trip-level bar */
+    .trip-bar {
+      display: grid;
+      grid-template-columns: 2fr 1fr 0.9fr 0.9fr;
+      gap: 1px;
+      background: var(--hair);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      box-shadow: var(--sh-sm);
+      margin-bottom: 24px;
+    }
+    @media (max-width: 760px) { .trip-bar { grid-template-columns: 1fr 1fr; } }
+    .trip-cell {
+      background: var(--paper-1);
+      padding: 14px 18px;
+      display: flex; flex-direction: column; gap: 4px;
+      transition: background var(--dur-fast);
+    }
+    .trip-cell:hover { background: var(--paper-0); }
+    .trip-cell .k {
+      font-family: var(--font-mono);
+      font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--text-500);
+    }
+    .trip-cell input {
+      width: 100%;
+      border: none; outline: none; background: transparent;
+      font-family: var(--font-sans);
+      font-size: 16px; font-weight: 500;
+      color: var(--text-900);
+      letter-spacing: -0.012em;
+      padding: 0;
+    }
+    .trip-cell input::placeholder { color: var(--text-400); }
+    .trip-cell.num input {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 18px;
+    }
+    .trip-cell .pre {
+      font-family: var(--font-mono);
+      font-size: 11px; color: var(--text-500); margin-right: 4px;
+    }
+    .trip-cell .row { display: flex; align-items: baseline; gap: 4px; }
+
+    /* Trip arc — mini timeline of cities */
+    .trip-arc {
+      background: var(--ink-900);
+      color: var(--paper-0);
+      border-radius: var(--r-lg);
+      padding: 18px 22px 16px;
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .trip-arc::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 30% 0%, rgba(47,125,251,.18), transparent 60%);
+      pointer-events: none;
+    }
+    .trip-arc__head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin-bottom: 14px; position: relative;
+    }
+    .trip-arc__head .l {
+      font-family: var(--font-mono);
+      font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: rgba(244,241,236,.55);
+    }
+    .trip-arc__head .r {
+      font-family: var(--font-mono);
+      font-size: 11px; letter-spacing: 0.04em;
+      color: rgba(244,241,236,.65);
+      font-variant-numeric: tabular-nums;
+    }
+    .trip-arc__head .r b {
+      color: var(--paper-0); font-weight: 500;
+    }
+    .trip-arc__rail {
+      position: relative;
+      height: 56px;
+      margin: 0 8px;
+    }
+    .trip-arc__line {
+      position: absolute;
+      left: 12px; right: 12px; top: 18px;
+      height: 1px;
+      background: linear-gradient(to right, transparent 0, rgba(244,241,236,.25) 8%, rgba(244,241,236,.25) 92%, transparent 100%);
+    }
+    .trip-arc__stops {
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      height: 100%;
+    }
+    .trip-stop {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      cursor: pointer;
+      transition: transform var(--dur-fast);
+    }
+    .trip-stop:hover { transform: translateY(-1px); }
+    .trip-stop .pin {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--ink-900);
+      border: 1.5px solid rgba(244,241,236,.4);
+      transition: all var(--dur-fast);
+      margin-top: 11px;
+    }
+    .trip-stop.active .pin {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(47,125,251,.3);
+    }
+    .trip-stop .nm {
+      font-size: 13px; font-weight: 500; letter-spacing: -0.005em;
+      color: rgba(244,241,236,.85);
+    }
+    .trip-stop .dt {
+      font-family: var(--font-mono);
+      font-size: 10px; letter-spacing: 0.04em;
+      color: rgba(244,241,236,.5);
+    }
+    .trip-stop.active .nm { color: var(--paper-0); }
+    .trip-stop.active .dt { color: rgba(244,241,236,.75); }
+    .trip-arc__edges {
+      display: flex; justify-content: space-between;
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+      color: rgba(244,241,236,.5);
+    }
+    .trip-arc__edges .e { display: inline-flex; align-items: center; gap: 6px; }
+    .trip-arc__edges .e::before {
+      content: ''; width: 4px; height: 4px; border-radius: 50%;
+      background: rgba(244,241,236,.4);
+    }
+
+    /* CITY toolbar */
+    .cities-tool {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .cities-tool h2 {
+      font-size: 18px; font-weight: 500; letter-spacing: -0.018em;
+      color: var(--text-900);
+      margin-right: auto;
+    }
+    .cities-tool h2 .count {
+      font-family: var(--font-mono);
+      font-size: 11px; font-weight: 500;
+      color: var(--text-500);
+      letter-spacing: 0.04em;
+      margin-left: 8px;
+      padding: 3px 8px;
+      background: var(--paper-2);
+      border-radius: var(--r-pill);
+      vertical-align: middle;
+    }
+    .stool-btn {
+      height: 34px; padding: 0 14px;
+      border-radius: var(--r-pill);
+      background: var(--paper-1);
+      border: 1px solid var(--hair-strong);
+      font-size: 13px; font-weight: 500; color: var(--text-700);
+      letter-spacing: -0.005em;
+      display: inline-flex; align-items: center; gap: 7px;
+      cursor: pointer;
+      transition: all var(--dur-fast);
+    }
+    .stool-btn:hover { border-color: var(--text-900); color: var(--text-900); }
+    .stool-btn svg { width: 14px; height: 14px; }
+    .stool-btn.add {
+      background: var(--ink-900); color: var(--paper-0); border-color: var(--ink-900);
+    }
+    .stool-btn.add:hover { background: var(--ink-800); }
+
+    /* CITY card */
+    .city-stack { display: flex; flex-direction: column; gap: 14px; }
+    .city {
+      background: var(--paper-1);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-lg);
+      box-shadow: var(--sh-sm);
+      overflow: hidden;
+      transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+    }
+    .city:hover { border-color: var(--hair-strong); }
+    .city.collapsed .city__body { display: none; }
+
+    .city__head {
+      display: grid;
+      grid-template-columns: 36px 1fr auto auto auto;
+      gap: 14px;
+      align-items: center;
+      padding: 16px 18px;
+      cursor: pointer;
+    }
+    .city__num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--ink-900);
+      color: var(--paper-0);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 11px; font-weight: 500;
+      letter-spacing: 0;
+    }
+    .city__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .city__name {
+      display: flex; align-items: baseline; gap: 8px;
+      font-size: 17px; font-weight: 500;
+      letter-spacing: -0.015em;
+      color: var(--text-900);
+    }
+    .city__country {
+      font-family: var(--font-mono);
+      font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--text-500);
+      font-weight: 400;
+    }
+    .city__sub {
+      font-family: var(--font-mono);
+      font-size: 11px; letter-spacing: 0.04em;
+      color: var(--text-500);
+      font-variant-numeric: tabular-nums;
+    }
+    .city__sub b { color: var(--text-700); font-weight: 500; }
+    .city__dates {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 14px;
+      background: var(--paper-0);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-pill);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-900);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: border-color var(--dur-fast);
+    }
+    .city__dates:hover { border-color: var(--text-900); }
+    .city__dates .arrow { color: var(--text-400); }
+    .city__dates .nights {
+      color: var(--text-500);
+      padding-left: 8px;
+      margin-left: 4px;
+      border-left: 1px solid var(--hair);
+    }
+    .city__chev {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--text-500);
+      transition: background var(--dur-fast), transform var(--dur-fast);
+    }
+    .city__chev:hover { background: var(--paper-2); color: var(--text-900); }
+    .city__chev svg { width: 14px; height: 14px; transition: transform var(--dur-fast); }
+    .city.collapsed .city__chev svg { transform: rotate(-90deg); }
+    .city__del {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--text-400);
+      transition: all var(--dur-fast);
+    }
+    .city__del:hover { background: rgba(192,54,44,.08); color: var(--err); }
+    .city__del svg { width: 14px; height: 14px; }
+
+    /* CITY body */
+    .city__body {
+      border-top: 1px solid var(--hair);
+      background: var(--paper-0);
+    }
+    .city__tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--hair);
+      background: var(--paper-1);
+    }
+    .city__tab {
+      padding: 14px 4px;
+      margin-right: 22px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-500);
+      letter-spacing: -0.005em;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color var(--dur-fast), border-color var(--dur-fast);
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    .city__tab:hover { color: var(--text-900); }
+    .city__tabs .city__tab.active {
+      color: var(--text-900);
+      border-bottom: 2px solid var(--accent);
+    }
+    .city__tab .tag {
+      font-family: var(--font-mono);
+      font-size: 9.5px; font-weight: 500;
+      letter-spacing: 0.06em;
+      color: var(--text-400);
+      padding: 1px 6px;
+      background: var(--paper-2);
+      border-radius: var(--r-pill);
+    }
+    .city__tab.active .tag {
+      background: var(--accent-soft);
+      color: var(--accent-deep);
+    }
+    .city__tab .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--text-400);
+    }
+    .city__tab.has-data .dot { background: var(--ok); }
+
+    .pane {
+      display: none;
+      padding: 22px 22px 24px;
+    }
+    .pane.active { display: block; }
+
+    /* Field grid inside panes */
+    .grid {
+      display: grid;
+      gap: 14px 16px;
+    }
+    .grid.c2 { grid-template-columns: 1fr 1fr; }
+    .grid.c3 { grid-template-columns: 1.6fr 1fr 1fr; }
+    .grid.c-loc-time { grid-template-columns: 1fr 160px; }
+    .grid.c-mode-intl { grid-template-columns: 1fr 160px; }
+    @media (max-width: 720px) {
+      .grid.c2, .grid.c3, .grid.c-loc-time, .grid.c-mode-intl { grid-template-columns: 1fr; }
+    }
+    .f { display: flex; flex-direction: column; gap: 6px; }
+    .f label {
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-500);
+      letter-spacing: -0.005em;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .f label .opt {
+      font-family: var(--font-mono);
+      font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--text-400); font-weight: 400;
+    }
+    .inp {
+      width: 100%;
+      height: 40px;
+      padding: 0 14px;
+      border-radius: var(--r-md);
+      background: var(--paper-1);
+      border: 1px solid var(--hair-strong);
+      font-size: 13.5px;
+      color: var(--text-900);
+      letter-spacing: -0.005em;
+      outline: none;
+      transition: border-color var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast);
+    }
+    .inp::placeholder { color: var(--text-400); }
+    .inp:hover { border-color: var(--text-400); }
+    .inp:focus {
+      border-color: var(--accent);
+      background: var(--paper-0);
+      box-shadow: 0 0 0 3px rgba(47,125,251,.14);
+    }
+    .inp.with-icon {
+      padding-left: 36px;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235A6679' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><path d='m20 20-3.5-3.5'/></svg>");
+      background-repeat: no-repeat;
+      background-position: 12px center;
+    }
+    .inp.with-pin {
+      padding-left: 36px;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235A6679' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M12 22s7-7.5 7-13a7 7 0 0 0-14 0c0 5.5 7 13 7 13Z'/><circle cx='12' cy='9' r='2.5'/></svg>");
+      background-repeat: no-repeat;
+      background-position: 12px center;
+    }
+    select.inp {
+      appearance: none; -webkit-appearance: none;
+      padding-right: 36px;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4 L5 7 L8 4' fill='none' stroke='%235A6679' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      cursor: pointer;
+    }
+    .inp[type="time"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+    .inp[type="date"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+    .ta {
+      width: 100%; min-height: 80px;
+      padding: 11px 14px;
+      border-radius: var(--r-md);
+      background: var(--paper-1);
+      border: 1px solid var(--hair-strong);
+      font-family: var(--font-sans);
+      font-size: 13.5px; line-height: 1.55;
+      color: var(--text-900);
+      resize: vertical;
+      outline: none;
+      letter-spacing: -0.005em;
+      transition: border-color var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast);
+    }
+    .ta:focus {
+      border-color: var(--accent);
+      background: var(--paper-0);
+      box-shadow: 0 0 0 3px rgba(47,125,251,.14);
+    }
+    .ta::placeholder { color: var(--text-400); }
+
+    /* match dates row */
+    .match-dates {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px; letter-spacing: 0.04em;
+      color: var(--text-500);
+      padding-top: 4px;
+    }
+    .match-dates input { accent-color: var(--accent); }
+
+    /* Inline checkbox (international) */
+    .check-inline {
+      display: inline-flex; align-items: center; gap: 8px;
+      height: 40px;
+      padding: 0 14px;
+      border-radius: var(--r-md);
+      background: var(--paper-1);
+      border: 1px solid var(--hair-strong);
+      font-size: 13px;
+      color: var(--text-700);
+      letter-spacing: -0.005em;
+      cursor: pointer;
+      transition: all var(--dur-fast);
+    }
+    .check-inline:hover { border-color: var(--text-400); }
+    .check-inline input { accent-color: var(--accent); }
+
+    /* Footer */
+    .setup-foot {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap;
+      margin-top: 28px;
+      padding-top: 4px;
+    }
+    .setup-foot .meta {
+      font-family: var(--font-mono);
+      font-size: 11px; letter-spacing: 0.04em;
+      color: var(--text-500);
+    }
+    .setup-foot .actions { display: flex; gap: 10px; }
+  </style>
+</head>
+<body>
+
+<div class="planner">
+
+  <!-- TOPBAR -->
+  <header class="ptop">
+    <div class="ptop__brand">
+      <span class="name">Guide<span class="me">me</span></span>
+      <span class="sub">Personal AI itinerary builder</span>
+    </div>
+    <div class="ptop__actions">
+      <div class="mode" role="group">
+        <button class="active" type="button">Planning</button>
+        <button type="button">Itinerary</button>
+      </div>
+      <button class="ptop__icon" type="button" title="Trip Health">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2-5 4 10 2-5h7"/></svg>
+      </button>
+      <button class="ptop__checklist" type="button" id="checklistBtn" aria-label="Open booking checklist">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8 12 3 3 5-6"/></svg>
+        Checklist
+      </button>
+      <button class="ptop__icon" type="button" title="Profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="pmain">
+
+    <!-- STEPPER -->
+    <nav class="steps" aria-label="Planning steps">
+      <button class="step active" type="button">
+        <span class="step__node"><span>1</span></span>
+        <span class="step__label">Setup</span>
+      </button>
+      <button class="step" type="button">
+        <span class="step__node"><span>2</span></span>
+        <span class="step__label">Review</span>
+      </button>
+      <button class="step" type="button">
+        <span class="step__node"><span>3</span></span>
+        <span class="step__label">Arrange</span>
+      </button>
+      <button class="step" type="button">
+        <span class="step__node"><span>4</span></span>
+        <span class="step__label">Finalize</span>
+      </button>
+    </nav>
+
+    <!-- HEADER -->
+    <div class="setup-h">
+      <div>
+        <span class="gm-eyebrow">Step 01 — Trip setup</span>
+        <h1 style="margin-top: 10px;">Build your trip <span class="serif">leg</span> by leg.</h1>
+        <p>Each city is a leg with its own dates, stay, and how you arrive and leave. Add as many as you need — drag to reorder, edit anytime.</p>
+      </div>
+      <span class="save"><span class="dot"></span> Auto-saved · 12s ago</span>
+    </div>
+
+    <!-- TRIP-LEVEL BAR -->
+    <div class="trip-bar">
+      <div class="trip-cell">
+        <span class="k">Trip name</span>
+        <input type="text" value="Allison &amp; Chard Take on Spain 2">
+      </div>
+      <div class="trip-cell num">
+        <span class="k">Total budget</span>
+        <div class="row">
+          <span class="pre">USD</span>
+          <input type="text" value="1,500" inputmode="numeric">
+        </div>
+      </div>
+      <div class="trip-cell num">
+        <span class="k">Adults</span>
+        <input type="text" value="2" inputmode="numeric">
+      </div>
+      <div class="trip-cell num">
+        <span class="k">Children</span>
+        <input type="text" value="0" inputmode="numeric">
+      </div>
+    </div>
+
+    <!-- TRIP ARC -->
+    <div class="trip-arc">
+      <div class="trip-arc__head">
+        <span class="l">∴ Trip arc</span>
+        <span class="r"><b>Apr 24</b> → <b>May 03</b> · <b>9</b> nights · <b>3</b> cities</span>
+      </div>
+      <div class="trip-arc__rail">
+        <div class="trip-arc__line"></div>
+        <div class="trip-arc__stops">
+          <div class="trip-stop active">
+            <span class="nm">Córdoba</span>
+            <span class="pin"></span>
+            <span class="dt">04/24 — 04/26</span>
+          </div>
+          <div class="trip-stop">
+            <span class="nm">Seville</span>
+            <span class="pin"></span>
+            <span class="dt">04/26 — 04/30</span>
+          </div>
+          <div class="trip-stop">
+            <span class="nm">Granada</span>
+            <span class="pin"></span>
+            <span class="dt">04/30 — 05/03</span>
+          </div>
+        </div>
+      </div>
+      <div class="trip-arc__edges">
+        <span class="e">Start · Madrid (MAD)</span>
+        <span class="e">End · Granada (GRX)</span>
+      </div>
+    </div>
+
+    <!-- CITIES -->
+    <div class="cities-tool">
+      <h2>Cities <span class="count">3 legs</span></h2>
+      <button class="stool-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6h10M7 12h10M7 18h10"/><path d="M3 6l1 1M3 12l1 1M3 18l1 1"/></svg>
+        Sort by date
+      </button>
+      <button class="stool-btn add" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        Add city
+      </button>
+    </div>
+
+    <div class="city-stack" id="cityStack">
+
+      <!-- CITY 1 -->
+      <article class="city" data-city="1">
+        <div class="city__head" data-toggle>
+          <span class="city__num">01</span>
+          <div class="city__main">
+            <span class="city__name">Córdoba <span class="city__country">Spain</span></span>
+            <span class="city__sub">Stay <b>Pl. Chirinos, 4</b> · Arrive <b>16:20 train</b></span>
+          </div>
+          <div class="city__dates" data-stop>
+            <span>04/24</span><span class="arrow">→</span><span>04/26</span>
+            <span class="nights">2 nights</span>
+          </div>
+          <button class="city__chev" type="button" aria-label="Collapse">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="city__del" type="button" aria-label="Remove leg" data-stop>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/></svg>
+          </button>
+        </div>
+
+        <div class="city__body">
+          <nav class="city__tabs">
+            <span class="city__tab active" data-tab="stay">
+              <span class="dot"></span> Stay
+            </span>
+            <span class="city__tab has-data" data-tab="arrival">
+              <span class="dot"></span> Arrival
+            </span>
+            <span class="city__tab" data-tab="departure">
+              <span class="dot"></span> Departure
+            </span>
+            <span class="city__tab has-data" data-tab="notes">
+              <span class="dot"></span> Notes <span class="tag">2</span>
+            </span>
+          </nav>
+
+          <!-- STAY -->
+          <div class="pane active" data-pane="stay">
+            <div class="grid c-loc-time" style="margin-bottom: 14px;">
+              <div class="f">
+                <label>City <span class="opt">required</span></label>
+                <input class="inp with-icon" value="Córdoba, Spain">
+              </div>
+              <div class="f">
+                <label>Nights</label>
+                <input class="inp" value="2 nights" readonly style="background: var(--paper-2); color: var(--text-500);">
+              </div>
+            </div>
+            <div class="grid c2">
+              <div class="f">
+                <label>Check-in</label>
+                <input class="inp" type="date" value="2026-04-24">
+              </div>
+              <div class="f">
+                <label>Check-out</label>
+                <input class="inp" type="date" value="2026-04-26">
+              </div>
+            </div>
+            <div class="f" style="margin-top: 14px;">
+              <label>Accommodation address <span class="opt">optional</span></label>
+              <input class="inp with-pin" value="Pl. Chirinos, 4, 3º, Centro, 14003 Córdoba, Spain">
+            </div>
+            <label class="match-dates" style="margin-top: 14px;">
+              <input type="checkbox" checked>
+              Stay dates match city dates
+            </label>
+          </div>
+
+          <!-- ARRIVAL -->
+          <div class="pane" data-pane="arrival">
+            <div class="grid c-loc-time" style="margin-bottom: 14px;">
+              <div class="f">
+                <label>Arriving at <span class="opt">station, airport, or address</span></label>
+                <input class="inp with-pin" value="Gta. Tres Culturas, s/n, Noroeste, 14011 Córdoba, Spain">
+              </div>
+              <div class="f">
+                <label>Time</label>
+                <input class="inp" type="time" value="16:20">
+              </div>
+            </div>
+            <div class="grid c-mode-intl">
+              <div class="f">
+                <label>Mode</label>
+                <select class="inp">
+                  <option>Train</option>
+                  <option>Flight</option>
+                  <option>Bus</option>
+                  <option>Car</option>
+                  <option>Ferry</option>
+                </select>
+              </div>
+              <div class="f">
+                <label>&nbsp;</label>
+                <label class="check-inline">
+                  <input type="checkbox"> International
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- DEPARTURE -->
+          <div class="pane" data-pane="departure">
+            <div class="grid c-loc-time" style="margin-bottom: 14px;">
+              <div class="f">
+                <label>Departing from</label>
+                <input class="inp with-pin" placeholder="Station, airport, or address">
+              </div>
+              <div class="f">
+                <label>Time</label>
+                <input class="inp" type="time" value="">
+              </div>
+            </div>
+            <div class="grid c-mode-intl">
+              <div class="f">
+                <label>Mode</label>
+                <select class="inp">
+                  <option>Train</option>
+                  <option>Flight</option>
+                  <option>Bus</option>
+                  <option>Car</option>
+                  <option>Ferry</option>
+                </select>
+              </div>
+              <div class="f">
+                <label>&nbsp;</label>
+                <label class="check-inline">
+                  <input type="checkbox"> International
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- NOTES -->
+          <div class="pane" data-pane="notes">
+            <div class="f">
+              <label>Notes for this city <span class="opt">bookings, must-sees, anything</span></label>
+              <textarea class="ta" placeholder="e.g. tour booked Mar 25 3–5pm, want to see X…">I have a tour booked for Mezquita Catedral at 3:00pm–5:00pm on 4/25.
+I want to see callejea de las flores.</textarea>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- CITY 2 -->
+      <article class="city collapsed" data-city="2">
+        <div class="city__head" data-toggle>
+          <span class="city__num">02</span>
+          <div class="city__main">
+            <span class="city__name">Seville <span class="city__country">Spain</span></span>
+            <span class="city__sub">Stay <b>Hotel Alfonso XIII</b> · Arrive <b>11:05 train</b></span>
+          </div>
+          <div class="city__dates" data-stop>
+            <span>04/26</span><span class="arrow">→</span><span>04/30</span>
+            <span class="nights">4 nights</span>
+          </div>
+          <button class="city__chev" type="button" aria-label="Expand">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="city__del" type="button" aria-label="Remove leg" data-stop>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/></svg>
+          </button>
+        </div>
+        <div class="city__body">
+          <nav class="city__tabs">
+            <span class="city__tab active" data-tab="stay"><span class="dot"></span> Stay</span>
+            <span class="city__tab has-data" data-tab="arrival"><span class="dot"></span> Arrival</span>
+            <span class="city__tab" data-tab="departure"><span class="dot"></span> Departure</span>
+            <span class="city__tab" data-tab="notes"><span class="dot"></span> Notes</span>
+          </nav>
+          <div class="pane active" data-pane="stay">
+            <div class="grid c-loc-time" style="margin-bottom: 14px;">
+              <div class="f"><label>City</label><input class="inp with-icon" value="Seville, Spain"></div>
+              <div class="f"><label>Nights</label><input class="inp" value="4 nights" readonly style="background: var(--paper-2); color: var(--text-500);"></div>
+            </div>
+            <div class="grid c2">
+              <div class="f"><label>Check-in</label><input class="inp" type="date" value="2026-04-26"></div>
+              <div class="f"><label>Check-out</label><input class="inp" type="date" value="2026-04-30"></div>
+            </div>
+            <div class="f" style="margin-top: 14px;">
+              <label>Accommodation address</label>
+              <input class="inp with-pin" value="C. San Fernando, 2, 41004 Sevilla, Spain (Hotel Alfonso XIII)">
+            </div>
+          </div>
+          <div class="pane" data-pane="arrival">
+            <div class="grid c-loc-time"><div class="f"><label>Arriving at</label><input class="inp with-pin" value="Estación de Sevilla-Santa Justa"></div><div class="f"><label>Time</label><input class="inp" type="time" value="11:05"></div></div>
+          </div>
+          <div class="pane" data-pane="departure"><p style="color: var(--text-500); font-size: 13px;">Empty.</p></div>
+          <div class="pane" data-pane="notes"><p style="color: var(--text-500); font-size: 13px;">No notes yet.</p></div>
+        </div>
+      </article>
+
+      <!-- CITY 3 -->
+      <article class="city collapsed" data-city="3">
+        <div class="city__head" data-toggle>
+          <span class="city__num">03</span>
+          <div class="city__main">
+            <span class="city__name">Granada <span class="city__country">Spain</span></span>
+            <span class="city__sub">Stay <b>Parador de Granada</b> · Arrive <b>09:40 bus</b></span>
+          </div>
+          <div class="city__dates" data-stop>
+            <span>04/30</span><span class="arrow">→</span><span>05/03</span>
+            <span class="nights">3 nights</span>
+          </div>
+          <button class="city__chev" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="city__del" type="button" data-stop>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/></svg>
+          </button>
+        </div>
+        <div class="city__body">
+          <nav class="city__tabs">
+            <span class="city__tab active" data-tab="stay"><span class="dot"></span> Stay</span>
+            <span class="city__tab" data-tab="arrival"><span class="dot"></span> Arrival</span>
+            <span class="city__tab" data-tab="departure"><span class="dot"></span> Departure</span>
+            <span class="city__tab" data-tab="notes"><span class="dot"></span> Notes</span>
+          </nav>
+          <div class="pane active" data-pane="stay">
+            <div class="grid c-loc-time" style="margin-bottom: 14px;">
+              <div class="f"><label>City</label><input class="inp with-icon" value="Granada, Spain"></div>
+              <div class="f"><label>Nights</label><input class="inp" value="3 nights" readonly style="background: var(--paper-2); color: var(--text-500);"></div>
+            </div>
+            <div class="grid c2">
+              <div class="f"><label>Check-in</label><input class="inp" type="date" value="2026-04-30"></div>
+              <div class="f"><label>Check-out</label><input class="inp" type="date" value="2026-05-03"></div>
+            </div>
+            <div class="f" style="margin-top: 14px;">
+              <label>Accommodation address</label>
+              <input class="inp with-pin" value="C. Real de la Alhambra, s/n, 18009 Granada, Spain">
+            </div>
+          </div>
+          <div class="pane" data-pane="arrival"><p style="color: var(--text-500); font-size: 13px;">No arrival info yet.</p></div>
+          <div class="pane" data-pane="departure"><p style="color: var(--text-500); font-size: 13px;">No departure info yet.</p></div>
+          <div class="pane" data-pane="notes"><p style="color: var(--text-500); font-size: 13px;">No notes yet.</p></div>
+        </div>
+      </article>
+
+    </div>
+
+    <!-- INLINE ADD CITY -->
+    <button class="stool-btn add" type="button" style="margin-top: 14px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      Add another city
+    </button>
+
+    <!-- FOOTER -->
+    <div class="setup-foot">
+      <span class="meta">3 cities · 9 nights · 1 of 3 fully filled</span>
+      <div class="actions">
+        <button type="button" class="gm-btn gm-btn--ghost">Save &amp; close</button>
+        <button type="button" class="gm-btn gm-btn--primary">Continue to Review →</button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- BOOKING CHECKLIST MODAL -->
+  <div id="checklistModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Booking Checklist">
+    <div class="modal-card checklist-modal-card">
+      <div class="between checklist-modal-header">
+        <h3>Booking Checklist</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="checklistModalSave" class="icon-btn grey" type="button" title="Save Progress" aria-label="Save">
+            <i class="ph-bold ph-floppy-disk" aria-hidden="true"></i>
+          </button>
+          <button id="checklistModalClose" class="icon-btn red" type="button" title="Close" aria-label="Close">
+            <i class="ph-bold ph-x" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+      <div id="bookingChecklist">
+
+        <div class="cl-search-wrap">
+          <div class="cl-search-row">
+            <div class="cl-search-pill">
+              <i class="ph-bold ph-magnifying-glass cl-search-icon" aria-hidden="true"></i>
+              <input type="search" class="cl-search-input" id="clSearchInput" placeholder="Search bookings…" autocomplete="off">
+            </div>
+          </div>
+        </div>
+
+        <div class="cl-containers">
+
+          <!-- ACCOMMODATION -->
+          <section class="cl-container" data-cl-group="Accommodation">
+            <button type="button" class="cl-container-header" data-cl-toggle-container="Accommodation">
+              <span class="cl-container-title">Accommodation</span>
+              <span class="cl-container-price">$2,355</span>
+              <i class="ph-bold ph-caret-up cl-container-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="cl-container-body">
+              <div class="cl-item cl-item--checked" data-cl-item="acc-1">
+                <div class="cl-item-collapsed" data-cl-collapse-row>
+                  <button type="button" class="cl-checkbox checked" data-cl-check aria-pressed="true" aria-label="Mark as verified"><i class="ph-bold ph-check" aria-hidden="true"></i></button>
+                  <div class="cl-item-text">
+                    <span class="cl-item-name">Hospes Palacio del Bailío</span>
+                    <span class="cl-item-meta">Córdoba · Apr 24 → Apr 26</span>
+                  </div>
+                  <span class="cl-item-price">$440</span>
+                  <i class="ph-bold ph-caret-down cl-item-chevron" aria-hidden="true"></i>
+                </div>
+              </div>
+              <div class="cl-item" data-cl-item="acc-2">
+                <div class="cl-item-collapsed" data-cl-collapse-row>
+                  <button type="button" class="cl-checkbox" data-cl-check aria-pressed="false" aria-label="Mark as verified"></button>
+                  <div class="cl-item-text">
+                    <span class="cl-item-name">Hotel Casa 1800 Sevilla</span>
+                    <span class="cl-item-meta">Seville · Apr 26 → Apr 30</span>
+                  </div>
+                  <span class="cl-item-price">$1,020</span>
+                  <i class="ph-bold ph-caret-down cl-item-chevron" aria-hidden="true"></i>
+                </div>
+              </div>
+              <div class="cl-item" data-cl-item="acc-3">
+                <div class="cl-item-collapsed" data-cl-collapse-row>
+                  <button type="button" class="cl-checkbox" data-cl-check aria-pressed="false" aria-label="Mark as verified"></button>
+                  <div class="cl-item-text">
+                    <span class="cl-item-name">Parador de Granada</span>
+                    <span class="cl-item-meta">Granada · Apr 30 → May 3</span>
+                  </div>
+                  <span class="cl-item-price">$895</span>
+                  <i class="ph-bold ph-caret-down cl-item-chevron" aria-hidden="true"></i>
+                </div>
+              </div>
+              <button type="button" class="cl-add-btn" data-cl-add="Accommodation" data-cl-add-type="accommodation">
+                <i class="ph-bold ph-plus" aria-hidden="true"></i> Add Item
+              </button>
+            </div>
+          </section>
+
+          <!-- TRANSPORTATION -->
+          <section class="cl-container" data-cl-group="Transportation">
+            <button type="button" class="cl-container-header" data-cl-toggle-container="Transportation">
+              <span class="cl-container-title">Transportation</span>
+              <span class="cl-container-price">$206</span>
+              <i class="ph-bold ph-caret-up cl-container-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="cl-container-body">
+              <div class="cl-item" data-cl-item="tr-1">
+                <div class="cl-item-collapsed" data-cl-collapse-row>
+                  <button type="button" class="cl-checkbox" data-cl-check aria-pressed="false" aria-label="Mark as verified"></button>
+                  <div class="cl-item-text">
+                    <span class="cl-item-name">Renfe AVE Córdoba → Sevilla</span>
+                    <span class="cl-item-meta">Apr 26, 11:05 AM</span>
+                  </div>
+                  <span class="cl-item-price">$78</span>
+                  <i class="ph-bold ph-caret-up cl-item-chevron" aria-hidden="true"></i>
+                </div>
+                <div class="cl-item-expanded-wrap">
+                  <div class="cl-expanded-header">
+                    <button type="button" class="cl-delete-btn" data-cl-delete title="Delete item"><i class="ph-bold ph-trash" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="cl-expanded-body">
+                    <div class="cl-primary-zone">
+                      <div class="cl-form-row cl-form-row--2">
+                        <label class="cl-field">
+                          <span class="cl-field-label">Name</span>
+                          <input type="text" data-cl="name" value="Renfe AVE Córdoba → Sevilla">
+                        </label>
+                        <label class="cl-field">
+                          <span class="cl-field-label">Type</span>
+                          <div class="cl-toggle-group" role="group">
+                            <button type="button" class="cl-toggle-btn active" data-cl-toggle="one-way">One-way</button>
+                            <button type="button" class="cl-toggle-btn" data-cl-toggle="round-trip">Round trip</button>
+                          </div>
+                        </label>
+                      </div>
+                      <div class="cl-form-row cl-form-row--2">
+                        <label class="cl-field">
+                          <span class="cl-field-label">From</span>
+                          <div class="city-autocomplete"><input type="text" data-cl="startLocation" value="Córdoba, Spain"></div>
+                        </label>
+                        <label class="cl-field">
+                          <span class="cl-field-label">To</span>
+                          <div class="city-autocomplete"><input type="text" data-cl="endLocation" value="Sevilla, Spain"></div>
+                        </label>
+                      </div>
+                      <div class="cl-form-row cl-form-row--2">
+                        <label class="cl-field">
+                          <span class="cl-field-label">Departure date &amp; time</span>
+                          <div class="cl-datetime-pair">
+                            <input type="date" data-cl="departureDate" value="2026-04-26">
+                            <input type="time" data-cl="departureTime" value="11:05">
+                          </div>
+                        </label>
+                        <label class="cl-field">
+                          <span class="cl-field-label">Arrival date &amp; time</span>
+                          <div class="cl-datetime-pair">
+                            <input type="date" data-cl="arrivalDate" value="2026-04-26">
+                            <input type="time" data-cl="arrivalTime" value="11:50">
+                          </div>
+                        </label>
+                      </div>
+                      <label class="cl-field">
+                        <span class="cl-field-label">Budget Tracker scope</span>
+                        <select data-cl="transportScope">
+                          <option value="entry_exit">Entry/exit travel (exclude)</option>
+                          <option value="experience" selected>Experience-linked travel (include)</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div class="cl-secondary-zone open">
+                      <button type="button" class="cl-more-details-btn" data-cl-more>
+                        <i class="ph-bold ph-caret-up" aria-hidden="true"></i>
+                        More details
+                      </button>
+                      <div class="cl-secondary-fields">
+                        <label class="cl-field">
+                          <span class="cl-field-label">Reference #</span>
+                          <input type="text" data-cl="referenceNum" value="RF-AVE-02064">
+                        </label>
+                        <label class="cl-field cl-field--price">
+                          <span class="cl-field-label">Price (USD)</span>
+                          <div class="cl-price-wrap">
+                            <span class="cl-price-prefix">$</span>
+                            <input type="number" min="0" step="0.01" data-cl="budgetUsd" value="78">
+                          </div>
+                        </label>
+                        <label class="cl-field">
+                          <span class="cl-field-label">Notes</span>
+                          <textarea data-cl="notes" rows="2" placeholder="Any details, reminders, links…">Window seat preferred. 45-min ride, light rail.</textarea>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="cl-item" data-cl-item="tr-2">
+                <div class="cl-item-collapsed" data-cl-collapse-row>
+                  <button type="button" class="cl-checkbox" data-cl-check aria-pressed="false" aria-label="Mark as verified"></button>
+                  <div class="cl-item-text">
+                    <span class="cl-item-name">ALSA bus Sevilla → Granada</span>
+                    <span class="cl-item-meta">Apr 30, 06:30 AM</span>
+                  </div>
+                  <span class="cl-item-price">$31</span>
+                  <i class="ph-bold ph-caret-down cl-item-chevron" aria-hidden="true"></i>
+                </div>
+              </div>
+
+              <div class="cl-item" data-cl-item="tr-3">
+                <div class="cl-item-collapsed" data-cl-collapse-row>
+                  <button type="button" class="cl-checkbox" data-cl-check aria-pressed="false" aria-label="Mark as verified"></button>
+                  <div class="cl-item-text">
+                    <span class="cl-item-name">Renfe AVE Granada → Madrid</span>
+                    <span class="cl-item-meta">May 3, 14:20</span>
+                  </div>
+                  <span class="cl-item-price">$97</span>
+                  <i class="ph-bold ph-caret-down cl-item-chevron" aria-hidden="true"></i>
+                </div>
+              </div>
+
+              <button type="button" class="cl-add-btn" data-cl-add="Transportation" data-cl-add-type="transportation">
+                <i class="ph-bold ph-plus" aria-hidden="true"></i> Add Item
+              </button>
+            </div>
+          </section>
+
+          <!-- CÓRDOBA -->
+          <section class="cl-container" data-cl-group="Córdoba">
+            <button type="button" class="cl-container-header" data-cl-toggle-container="Córdoba">
+              <span class="cl-container-title">Córdoba</span>
+              <span class="cl-container-price">$199</span>
+              <i class="ph-bold ph-caret-up cl-container-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="cl-container-body">
+
+              <div class="cl-subsection">
+                <h4 class="cl-subsection-title">Booking Required</h4>
+
+                <div class="cl-item" data-cl-item="cb-1">
+                  <div class="cl-item-collapsed" data-cl-collapse-row>
+                    <button type="button" class="cl-checkbox" data-cl-check aria-pressed="false" aria-label="Mark as verified"></button>
+                    <button type="button" class="cl-ticket-toggle" data-cl-booking-toggle aria-pressed="false" aria-label="Mark booking not required"><i class="ph-bold ph-ticket" aria-hidden="true"></i></button>
+                    <div class="cl-item-text">
+                      <span class="cl-item-name">Mezquita-Catedral Guided Tour</span>
+                      <span class="cl-item-meta">Apr 25, 9:30 AM – 11:30 AM</span>
+                    </div>
+                    <span class="cl-item-price">$22</span>
+                    <i class="ph-bold ph-caret-up cl-item-chevron" aria-hidden="true"></i>
+                  </div>
+                  <div class="cl-item-expanded-wrap">
+                    <div class="cl-expanded-header"></div>
+                    <div class="cl-expanded-body">
+                      <div class="cl-primary-zone">
+                        <label class="cl-field">
+                          <span class="cl-field-label">Name</span>
+                          <input type="text" data-cl="name" value="Mezquita-Catedral Guided Tour">
+                        </label>
+                        <label class="cl-field">
+                          <span class="cl-field-label">Location</span>
+                          <div class="city-autocomplete"><input type="text" data-cl="activityLocation" value="Mezquita-Catedral de Córdoba"></div>
+                        </label>
+                        <label class="cl-field">
+                          <span class="cl-field-label">Date &amp; time</span>
+                          <div class="cl-datetime-pair cl-datetime-pair--range">
+                            <input type="date" data-cl="activityDate" value="2026-04-25">
+                            <input type="time" data-cl="activityTime" value="09:30">
+                            <span class="finalize-time-sep">–</span>
+                            <input type="time" data-cl="activityEndTime" value="11:30">
+                          </div>
+                        </label>
+                      </div>
+                      <div class="cl-secondary-zone">
+                        <button type="button" class="cl-more-details-btn" data-cl-more>
+                          <i class="ph-bold ph-caret-down" aria-hidden="true"></i>
+                          More details
+                        </button>
+                        <div class="cl-secondary-fields hidden">
+                          <label class="cl-field">
+                            <span class="cl-field-label">Reference #</span>
+                            <input type="text" data-cl="referenceNum" placeholder="Confirmation code / ticket number">
+                          </label>
+                          <label class="cl-field cl-field--price">
+                            <span class="cl-field-label">Price (USD)</span>
+                            <div class="cl-price-wrap">
+                              <span class="cl-price-prefix">$</span>
+                              <input type="number" min="0" step="0.01" data-cl="budgetUsd" value="22">
+                            </div>
+                          </label>
+                          <label class="cl-field">
+                            <span class="cl-field-label">Notes</span>
+                            <textarea data-cl="notes" rows="2" placeholder="Any details, reminders, links…"></textarea>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="cl-item" data-cl-item="cb-2">
+                  <div class="cl-item-collapsed" data-cl-collapse-row>
+                    <button type="button" class="cl-checkbox" data-cl-check aria-pressed="false" aria-label="Mark as verified"></button>
+                    <button type="button" class="cl-ticket-toggle" data-cl-booking-toggle aria-pressed="false" aria-label="Mark booking not required"><i class="ph-bold ph-ticket" aria-hidden="true"></i></button>
+                    <div class="cl-item-text">
+                      <span class="cl-item-name">Dinner at Choco</span>
+                      <span class="cl-item-meta">Apr 25, 8:30 PM – 11:00 PM</span>
+                    </div>
+                    <span class="cl-item-price">$135</span>
+                    <i class="ph-bold ph-caret-down cl-item-chevron" aria-hidden="true"></i>
+                  </div>
+                </div>
+
+                <div class="cl-item cl-item--checked" data-cl-item="cb-3">
+                  <div class="cl-item-collapsed" data-cl-collapse-row>
+                    <button type="button" class="cl-checkbox checked" data-cl-check aria-pressed="true" aria-label="Mark as verified"><i class="ph-bold ph-check" aria-hidden="true"></i></button>
+                    <button type="button" class="cl-ticket-toggle" data-cl-booking-toggle aria-pressed="false" aria-label="Mark booking not required"><i class="ph-bold ph-ticket" aria-hidden="true"></i></button>
+                    <div class="cl-item-text">
+                      <span class="cl-item-name">Hammam Al Ándalus</span>
+                      <span class="cl-item-meta">Apr 25, 6:00 PM – 7:30 PM</span>
+                    </div>
+                    <span class="cl-item-price">$42</span>
+                    <i class="ph-bold ph-caret-down cl-item-chevron" aria-hidden="true"></i>
+                  </div>
+                </div>
+              </div>
+
+              <div class="cl-subsection">
+                <button type="button" class="cl-subsection-toggle" data-cl-toggle-container="Córdoba::bookingNotRequired">
+                  <span class="cl-subsection-title">Booking Not Required</span>
+                  <span class="cl-container-badge">2</span>
+                  <i class="ph-bold ph-caret-down cl-container-chevron" aria-hidden="true"></i>
+                </button>
+              </div>
+
+              <button type="button" class="cl-add-btn" data-cl-add="Córdoba" data-cl-add-type="activity">
+                <i class="ph-bold ph-plus" aria-hidden="true"></i> Add Item
+              </button>
+            </div>
+          </section>
+
+          <!-- SEVILLE (collapsed) -->
+          <section class="cl-container" data-cl-group="Seville">
+            <button type="button" class="cl-container-header" data-cl-toggle-container="Seville">
+              <span class="cl-container-title">Seville</span>
+              <span class="cl-container-badge">5</span>
+              <i class="ph-bold ph-caret-down cl-container-chevron" aria-hidden="true"></i>
+            </button>
+          </section>
+
+          <!-- GRANADA (collapsed) -->
+          <section class="cl-container" data-cl-group="Granada">
+            <button type="button" class="cl-container-header" data-cl-toggle-container="Granada">
+              <span class="cl-container-title">Granada</span>
+              <span class="cl-container-badge">4</span>
+              <i class="ph-bold ph-caret-down cl-container-chevron" aria-hidden="true"></i>
+            </button>
+          </section>
+
+        </div>
+
+        <div class="cl-totals-block">
+          <p class="cl-total-trip"><strong>Total Trip Cost: $2,956</strong></p>
+          <p class="cl-total-activities">Activities Cost: $395</p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOATING STEP NAV -->
+  <div class="step-nav">
+    <button type="button" title="Back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <button type="button" title="Save progress">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+    </button>
+    <button type="button" class="primary" title="Next">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+
+  <!-- CHAT BUBBLE -->
+  <button class="chat-bubble" type="button" aria-label="Open travel assistant">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.6-.8L3 21l1.8-5.4A8.38 8.38 0 0 1 4 11.5a8.5 8.5 0 0 1 17 0Z"/></svg>
+  </button>
+
+</div>
+
+<script>
+  // Mode toggle
+  document.querySelectorAll('.mode button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.mode button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  // City collapse / expand
+  document.querySelectorAll('.city__head').forEach(h => {
+    h.addEventListener('click', e => {
+      if (e.target.closest('[data-stop]')) return;
+      h.closest('.city').classList.toggle('collapsed');
+    });
+  });
+
+  // Tab switching
+  document.querySelectorAll('.city__tabs').forEach(tabs => {
+    tabs.addEventListener('click', e => {
+      const t = e.target.closest('.city__tab');
+      if (!t) return;
+      const city = t.closest('.city');
+      city.querySelectorAll('.city__tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      const which = t.dataset.tab;
+      city.querySelectorAll('.pane').forEach(p => {
+        p.classList.toggle('active', p.dataset.pane === which);
+      });
+    });
+  });
+
+  // Trip arc — click to expand the matching city
+  document.querySelectorAll('.trip-stop').forEach((s, i) => {
+    s.addEventListener('click', () => {
+      document.querySelectorAll('.trip-stop').forEach(x => x.classList.remove('active'));
+      s.classList.add('active');
+      const all = document.querySelectorAll('.city');
+      all.forEach((c, idx) => {
+        if (idx === i) {
+          c.classList.remove('collapsed');
+          c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  });
+
+  // ----- Checklist modal preview -----
+  // Static preview only — wired to mimic the production behaviors so the
+  // styling can be validated end-to-end. Production app.js owns the real
+  // state; nothing here touches it.
+  (function(){
+    const modal  = document.getElementById('checklistModal');
+    const btn    = document.getElementById('checklistBtn');
+    const close  = document.getElementById('checklistModalClose');
+    if (!modal || !btn) return;
+
+    const open = () => modal.classList.remove('hidden');
+    const shut = () => modal.classList.remove('hidden') || modal.classList.add('hidden');
+    btn.addEventListener('click', open);
+    close.addEventListener('click', shut);
+    modal.addEventListener('click', (e) => { if (e.target === modal) shut(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) shut();
+    });
+
+    // Container collapse — click header to toggle its body's display + flip chevron.
+    modal.querySelectorAll('.cl-container-header, .cl-subsection-toggle').forEach(h => {
+      h.addEventListener('click', () => {
+        const container = h.closest('.cl-container, .cl-subsection');
+        if (!container) return;
+        const body = h.parentElement.querySelector(':scope > .cl-container-body');
+        const chev = h.querySelector('.cl-container-chevron');
+        const isOpen = !container.classList.contains('cl-collapsed');
+        if (body) body.style.display = isOpen ? 'none' : '';
+        container.classList.toggle('cl-collapsed', isOpen);
+        if (chev) {
+          chev.classList.toggle('ph-caret-up', !isOpen);
+          chev.classList.toggle('ph-caret-down', isOpen);
+        }
+      });
+    });
+
+    // Item expand/collapse — click the collapsed row.
+    modal.querySelectorAll('[data-cl-collapse-row]').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return; // don't expand on checkbox/ticket clicks
+        const item = row.closest('.cl-item');
+        const wrap = item?.querySelector(':scope > .cl-item-expanded-wrap');
+        if (!wrap) return;
+        const isOpen = wrap.style.display !== 'none' && wrap.offsetHeight > 0;
+        wrap.style.display = isOpen ? 'none' : '';
+        const chev = row.querySelector('.cl-item-chevron');
+        if (chev) {
+          chev.classList.toggle('ph-caret-up', !isOpen);
+          chev.classList.toggle('ph-caret-down', isOpen);
+        }
+      });
+    });
+
+    // Verified checkbox toggle — flip checked state + green tint on the row.
+    modal.querySelectorAll('[data-cl-check]').forEach(cb => {
+      cb.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const checked = cb.classList.toggle('checked');
+        cb.setAttribute('aria-pressed', String(checked));
+        cb.innerHTML = checked ? '<i class="ph-bold ph-check" aria-hidden="true"></i>' : '';
+        const item = cb.closest('.cl-item');
+        if (item) item.classList.toggle('cl-item--checked', checked);
+      });
+    });
+
+    // Ticket toggle (booking-required / not-required, activities only).
+    modal.querySelectorAll('[data-cl-booking-toggle]').forEach(t => {
+      t.addEventListener('click', (e) => {
+        e.stopPropagation();
+        t.classList.toggle('cl-ticket-toggle--off');
+      });
+    });
+
+    // More details disclosure inside an expanded item.
+    modal.querySelectorAll('[data-cl-more]').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const zone = b.closest('.cl-secondary-zone');
+        const fields = zone?.querySelector('.cl-secondary-fields');
+        if (!fields) return;
+        const willOpen = fields.classList.contains('hidden');
+        fields.classList.toggle('hidden', !willOpen);
+        zone.classList.toggle('open', willOpen);
+        const chev = b.querySelector('i');
+        if (chev) {
+          chev.classList.toggle('ph-caret-up', willOpen);
+          chev.classList.toggle('ph-caret-down', !willOpen);
+        }
+      });
+    });
+
+    // One-way / Round-trip toggle (transportation form).
+    modal.querySelectorAll('.cl-toggle-group').forEach(group => {
+      group.addEventListener('click', (e) => {
+        const btn = e.target.closest('.cl-toggle-btn');
+        if (!btn) return;
+        group.querySelectorAll('.cl-toggle-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+  })();
+</script>
+
+</body>
+</html>
