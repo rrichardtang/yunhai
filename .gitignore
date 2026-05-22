@@ -21,3 +21,4 @@ client_secret_*.json
 .trae
 .windsurf
 yunhai_client_secret.json
+.DS_Store
