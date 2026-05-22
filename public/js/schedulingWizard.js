@@ -66,7 +66,6 @@
     function render() {
       overlay.querySelector('#schedulingWizardBody').innerHTML = `
         <h2 class="wizard-question-label">Schedule <span class="serif">preferences</span></h2>
-        <p class="wizard-sub">How should we shape this trip's days? These apply to this trip only.</p>
 
         <div class="sched-row">
           <label class="sched-field">
