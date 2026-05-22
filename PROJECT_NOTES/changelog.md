@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-21] Teach Concierge Bot how the website works + step-aware suggestion chips
+
+- New `src/services/websiteGuide.md`: high-level, UI-label-only knowledge base covering the 4 steps (Setup / Review / Arrange / Finalize), Trip Health, Booking Checklist, Email Forwarding, Traveler Profile, calendar export, share link, save progress, and a "Not supported" section (no multi-user editing, no booking actions, no dark mode, no two-way calendar sync, no native app, no "pin"). Includes a no-guess directive: bot must propose the closest real feature when the user asks about something not in the guide, never fabricate steps.
+- `src/services/chatPrompt.js`: loads `websiteGuide.md` once at module init; new `looksLikeHelpQuestion(message)` heuristic (help phrases + app nouns); `buildChatSystemPrompt` accepts `{ includeWebsiteGuide }` and appends the guide + directive only when set.
+- `src/routes/chat.js`: computes `isHelp` per message; bypasses the cached prompt and skips Brave web search on help-shaped messages.
+- `public/app.js`: `STEP_SUGGESTED_QUESTIONS` map (3 questions per step) + `renderChatSuggestions()` that renders pill buttons above the chat input, hides once the user has sent a message, and re-renders on step change.
+- `public/planner.html`: added `#chatSuggestions` container above `#chatInputArea`.
+- `public/styles.css`: `.chat-suggestions` / `.chat-suggestion-chip` matching existing chat styling.
+- Tests: 99/99 passing.
+
 ## [2026-05-19] Add per-trip Scheduling Preferences wizard for Arrange step
 
 - New module `public/js/schedulingWizard.js`: single-page modal with day start/end times, tour timing radio (morning/afternoon/flexible), lunch/dinner times, breaks-between slider, and notes textarea. Exposes `defaultSchedulingPrefs`, `normalizeSchedulingPrefs`, `openSchedulingWizard`.

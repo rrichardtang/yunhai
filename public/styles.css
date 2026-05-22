@@ -1659,6 +1659,25 @@ body.overlay-active #chatWidget {
   max-width: 80%;
   font-size: .9rem;
 }
+.chat-suggestions {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px 14px 0;
+}
+.chat-suggestions.hidden { display: none; }
+.chat-suggestion-chip {
+  border: 1px solid var(--secondary);
+  background: var(--base-light);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: .8rem;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.chat-suggestion-chip:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
 #chatInputArea {
   display: flex; gap: 8px; padding: 12px 14px;
   border-top: 1px solid var(--secondary-light);
