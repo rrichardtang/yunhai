@@ -13,7 +13,7 @@ function sendDebug(scope, payload) {
   } catch {}
 }
 
-const APP_BUILD_ID = 'geocode-no-duplicate-city';
+const APP_BUILD_ID = 'geocode-fallback';
 sendDebug('boot', `build=${APP_BUILD_ID} loaded=${new Date().toISOString()} sw=${navigator.serviceWorker?.controller ? 'controlled' : 'uncontrolled'}`);
 
 ['prefsModal', 'checklistModal', 'budgetOptOverlay', 'addActivityModal',
