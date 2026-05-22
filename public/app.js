@@ -13,7 +13,7 @@ function sendDebug(scope, payload) {
   } catch {}
 }
 
-const APP_BUILD_ID = 'sw-network-first-v2';
+const APP_BUILD_ID = 'always-render-city-body';
 sendDebug('boot', `build=${APP_BUILD_ID} loaded=${new Date().toISOString()} sw=${navigator.serviceWorker?.controller ? 'controlled' : 'uncontrolled'}`);
 
 ['prefsModal', 'checklistModal', 'budgetOptOverlay', 'addActivityModal',
@@ -2563,13 +2563,13 @@ function renderCities() {
           <input type="date" class="gm-city__date" value="${esc(city.logistics.departure.date)}" data-field="dateTo" aria-label="End date" title="End date" />
           ${nightsCount ? `<span class="nights">${nightsCount} ${nightsCount === 1 ? 'night' : 'nights'}</span>` : ''}
         </div>
-        <button class="gm-city__chev" type="button" data-toggle-details aria-label="${city.detailsExpanded ? 'Collapse' : 'Expand'}" ${readyForDetails ? '' : 'disabled'} data-stop>
+        <button class="gm-city__chev" type="button" data-toggle-details aria-label="${city.detailsExpanded ? 'Collapse' : 'Expand'}" data-stop>
           <i class="ph-bold ph-caret-right" aria-hidden="true"></i>
         </button>
         <button class="gm-city__del" type="button" data-remove-city aria-label="Remove city" data-stop><i class="ph-bold ph-trash" aria-hidden="true"></i></button>
       </div>
 
-      ${readyForDetails && city.detailsExpanded ? `
+      ${city.detailsExpanded ? `
         <div class="gm-city__body">
           <nav class="gm-city__tabs" role="tablist">
             <span class="gm-city__tab ${activeTab === 'stay' ? 'active' : ''} ${hasStay ? 'has-data' : ''}" data-tab="stay" role="tab" tabindex="0"><span class="dot"></span> Stay</span>
@@ -2755,7 +2755,6 @@ function renderCities() {
 
     const head = row.querySelector('.gm-city__head');
     head?.addEventListener('click', (e) => {
-      if (!readyForDetails) return;
       const stopEl = e.target.closest('[data-stop]');
       if (stopEl && head.contains(stopEl) && stopEl !== head) return;
       const explicitToggle = e.target.closest('[data-toggle-details]');
@@ -2764,7 +2763,6 @@ function renderCities() {
       renderCities();
     });
     row.querySelector('.gm-city__chev')?.addEventListener('click', (e) => {
-      if (!readyForDetails) return;
       e.stopPropagation();
       city.detailsExpanded = !city.detailsExpanded;
       renderCities();
