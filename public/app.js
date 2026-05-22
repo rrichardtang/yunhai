@@ -531,10 +531,22 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
     if (!inner || !isMobile) return;
     inner.style.cssText = 'font-size:0.8rem;padding:4px 8px;height:32px;min-height:0;box-sizing:border-box';
   };
+  const dbg = (msg) => {
+    try {
+      fetch('/debug/client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: 'place-ac', message: msg })
+      });
+    } catch {}
+  };
+  dbg(`attach: field=${element.dataset.field || element.dataset.accommodationField || element.dataset.logistics || '?'} hasShadow=${!!placeAutocomplete.shadowRoot}`);
+
   const boundShadowInputs = new WeakSet();
   const onShadowInput = (event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement)) return;
+    dbg(`shadowInput: "${target.value}"`);
     element.value = target.value;
     element.dispatchEvent(new Event('input', { bubbles: true }));
     if (typeof onInput === 'function') onInput();
@@ -542,10 +554,13 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
   const bindShadowInputListener = () => {
     const sr = placeAutocomplete.shadowRoot;
     if (!sr) return;
-    sr.querySelectorAll('input').forEach((inner) => {
+    const inputs = sr.querySelectorAll('input');
+    if (inputs.length === 0) return;
+    inputs.forEach((inner) => {
       if (boundShadowInputs.has(inner)) return;
       boundShadowInputs.add(inner);
       inner.addEventListener('input', onShadowInput);
+      dbg(`bound shadow input (count=${inputs.length})`);
     });
   };
 
@@ -556,11 +571,17 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
   setTimeout(runShadowSetup, 500);
 
   if (placeAutocomplete.shadowRoot) {
-    new MutationObserver(bindShadowInputListener).observe(placeAutocomplete.shadowRoot, {
+    new MutationObserver(() => {
+      dbg('shadow mutation');
+      bindShadowInputListener();
+    }).observe(placeAutocomplete.shadowRoot, {
       childList: true,
       subtree: true
     });
+  } else {
+    dbg('no shadowRoot at attach time');
   }
+
 
   const getWidgetValue = () => {
     if (typeof placeAutocomplete.value === 'string') return placeAutocomplete.value;
@@ -605,8 +626,14 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
     }
   };
 
-  const handleInput = () => syncInputFromWidget('input');
-  const handleChange = () => syncInputFromWidget('change');
+  const handleInput = () => {
+    dbg(`host input event, widget.value="${typeof placeAutocomplete.value === 'string' ? placeAutocomplete.value : '(non-string)'}"`);
+    syncInputFromWidget('input');
+  };
+  const handleChange = () => {
+    dbg(`host change event`);
+    syncInputFromWidget('change');
+  };
   placeAutocomplete.addEventListener('input', handleInput);
   placeAutocomplete.addEventListener('change', handleChange);
   placeAutocomplete.addEventListener('gmp-select', handleSelection);
