@@ -5333,6 +5333,7 @@ select.gm-inp {
 body.is-dragging-activity { cursor: grabbing; }
 
 .scheduling-wizard-shell .profile-wizard-card { min-height: auto; gap: 18px; }
+.scheduling-wizard-shell .wizard-question-label { margin: 0 0 12px; }
 .sched-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .sched-field { display: flex; flex-direction: column; gap: 6px; }
 .sched-label {
