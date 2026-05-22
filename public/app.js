@@ -7056,7 +7056,7 @@ function getItineraryRows() {
       const notes = String(state.reviewed[activity.id]?.notes || '').trim();
       const referenceNum = getActivityReferenceNum(activity.id);
 
-      const priceTier = Number.isInteger(activity.price_tier) ? activity.price_tier : null;
+      const priceTier = Number.isInteger(activity.price_level) ? activity.price_level : null;
       return {
         id: activity.id,
         date: day.date,
