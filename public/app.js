@@ -8129,13 +8129,25 @@ function renderChatSuggestions() {
     return;
   }
   container.classList.remove('hidden');
-  const chipsHtml = questions.map((q) => `
+  const collapsed = !!state.chatSuggestionsCollapsed;
+  container.classList.toggle('chat-suggestions--collapsed', collapsed);
+  const toggleIcon = collapsed ? 'ph-caret-down' : 'ph-caret-up';
+  const toggleLabel = collapsed ? 'Show suggestions' : 'Hide suggestions';
+  const chipsHtml = collapsed ? '' : questions.map((q) => `
     <button type="button" class="chat-suggestion-chip">
       <span class="chat-suggestion-icon"><i class="ph-bold ${q.icon}" aria-hidden="true"></i></span>
       <span class="chat-suggestion-text">${esc(q.text)}</span>
       <span class="chat-suggestion-arrow" aria-hidden="true">→</span>
     </button>`).join('');
-  container.innerHTML = `<p class="chat-suggestions-label">Try asking</p>${chipsHtml}`;
+  container.innerHTML = `
+    <button type="button" class="chat-suggestions-label" aria-expanded="${!collapsed}" aria-label="${toggleLabel}">
+      <span>Try asking</span>
+      <i class="ph-bold ${toggleIcon}" aria-hidden="true"></i>
+    </button>${chipsHtml}`;
+  container.querySelector('.chat-suggestions-label').addEventListener('click', () => {
+    state.chatSuggestionsCollapsed = !state.chatSuggestionsCollapsed;
+    renderChatSuggestions();
+  });
   container.querySelectorAll('.chat-suggestion-chip').forEach((btn, i) => {
     btn.addEventListener('click', () => {
       els.chatInput.value = questions[i].text;

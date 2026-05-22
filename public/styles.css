@@ -1829,14 +1829,25 @@ body.overlay-active #chatWidget {
 }
 .chat-suggestions.hidden { display: none; }
 .chat-suggestions-label {
+  display: flex; align-items: center; justify-content: space-between;
   font-family: var(--chat-font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: rgba(244,241,236,.5);
   margin: 0 0 2px;
+  padding: 4px 2px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
   animation: chat-fade 200ms var(--chat-ease-out) 180ms backwards;
+  transition: color 140ms var(--chat-ease-out);
 }
+.chat-suggestions-label:hover { color: rgba(244,241,236,.85); }
+.chat-suggestions-label i { font-size: 12px; transition: transform 140ms var(--chat-ease-out); }
+.chat-suggestions--collapsed { padding-bottom: 6px; }
 .chat-suggestion-chip {
   display: flex; align-items: center; gap: 10px;
   padding: 11px 14px;
