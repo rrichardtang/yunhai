@@ -223,11 +223,6 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
 
       const updates = JSON.parse(response.choices?.[0]?.message?.content?.trim() || '{}');
 
-      if (updates.price_tier !== undefined) {
-        if (updates.price_level === undefined) updates.price_level = updates.price_tier;
-        delete updates.price_tier;
-      }
-
       const updatedName = updates.name || activity.name;
       const updatedCity = updates.city || activity.city;
       const isNewShape = activity.booking !== undefined;
