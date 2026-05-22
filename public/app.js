@@ -531,10 +531,24 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
     if (!inner || !isMobile) return;
     inner.style.cssText = 'font-size:0.8rem;padding:4px 8px;height:32px;min-height:0;box-sizing:border-box';
   };
-  styleShadowInput();
-  requestAnimationFrame(styleShadowInput);
-  setTimeout(styleShadowInput, 200);
-  setTimeout(styleShadowInput, 500);
+  let shadowInputBound = false;
+  const bindShadowInputListener = () => {
+    if (shadowInputBound) return;
+    const inner = placeAutocomplete.shadowRoot?.querySelector('input');
+    if (!inner) return;
+    shadowInputBound = true;
+    inner.addEventListener('input', () => {
+      element.value = inner.value;
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      if (typeof onInput === 'function') onInput();
+    });
+  };
+
+  const runShadowSetup = () => { styleShadowInput(); bindShadowInputListener(); };
+  runShadowSetup();
+  requestAnimationFrame(runShadowSetup);
+  setTimeout(runShadowSetup, 200);
+  setTimeout(runShadowSetup, 500);
 
   const getWidgetValue = () => {
     if (typeof placeAutocomplete.value === 'string') return placeAutocomplete.value;
@@ -2700,11 +2714,20 @@ function renderCities() {
         const field = input.dataset.field;
 
         if (field === 'name') {
+          const wasEmpty = !String(city.name || '').trim();
           city.name = input.value;
           city.placeId = '';
           city.latitude = null;
           city.longitude = null;
-          renderSetupInsights();
+          const isEmpty = !String(city.name || '').trim();
+          if (wasEmpty !== isEmpty) {
+            renderCities();
+            const restored = document.querySelector(`[data-city-id="${CSS.escape(city.id)}"] [data-field="name"]`);
+            const widget = restored?.nextElementSibling;
+            widget?.shadowRoot?.querySelector('input')?.focus();
+          } else {
+            renderSetupInsights();
+          }
           return;
         }
 
@@ -2762,13 +2785,15 @@ function renderCities() {
     if (cityNameInput && isGooglePlacesReady()) {
       attachPlaceAutocompleteElement(cityNameInput, {
         onResolved: ({ formattedAddress, placeId, lat, lng }) => {
+          const wasEmpty = !String(city.name || '').trim();
           city.name = formattedAddress;
           city.placeId = placeId;
           city.latitude = lat;
           city.longitude = lng;
           cityNameInput.value = formattedAddress;
           clearLocationValidationError();
-          renderSetupInsights();
+          if (wasEmpty) renderCities();
+          else renderSetupInsights();
         },
         onInput: () => {
           city.placeId = '';
@@ -2797,7 +2822,7 @@ function renderCities() {
           accommodationInput.value = formattedAddress;
           clearLocationValidationError();
         },
-        onInput: () => { city.accommodation.placeId = ''; city.accommodation.latitude = null; city.accommodation.longitude = null; },
+        onInput: () => { city.accommodation.address = accommodationInput.value; city.accommodation.placeId = ''; city.accommodation.latitude = null; city.accommodation.longitude = null; },
         onInvalid: () => {
           city.accommodation.placeId = ''; city.accommodation.latitude = null; city.accommodation.longitude = null;
           showLocationValidationError('Accommodation address is invalid. Please choose a Google Places suggestion.');
