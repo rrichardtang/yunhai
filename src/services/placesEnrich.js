@@ -127,7 +127,7 @@ async function fetchPlaceDetails(name, city, cityCenter = null) {
 function applyDetails(activity, details) {
   if (!details) return;
   if (Number.isInteger(details.priceTier) && isFoodActivity(activity)) {
-    activity.price_tier = details.priceTier;
+    activity.price_level = details.priceTier;
   }
   if (details.openingHours) {
     const llmHours = activity?.timing?.opening_hours || activity?.opening_hours || '';
