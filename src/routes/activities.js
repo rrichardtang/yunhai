@@ -157,7 +157,7 @@ function register(app) {
         debugLog('places-resolve', `findplace_http=${r.status} input="${input}"`);
       } else {
         const data = await r.json();
-        debugLog('places-resolve', `findplace status=${data.status} candidates=${(data.candidates || []).length} input="${input}"`);
+        debugLog('places-resolve', `findplace status=${data.status} candidates=${(data.candidates || []).length} input="${input}" err="${data.error_message || ''}"`);
         const candidate = Array.isArray(data.candidates) ? data.candidates[0] : null;
         if (candidate) {
           const response = {
@@ -183,7 +183,7 @@ function register(app) {
         return res.json(response);
       }
       const gdata = await gr.json();
-      debugLog('places-resolve', `geocode status=${gdata.status} results=${(gdata.results || []).length} input="${input}"`);
+      debugLog('places-resolve', `geocode status=${gdata.status} results=${(gdata.results || []).length} input="${input}" err="${gdata.error_message || ''}"`);
       const result = Array.isArray(gdata.results) ? gdata.results[0] : null;
       if (!result) {
         const response = { placeId: null };
