@@ -1,23 +1,25 @@
 # Current State
 
-_Last updated: 2026-05-19_
+_Last updated: 2026-05-21_
 
 ## Objective
-Add a per-trip "Schedule Preferences" wizard that feeds the Arrange step with explicit, structured scheduling inputs (day start/end, lunch/dinner times, tour timing, pacing) so the LLM-generated draft actually honors the traveler's day-shape preferences.
+Give the Concierge Bot grounded knowledge of how the website works so it can answer user "how do I…" questions without hallucinating, and nudge users with 3 step-aware suggested questions when the chat is empty.
 
 ## Active Workstream
-Branch `feature/scheduling-wizard-arrange` — implementation complete locally, tests pass (99/99). Awaiting push + staging verification.
+Branch `feature/concierge-bot-knowledge` — implementation complete locally, 99/99 tests pass. Awaiting smoke test in browser + push.
 
 ## Constraints
-- Per-trip scope: prefs stored on itinerary + localStorage; not per-profile (a beach trip ≠ a museum trip).
-- Window clamps must apply ONLY to the arrange POST payload, not to the global timeline UI — manual drag/drop still works across the full day range.
-- Arrival/departure days keep their travel-time bounds (clamp does not narrow them further).
+- Bot answers help questions strictly from `src/services/websiteGuide.md`. Never fabricates UI; proposes closest real feature when the user uses wrong terminology.
+- Website guide injected only when `looksLikeHelpQuestion(message)` returns true (saves tokens, preserves Brave quota).
+- Suggestion chips hide once the chat session has any user message.
+- No backend changes for chips (frontend uses existing `step` field in `tripContext`).
 
 ## Risks
+- Heuristic `looksLikeHelpQuestion` may false-trigger on travel questions that contain "where is" (e.g. "where is the best ramen"). The Brave search bypass would then hurt that one reply. Watch for this in smoke testing.
 - (Carried over) Google OAuth client secret was briefly exposed; should be rotated.
 - (Carried over) `client_secret_*.json` should be added to `.gitignore`.
 
 ## Next Actions
-- Push `feature/scheduling-wizard-arrange` and verify on staging.
-- Open the wizard from Draft on a fresh trip; confirm window clamps and prompt block reach the LLM.
+- Browser smoke test: ask each step's chips, then "How do I pin an activity?" (should propose Lock), and a non-help travel question (should still get Brave search).
+- Push `feature/concierge-bot-knowledge` and verify on staging.
 - Rotate Google OAuth secret + .gitignore the client_secret file (deferred from prior session).

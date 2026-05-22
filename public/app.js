@@ -171,6 +171,7 @@ const els = {
   chatPanel: document.getElementById('chatPanel'),
   chatClose: document.getElementById('chatClose'),
   chatMessages: document.getElementById('chatMessages'),
+  chatSuggestions: document.getElementById('chatSuggestions'),
   chatInput: document.getElementById('chatInput'),
   chatSend: document.getElementById('chatSend'),
   tripHealthBadge: document.getElementById("tripHealthBadge"),
@@ -979,6 +980,7 @@ function setStep(n, { pushHistory = true } = {}) {
   });
   els.panels.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
   if (pushHistory) history.pushState({ spa: true, step: n }, '');
+  if (typeof renderChatSuggestions === 'function') renderChatSuggestions();
 
   // Ensure the target step's content is rendered regardless of navigation source
   if (n !== prev) {
@@ -8012,6 +8014,29 @@ function buildScheduledDays() {
 
 const STEP_LABELS = { 1: 'setup', 2: 'reviewing activities', 3: 'arranging schedule', 4: 'itinerary finalized' };
 
+const STEP_SUGGESTED_QUESTIONS = {
+  'setup': [
+    "How do I add a city to my trip?",
+    "What does the 'leave time' field do?",
+    "Where do I put my hotel address?"
+  ],
+  'reviewing activities': [
+    "How do I get more activity suggestions?",
+    "What is Budget Optimization?",
+    "Why was this activity recommended for me?"
+  ],
+  'arranging schedule': [
+    "How do I lock an activity to a specific time?",
+    "Can I drag activities to reorder them?",
+    "What does the Draft button do?"
+  ],
+  'itinerary finalized': [
+    "How do I export to Google Calendar?",
+    "Where do I add my flight bookings?",
+    "What does 'Needs booking' mean in Trip Health?"
+  ]
+};
+
 function slimCities() {
   return state.cities.map((c) => ({
     name: c.name,
@@ -8074,6 +8099,28 @@ function renderChatMessages() {
     return `<div class="${msg.role === 'user' ? 'chat-msg-user' : 'chat-msg-assistant'}">${html}</div>`;
   }).join('');
   els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
+  renderChatSuggestions();
+}
+
+function renderChatSuggestions() {
+  const container = els.chatSuggestions;
+  if (!container) return;
+  const hasUserMessage = state.chatHistory.some((m) => m.role === 'user');
+  const label = STEP_LABELS[state.step];
+  const questions = STEP_SUGGESTED_QUESTIONS[label];
+  if (hasUserMessage || !questions) {
+    container.classList.add('hidden');
+    container.innerHTML = '';
+    return;
+  }
+  container.classList.remove('hidden');
+  container.innerHTML = questions.map((q) => `<button type="button" class="chat-suggestion-chip">${esc(q)}</button>`).join('');
+  container.querySelectorAll('.chat-suggestion-chip').forEach((btn, i) => {
+    btn.addEventListener('click', () => {
+      els.chatInput.value = questions[i];
+      sendChatMessage();
+    });
+  });
 }
 
 function setChatOpen(isOpen) {
