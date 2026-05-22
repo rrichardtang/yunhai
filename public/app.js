@@ -13,7 +13,7 @@ function sendDebug(scope, payload) {
   } catch {}
 }
 
-const APP_BUILD_ID = 'always-render-city-body';
+const APP_BUILD_ID = 'inline-header-and-blur-logs';
 sendDebug('boot', `build=${APP_BUILD_ID} loaded=${new Date().toISOString()} sw=${navigator.serviceWorker?.controller ? 'controlled' : 'uncontrolled'}`);
 
 ['prefsModal', 'checklistModal', 'budgetOptOverlay', 'addActivityModal',
@@ -2703,20 +2703,16 @@ function renderCities() {
         const field = input.dataset.field;
 
         if (field === 'name') {
-          const wasEmpty = !String(city.name || '').trim();
           city.name = input.value;
           city.placeId = '';
           city.latitude = null;
           city.longitude = null;
-          const isEmpty = !String(city.name || '').trim();
-          if (wasEmpty !== isEmpty) {
-            renderCities();
-            const restored = document.querySelector(`[data-city-id="${CSS.escape(city.id)}"] [data-field="name"]`);
-            const widget = restored?.nextElementSibling;
-            widget?.shadowRoot?.querySelector('input')?.focus();
-          } else {
-            renderSetupInsights();
+          const headerText = row.querySelector('.gm-city__name-text');
+          if (headerText) {
+            const trimmed = input.value.trim();
+            headerText.innerHTML = trimmed ? esc(trimmed) : '<span class="gm-city__sub-empty">Untitled city</span>';
           }
+          renderSetupInsights();
           return;
         }
 
@@ -2772,12 +2768,21 @@ function renderCities() {
     if (cityNameInput) {
       cityNameInput.addEventListener('blur', async () => {
         const query = cityNameInput.value.trim();
-        if (!query) return;
+        if (!query) {
+          sendDebug('city-blur', `id=${city.id} typed="" (no geocode)`);
+          return;
+        }
         try {
           const res = await fetch(`/api/places/resolve?q=${encodeURIComponent(query)}&city=${encodeURIComponent(query)}`);
-          if (!res.ok) return;
+          if (!res.ok) {
+            sendDebug('city-blur', `id=${city.id} typed="${query}" geocode_http=${res.status}`);
+            return;
+          }
           const place = await res.json();
-          if (!place?.placeId || !Number.isFinite(place?.lat) || !Number.isFinite(place?.lng)) return;
+          if (!place?.placeId || !Number.isFinite(place?.lat) || !Number.isFinite(place?.lng)) {
+            sendDebug('city-blur', `id=${city.id} typed="${query}" geocode=no_match raw=${JSON.stringify(place).slice(0, 200)}`);
+            return;
+          }
           city.placeId = place.placeId;
           city.latitude = place.lat;
           city.longitude = place.lng;
@@ -2787,7 +2792,10 @@ function renderCities() {
             cityNameInput.value = formatted;
             renderCities();
           }
-        } catch {}
+          sendDebug('city-blur', `id=${city.id} name="${city.name}" placeId=${city.placeId} lat=${city.latitude} lng=${city.longitude}`);
+        } catch (err) {
+          sendDebug('city-blur', `id=${city.id} typed="${query}" error=${err?.message || err}`);
+        }
       });
     }
     bindTextareaExpandButtons(row);
