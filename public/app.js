@@ -13,7 +13,7 @@ function sendDebug(scope, payload) {
   } catch {}
 }
 
-const APP_BUILD_ID = 'inline-header-and-blur-logs';
+const APP_BUILD_ID = 'geocode-no-duplicate-city';
 sendDebug('boot', `build=${APP_BUILD_ID} loaded=${new Date().toISOString()} sw=${navigator.serviceWorker?.controller ? 'controlled' : 'uncontrolled'}`);
 
 ['prefsModal', 'checklistModal', 'budgetOptOverlay', 'addActivityModal',
@@ -2773,7 +2773,7 @@ function renderCities() {
           return;
         }
         try {
-          const res = await fetch(`/api/places/resolve?q=${encodeURIComponent(query)}&city=${encodeURIComponent(query)}`);
+          const res = await fetch(`/api/places/resolve?q=${encodeURIComponent(query)}`);
           if (!res.ok) {
             sendDebug('city-blur', `id=${city.id} typed="${query}" geocode_http=${res.status}`);
             return;
