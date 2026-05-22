@@ -3,23 +3,24 @@
 _Last updated: 2026-05-21_
 
 ## Objective
-Give the Concierge Bot grounded knowledge of how the website works so it can answer user "how do I…" questions without hallucinating, and nudge users with 3 step-aware suggested questions when the chat is empty.
+Concierge bot revamp: grounded website knowledge with no-guess directive, step-aware suggestion chips, and a high-fidelity dark-theme redesign per `design_handoff_concierge/`.
 
 ## Active Workstream
-Branch `feature/concierge-bot-knowledge` — implementation complete locally, 99/99 tests pass. Awaiting smoke test in browser + push.
+Branch `feature/concierge-bot-knowledge` — knowledge base + step-aware chips shipped earlier this session; redesigned chat widget UI shipped just now. 99/99 tests pass. Awaiting browser smoke test + push of the redesign commit.
 
 ## Constraints
-- Bot answers help questions strictly from `src/services/websiteGuide.md`. Never fabricates UI; proposes closest real feature when the user uses wrong terminology.
-- Website guide injected only when `looksLikeHelpQuestion(message)` returns true (saves tokens, preserves Brave quota).
-- Suggestion chips hide once the chat session has any user message.
-- No backend changes for chips (frontend uses existing `step` field in `tripContext`).
+- Bot answers help questions strictly from `src/services/websiteGuide.md`; closest-match + confirm when feature doesn't exist.
+- Website guide injected only when `looksLikeHelpQuestion(message)` returns true.
+- Chat redesign uses tokens from `design_handoff_concierge/tokens.css` (ink-900 shell, paper-0 text, electric-blue accent). Geist / Instrument Serif / Geist Mono fonts already loaded in `planner.html`.
+- `prefers-reduced-motion` disables halo, glint, avatar pulse, and replaces morph with a 120ms fade.
+- Suggestion chips hide once the chat session has any user message; chip text remains step-aware (4 sets of 3).
 
 ## Risks
-- Heuristic `looksLikeHelpQuestion` may false-trigger on travel questions that contain "where is" (e.g. "where is the best ramen"). The Brave search bypass would then hurt that one reply. Watch for this in smoke testing.
+- Heuristic `looksLikeHelpQuestion` may false-trigger on travel questions that contain "where is" — Brave search bypass would hurt that reply. Watch for this.
 - (Carried over) Google OAuth client secret was briefly exposed; should be rotated.
 - (Carried over) `client_secret_*.json` should be added to `.gitignore`.
 
 ## Next Actions
-- Browser smoke test: ask each step's chips, then "How do I pin an activity?" (should propose Lock), and a non-help travel question (should still get Brave search).
+- Browser smoke test: open chat, verify FAB animations + morph, click each step's chips, send a help question (verify typing dots → reply with role label), test Escape-to-close, test reduced-motion mode in DevTools.
 - Push `feature/concierge-bot-knowledge` and verify on staging.
 - Rotate Google OAuth secret + .gitignore the client_secret file (deferred from prior session).

@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-21] Redesign concierge chat widget per design_handoff_concierge spec
+
+- `public/planner.html`: rebuilt `#chatWidget` markup — FAB with halo ripple + glint pulse, expanded panel with avatar (gradient + pulsing ring), Concierge/me identity, ONLINE status row, rotating close button, input pill, send circle, AI legal microtext.
+- `public/styles.css`: replaced entire chat CSS block with dark-theme styles using design tokens (`--ink-900` shell, `--paper-0` text, `--accent` blue). Added `chat-msg-welcome`, `.chat-role-label`, `.chat-typing` (3-dot bounce), `.chat-suggestions-label`, `.chat-suggestion-icon`/`text`/`arrow` chip layout, `.chat-input-pill`, `.chat-legal`. Added `prefers-reduced-motion` fallback that disables halo/glint/avatar pulse and replaces morph with 120ms fade. Updated mobile bottom-sheet override to use 22px top radius.
+- `public/app.js`: `STEP_SUGGESTED_QUESTIONS` entries are now `{icon, text}` (Phosphor icons per question, 12 total). `renderChatMessages` renders the always-visible welcome bubble (until first message) and uses a separate `.chat-typing` indicator instead of a fake assistant message. `renderChatSuggestions` emits the new chip layout with icon tile + text + arrow and a "TRY ASKING" eyebrow label. `setChatOpen` flips `[data-state]` on the widget (hides FAB) and focuses the input ~320ms after open. New `updateChatSendEnabled` greys the send button when input is empty or while thinking. `bindChatEvents` adds Escape-to-close and input-driven send-button state.
+- 99/99 tests still passing.
+
 ## [2026-05-21] Teach Concierge Bot how the website works + step-aware suggestion chips
 
 - New `src/services/websiteGuide.md`: high-level, UI-label-only knowledge base covering the 4 steps (Setup / Review / Arrange / Finalize), Trip Health, Booking Checklist, Email Forwarding, Traveler Profile, calendar export, share link, save progress, and a "Not supported" section (no multi-user editing, no booking actions, no dark mode, no two-way calendar sync, no native app, no "pin"). Includes a no-guess directive: bot must propose the closest real feature when the user asks about something not in the guide, never fabricate steps.

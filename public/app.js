@@ -8016,24 +8016,24 @@ const STEP_LABELS = { 1: 'setup', 2: 'reviewing activities', 3: 'arranging sched
 
 const STEP_SUGGESTED_QUESTIONS = {
   'setup': [
-    "How do I add a city to my trip?",
-    "What does the 'leave time' field do?",
-    "Where do I put my hotel address?"
+    { icon: 'ph-map-pin', text: "How do I add a city to my trip?" },
+    { icon: 'ph-clock', text: "What does the 'leave time' field do?" },
+    { icon: 'ph-house', text: "Where do I put my hotel address?" }
   ],
   'reviewing activities': [
-    "How do I get more activity suggestions?",
-    "What is Budget Optimization?",
-    "Why was this activity recommended for me?"
+    { icon: 'ph-sparkle', text: "How do I get more activity suggestions?" },
+    { icon: 'ph-currency-dollar', text: "What is Budget Optimization?" },
+    { icon: 'ph-question', text: "Why was this activity recommended for me?" }
   ],
   'arranging schedule': [
-    "How do I lock an activity to a specific time?",
-    "Can I drag activities to reorder them?",
-    "What does the Draft button do?"
+    { icon: 'ph-lock', text: "How do I lock an activity to a specific time?" },
+    { icon: 'ph-arrows-out-cardinal', text: "Can I drag activities to reorder them?" },
+    { icon: 'ph-magic-wand', text: "What does the Draft button do?" }
   ],
   'itinerary finalized': [
-    "How do I export to Google Calendar?",
-    "Where do I add my flight bookings?",
-    "What does 'Needs booking' mean in Trip Health?"
+    { icon: 'ph-calendar-blank', text: "How do I export to Google Calendar?" },
+    { icon: 'ph-airplane-takeoff', text: "Where do I add my flight bookings?" },
+    { icon: 'ph-heartbeat', text: "What does 'Needs booking' mean in Trip Health?" }
   ]
 };
 
@@ -8088,16 +8088,31 @@ function ensureChatSessionId() {
   return state.chatSessionId;
 }
 
+const CHAT_WELCOME = {
+  headline: "Hello — I'm your trip concierge.",
+  sub: "Ask about restaurants, timing, weather, or what to swap in your itinerary."
+};
+
 function renderChatMessages() {
   if (!els.chatMessages) return;
-  els.chatMessages.innerHTML = state.chatHistory.map((msg) => {
+  const hasMessages = state.chatHistory.length > 0;
+  const welcomeHtml = hasMessages ? '' : `
+    <div class="chat-msg-assistant chat-msg-welcome">
+      <span class="chat-role-label">Concierge</span>
+      ${esc(CHAT_WELCOME.headline)}
+      <span class="chat-msg-sub">${esc(CHAT_WELCOME.sub)}</span>
+    </div>`;
+  const messagesHtml = state.chatHistory.map((msg) => {
     let html = esc(msg.content || '');
     if (msg.role === 'assistant') {
       html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
       html = html.replace(/(^|[^"'>])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener">link</a>');
+      return `<div class="chat-msg-assistant"><span class="chat-role-label">Concierge</span>${html}</div>`;
     }
-    return `<div class="${msg.role === 'user' ? 'chat-msg-user' : 'chat-msg-assistant'}">${html}</div>`;
+    return `<div class="chat-msg-user">${html}</div>`;
   }).join('');
+  const typingHtml = state.chatLoading ? '<div class="chat-typing" aria-label="Concierge is typing"><span></span><span></span><span></span></div>' : '';
+  els.chatMessages.innerHTML = welcomeHtml + messagesHtml + typingHtml;
   els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
   renderChatSuggestions();
 }
@@ -8114,10 +8129,16 @@ function renderChatSuggestions() {
     return;
   }
   container.classList.remove('hidden');
-  container.innerHTML = questions.map((q) => `<button type="button" class="chat-suggestion-chip">${esc(q)}</button>`).join('');
+  const chipsHtml = questions.map((q) => `
+    <button type="button" class="chat-suggestion-chip">
+      <span class="chat-suggestion-icon"><i class="ph-bold ${q.icon}" aria-hidden="true"></i></span>
+      <span class="chat-suggestion-text">${esc(q.text)}</span>
+      <span class="chat-suggestion-arrow" aria-hidden="true">→</span>
+    </button>`).join('');
+  container.innerHTML = `<p class="chat-suggestions-label">Try asking</p>${chipsHtml}`;
   container.querySelectorAll('.chat-suggestion-chip').forEach((btn, i) => {
     btn.addEventListener('click', () => {
-      els.chatInput.value = questions[i];
+      els.chatInput.value = questions[i].text;
       sendChatMessage();
     });
   });
@@ -8126,6 +8147,17 @@ function renderChatSuggestions() {
 function setChatOpen(isOpen) {
   state.chatOpen = isOpen;
   els.chatPanel.classList.toggle('hidden', !isOpen);
+  const widget = document.getElementById('chatWidget');
+  if (widget) widget.setAttribute('data-state', isOpen ? 'expanded' : 'collapsed');
+  if (isOpen) {
+    setTimeout(() => { els.chatInput?.focus(); }, 320);
+  }
+}
+
+function updateChatSendEnabled() {
+  if (!els.chatSend) return;
+  const hasText = (els.chatInput?.value || '').trim().length > 0;
+  els.chatSend.disabled = !hasText || state.chatLoading;
 }
 
 async function restoreChatHistory() {
@@ -8149,11 +8181,9 @@ async function sendChatMessage() {
 
   state.chatHistory.push({ role: 'user', content: message });
   els.chatInput.value = '';
-  renderChatMessages();
-
   state.chatLoading = true;
-  state.chatHistory.push({ role: 'assistant', content: 'Thinking...' });
   renderChatMessages();
+  updateChatSendEnabled();
 
   try {
     const res = await apiFetch('/api/chat/message', {
@@ -8168,19 +8198,19 @@ async function sendChatMessage() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Chat failed');
-
-    state.chatHistory[state.chatHistory.length - 1] = {
+    state.chatHistory.push({
       role: 'assistant',
-      content: data.reply || 'Sorry, chat is unavailable right now.'
-    };
+      content: data.reply || "I couldn't reach my brain just now — try again in a moment."
+    });
   } catch (err) {
-    state.chatHistory[state.chatHistory.length - 1] = {
+    state.chatHistory.push({
       role: 'assistant',
-      content: err.message || 'Sorry, chat is unavailable right now.'
-    };
+      content: err.message || "I couldn't reach my brain just now — try again in a moment."
+    });
   } finally {
     state.chatLoading = false;
     renderChatMessages();
+    updateChatSendEnabled();
   }
 }
 
@@ -8209,6 +8239,11 @@ function bindChatEvents() {
       sendChatMessage();
     }
   });
+  els.chatInput.addEventListener('input', updateChatSendEnabled);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && state.chatOpen) setChatOpen(false);
+  });
+  updateChatSendEnabled();
 }
 
 function mountPlanningOverlay() {
