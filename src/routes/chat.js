@@ -15,8 +15,7 @@ const {
   buildChatSystemPrompt,
   parseChatResponse,
   processChatSignals,
-  toOpenAiMessages,
-  looksLikeHelpQuestion
+  toOpenAiMessages
 } = require('../services/chatPrompt');
 
 const CHAT_CONCIERGE_MODEL = 'gpt-5.4-mini';
@@ -40,13 +39,10 @@ function register(app) {
       setTripContext(sessionId, tripContext || {});
       addMessage(sessionId, 'user', message);
 
-      const isHelp = looksLikeHelpQuestion(message);
-      const systemPrompt = isHelp
-        ? buildChatSystemPrompt(tripContext || {}, prefSummary, { includeWebsiteGuide: true })
-        : getCachedPrompt(sessionId, tripContext || {}, () => buildChatSystemPrompt(tripContext || {}, prefSummary));
+      const systemPrompt = getCachedPrompt(sessionId, tripContext || {}, () => buildChatSystemPrompt(tripContext || {}, prefSummary));
 
       let searchContext = '';
-      if (!isHelp && isBraveConfigured() && shouldUseBrave('chat_concierge', { userMessage: message })) {
+      if (isBraveConfigured() && shouldUseBrave('chat_concierge', { userMessage: message })) {
         try {
           const searchResults = await searchForChat(message, { count: 5 });
           if (searchResults) {

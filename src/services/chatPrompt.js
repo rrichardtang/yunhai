@@ -4,58 +4,6 @@ const { recordPreference, recordConstraint } = require('../preferences');
 
 const WEBSITE_GUIDE = fs.readFileSync(path.join(__dirname, 'websiteGuide.md'), 'utf8');
 
-// Travel/activity-suggestion signals. If the message contains ANY of these
-// (as whole words), it's a Bucket A (travel suggestion) question — route
-// to Brave search. Otherwise, default to Bucket B (website) and load the
-// guide. Keywords kept specific to avoid false positives — short generic
-// words like "do", "see", "try", "go" are intentionally excluded.
-const TRAVEL_KEYWORDS = [
-  // food + dining
-  'restaurant', 'restaurants', 'cafe', 'café', 'cafes', 'cafés', 'bistro', 'bistros',
-  'pub', 'pubs', 'dining', 'eat', 'eating', 'food', 'foods', 'dish', 'dishes',
-  'cuisine', 'cuisines', 'meal', 'meals', 'breakfast', 'lunch', 'dinner', 'brunch',
-  'snack', 'snacks', 'drink', 'drinks', 'coffee', 'tea', 'wine', 'cocktail', 'cocktails',
-  'ramen', 'sushi', 'tapas', 'pizza', 'pasta', 'noodles', 'bbq', 'michelin', 'reservation',
-  // places + attractions
-  'museum', 'museums', 'gallery', 'galleries', 'park', 'parks', 'beach', 'beaches',
-  'temple', 'temples', 'shrine', 'shrines', 'church', 'churches', 'cathedral',
-  'mosque', 'monument', 'landmark', 'landmarks', 'palace', 'castle', 'castles',
-  'neighborhood', 'neighborhoods', 'neighbourhood', 'neighbourhoods',
-  'district', 'districts', 'attraction', 'attractions', 'sight', 'sights',
-  'sightseeing', 'tour', 'tours', 'guided',
-  'market', 'markets', 'mall', 'malls', 'boutique', 'boutiques',
-  // travel verbs / nouns
-  'visit', 'visiting', 'explore', 'exploring', 'experience',
-  'recommend', 'recommendation', 'recommendations', 'suggest', 'suggestion', 'suggestions',
-  'must-see', 'must-do', 'hidden gem', 'hidden gems', 'itinerary idea',
-  // logistics + weather
-  'weather', 'rain', 'rains', 'raining', 'rainy', 'sunny', 'cloudy', 'forecast',
-  'temperature', 'humidity', 'transport', 'transit', 'metro', 'subway', 'bus',
-  'taxi', 'uber', 'rental', 'walking', 'flight', 'flights', 'airport', 'train',
-  'hotel', 'hotels', 'airbnb', 'jetlag', 'jet lag', 'currency', 'tipping', 'safety',
-  // activity types
-  'hike', 'hikes', 'hiking', 'swim', 'swimming', 'snorkel', 'snorkeling',
-  'dive', 'diving', 'surf', 'surfing', 'ski', 'skiing', 'bike', 'biking', 'cycling',
-  // shopping (the activity, not the step)
-  'souvenirs', 'gifts',
-  // contextual phrases
-  'near my hotel', 'near the hotel', 'nearby', 'around here',
-  'swap', 'swap for', 'alternative to', 'something else'
-];
-
-const TRAVEL_KEYWORD_REGEX = new RegExp(
-  '\\b(' + TRAVEL_KEYWORDS.map((kw) => kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b',
-  'i'
-);
-
-function looksLikeHelpQuestion(message) {
-  if (!message || typeof message !== 'string') return false;
-  // Default to Bucket B (website help) unless the message clearly asks for
-  // travel suggestions. The small chat model is much more likely to invent
-  // app behavior than to invent travel facts, so this bias is safer.
-  return !TRAVEL_KEYWORD_REGEX.test(message);
-}
-
 function formatCityLine(city) {
   const accomLabel = city.accommodation?.address || 'none listed';
   return `${city.name} (${city.startDate} → ${city.endDate}, leaving ${city.leaveTime || '18:00'}) — staying: ${accomLabel}`;
@@ -75,7 +23,7 @@ function buildWebsiteGuideBlock() {
   return directive;
 }
 
-function buildChatSystemPrompt(tripContext = {}, prefSummary = '', opts = {}) {
+function buildChatSystemPrompt(tripContext = {}, prefSummary = '') {
   const cities = Array.isArray(tripContext.cities) && tripContext.cities.length
     ? tripContext.cities.map(formatCityLine).join('\n')
     : 'None yet';
@@ -95,7 +43,7 @@ BUCKET A — TRAVEL SUGGESTIONS (restaurants, activities, timing, weather, what 
 - If no search results are present for a travel question, say so plainly in one sentence — do not guess from general knowledge.
 
 BUCKET B — HOW THE WEBSITE WORKS (any question about a button, step, feature, menu, icon, control, or how to do something in the app, including questions like "what does X do" where X is part of the UI):
-- Your ONLY source of truth is the "How this website works" guide below. If the guide is not present below, say: "Let me check that — could you ask again?" Do NOT answer from memory or by inferring meaning from the button/feature name.
+- Your ONLY source of truth is the "How this website works" guide below. Do NOT answer from memory or by inferring meaning from the button/feature name.
 - NEVER infer behavior from English meaning. The word "Draft" in this app does NOT mean "save a draft of edits" just because that's what "draft" means elsewhere. Read the guide.
 - If the user references something that does not appear in the guide, pick the closest real feature, describe it briefly, and ask the user to confirm.
 - Use the UI labels exactly as written in the guide. Never mention file paths, routes, code, or technical implementation.
@@ -120,8 +68,7 @@ Only include signals when the user clearly states something personal. Omit if em
   const tripBlock = `\n\n## Trip: ${tripContext.tripName || 'Untitled'} (${tripContext.step || 'unknown'})\n${cities}${activityLines}`;
   const scheduleBlock = formatScheduleBlock(tripContext.scheduledByDay);
 
-  const guideBlock = opts.includeWebsiteGuide ? buildWebsiteGuideBlock() : '';
-  return base + profileBlock + tripBlock + scheduleBlock + guideBlock;
+  return base + profileBlock + tripBlock + scheduleBlock + buildWebsiteGuideBlock();
 }
 
 function parseChatResponse(raw) {
@@ -160,6 +107,5 @@ module.exports = {
   buildChatSystemPrompt,
   parseChatResponse,
   processChatSignals,
-  toOpenAiMessages,
-  looksLikeHelpQuestion
+  toOpenAiMessages
 };
