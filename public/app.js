@@ -4086,10 +4086,9 @@ function renderActivities() {
             </div>
             <div class="activity-inline-row">
               <div class="textarea-expand-wrap activity-notes-wrap">
-                <textarea id="actDecline-${a.id}" class="profile-textarea-fixed decline-reason" rows="2" maxlength="200" placeholder="Tweak or replace this activity…"></textarea>
-                <button class="textarea-expand-btn" type="button" data-expand="actDecline-${a.id}" data-title="Modify / Replace — ${esc(a.name)}" aria-label="Expand reason"><i class="ph-bold ph-arrows-out-simple"></i></button>
+                <textarea id="actDecline-${a.id}" class="profile-textarea-fixed decline-reason" rows="2" maxlength="200" placeholder="Why replace this activity?…"></textarea>
+                <button class="textarea-expand-btn" type="button" data-expand="actDecline-${a.id}" data-title="Replace — ${esc(a.name)}" aria-label="Expand reason"><i class="ph-bold ph-arrows-out-simple"></i></button>
               </div>
-              <button class="icon-btn confirm-modify" type="button" title="Adjust name, price, or details" aria-label="Modify" disabled><i class="ph-bold ph-pencil-simple"></i></button>
               <button class="icon-btn confirm-replace" type="button" title="Swap for a different activity" aria-label="Replace" disabled><i class="ph-bold ph-arrows-clockwise"></i></button>
             </div>
           </div>
@@ -4135,7 +4134,6 @@ function renderActivities() {
       renderBudgetTracker();
     });
     const declineReason = card.querySelector('.decline-reason');
-    const confirmModify = card.querySelector('.confirm-modify');
     const confirmReplace = card.querySelector('.confirm-replace');
     const saveActivityNotes = card.querySelector('.save-activity-notes');
     const activityNotesText = card.querySelector('.activity-notes-text');
@@ -4163,29 +4161,7 @@ function renderActivities() {
     });
 
     declineReason.addEventListener('input', () => {
-      const hasText = !!declineReason.value.trim();
-      confirmModify.disabled = !hasText;
-      confirmReplace.disabled = !hasText;
-    });
-
-    confirmModify.addEventListener('click', async () => {
-      const note = declineReason.value.trim();
-      if (!note) return;
-      confirmModify.disabled = true;
-      confirmModify.innerHTML = '<i class="ph-bold ph-spinner"></i>';
-      try {
-        const resp = await apiFetch('/api/activity/refine', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity: a, note, userId: ensureUserId() })
-        });
-        if (!resp.ok) throw new Error('Modify failed');
-        const { updates } = await resp.json();
-        updateActivityInState(a.id, updates);
-      } catch {
-        confirmModify.innerHTML = '<i class="ph-bold ph-pencil-simple"></i>';
-        confirmModify.disabled = false;
-      }
+      confirmReplace.disabled = !declineReason.value.trim();
     });
 
     confirmReplace.addEventListener('click', async () => {
@@ -4276,7 +4252,6 @@ function renderActivities() {
 
     const expandDeclineBtn = body.querySelector('.decline');
     const expandDeclineReason = body.querySelector('.decline-reason');
-    const expandConfirmModify = body.querySelector('.confirm-modify');
     const expandConfirmReplace = body.querySelector('.confirm-replace');
     const expandSaveActivityNotes = body.querySelector('.save-activity-notes');
     const expandActivityNotesText = body.querySelector('.activity-notes-text');
@@ -4298,30 +4273,7 @@ function renderActivities() {
     });
 
     expandDeclineReason?.addEventListener('input', () => {
-      const hasText = !!expandDeclineReason.value.trim();
-      if (expandConfirmModify) expandConfirmModify.disabled = !hasText;
-      if (expandConfirmReplace) expandConfirmReplace.disabled = !hasText;
-    });
-
-    expandConfirmModify?.addEventListener('click', async () => {
-      const note = expandDeclineReason.value.trim();
-      if (!note) return;
-      expandConfirmModify.disabled = true;
-      expandConfirmModify.innerHTML = '<i class="ph-bold ph-spinner"></i>';
-      try {
-        const resp = await apiFetch('/api/activity/refine', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity: a, note, userId: ensureUserId() })
-        });
-        if (!resp.ok) throw new Error('Modify failed');
-        const { updates } = await resp.json();
-        close();
-        updateActivityInState(a.id, updates);
-      } catch {
-        expandConfirmModify.innerHTML = '<i class="ph-bold ph-pencil-simple"></i>';
-        expandConfirmModify.disabled = false;
-      }
+      if (expandConfirmReplace) expandConfirmReplace.disabled = !expandDeclineReason.value.trim();
     });
 
     expandConfirmReplace?.addEventListener('click', async () => {
