@@ -531,16 +531,21 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
     if (!inner || !isMobile) return;
     inner.style.cssText = 'font-size:0.8rem;padding:4px 8px;height:32px;min-height:0;box-sizing:border-box';
   };
-  let shadowInputBound = false;
+  const boundShadowInputs = new WeakSet();
+  const onShadowInput = (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    element.value = target.value;
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    if (typeof onInput === 'function') onInput();
+  };
   const bindShadowInputListener = () => {
-    if (shadowInputBound) return;
-    const inner = placeAutocomplete.shadowRoot?.querySelector('input');
-    if (!inner) return;
-    shadowInputBound = true;
-    inner.addEventListener('input', () => {
-      element.value = inner.value;
-      element.dispatchEvent(new Event('input', { bubbles: true }));
-      if (typeof onInput === 'function') onInput();
+    const sr = placeAutocomplete.shadowRoot;
+    if (!sr) return;
+    sr.querySelectorAll('input').forEach((inner) => {
+      if (boundShadowInputs.has(inner)) return;
+      boundShadowInputs.add(inner);
+      inner.addEventListener('input', onShadowInput);
     });
   };
 
@@ -549,6 +554,13 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
   requestAnimationFrame(runShadowSetup);
   setTimeout(runShadowSetup, 200);
   setTimeout(runShadowSetup, 500);
+
+  if (placeAutocomplete.shadowRoot) {
+    new MutationObserver(bindShadowInputListener).observe(placeAutocomplete.shadowRoot, {
+      childList: true,
+      subtree: true
+    });
+  }
 
   const getWidgetValue = () => {
     if (typeof placeAutocomplete.value === 'string') return placeAutocomplete.value;
