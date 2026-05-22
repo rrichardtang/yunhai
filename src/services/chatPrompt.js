@@ -4,26 +4,56 @@ const { recordPreference, recordConstraint } = require('../preferences');
 
 const WEBSITE_GUIDE = fs.readFileSync(path.join(__dirname, 'websiteGuide.md'), 'utf8');
 
-const HELP_PHRASES = [
-  'how do i', 'how do you', 'how can i', 'how does',
-  'where do i', 'where is', 'where can i', 'where are',
-  'what does', 'what is the', 'what are the',
-  'can i', 'is there a way', 'is there an option',
-  "i don't know how", "i dont know how", "i'm confused", 'im confused',
-  'confused about', 'help me with', 'help with the'
+// Travel/activity-suggestion signals. If the message contains ANY of these
+// (as whole words), it's a Bucket A (travel suggestion) question — route
+// to Brave search. Otherwise, default to Bucket B (website) and load the
+// guide. Keywords kept specific to avoid false positives — short generic
+// words like "do", "see", "try", "go" are intentionally excluded.
+const TRAVEL_KEYWORDS = [
+  // food + dining
+  'restaurant', 'restaurants', 'cafe', 'café', 'cafes', 'cafés', 'bistro', 'bistros',
+  'pub', 'pubs', 'dining', 'eat', 'eating', 'food', 'foods', 'dish', 'dishes',
+  'cuisine', 'cuisines', 'meal', 'meals', 'breakfast', 'lunch', 'dinner', 'brunch',
+  'snack', 'snacks', 'drink', 'drinks', 'coffee', 'tea', 'wine', 'cocktail', 'cocktails',
+  'ramen', 'sushi', 'tapas', 'pizza', 'pasta', 'noodles', 'bbq', 'michelin', 'reservation',
+  // places + attractions
+  'museum', 'museums', 'gallery', 'galleries', 'park', 'parks', 'beach', 'beaches',
+  'temple', 'temples', 'shrine', 'shrines', 'church', 'churches', 'cathedral',
+  'mosque', 'monument', 'landmark', 'landmarks', 'palace', 'castle', 'castles',
+  'neighborhood', 'neighborhoods', 'neighbourhood', 'neighbourhoods',
+  'district', 'districts', 'attraction', 'attractions', 'sight', 'sights',
+  'sightseeing', 'tour', 'tours', 'guided',
+  'market', 'markets', 'mall', 'malls', 'boutique', 'boutiques',
+  // travel verbs / nouns
+  'visit', 'visiting', 'explore', 'exploring', 'experience',
+  'recommend', 'recommendation', 'recommendations', 'suggest', 'suggestion', 'suggestions',
+  'must-see', 'must-do', 'hidden gem', 'hidden gems', 'itinerary idea',
+  // logistics + weather
+  'weather', 'rain', 'rains', 'raining', 'rainy', 'sunny', 'cloudy', 'forecast',
+  'temperature', 'humidity', 'transport', 'transit', 'metro', 'subway', 'bus',
+  'taxi', 'uber', 'rental', 'walking', 'flight', 'flights', 'airport', 'train',
+  'hotel', 'hotels', 'airbnb', 'jetlag', 'jet lag', 'currency', 'tipping', 'safety',
+  // activity types
+  'hike', 'hikes', 'hiking', 'swim', 'swimming', 'snorkel', 'snorkeling',
+  'dive', 'diving', 'surf', 'surfing', 'ski', 'skiing', 'bike', 'biking', 'cycling',
+  // shopping (the activity, not the step)
+  'souvenirs', 'gifts',
+  // contextual phrases
+  'near my hotel', 'near the hotel', 'nearby', 'around here',
+  'swap', 'swap for', 'alternative to', 'something else'
 ];
 
-const HELP_NOUNS = [
-  'button', 'step', 'tab', 'menu', 'icon', 'checklist', 'calendar export',
-  'forwarding', 'forward email', 'preferences', 'profile', 'lock', 'unlock',
-  'arrange', 'trip health', 'finalize', 'draft', 'approve', 'decline',
-  'budget optimization', 'sign in', 'share trip', 'pdf', 'sync'
-];
+const TRAVEL_KEYWORD_REGEX = new RegExp(
+  '\\b(' + TRAVEL_KEYWORDS.map((kw) => kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b',
+  'i'
+);
 
 function looksLikeHelpQuestion(message) {
   if (!message || typeof message !== 'string') return false;
-  const m = message.toLowerCase();
-  return HELP_PHRASES.some((p) => m.includes(p)) || HELP_NOUNS.some((n) => m.includes(n));
+  // Default to Bucket B (website help) unless the message clearly asks for
+  // travel suggestions. The small chat model is much more likely to invent
+  // app behavior than to invent travel facts, so this bias is safer.
+  return !TRAVEL_KEYWORD_REGEX.test(message);
 }
 
 function formatCityLine(city) {
@@ -41,7 +71,7 @@ function formatScheduleBlock(scheduledByDay) {
 }
 
 function buildWebsiteGuideBlock() {
-  const directive = `\n\n## How this website works (for answering user help questions)\n\nWhen the user asks about how the app works, the guide below is your ONLY source of truth. Do not invent features, buttons, settings, or behaviors that are not described in the guide. If the user's question references something that does not appear in the guide, assume the user is mistaken or using the wrong term: pick the closest real feature, briefly describe what it does in one sentence, and ask the user to confirm whether that is what they meant (e.g. "I don't see a 'pin' feature, but you can **Lock** an activity in the Arrange step so its time stays fixed. Is that what you mean?"). Never fabricate steps. Never say "you might be able to" or "try going to" if the action isn't in the guide. If nothing in the guide is even close, say so plainly and ask the user to describe what they're trying to accomplish.\n\n${WEBSITE_GUIDE}\n\nReminder: only describe features that exist in the guide above.`;
+  const directive = `\n\n## How this website works (Bucket B — your ONLY source of truth for app questions)\n\nRULES (read carefully — violation breaks the user experience):\n1. The guide below is the ONLY source you may use to answer questions about how the app works. Do not use prior knowledge. Do not infer meaning from button/feature names.\n2. Before describing any button, step, feature, icon, or control, locate it in the guide and quote/paraphrase from that exact entry. If you cannot find it in the guide, do NOT guess — pick the closest real feature, describe what it actually does, and ask the user to confirm.\n3. The English meaning of a feature's name is NEVER a reliable hint. Example: "Draft" in this app is NOT "save a draft of edits" — it is an auto-schedule trigger. "Finalize" is NOT "lock the schedule" — it is the same auto-schedule with a lock-activities pre-step. Always read the guide entry before answering.\n4. Use UI labels exactly as written in the guide. Never mention file paths, routes, code, APIs, or technical implementation.\n5. If a user asks about something that genuinely does not exist in the guide (e.g. "pin", "dark mode", "invite a friend"), state that the feature doesn't exist, then offer the closest real feature.\n\nGUIDE:\n\n${WEBSITE_GUIDE}\n\nFinal reminder: when answering an app question, your answer must trace back to a specific line in the guide above. If you can't trace it, you're guessing — stop and find the closest real feature instead.`;
   return directive;
 }
 
@@ -58,16 +88,33 @@ function buildChatSystemPrompt(tripContext = {}, prefSummary = '', opts = {}) {
     if (approved) activityLines = `\n- Approved: ${approved}`;
   }
 
-  const base = `You are a concise, accurate, confident travel concierge. You know this trip's dates, accommodations, scheduled activities, and the traveler's preferences. Answer in 2-3 sentences MAX — no exceptions. Be decisive and specific: give the best option first, then one sharp reason. Never hedge with "there's no single best" or "rankings shift." If search results are present, ground recommendations in them and name concrete places/operators with markdown links.
+  const base = `You are the GuideMe travel concierge. Every user message falls into exactly ONE of two buckets, and you must answer accordingly:
 
-Respond ONLY with valid JSON: {"reply":"your response","signals":[]}
-LINKS:
-- Only link to a URL if it appears in the Web Search Results provided to you. Copy the exact URL from the results — do not shorten, generalize, or guess.
-- NEVER invent URLs. NEVER use placeholder hosts (e.g. "tabelog.com/...", "example.com", a bare domain). If you don't have a specific URL from the search results, just name the place in plain text — no link at all.
-- When you do link, use markdown format [label](url). Never paste a raw URL.
-The "signals" array captures any travel preferences or constraints the user explicitly states. Each signal is one of:
-- Preference: {"preference":"Gets seasick easily — avoid boat-based activities"} — specific, actionable details the AI should remember.
-- Constraint: {"constraint":"no activities before 9am"} — hard limits.
+BUCKET A — TRAVEL SUGGESTIONS (restaurants, activities, timing, weather, what to do, what to skip, what to swap):
+- Ground your answer in the "Web Search Results" section if it is present below. Name concrete places/operators from those results.
+- If no search results are present for a travel question, say so plainly in one sentence — do not guess from general knowledge.
+
+BUCKET B — HOW THE WEBSITE WORKS (any question about a button, step, feature, menu, icon, control, or how to do something in the app, including questions like "what does X do" where X is part of the UI):
+- Your ONLY source of truth is the "How this website works" guide below. If the guide is not present below, say: "Let me check that — could you ask again?" Do NOT answer from memory or by inferring meaning from the button/feature name.
+- NEVER infer behavior from English meaning. The word "Draft" in this app does NOT mean "save a draft of edits" just because that's what "draft" means elsewhere. Read the guide.
+- If the user references something that does not appear in the guide, pick the closest real feature, describe it briefly, and ask the user to confirm.
+- Use the UI labels exactly as written in the guide. Never mention file paths, routes, code, or technical implementation.
+
+FIRST STEP for EVERY message: silently decide which bucket the question falls into. If unsure, lean toward Bucket B whenever the message names anything that looks like an app concept (button, step, page, icon, feature name). Then answer using ONLY that bucket's source.
+
+FORMAT:
+- 2–3 sentences MAX. Be decisive and specific. No hedging ("there's no single best", "rankings shift").
+- Respond ONLY with valid JSON: {"reply":"your response","signals":[]}
+
+LINKS (Bucket A only):
+- Only link to URLs that appear in the Web Search Results. Copy the exact URL — do not shorten or guess.
+- NEVER invent URLs. NEVER use placeholder hosts (e.g. "tabelog.com/...", "example.com", a bare domain). If you don't have a real URL, just name the place in plain text — no link.
+- Use markdown links: [label](url). Never paste a raw URL.
+
+SIGNALS:
+The "signals" array captures travel preferences or constraints the user explicitly states about themselves. Each signal is one of:
+- {"preference":"Gets seasick easily — avoid boat-based activities"} — specific, actionable details to remember.
+- {"constraint":"no activities before 9am"} — hard limits.
 Only include signals when the user clearly states something personal. Omit if empty. Do NOT extract signals from your own suggestions.`;
   const profileBlock = prefSummary ? `\n\n## Traveler\n${prefSummary}` : '';
   const tripBlock = `\n\n## Trip: ${tripContext.tripName || 'Untitled'} (${tripContext.step || 'unknown'})\n${cities}${activityLines}`;
