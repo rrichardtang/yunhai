@@ -2776,10 +2776,15 @@ function renderCities() {
           const res = await fetch(`/api/places/resolve?q=${encodeURIComponent(query)}&city=${encodeURIComponent(query)}`);
           if (!res.ok) return;
           const place = await res.json();
-          if (place?.placeId && Number.isFinite(place?.lat) && Number.isFinite(place?.lng)) {
-            city.placeId = place.placeId;
-            city.latitude = place.lat;
-            city.longitude = place.lng;
+          if (!place?.placeId || !Number.isFinite(place?.lat) || !Number.isFinite(place?.lng)) return;
+          city.placeId = place.placeId;
+          city.latitude = place.lat;
+          city.longitude = place.lng;
+          const formatted = String(place.formattedAddress || '').trim();
+          if (formatted && formatted !== city.name) {
+            city.name = formatted;
+            cityNameInput.value = formatted;
+            renderCities();
           }
         } catch {}
       });
