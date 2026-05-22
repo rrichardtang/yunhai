@@ -531,59 +531,27 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
     if (!inner || !isMobile) return;
     inner.style.cssText = 'font-size:0.8rem;padding:4px 8px;height:32px;min-height:0;box-sizing:border-box';
   };
+  styleShadowInput();
+  requestAnimationFrame(styleShadowInput);
+  setTimeout(styleShadowInput, 200);
+  setTimeout(styleShadowInput, 500);
+
   const dbg = (msg) => {
     try {
       fetch('/debug/client', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope: 'place-ac', message: msg })
+        body: JSON.stringify({ scope: 'place-ac', message: `[${element.dataset.field || '?'}] ${msg}` })
       });
     } catch {}
   };
-  dbg(`attach: field=${element.dataset.field || element.dataset.accommodationField || element.dataset.logistics || '?'} hasShadow=${!!placeAutocomplete.shadowRoot}`);
 
-  const boundInternalInputs = new WeakSet();
-  const onInternalInput = (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement)) return;
-    dbg(`internalInput fired: "${target.value}"`);
-    element.value = target.value;
-    element.dispatchEvent(new Event('input', { bubbles: true }));
-    if (typeof onInput === 'function') onInput();
-  };
-  const findInternalInputs = () => {
-    const fromShadow = placeAutocomplete.shadowRoot ? Array.from(placeAutocomplete.shadowRoot.querySelectorAll('input')) : [];
-    const fromLight = Array.from(placeAutocomplete.querySelectorAll('input'));
-    return [...fromShadow, ...fromLight];
-  };
-  const bindInternalInputs = () => {
-    const inputs = findInternalInputs();
-    if (inputs.length === 0) return;
-    inputs.forEach((inner) => {
-      if (boundInternalInputs.has(inner)) return;
-      boundInternalInputs.add(inner);
-      inner.addEventListener('input', onInternalInput);
-      dbg(`bound internal input (total=${inputs.length}, where=${inner.getRootNode() === placeAutocomplete.shadowRoot ? 'shadow' : 'light'})`);
-    });
-  };
-
-  const runShadowSetup = () => { styleShadowInput(); bindInternalInputs(); };
-  runShadowSetup();
-  requestAnimationFrame(runShadowSetup);
-  setTimeout(runShadowSetup, 200);
-  setTimeout(runShadowSetup, 500);
-  setTimeout(() => { dbg(`late check: hasShadow=${!!placeAutocomplete.shadowRoot} lightInputs=${placeAutocomplete.querySelectorAll('input').length} children=${placeAutocomplete.children.length} html=${placeAutocomplete.outerHTML.slice(0,200)}`); bindInternalInputs(); }, 1500);
-
-  new MutationObserver(() => { bindInternalInputs(); }).observe(placeAutocomplete, {
-    childList: true,
-    subtree: true
+  ['input', 'change', 'keydown', 'keyup', 'beforeinput', 'focus', 'blur', 'gmp-select', 'gmp-placeselect', 'gmp-error'].forEach((evt) => {
+    placeAutocomplete.addEventListener(evt, (e) => {
+      const v = typeof placeAutocomplete.value === 'string' ? placeAutocomplete.value : '?';
+      dbg(`evt=${evt} target=${e.target?.tagName || '?'} composed=${e.composed} widget.value="${v}"`);
+    }, true);
   });
-  if (placeAutocomplete.shadowRoot) {
-    new MutationObserver(() => { bindInternalInputs(); }).observe(placeAutocomplete.shadowRoot, {
-      childList: true,
-      subtree: true
-    });
-  }
 
 
   const getWidgetValue = () => {
@@ -629,14 +597,8 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
     }
   };
 
-  const handleInput = () => {
-    dbg(`host input event, widget.value="${typeof placeAutocomplete.value === 'string' ? placeAutocomplete.value : '(non-string)'}"`);
-    syncInputFromWidget('input');
-  };
-  const handleChange = () => {
-    dbg(`host change event`);
-    syncInputFromWidget('change');
-  };
+  const handleInput = () => syncInputFromWidget('input');
+  const handleChange = () => syncInputFromWidget('change');
   placeAutocomplete.addEventListener('input', handleInput);
   placeAutocomplete.addEventListener('change', handleChange);
   placeAutocomplete.addEventListener('gmp-select', handleSelection);
