@@ -50,6 +50,7 @@ const state = {
   reviewFilters: {
     search: '',
     city: '',
+    type: '',
     verdict: ''
   },
   reviewCardFlips: {},
@@ -105,6 +106,7 @@ const els = {
   activitiesGrid: document.getElementById('activitiesGrid'),
   reviewSearch: document.getElementById('reviewSearch'),
   reviewCityFilter: document.getElementById('reviewCityFilter'),
+  reviewTypeFilter: document.getElementById('reviewTypeFilter'),
   reviewVerdictFilter: document.getElementById('reviewVerdictFilter'),
   approveVisibleBtn: document.getElementById('approveVisibleBtn'),
   continueArrangeBtn: document.getElementById('continueArrangeBtn'),
@@ -3509,9 +3511,25 @@ function populateReviewCityFilter() {
   els.reviewCityFilter.value = current;
 }
 
+const REVIEW_TYPE_FILTER_EXCLUDE = new Set(['arrival', 'departure']);
+
+function populateReviewTypeFilter() {
+  if (!els.reviewTypeFilter) return;
+  const current = state.reviewFilters.type;
+  const present = [...new Set(
+    state.activities
+      .map((a) => String(a.type || '').trim().toLowerCase())
+      .filter((t) => t && !REVIEW_TYPE_FILTER_EXCLUDE.has(t))
+  )].sort();
+  const label = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  els.reviewTypeFilter.innerHTML = ['<option value="">All types</option>', ...present.map((t) => `<option value="${esc(t)}">${esc(label(t))}</option>`)].join('');
+  els.reviewTypeFilter.value = current;
+}
+
 function getFilteredReviewActivities() {
   const search = String(state.reviewFilters.search || '').trim().toLowerCase();
   const city = String(state.reviewFilters.city || '').trim().toLowerCase();
+  const type = String(state.reviewFilters.type || '').trim().toLowerCase();
   const verdict = String(state.reviewFilters.verdict || '').trim();
 
   return state.activities.filter((a) => {
@@ -3520,6 +3538,7 @@ function getFilteredReviewActivities() {
 
     if (search && !text.includes(search)) return false;
     if (city && String(a.city || '').trim().toLowerCase() !== city) return false;
+    if (type && String(a.type || '').trim().toLowerCase() !== type) return false;
     if (verdict === 'approved' && review.approved !== true) return false;
     if (verdict === 'declined' && review.approved !== false) return false;
     if (verdict === 'unreviewed' && review.approved !== null) return false;
@@ -3942,6 +3961,7 @@ function updateActivityInState(id, updates) {
 function renderActivities() {
   updateReviewNav();
   populateReviewCityFilter();
+  populateReviewTypeFilter();
   destroyMiniMaps();
 
   const filteredActivities = getFilteredReviewActivities();
@@ -8452,7 +8472,7 @@ function resetToFresh() {
   state.arrangeCity = null;
   state.chatHistory = [];
   state.chatLoading = false;
-  state.reviewFilters = { search: '', city: '', verdict: '' };
+  state.reviewFilters = { search: '', city: '', type: '', verdict: '' };
   state.bookingChecklist = [];
   state.tripHealth = null;
   state.tripHealthIssueSignatures = [];
@@ -8462,6 +8482,7 @@ function resetToFresh() {
   els.tripName.value = '';
   if (els.reviewSearch) els.reviewSearch.value = '';
   if (els.reviewCityFilter) els.reviewCityFilter.value = '';
+  if (els.reviewTypeFilter) els.reviewTypeFilter.value = '';
   if (els.reviewVerdictFilter) els.reviewVerdictFilter.value = '';
   renderCities();
   addCityRow();
@@ -8917,6 +8938,10 @@ els.reviewSearch?.addEventListener('input', (e) => {
 });
 els.reviewCityFilter?.addEventListener('change', (e) => {
   state.reviewFilters.city = e.target.value || '';
+  renderActivities();
+});
+els.reviewTypeFilter?.addEventListener('change', (e) => {
+  state.reviewFilters.type = e.target.value || '';
   renderActivities();
 });
 els.reviewVerdictFilter?.addEventListener('change', (e) => {
