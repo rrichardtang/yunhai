@@ -59,12 +59,11 @@ To move forward: approve at least one activity, then advance to Step 3.
 Where approved activities get scheduled into specific days and times.
 
 Controls:
-- **Schedule** button (calendar icon) — opens the Scheduling Preferences wizard for this trip: day start/end times, lunch and dinner windows, tour timing, pacing. These guide the auto-arrangement.
-- **Draft** button (magic wand icon) — runs the auto-arrange. The AI orders activities into days; the app then assigns concrete times using opening hours, travel time between places, meal bands, and the day windows from the Schedule preferences.
-- **Finalize** button (lock icon) — locks in the current arrangement and advances to Step 4. Disabled until a draft exists.
+- **Schedule** button (calendar icon) — opens the Scheduling Preferences wizard for this trip: day start/end times, lunch and dinner windows, when the user prefers to do tours, pacing. These preferences are used when the Draft or Finalize button builds the schedule, so it matches how the user actually likes to travel.
+- **Draft** button (magic wand icon) — builds a starting schedule for the user. When clicked, the app takes every approved activity and lays it out across the trip's days, picking a time of day for each one. The result is a first-pass itinerary the user can then adjust by dragging activities around. Most users click Draft first to see a suggested arrangement instead of building the schedule by hand.
+- **Finalize** button (lock icon) — builds the schedule the same way Draft does, but with one extra step at the start. Finalize opens a window where the user can pick certain activities to **lock** to a specific day and time before the schedule is built — for example, a flight at 9am, a dinner reservation at 7pm, or a guided tour they've already booked for a specific slot. The locked activities are placed exactly where the user said, and the rest of the trip is built around them. Use Finalize when there are bookings or other fixed times the schedule must respect. The button stays disabled until at least one verified booking exists.
 - **Unplaced activities** panel — approved activities that haven't been scheduled yet. Drag them onto a day to place them.
 - **Days** panel — each day shows its scheduled activities on a timeline. Drag activities to reorder or move between days.
-- **Lock icon on a scheduled activity** — fixes that activity to its current day and time. When the user clicks **Draft** again, locked activities stay put while the rest get re-arranged around them.
 
 ---
 
