@@ -4,7 +4,6 @@ data/
 logs/
 .env
 *.log
-client_secret_*.json
 .claude/
 # InsForge & AI agent skills
 .insforge
@@ -20,5 +19,5 @@ client_secret_*.json
 .roo
 .trae
 .windsurf
-yunhai_client_secret.json
 .DS_Store
+env/*
