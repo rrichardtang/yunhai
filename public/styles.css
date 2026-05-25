@@ -578,7 +578,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .travel-row input, .travel-row select { margin-top: 0; }
 
 .place-autocomplete-fallback { display: none; }
-.tp-place-autocomplete { display: block; width: 100%; }
+.tp-place-autocomplete { display: block; width: 100%; position: relative; z-index: 30; }
 .city-autocomplete { position: relative; }
 .city-suggestions {
   position: absolute;
@@ -2097,8 +2097,8 @@ body.overlay-active #chatWidget {
 
   /* Forms: tighten padding globally */
   input, textarea, select { padding: 6px 10px; font-size: 0.85rem; }
-  .tp-place-autocomplete { max-width: 100%; overflow: hidden; box-sizing: border-box; }
-  .city-autocomplete { max-width: 100%; overflow: hidden; }
+  .tp-place-autocomplete { max-width: 100%; box-sizing: border-box; }
+  .city-autocomplete { max-width: 100%; }
   label { margin-bottom: 6px; font-size: 0.85rem; }
 
   /* Buttons: compact */
@@ -3298,7 +3298,6 @@ button.secondary:hover:not(:disabled) {
   border: 1px solid var(--hair);
   border-radius: var(--r-lg);
   box-shadow: var(--sh-sm);
-  overflow: hidden;
   padding: 0;
   margin: 0;
   transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
