@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-25] Rewrite Tianhe suggestion-chip bank — concrete questions, not UX-copy labels
+
+- `public/app.js` `STEP_SUGGESTED_QUESTIONS` (~L8032): replaced all 12 chips. Old bank was 7-of-12 "where is the button" UI-help questions (e.g. "What does the 'leave time' field do?", "Where do I put my hotel address?") — framed Tianhe as a help-doc lookup. New bank reframes chips as *demonstrations* of what Tianhe is good at, using concrete place names (Tokyo / Harajuku / Madrid / Barcelona / Shibuya–Asakusa) as templates users can read, tweak, and submit.
+- Each step now mixes itinerary-specific local-knowledge questions with high-value app-explainer questions (genuine feature distinctions like Draft vs. Finalize), not "where is the button" lookups.
+- Chip icons now mirror the literal buttons they reference where applicable (e.g. setup "Continue" chip uses `ph-arrow-right` matching the Continue button; arrange "Draft vs. Finalize" chip uses `ph-magic-wand` matching the Draft button).
+- 99/99 tests still passing.
+
 ## [2026-05-25] Rename concierge bot Concierge/me → Tianhe
 
 - `public/planner.html`: chat header wordmark now `Tian<span class="chat-name-me">he</span>` (mirrors the YunHai `Yun` + italic-serif `Hai` treatment — bot name shares the brand family's typographic pattern). Aria-labels for FAB/panel/close updated to "Tianhe", input placeholder "Ask Tianhe anything…", legal microtext changed from `GUIDEME · …` → `YUNHAI · …`.
