@@ -8104,7 +8104,7 @@ function ensureChatSessionId() {
 }
 
 const CHAT_WELCOME = {
-  headline: "Hello — I'm your trip concierge.",
+  headline: "Hello — I'm Tianhe, your trip concierge.",
   sub: "Ask about restaurants, timing, weather, or what to swap in your itinerary."
 };
 
@@ -8113,7 +8113,7 @@ function renderChatMessages() {
   const hasMessages = state.chatHistory.length > 0;
   const welcomeHtml = hasMessages ? '' : `
     <div class="chat-msg-assistant chat-msg-welcome">
-      <span class="chat-role-label">Concierge</span>
+      <span class="chat-role-label">Tianhe</span>
       ${esc(CHAT_WELCOME.headline)}
       <span class="chat-msg-sub">${esc(CHAT_WELCOME.sub)}</span>
     </div>`;
@@ -8122,11 +8122,11 @@ function renderChatMessages() {
     if (msg.role === 'assistant') {
       html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
       html = html.replace(/(^|[^"'>])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener">link</a>');
-      return `<div class="chat-msg-assistant"><span class="chat-role-label">Concierge</span>${html}</div>`;
+      return `<div class="chat-msg-assistant"><span class="chat-role-label">Tianhe</span>${html}</div>`;
     }
     return `<div class="chat-msg-user">${html}</div>`;
   }).join('');
-  const typingHtml = state.chatLoading ? '<div class="chat-typing" aria-label="Concierge is typing"><span></span><span></span><span></span></div>' : '';
+  const typingHtml = state.chatLoading ? '<div class="chat-typing" aria-label="Tianhe is typing"><span></span><span></span><span></span></div>' : '';
   els.chatMessages.innerHTML = welcomeHtml + messagesHtml + typingHtml;
   els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
   renderChatSuggestions();
