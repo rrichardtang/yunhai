@@ -135,6 +135,12 @@ function getItineraryById(id, userId) {
   return found;
 }
 
+function getItineraryByIdPublic(id) {
+  if (!id) return null;
+  const store = readStore();
+  return store.items.find((item) => item.id === id) || null;
+}
+
 function listItineraries(userId) {
   if (!userId) return [];
   const store = readStore();
@@ -218,6 +224,7 @@ module.exports = {
   updateItinerary,
   getLatestItinerary,
   getItineraryById,
+  getItineraryByIdPublic,
   listItineraries,
   deleteItinerary,
   addParsedBookings,

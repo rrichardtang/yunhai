@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-25] Fix share-link routing — public read-only itinerary endpoint
+
+- Bug: clicking a shared `/planner.html?itinerary=…&mode=itinerary` link dropped recipients on the home/My Trips view. Root cause: frontend hit authed `/api/itinerary/:id` (scoped by ownerId), got 401/404 for anonymous or non-owner viewers, fell through to `renderMyTrips()`.
+- `src/itineraryStore.js`: added `getItineraryByIdPublic(id)` — id-only lookup, no userId scope. Exported alongside existing fns.
+- `src/routes/itinerary.js`: added `registerPublic(app)` + `toPublicItinerary()` helper. New route `GET /api/public/itinerary/:id` strips owner-private fields (userId, notificationPrefs, issueMeta) before returning.
+- `src/server.js`: registered public route before `app.use('/api', requireConfiguredAuth)` so it bypasses auth gate.
+- `public/app.js`: extracted `hydrateLoadedItinerary(itinerary)` helper from `loadItineraryById`. Added `loadPublicSharedItinerary(id)` which fetches via the public endpoint and sets `state.readOnlyShare = true`. `maybeLoadSharedItineraryFromUrl()` now uses the public path; the unused `mode` URL param read was removed (always forces itinerary view).
+- 99/99 tests still passing.
+
 ## [2026-05-25] Rewrite Tianhe suggestion-chip bank — concrete questions, not UX-copy labels
 
 - `public/app.js` `STEP_SUGGESTED_QUESTIONS` (~L8032): replaced all 12 chips. Old bank was 7-of-12 "where is the button" UI-help questions (e.g. "What does the 'leave time' field do?", "Where do I put my hotel address?") — framed Tianhe as a help-doc lookup. New bank reframes chips as *demonstrations* of what Tianhe is good at, using concrete place names (Tokyo / Harajuku / Madrid / Barcelona / Shibuya–Asakusa) as templates users can read, tweak, and submit.
