@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-25] Fix accommodation autocomplete dropdown clipping in Setup step
+
+- Bug: in the city Stay tab, the Accommodation address Google Places dropdown was cut off — only the top of the first suggestion was visible.
+- `public/styles.css`: removed `overflow: hidden` from `.city-row.gm-city` (line ~3296). The rounded card was clipping the absolutely-positioned `<gmp-place-autocomplete>` dropdown that paints outside the input row.
+- Added `position: relative; z-index: 30;` to `.tp-place-autocomplete` so the dropdown stacks above subsequent sibling cards (e.g. trip-health placeholder).
+- Removed unused `overflow: hidden` from `.tp-place-autocomplete` / `.city-autocomplete` mobile rules — same clipping concern. `max-width: 100%` is kept to prevent horizontal overflow.
+
 ## [2026-05-25] Fix share-link routing — public read-only itinerary endpoint
 
 - Bug: clicking a shared `/planner.html?itinerary=…&mode=itinerary` link dropped recipients on the home/My Trips view. Root cause: frontend hit authed `/api/itinerary/:id` (scoped by ownerId), got 401/404 for anonymous or non-owner viewers, fell through to `renderMyTrips()`.
