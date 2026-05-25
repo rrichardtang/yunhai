@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-25] Rename concierge bot Concierge/me → Tianhe
+
+- `public/planner.html`: chat header wordmark now `Tian<span class="chat-name-me">he</span>` (mirrors the YunHai `Yun` + italic-serif `Hai` treatment — bot name shares the brand family's typographic pattern). Aria-labels for FAB/panel/close updated to "Tianhe", input placeholder "Ask Tianhe anything…", legal microtext changed from `GUIDEME · …` → `YUNHAI · …`.
+- `public/app.js`: `CHAT_WELCOME.headline` → "Hello — I'm Tianhe, your trip concierge." (role kept as the noun, name takes the subject). Per-bubble `.chat-role-label` "Concierge" → "Tianhe" in both welcome and rendered assistant messages. Typing-indicator aria-label updated.
+- Dropped the "/me" slash riff — it didn't mirror anything in the new YunHai brand pattern. Internal CSS class names (`.chat-name-me`, `.chat-role-label`) kept as-is.
+- 99/99 tests still passing.
+
 ## [2026-05-22] YunHai landing page + live-product demo reel
 
 - `public/index.html`: rewrote as the new YunHai marketing landing (nav, hero with animated stage, marquee, demo reel section, pricing with Free + Pro $14.99/mo cards, trust band, FAQ, footer). Replaces the previous Tailwind-CDN landing.
