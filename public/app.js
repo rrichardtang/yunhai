@@ -8031,24 +8031,24 @@ const STEP_LABELS = { 1: 'setup', 2: 'reviewing activities', 3: 'arranging sched
 
 const STEP_SUGGESTED_QUESTIONS = {
   'setup': [
-    { icon: 'ph-sparkle', text: "What should I prioritize on this trip?" },
-    { icon: 'ph-clock', text: "What does the 'leave time' field do?" },
-    { icon: 'ph-house', text: "Where do I put my hotel address?" }
+    { icon: 'ph-hourglass-medium', text: "Is 3 days enough for Tokyo?" },
+    { icon: 'ph-thermometer-simple', text: "Is Madrid in August too hot?" },
+    { icon: 'ph-arrow-right', text: "What happens after I click Continue?" }
   ],
   'reviewing activities': [
-    { icon: 'ph-fork-knife', text: "What's a must-try local dish here?" },
-    { icon: 'ph-currency-dollar', text: "What is Budget Optimization?" },
-    { icon: 'ph-question', text: "Why was this activity recommended for me?" }
+    { icon: 'ph-bowl-food', text: "Best ramen spots locals actually go to in Harajuku?" },
+    { icon: 'ph-ticket', text: "What's worth booking ahead in Barcelona?" },
+    { icon: 'ph-arrows-left-right', text: "What happens when I approve or decline an activity?" }
   ],
   'arranging schedule': [
-    { icon: 'ph-sun', text: "What's the best time of day for outdoor activities here?" },
-    { icon: 'ph-arrows-out-cardinal', text: "Can I drag activities to reorder them?" },
-    { icon: 'ph-magic-wand', text: "What does the Draft button do?" }
+    { icon: 'ph-magic-wand', text: "What's the difference between Draft and Finalize?" },
+    { icon: 'ph-train', text: "How long does it actually take to get from Shibuya to Asakusa?" },
+    { icon: 'ph-stack', text: "How many activities is too many for one day in Tokyo?" }
   ],
   'itinerary finalized': [
-    { icon: 'ph-cloud-rain', text: "What can I swap if it rains on one of my days?" },
-    { icon: 'ph-airplane-takeoff', text: "Where do I add my flight bookings?" },
-    { icon: 'ph-heartbeat', text: "What does 'Needs booking' mean in Trip Health?" }
+    { icon: 'ph-receipt', text: "Where can I update my booking reference numbers?" },
+    { icon: 'ph-download-simple', text: "How can I save my itinerary offline?" },
+    { icon: 'ph-share-network', text: "How do I share this trip with my friends?" }
   ]
 };
 
