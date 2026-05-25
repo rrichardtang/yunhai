@@ -4,10 +4,36 @@ const {
   updateItinerary,
   getLatestItinerary,
   getItineraryById,
+  getItineraryByIdPublic,
   listItineraries,
   deleteItinerary,
   updateBookingChecklist
 } = require('../itineraryStore');
+
+function toPublicItinerary(itinerary) {
+  if (!itinerary) return null;
+  const checklist = Array.isArray(itinerary?.bookingChecklist?.checklist)
+    ? itinerary.bookingChecklist.checklist
+    : [];
+  return {
+    id: itinerary.id,
+    tripName: itinerary.tripName || '',
+    tripBudget: itinerary.tripBudget ?? null,
+    numTravelers: itinerary.numTravelers ?? null,
+    numChildren: itinerary.numChildren ?? null,
+    cities: itinerary.cities || [],
+    travels: itinerary.travels || [],
+    days: itinerary.days || [],
+    activities: itinerary.activities || [],
+    reviewed: itinerary.reviewed || {},
+    placements: itinerary.placements || {},
+    commutes: itinerary.commutes || {},
+    schedulingPrefs: itinerary.schedulingPrefs || null,
+    itineraryRows: itinerary.itineraryRows || [],
+    executionRows: itinerary.executionRows || [],
+    bookingChecklist: { checklist }
+  };
+}
 const { computeTripHealth, normalizeChecklistItem } = require('../tripHealth');
 const { sendTripHealthSummaryEmail } = require('../services/tripHealthEmail');
 
@@ -98,4 +124,12 @@ function register(app) {
   });
 }
 
-module.exports = { register };
+function registerPublic(app) {
+  app.get('/api/public/itinerary/:id', (req, res) => {
+    const itinerary = getItineraryByIdPublic(req.params.id);
+    if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
+    return res.json({ itinerary: toPublicItinerary(itinerary) });
+  });
+}
+
+module.exports = { register, registerPublic };

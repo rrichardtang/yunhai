@@ -7726,6 +7726,43 @@ function renderSavedItineraries() {
   });
 }
 
+function hydrateLoadedItinerary(itinerary) {
+  state.itinerary = itinerary;
+  state.currentItineraryId = itinerary.id || null;
+  state.tripName = itinerary.tripName || state.tripName;
+  state.tripBudget = itinerary.tripBudget ?? state.tripBudget;
+  state.numTravelers = itinerary.numTravelers ?? state.numTravelers;
+  state.numChildren = itinerary.numChildren ?? state.numChildren;
+  if (els.tripName) els.tripName.value = state.tripName;
+  if (els.tripBudget && state.tripBudget != null) els.tripBudget.value = state.tripBudget;
+  if (els.numTravelers) els.numTravelers.value = state.numTravelers;
+  if (els.numChildren) els.numChildren.value = state.numChildren;
+  state.bookingChecklist = Array.isArray(itinerary?.bookingChecklist?.checklist)
+    ? itinerary.bookingChecklist.checklist.map(normalizeChecklistItem)
+    : [];
+  state.bookingChecklistNotificationPrefs = itinerary?.bookingChecklist?.notificationPrefs || state.bookingChecklistNotificationPrefs;
+  state.bookingChecklistIssueMeta = itinerary?.bookingChecklist?.issueMeta || {};
+  state.cities = Array.isArray(itinerary.cities)
+    ? itinerary.cities.map(normalizeCityData)
+    : state.cities;
+  state.travels = Array.isArray(itinerary.travels) ? itinerary.travels.slice(0, 1).map(normalizeTravelEntry) : state.travels;
+  state.days = Array.isArray(itinerary.days)
+    ? itinerary.days.map((day) => ({ id: day.id || `${day.city}-${day.date}`, city: day.city, date: day.date }))
+    : [];
+  state.activities = (itinerary.activities || []).map((a) => normalizeActivityMetadata(a));
+  state.reviewed = itinerary.reviewed || {};
+  state.placements = itinerary.placements || {};
+  state.commutes = normalizeCommuteStateMap(itinerary.commutes || {});
+  state.schedulingPrefs = itinerary.schedulingPrefs
+    ? saveSchedulingPrefs(itinerary.schedulingPrefs)
+    : loadSchedulingPrefs();
+  hydrateTravelIntoCities();
+  renderCities();
+  state.lastPlannedFingerprint = step1Fingerprint();
+  updateCalendarControls();
+  renderItinerary();
+}
+
 async function loadItineraryById(id) {
   if (!id) return;
   try {
@@ -7733,42 +7770,7 @@ async function loadItineraryById(id) {
     const data = await res.json();
     if (!res.ok || !data?.itinerary) throw new Error('Failed to load itinerary');
 
-    const itinerary = data.itinerary;
-    state.itinerary = itinerary;
-    state.currentItineraryId = itinerary.id || null;
-    state.tripName = itinerary.tripName || state.tripName;
-    state.tripBudget = itinerary.tripBudget ?? state.tripBudget;
-    state.numTravelers = itinerary.numTravelers ?? state.numTravelers;
-    state.numChildren = itinerary.numChildren ?? state.numChildren;
-    if (els.tripName) els.tripName.value = state.tripName;
-    if (els.tripBudget && state.tripBudget != null) els.tripBudget.value = state.tripBudget;
-    if (els.numTravelers) els.numTravelers.value = state.numTravelers;
-    if (els.numChildren) els.numChildren.value = state.numChildren;
-    state.bookingChecklist = Array.isArray(itinerary?.bookingChecklist?.checklist)
-      ? itinerary.bookingChecklist.checklist.map(normalizeChecklistItem)
-      : [];
-    state.bookingChecklistNotificationPrefs = itinerary?.bookingChecklist?.notificationPrefs || state.bookingChecklistNotificationPrefs;
-    state.bookingChecklistIssueMeta = itinerary?.bookingChecklist?.issueMeta || {};
-    state.cities = Array.isArray(itinerary.cities)
-      ? itinerary.cities.map(normalizeCityData)
-      : state.cities;
-    state.travels = Array.isArray(itinerary.travels) ? itinerary.travels.slice(0, 1).map(normalizeTravelEntry) : state.travels;
-    state.days = Array.isArray(itinerary.days)
-      ? itinerary.days.map((day) => ({ id: day.id || `${day.city}-${day.date}`, city: day.city, date: day.date }))
-      : [];
-
-    state.activities = (itinerary.activities || []).map((a) => normalizeActivityMetadata(a));
-    state.reviewed = itinerary.reviewed || {};
-    state.placements = itinerary.placements || {};
-    state.commutes = normalizeCommuteStateMap(itinerary.commutes || {});
-    state.schedulingPrefs = itinerary.schedulingPrefs
-      ? saveSchedulingPrefs(itinerary.schedulingPrefs)
-      : loadSchedulingPrefs();
-    hydrateTravelIntoCities();
-    renderCities();
-    state.lastPlannedFingerprint = step1Fingerprint();
-    updateCalendarControls();
-    renderItinerary();
+    hydrateLoadedItinerary(data.itinerary);
     await fetchSavedItineraries();
     renderSavedItineraries();
     ensureChatSessionId();
@@ -7778,6 +7780,15 @@ async function loadItineraryById(id) {
   } catch {
     showToast('Could not load itinerary.', 'error');
   }
+}
+
+async function loadPublicSharedItinerary(id) {
+  const res = await fetch(`/api/public/itinerary/${encodeURIComponent(id)}`);
+  if (!res.ok) throw new Error('Failed to load shared itinerary');
+  const data = await res.json();
+  if (!data?.itinerary) throw new Error('Failed to load shared itinerary');
+  state.readOnlyShare = true;
+  hydrateLoadedItinerary(data.itinerary);
 }
 
 function syncTripMetaFromInputs() {
@@ -8719,13 +8730,12 @@ function renderMyTrips() {
 async function maybeLoadSharedItineraryFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const itineraryId = String(params.get('itinerary') || '').trim();
-  const mode = String(params.get('mode') || '').trim().toLowerCase();
 
   if (!itineraryId) return false;
 
   try {
-    await loadItineraryById(itineraryId);
-    if (mode === 'itinerary' || mode === 'execution') setViewMode('itinerary');
+    await loadPublicSharedItinerary(itineraryId);
+    setViewMode('itinerary');
     return true;
   } catch {
     const offline = loadMinimalOfflinePayload(itineraryId);

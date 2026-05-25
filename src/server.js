@@ -52,6 +52,7 @@ app.use('/shared', express.static(path.join(__dirname, '..', 'shared')));
 require('./routes/status').register(app);
 require('./routes/email').register(app);
 require('./routes/geocode').register(app);
+require('./routes/itinerary').registerPublic(app);
 
 app.use('/api', requireConfiguredAuth);
 
