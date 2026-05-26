@@ -2976,6 +2976,9 @@ async function getAuthToken() {
 
 async function apiFetch(url, options = {}) {
   const token = await getAuthToken();
+  if (url.includes('/api/auth/redeem-code') || url.includes('/api/auth/entitlement')) {
+    sendDebug('apiFetch', `url=${url} tokenLen=${token ? token.length : 0} tokenHead=${token ? token.slice(0, 16) : ''}`);
+  }
   const headers = new Headers(options.headers || {});
   if (token) headers.set('Authorization', `Bearer ${token}`);
   const next = { ...options, headers };
