@@ -9,6 +9,33 @@ const app = express();
 const PORT = Number(process.env.PORT || 3457);
 
 app.use(express.json({ limit: '1mb' }));
+
+const SITE_PASSWORD = process.env.SITE_PASSWORD || 'GUIDEME2026';
+const SITE_USERNAME = process.env.SITE_USERNAME || 'guideme';
+
+function isShareRequest(req) {
+  if (req.path.startsWith('/api/public/')) return true;
+  if (req.path === '/planner.html' && req.query && req.query.itinerary) return true;
+  return false;
+}
+
+app.use((req, res, next) => {
+  if (!SITE_PASSWORD) return next();
+  if (isShareRequest(req)) return next();
+
+  const header = req.headers.authorization || '';
+  if (header.startsWith('Basic ')) {
+    const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
+    const idx = decoded.indexOf(':');
+    const user = idx >= 0 ? decoded.slice(0, idx) : '';
+    const pass = idx >= 0 ? decoded.slice(idx + 1) : '';
+    if (user === SITE_USERNAME && pass === SITE_PASSWORD) return next();
+  }
+
+  res.set('WWW-Authenticate', 'Basic realm="YunHai", charset="UTF-8"');
+  return res.status(401).type('text/plain').send('Authentication required');
+});
+
 app.use(clerkMiddleware());
 
 app.get('/planner.html', (_req, res) => {
