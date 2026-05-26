@@ -8913,6 +8913,78 @@ async function loadAuthSessionData() {
   renderAuthUi();
 }
 
+async function enforceEntitlementGate() {
+  let entitled = false;
+  try {
+    const res = await apiFetch('/api/auth/entitlement');
+    if (res.ok) entitled = Boolean((await res.json())?.entitled);
+  } catch {}
+  if (entitled) return true;
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'entitlement-gate';
+    overlay.innerHTML = `
+      <div class="entitlement-card">
+        <h1>Private beta</h1>
+        <p>YunHai is invite-only right now. Enter your access code to continue.</p>
+        <form class="entitlement-form">
+          <input type="text" name="code" placeholder="Access code" autocomplete="off" required />
+          <div class="entitlement-error hidden"></div>
+          <button type="submit">Unlock</button>
+        </form>
+        <p class="entitlement-foot">Don't have a code? Ask whoever invited you, or <a href="#" data-signout>sign out</a>.</p>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const form = overlay.querySelector('.entitlement-form');
+    const input = form.querySelector('input[name="code"]');
+    const errorEl = overlay.querySelector('.entitlement-error');
+    const signOut = overlay.querySelector('[data-signout]');
+
+    const showError = (msg) => {
+      errorEl.textContent = msg;
+      errorEl.classList.remove('hidden');
+    };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.classList.add('hidden');
+      const code = input.value.trim();
+      if (!code) return;
+      try {
+        const res = await apiFetch('/api/auth/redeem-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (data?.ok) {
+          overlay.remove();
+          resolve(true);
+          return;
+        }
+        const reasons = {
+          invalid: 'That code isn’t recognized.',
+          already_used: 'That code has already been used.',
+          already_entitled: 'Your account already has access — reload the page.'
+        };
+        showError(reasons[data?.reason] || 'Could not redeem code.');
+      } catch {
+        showError('Network error. Try again.');
+      }
+    });
+
+    signOut.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try { await window.Clerk?.signOut({ redirectUrl: window.location.href }); } catch {}
+    });
+
+    input.focus();
+  });
+}
+
 async function initClerkAuth() {
   const clerk = window.Clerk;
   if (!clerk) throw new Error('Clerk SDK not loaded');
@@ -9406,6 +9478,12 @@ history.replaceState({ spa: true, step: 1 }, '');
       els.apiBanner.classList.remove('hidden');
     }
     return;
+  }
+
+  const hasShareLink = new URLSearchParams(location.search).has('itinerary');
+  if (!hasShareLink) {
+    const entitled = await enforceEntitlementGate();
+    if (!entitled) return;
   }
 
   state.profilesStore = loadProfiles();

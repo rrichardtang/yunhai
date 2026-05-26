@@ -1,5 +1,6 @@
-const { requireConfiguredAuth, getAuthedUserId } = require('../middleware/auth');
+const { requireConfiguredAuth, getAuthedUserId, parseUserId } = require('../middleware/auth');
 const { getOrCreateForwardingAddress } = require('../emailForwarding');
+const { isEntitled, redeemCode } = require('../entitlements');
 
 function register(app) {
   app.get('/api/status', (_req, res) => {
@@ -27,6 +28,17 @@ function register(app) {
       forwardingAddress,
       forwardingEnabled: Boolean(forwardingAddress)
     });
+  });
+
+  app.get('/api/auth/entitlement', (req, res) => {
+    const userId = parseUserId(getAuthedUserId(req));
+    res.json({ entitled: isEntitled(userId) });
+  });
+
+  app.post('/api/auth/redeem-code', (req, res) => {
+    const userId = parseUserId(getAuthedUserId(req));
+    const result = redeemCode(req.body?.code, userId);
+    res.json(result);
   });
 }
 

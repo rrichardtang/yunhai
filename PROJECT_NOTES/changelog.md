@@ -4,11 +4,17 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
-## [2026-05-26] Lock site behind HTTP Basic Auth for staged rollout
+## [2026-05-26] Invite-code entitlement gate (replaces failed Basic Auth attempt)
 
-- Added a site-wide Basic Auth gate in `src/server.js` (mounted before Clerk middleware). Credentials default to `guideme` / `GUIDEME2026`; overridable via `SITE_USERNAME` / `SITE_PASSWORD` env vars. Set `SITE_PASSWORD=` empty to disable.
-- Bypass paths: requests to `/api/public/*` and `GET /planner.html?itinerary=…` skip the gate so existing share links keep working for recipients who don't have the password.
-- `.env.example`: documented the new vars.
+- Removed the HTTP Basic Auth site gate from `src/server.js` — it caused a re-prompt loop in production (reverse proxy likely strips `Authorization` on subresources). Also dropped the `SITE_USERNAME` / `SITE_PASSWORD` env vars from `.env.example`.
+- New `src/entitlements.js`: per-user entitlement store backed by `data/invite-codes.json`. Exports `generateCodes(n)`, `listCodes()`, `isEntitled(userId)`, `redeemCode(code, userId)`, `seedOwnerEntitlement(userId)`. Codes are single-use, 8-char base64url uppercase.
+- New `scripts/mint-invite-codes.js` CLI: `node scripts/mint-invite-codes.js 10` mints 10 codes; `--owner <clerk-user-id>` seeds owner access without consuming a code.
+- `src/middleware/auth.js`: added `requireEntitlement` — 403 `{error:'not_entitled'}` unless the caller has redeemed a code. Bypasses `/api/auth/session`, `/api/auth/entitlement`, `/api/auth/redeem-code` so the redeem screen can do its work.
+- `src/server.js`: chained `requireEntitlement` after `requireConfiguredAuth` on `/api`. Public share endpoint (`/api/public/itinerary/:id`) is mounted before both gates and remains open.
+- `src/routes/status.js`: added `GET /api/auth/entitlement` and `POST /api/auth/redeem-code`.
+- `public/app.js`: after Clerk auth resolves, call `/api/auth/entitlement`. If unentitled, show a full-page overlay with an access-code form. Skip entirely when the URL has `?itinerary=…` so share-link recipients aren't blocked.
+- `public/styles.css`: styling for `.entitlement-gate` / `.entitlement-card` overlay.
+- 105/105 tests still pass.
 
 ## [2026-05-25] Fix accommodation autocomplete dropdown clipping in Setup step
 
