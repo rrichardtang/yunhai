@@ -4,12 +4,23 @@ const path = require('path');
 const express = require('express');
 const { clerkMiddleware } = require('@clerk/express');
 const { requireConfiguredAuth, requireEntitlement } = require('./middleware/auth');
+const { readDebugLog, clearDebugLog, debugLog } = require('./services/debugLog');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3457);
 
 app.use(express.json({ limit: '1mb' }));
-app.use(clerkMiddleware());
+
+const _clerk = clerkMiddleware();
+app.use((req, res, next) => {
+  _clerk(req, res, (err) => {
+    if (err) {
+      debugLog('clerk-middleware', `swallowed err on ${req.method} ${req.path}: ${err?.message || err}`);
+      return next();
+    }
+    return next();
+  });
+});
 
 app.get('/planner.html', (_req, res) => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'planner.html'), 'utf8');
@@ -19,8 +30,6 @@ app.get('/planner.html', (_req, res) => {
     .replace('data-clerk-publishable-key=""', `data-clerk-publishable-key="${key}"`)
     .replaceAll('__CLERK_FAPI_DOMAIN__', fapiDomain));
 });
-
-const { readDebugLog, clearDebugLog, debugLog } = require('./services/debugLog');
 
 app.post('/debug/client', (req, res) => {
   const scope = String(req.body?.scope || 'client').slice(0, 40);
@@ -68,6 +77,12 @@ require('./routes/calendar').register(app);
 
 app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+
+app.use((err, req, res, _next) => {
+  debugLog('express-error', `${req.method} ${req.path}: ${err?.message || err} stack=${(err?.stack || '').split('\n').slice(0, 3).join(' | ')}`);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'internal', message: err?.message || 'Unknown error' });
 });
 
 if (require.main === module) {
