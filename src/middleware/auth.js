@@ -1,6 +1,7 @@
 const { requireAuth } = require('@clerk/express');
 const { resolveUserId } = require('../preferences');
 const { isEntitled } = require('../entitlements');
+const { debugLog } = require('../services/debugLog');
 
 function requireConfiguredAuth(req, res, next) {
   if (!process.env.CLERK_SECRET_KEY || !process.env.CLERK_PUBLISHABLE_KEY) {
@@ -24,9 +25,14 @@ const ENTITLEMENT_BYPASS_PATHS = new Set([
 ]);
 
 function requireEntitlement(req, res, next) {
-  if (ENTITLEMENT_BYPASS_PATHS.has(req.path)) return next();
-  const userId = parseUserId(getAuthedUserId(req));
-  if (!isEntitled(userId)) return res.status(403).json({ error: 'not_entitled' });
+  const bypass = ENTITLEMENT_BYPASS_PATHS.has(req.path);
+  const rawUserId = getAuthedUserId(req);
+  debugLog('entitlement-gate', `path=${req.path} method=${req.method} bypass=${bypass} rawUserId=${rawUserId}`);
+  if (bypass) return next();
+  const userId = parseUserId(rawUserId);
+  const entitled = isEntitled(userId);
+  debugLog('entitlement-gate', `path=${req.path} userId=${userId} entitled=${entitled}`);
+  if (!entitled) return res.status(403).json({ error: 'not_entitled' });
   return next();
 }
 
