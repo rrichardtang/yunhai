@@ -1,6 +1,7 @@
 const { requireConfiguredAuth, getAuthedUserId, parseUserId } = require('../middleware/auth');
 const { getOrCreateForwardingAddress } = require('../emailForwarding');
-const { isEntitled, redeemCode } = require('../entitlements');
+const { isEntitled, redeemCode, listCodes } = require('../entitlements');
+const { debugLog } = require('../services/debugLog');
 
 function register(app) {
   app.get('/api/status', (_req, res) => {
@@ -36,9 +37,25 @@ function register(app) {
   });
 
   app.post('/api/auth/redeem-code', (req, res) => {
-    const userId = parseUserId(getAuthedUserId(req));
-    const result = redeemCode(req.body?.code, userId);
+    const rawCode = req.body?.code;
+    const rawUserId = getAuthedUserId(req);
+    const userId = parseUserId(rawUserId);
+    const result = redeemCode(rawCode, userId);
+    debugLog('redeem-code', `rawUserId=${rawUserId} parsedUserId=${userId} codeLen=${String(rawCode || '').length} result=${JSON.stringify(result)}`);
     res.json(result);
+  });
+
+  app.get('/debug/codes', (_req, res) => {
+    const codes = listCodes();
+    res.json({
+      count: codes.length,
+      codes: codes.map((c) => ({
+        code: c.code,
+        createdAt: c.createdAt,
+        redeemedBy: c.redeemedBy,
+        redeemedAt: c.redeemedAt
+      }))
+    });
   });
 }
 
