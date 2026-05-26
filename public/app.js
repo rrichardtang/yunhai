@@ -8917,8 +8917,16 @@ async function enforceEntitlementGate() {
   let entitled = false;
   try {
     const res = await apiFetch('/api/auth/entitlement');
-    if (res.ok) entitled = Boolean((await res.json())?.entitled);
-  } catch {}
+    sendDebug('entitlement-client', `check status=${res.status}`);
+    if (res.ok) {
+      const body = await res.json();
+      sendDebug('entitlement-client', `body=${JSON.stringify(body)}`);
+      entitled = Boolean(body?.entitled);
+    }
+  } catch (err) {
+    sendDebug('entitlement-client', `check-threw msg=${err?.message || err}`);
+  }
+  sendDebug('entitlement-client', `decision entitled=${entitled}`);
   if (entitled) return true;
 
   return new Promise((resolve) => {
@@ -8953,31 +8961,40 @@ async function enforceEntitlementGate() {
       errorEl.classList.add('hidden');
       const code = input.value.trim();
       if (!code) return;
+      sendDebug('redeem-client', `submit codeLen=${code.length}`);
+      let res;
       try {
-        console.log('[redeem] sending code', { codeLen: code.length });
-        const res = await apiFetch('/api/auth/redeem-code', {
+        res = await apiFetch('/api/auth/redeem-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code })
         });
-        console.log('[redeem] response', { status: res.status, ok: res.ok });
-        const data = await res.json();
-        console.log('[redeem] body', data);
-        if (data?.ok) {
-          overlay.remove();
-          resolve(true);
-          return;
-        }
-        const reasons = {
-          invalid: 'That code isn’t recognized.',
-          already_used: 'That code has already been used.',
-          already_entitled: 'Your account already has access — reload the page.'
-        };
-        showError(reasons[data?.reason] || 'Could not redeem code.');
       } catch (err) {
-        console.error('[redeem] fetch threw', err);
+        sendDebug('redeem-client', `fetch-threw msg=${err?.message || err} name=${err?.name || ''}`);
         showError(`Network error: ${err?.message || err}`);
+        return;
       }
+      sendDebug('redeem-client', `response status=${res.status} ok=${res.ok}`);
+      let data;
+      try {
+        data = await res.json();
+      } catch (err) {
+        sendDebug('redeem-client', `json-parse-threw status=${res.status} msg=${err?.message || err}`);
+        showError(`Could not parse response (status ${res.status})`);
+        return;
+      }
+      sendDebug('redeem-client', `body=${JSON.stringify(data)}`);
+      if (data?.ok) {
+        overlay.remove();
+        resolve(true);
+        return;
+      }
+      const reasons = {
+        invalid: 'That code isn’t recognized.',
+        already_used: 'That code has already been used.',
+        already_entitled: 'Your account already has access — reload the page.'
+      };
+      showError(reasons[data?.reason] || `Could not redeem code (reason=${data?.reason || 'unknown'})`);
     });
 
     signOut.addEventListener('click', async (e) => {
