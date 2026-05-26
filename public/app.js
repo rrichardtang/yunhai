@@ -8954,12 +8954,15 @@ async function enforceEntitlementGate() {
       const code = input.value.trim();
       if (!code) return;
       try {
+        console.log('[redeem] sending code', { codeLen: code.length });
         const res = await apiFetch('/api/auth/redeem-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code })
         });
+        console.log('[redeem] response', { status: res.status, ok: res.ok });
         const data = await res.json();
+        console.log('[redeem] body', data);
         if (data?.ok) {
           overlay.remove();
           resolve(true);
@@ -8971,8 +8974,9 @@ async function enforceEntitlementGate() {
           already_entitled: 'Your account already has access — reload the page.'
         };
         showError(reasons[data?.reason] || 'Could not redeem code.');
-      } catch {
-        showError('Network error. Try again.');
+      } catch (err) {
+        console.error('[redeem] fetch threw', err);
+        showError(`Network error: ${err?.message || err}`);
       }
     });
 
