@@ -8778,9 +8778,9 @@ async function maybeLoadSharedItineraryFromUrl() {
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
+  navigator.serviceWorker.getRegistrations()
+    .then((regs) => regs.forEach((r) => r.unregister().catch(() => {})))
+    .catch(() => {});
 }
 
 function renderAuthUi() {

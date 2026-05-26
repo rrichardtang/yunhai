@@ -55,8 +55,13 @@ app.get('/debug/clear', (_req, res) => {
   res.type('text/plain').send(clearDebugLog() ? 'cleared' : 'failed');
 });
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
-app.use('/shared', express.static(path.join(__dirname, '..', 'shared')));
+const noStoreFor = (res, filePath) => {
+  if (/\.(html|js|css)$/.test(filePath)) {
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
+  }
+};
+app.use(express.static(path.join(__dirname, '..', 'public'), { setHeaders: noStoreFor }));
+app.use('/shared', express.static(path.join(__dirname, '..', 'shared'), { setHeaders: noStoreFor }));
 
 require('./routes/status').register(app);
 require('./routes/email').register(app);
