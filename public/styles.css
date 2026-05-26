@@ -5657,3 +5657,15 @@ body.is-dragging-activity { cursor: grabbing; }
 @media (max-width: 600px) {
   .sched-row { grid-template-columns: 1fr; }
 }
+
+.entitlement-gate { position: fixed; inset: 0; background: rgba(245, 241, 234, 0.96); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 24px; }
+.entitlement-card { background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.10); padding: 32px 28px; width: 100%; max-width: 380px; }
+.entitlement-card h1 { margin: 0 0 8px; font-size: 22px; letter-spacing: -.01em; }
+.entitlement-card p { margin: 0 0 18px; color: var(--text-500, #6b635a); font-size: 14px; }
+.entitlement-form input { width: 100%; box-sizing: border-box; padding: 11px 14px; border: 1px solid var(--hair, #d9d2c7); border-radius: 8px; font-size: 15px; margin-bottom: 10px; letter-spacing: .04em; text-transform: uppercase; }
+.entitlement-form input:focus { outline: none; border-color: var(--text-900, #2a2520); }
+.entitlement-form button { width: 100%; padding: 11px; background: var(--text-900, #2a2520); color: #fff; border: 0; border-radius: 8px; font-size: 15px; font-weight: 500; cursor: pointer; }
+.entitlement-error { color: var(--err, #c0362c); font-size: 13px; margin-bottom: 10px; }
+.entitlement-error.hidden { display: none; }
+.entitlement-foot { margin: 16px 0 0; font-size: 12px; color: var(--text-500, #6b635a); text-align: center; }
+.entitlement-foot a { color: inherit; text-decoration: underline; }
