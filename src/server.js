@@ -41,13 +41,17 @@ app.post('/debug/client', (req, res) => {
 });
 
 app.get('/debug', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   const log = readDebugLog();
   if (log == null) return res.status(404).type('text/plain').send('No log yet');
   const scope = String(req.query.scope || '').trim();
   const tailRaw = Number(req.query.tail);
+  const tail = Number.isInteger(tailRaw) && tailRaw > 0 ? tailRaw : 50;
   let lines = log.split('\n');
   if (scope) lines = lines.filter((l) => l.includes(`[${scope}]`));
-  if (Number.isInteger(tailRaw) && tailRaw > 0) lines = lines.slice(-tailRaw);
+  lines = lines.slice(-tail);
   res.type('text/plain').send(lines.join('\n'));
 });
 
