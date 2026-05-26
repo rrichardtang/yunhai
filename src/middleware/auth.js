@@ -18,9 +18,9 @@ function parseUserId(rawUserId) {
 }
 
 const ENTITLEMENT_BYPASS_PATHS = new Set([
-  '/api/auth/session',
-  '/api/auth/entitlement',
-  '/api/auth/redeem-code'
+  '/auth/session',
+  '/auth/entitlement',
+  '/auth/redeem-code'
 ]);
 
 function requireEntitlement(req, res, next) {
