@@ -4,6 +4,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-26] Lock site behind HTTP Basic Auth for staged rollout
+
+- Added a site-wide Basic Auth gate in `src/server.js` (mounted before Clerk middleware). Credentials default to `guideme` / `GUIDEME2026`; overridable via `SITE_USERNAME` / `SITE_PASSWORD` env vars. Set `SITE_PASSWORD=` empty to disable.
+- Bypass paths: requests to `/api/public/*` and `GET /planner.html?itinerary=…` skip the gate so existing share links keep working for recipients who don't have the password.
+- `.env.example`: documented the new vars.
+
 ## [2026-05-25] Fix accommodation autocomplete dropdown clipping in Setup step
 
 - Bug: in the city Stay tab, the Accommodation address Google Places dropdown was cut off — only the top of the first suggestion was visible.
