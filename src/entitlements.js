@@ -73,6 +73,17 @@ function redeemCode(rawCode, userId) {
   return { ok: true };
 }
 
+function revokeCode(rawCode) {
+  const code = normalizeCode(rawCode);
+  if (!code) return { ok: false, reason: 'invalid' };
+  const store = readStore();
+  const before = store.codes.length;
+  store.codes = store.codes.filter((c) => c.code !== code);
+  if (store.codes.length === before) return { ok: false, reason: 'not_found' };
+  writeStore(store);
+  return { ok: true };
+}
+
 function seedOwnerEntitlement(userId, codeLabel = 'OWNER') {
   if (!userId) return false;
   const store = readStore();
@@ -83,4 +94,4 @@ function seedOwnerEntitlement(userId, codeLabel = 'OWNER') {
   return true;
 }
 
-module.exports = { generateCodes, listCodes, isEntitled, redeemCode, seedOwnerEntitlement };
+module.exports = { generateCodes, listCodes, isEntitled, redeemCode, revokeCode, seedOwnerEntitlement };

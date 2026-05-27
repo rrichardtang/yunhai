@@ -8916,6 +8916,24 @@ async function loadAuthSessionData() {
   renderAuthUi();
 }
 
+function readInviteCodeFromUrl() {
+  try {
+    const code = new URLSearchParams(window.location.search).get('invite');
+    return code ? code.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
+function clearInviteCodeFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('invite')) return;
+    url.searchParams.delete('invite');
+    window.history.replaceState({}, '', url.toString());
+  } catch {}
+}
+
 async function enforceEntitlementGate() {
   let entitled = false;
   try {
@@ -8930,7 +8948,10 @@ async function enforceEntitlementGate() {
     sendDebug('entitlement-client', `check-threw msg=${err?.message || err}`);
   }
   sendDebug('entitlement-client', `decision entitled=${entitled}`);
-  if (entitled) return true;
+  if (entitled) {
+    clearInviteCodeFromUrl();
+    return true;
+  }
 
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
@@ -8988,6 +9009,7 @@ async function enforceEntitlementGate() {
       }
       sendDebug('redeem-client', `body=${JSON.stringify(data)}`);
       if (data?.ok) {
+        clearInviteCodeFromUrl();
         overlay.remove();
         resolve(true);
         return;
@@ -9005,7 +9027,14 @@ async function enforceEntitlementGate() {
       try { await window.Clerk?.signOut({ redirectUrl: window.location.href }); } catch {}
     });
 
-    input.focus();
+    const presetCode = readInviteCodeFromUrl();
+    if (presetCode) {
+      input.value = presetCode;
+      sendDebug('redeem-client', `auto-submit from url codeLen=${presetCode.length}`);
+      form.requestSubmit();
+    } else {
+      input.focus();
+    }
   });
 }
 

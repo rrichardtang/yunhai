@@ -4,6 +4,19 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-27] Invite management is a browser admin UI, not a CLI
+
+**Decision:** Mint, list, and revoke beta access codes via `/admin.html` (Clerk-gated by `OWNER_USER_ID` env var) instead of the existing `scripts/mint-invite-codes.js`. Endpoints live in `src/routes/admin.js` and mount before `requireEntitlement` so the owner can administer without being entitled themselves.
+
+**Reasoning:** Node isn't on PATH on the VPS, so the CLI script can't run there. Minting locally and shipping `data/invite-codes.json` would couple invite issuance to a deploy. A browser-driven admin page is operable from any device, scales to ad-hoc beta growth, and reuses the existing Clerk session.
+
+**Alternatives rejected:**
+- *Clerk Backend API invitations.* Dev tier caps invitations and requires SMTP/domain setup. This was the original failed attempt.
+- *Mint locally, sync the JSON file.* Couples invites to deploys; also fragile across multiple devices.
+- *Add node to the VPS PATH.* Possible but a yak-shave; doesn't solve "I want to mint from my phone."
+
+**Tradeoffs:** Trusts a single owner userId. If the owner account is compromised, an attacker can mint unlimited codes — but they could also already access the gate as the owner, so the marginal risk is small. The script (`scripts/mint-invite-codes.js`) remains for local emergency use.
+
 ## [2026-05-22] Landing demo reel drives the real `planner.html` via `?embed=1` iframe — no static screenshots, no separate demo screens
 
 **Decision:** The marketing landing's "See it in motion" demo embeds the real `planner.html` in an iframe (`?embed=1` mode) and reaches into the same-origin DOM at scripted timestamps to move a synthetic cursor, fire real clicks, type into real inputs, and jump between the app's 4 setup steps via `iframe.contentWindow.setStep(n)`. `?embed=1` bypasses Clerk, hides topbar/chat/banner chrome, unlocks `state.maxStep=4`, and seeds a baseline Córdoba city so the Setup beat has something to add to.

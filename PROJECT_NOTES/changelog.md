@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-27] Invite admin UI + magic invite links
+
+- `public/app.js`: gate now auto-fills + auto-submits when `?invite=ABC` is in the URL; strips the param after success or if already entitled. Added `readInviteCodeFromUrl()` / `clearInviteCodeFromUrl()` helpers.
+- New `src/routes/admin.js`: `GET /api/admin/invites`, `POST /api/admin/invites`, `DELETE /api/admin/invites/:code` — owner-only (gated by `OWNER_USER_ID` env var). Mounted before the global `requireEntitlement` so the owner doesn't need to be entitled themselves.
+- New `public/admin.html`: minimal browser UI to mint, list, and revoke codes. Shows full invite links so they can be copied and sent. Reuses Clerk for auth.
+- `src/entitlements.js`: added `revokeCode(code)`.
+- `src/server.js`: refactored Clerk-key HTML substitution into `serveWithClerkKey(filename)`, applied to `/planner.html` and new `/admin.html`.
+- Approach: replaces the failed Clerk Backend API token-script attempt. Node isn't on PATH on the VPS, so admin is browser-driven.
+- 99/99 tests pass.
+
 ## [2026-05-26] Invite-code entitlement gate (replaces failed Basic Auth attempt)
 
 - Removed the HTTP Basic Auth site gate from `src/server.js` — it caused a re-prompt loop in production (reverse proxy likely strips `Authorization` on subresources). Also dropped the `SITE_USERNAME` / `SITE_PASSWORD` env vars from `.env.example`.
