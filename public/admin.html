@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YunHai — Invite Admin</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #222; }
+    h1 { margin: 0 0 8px; }
+    .muted { color: #777; font-size: 14px; }
+    .row { display: flex; gap: 8px; align-items: center; margin: 16px 0; }
+    input, button { font: inherit; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; }
+    button { background: #111; color: #fff; border-color: #111; cursor: pointer; }
+    button.secondary { background: #fff; color: #111; }
+    button.danger { background: #fff; color: #c00; border-color: #c99; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; }
+    th { color: #555; font-weight: 600; }
+    .code { font-family: ui-monospace, monospace; }
+    .link { font-family: ui-monospace, monospace; font-size: 12px; color: #06c; word-break: break-all; }
+    .status-redeemed { color: #060; }
+    .status-open { color: #888; }
+    .empty { color: #777; padding: 20px; text-align: center; }
+    .error { color: #c00; padding: 12px; background: #fee; border-radius: 6px; margin: 12px 0; }
+    .gate { padding: 40px; text-align: center; }
+  </style>
+  <script crossorigin="anonymous" src="https://__CLERK_FAPI_DOMAIN__/npm/@clerk/ui@1/dist/ui.browser.js"></script>
+  <script crossorigin="anonymous" data-clerk-publishable-key="" src="https://__CLERK_FAPI_DOMAIN__/npm/@clerk/clerk-js@6/dist/clerk.browser.js"></script>
+</head>
+<body>
+  <h1>Invite Admin</h1>
+  <div class="muted">Mint, list, and revoke YunHai access codes. Owner-only.</div>
+
+  <div id="gate" class="gate" style="display:none">Loading…</div>
+
+  <div id="app" style="display:none">
+    <div class="row">
+      <input id="count" type="number" min="1" max="100" value="5" style="width:80px" />
+      <button id="mint">Mint codes</button>
+      <button id="refresh" class="secondary">Refresh</button>
+      <span id="me" class="muted" style="margin-left:auto"></span>
+    </div>
+    <div id="error" class="error" style="display:none"></div>
+    <table id="codes">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Invite link</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div id="empty" class="empty" style="display:none">No codes yet. Mint some above.</div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const showError = (msg) => { const e = $('error'); e.textContent = msg; e.style.display = 'block'; };
+const clearError = () => { $('error').style.display = 'none'; };
+
+async function api(path, opts = {}) {
+  const token = await window.Clerk.session.getToken();
+  const res = await fetch(path, {
+    ...opts,
+    headers: {
+      ...(opts.headers || {}),
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function inviteUrl(code) {
+  return `${window.location.origin}/?invite=${code}`;
+}
+
+function render(codes) {
+  const tbody = document.querySelector('#codes tbody');
+  tbody.innerHTML = '';
+  if (!codes.length) {
+    $('codes').style.display = 'none';
+    $('empty').style.display = 'block';
+    return;
+  }
+  $('codes').style.display = 'table';
+  $('empty').style.display = 'none';
+  codes.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  for (const c of codes) {
+    const tr = document.createElement('tr');
+    const status = c.redeemedBy
+      ? `<span class="status-redeemed">redeemed ${c.redeemedAt ? new Date(c.redeemedAt).toLocaleDateString() : ''}</span>`
+      : `<span class="status-open">open</span>`;
+    const link = inviteUrl(c.code);
+    tr.innerHTML = `
+      <td class="code">${c.code}</td>
+      <td><a class="link" href="${link}">${link}</a></td>
+      <td>${status}</td>
+      <td class="muted">${c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ''}</td>
+      <td><button class="danger" data-revoke="${c.code}">Revoke</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+  tbody.querySelectorAll('[data-revoke]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm(`Revoke ${btn.dataset.revoke}? If already redeemed, the user will lose access.`)) return;
+      try {
+        clearError();
+        await api(`/api/admin/invites/${btn.dataset.revoke}`, { method: 'DELETE' });
+        await refresh();
+      } catch (e) { showError(e.message); }
+    });
+  });
+}
+
+async function refresh() {
+  try {
+    clearError();
+    const { codes } = await api('/api/admin/invites');
+    render(codes || []);
+  } catch (e) { showError(e.message); }
+}
+
+async function mint() {
+  try {
+    clearError();
+    const count = parseInt($('count').value, 10) || 1;
+    await api('/api/admin/invites', { method: 'POST', body: JSON.stringify({ count }) });
+    await refresh();
+  } catch (e) { showError(e.message); }
+}
+
+(async () => {
+  const gate = $('gate');
+  const app = $('app');
+  gate.style.display = 'block';
+
+  await window.Clerk.load();
+  if (!window.Clerk.user) {
+    gate.innerHTML = '<p>Sign in to continue.</p>';
+    await window.Clerk.openSignIn({ redirectUrl: window.location.href });
+    return;
+  }
+
+  try {
+    const { codes } = await api('/api/admin/invites');
+    $('me').textContent = `Signed in as ${window.Clerk.user.id}`;
+    gate.style.display = 'none';
+    app.style.display = 'block';
+    render(codes || []);
+  } catch (e) {
+    gate.innerHTML = `<p class="error">${e.message}</p><p class="muted">User id: ${window.Clerk.user.id}<br>Set <code>OWNER_USER_ID</code> to this value on the server and reload.</p>`;
+    return;
+  }
+
+  $('mint').addEventListener('click', mint);
+  $('refresh').addEventListener('click', refresh);
+})();
+</script>
+</body>
+</html>

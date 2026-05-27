@@ -22,14 +22,19 @@ app.use((req, res, next) => {
   });
 });
 
-app.get('/planner.html', (_req, res) => {
-  const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'planner.html'), 'utf8');
-  const key = process.env.CLERK_PUBLISHABLE_KEY || '';
-  const fapiDomain = key ? Buffer.from(key.replace(/^pk_(test|live)_/, ''), 'base64').toString().replace(/\$$/, '') : '';
-  res.send(html
-    .replace('data-clerk-publishable-key=""', `data-clerk-publishable-key="${key}"`)
-    .replaceAll('__CLERK_FAPI_DOMAIN__', fapiDomain));
-});
+function serveWithClerkKey(filename) {
+  return (_req, res) => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'public', filename), 'utf8');
+    const key = process.env.CLERK_PUBLISHABLE_KEY || '';
+    const fapiDomain = key ? Buffer.from(key.replace(/^pk_(test|live)_/, ''), 'base64').toString().replace(/\$$/, '') : '';
+    res.send(html
+      .replace('data-clerk-publishable-key=""', `data-clerk-publishable-key="${key}"`)
+      .replaceAll('__CLERK_FAPI_DOMAIN__', fapiDomain));
+  };
+}
+
+app.get('/planner.html', serveWithClerkKey('planner.html'));
+app.get('/admin.html', serveWithClerkKey('admin.html'));
 
 app.post('/debug/client', (req, res) => {
   const scope = String(req.body?.scope || 'client').slice(0, 40);
@@ -71,6 +76,7 @@ require('./routes/status').register(app);
 require('./routes/email').register(app);
 require('./routes/geocode').register(app);
 require('./routes/itinerary').registerPublic(app);
+require('./routes/admin').register(app);
 
 app.use('/api', requireConfiguredAuth);
 app.use('/api', requireEntitlement);
