@@ -32,16 +32,23 @@ function register(app) {
   });
 
   app.get('/api/auth/entitlement', (req, res) => {
-    const userId = parseUserId(getAuthedUserId(req));
-    res.json({ entitled: isEntitled(userId) });
+    const rawUserId = String(req.query.userId || '').trim();
+    const userId = rawUserId ? parseUserId(rawUserId) : null;
+    const entitled = userId ? isEntitled(userId) : false;
+    debugLog('entitlement-check', `userId=${userId} entitled=${entitled}`);
+    res.json({ entitled, userId });
   });
 
   app.post('/api/auth/redeem-code', (req, res) => {
     const rawCode = req.body?.code;
-    const rawUserId = getAuthedUserId(req);
+    const rawUserId = String(req.body?.userId || '').trim();
+    if (!rawUserId) {
+      debugLog('redeem-code', `denied no-userId codeLen=${String(rawCode || '').length}`);
+      return res.json({ ok: false, reason: 'invalid' });
+    }
     const userId = parseUserId(rawUserId);
     const result = redeemCode(rawCode, userId);
-    debugLog('redeem-code', `rawUserId=${rawUserId} parsedUserId=${userId} codeLen=${String(rawCode || '').length} result=${JSON.stringify(result)}`);
+    debugLog('redeem-code', `userId=${userId} codeLen=${String(rawCode || '').length} result=${JSON.stringify(result)}`);
     res.json(result);
   });
 

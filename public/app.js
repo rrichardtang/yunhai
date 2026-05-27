@@ -8935,10 +8935,11 @@ function clearInviteCodeFromUrl() {
 }
 
 async function enforceEntitlementGate() {
+  const userId = state.authUserId || '';
   let entitled = false;
   try {
-    const res = await apiFetch('/api/auth/entitlement');
-    sendDebug('entitlement-client', `check status=${res.status}`);
+    const res = await fetch(`/api/auth/entitlement?userId=${encodeURIComponent(userId)}`, { headers: { 'Accept': 'application/json' } });
+    sendDebug('entitlement-client', `check userId=${userId} status=${res.status}`);
     if (res.ok) {
       const body = await res.json();
       sendDebug('entitlement-client', `body=${JSON.stringify(body)}`);
@@ -8985,13 +8986,14 @@ async function enforceEntitlementGate() {
       errorEl.classList.add('hidden');
       const code = input.value.trim();
       if (!code) return;
-      sendDebug('redeem-client', `submit codeLen=${code.length}`);
+      const userId = state.authUserId || '';
+      sendDebug('redeem-client', `submit userId=${userId} codeLen=${code.length}`);
       let res;
       try {
-        res = await apiFetch('/api/auth/redeem-code', {
+        res = await fetch('/api/auth/redeem-code', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code })
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ code, userId })
         });
       } catch (err) {
         sendDebug('redeem-client', `fetch-threw msg=${err?.message || err} name=${err?.name || ''}`);

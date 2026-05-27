@@ -11,8 +11,16 @@ const PORT = Number(process.env.PORT || 3457);
 
 app.use(express.json({ limit: '1mb' }));
 
+const CLERK_BYPASS_PATHS = new Set([
+  '/api/auth/entitlement',
+  '/api/auth/redeem-code'
+]);
 const _clerk = clerkMiddleware();
 app.use((req, res, next) => {
+  if (CLERK_BYPASS_PATHS.has(req.path)) {
+    debugLog('clerk-middleware', `bypassed ${req.method} ${req.path}`);
+    return next();
+  }
   _clerk(req, res, (err) => {
     if (err) {
       debugLog('clerk-middleware', `swallowed err on ${req.method} ${req.path}: ${err?.message || err}`);
