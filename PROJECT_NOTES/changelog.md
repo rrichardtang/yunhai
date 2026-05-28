@@ -4,6 +4,14 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-28] Engage per-trip memory: plumb `tripId` through all touchpoints
+
+- `public/app.js`: added `tripId: state.currentItineraryId || null` to every relevant POST body — `/api/arrange` (autoArrangeActiveCity), `/api/activity/refine` (onConfirmLocks budget path), `/api/activity/replace` (all 3 call sites), `/api/plan` payload, and `/api/chat/message`.
+- `src/routes/chat.js`: now reads `tripId` from the body and uses it for `recall()`/`processChatSignals()` instead of the chat `sessionId`. **Standardizes the canonical trip key** on the itinerary id (`it_...`) across all touchpoints — previously chat keyed memory by its random UUID `sessionId`, which would have fragmented per-trip memory from the other endpoints. `sessionId` still keys chat history only.
+- `src/routes/activities.js`: `/api/plan` reads `tripId` and forwards it as the 11th arg to `planCity(...)` (param already added when the layer shipped).
+- No changes to `src/memory/*` (treats `tripId` as an opaque scope key). `null` tripId (trip not yet saved) cleanly falls back to user-scoped memory.
+- 113/113 tests pass; server boots clean.
+
 ## [2026-05-28] Modular agent-memory layer (A-MEM / Mem0-inspired)
 
 - New `src/memory/store.js`: swappable `MemoryStore` (flat-JSON at `/data/memory/{userId}.json`, atomic temp-file write). Record shape `{id, text, type, scope, tripId, keywords, salience, source, createdTs, updatedTs, supersedes}`. CRUD (`loadAll/saveAll/add/update/remove`), `makeRecord`, `trimUserScoped` (caps user-scoped to 30 prefs / 20 constraints), `formatRecords`.

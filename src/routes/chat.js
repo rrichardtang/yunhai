@@ -22,7 +22,7 @@ const CHAT_CONCIERGE_MODEL = 'gpt-5.4-mini';
 
 function register(app) {
   app.post('/api/chat/message', async (req, res) => {
-    const { sessionId, message, tripContext } = req.body || {};
+    const { sessionId, message, tripContext, tripId = null } = req.body || {};
     if (!sessionId || !message || typeof message !== 'string') {
       return res.status(400).json({ error: 'sessionId and message are required' });
     }
@@ -33,7 +33,7 @@ function register(app) {
 
     try {
       const userId = parseUserId(getAuthedUserId(req));
-      const prefSummary = recall({ userId, tripId: sessionId, query: message }).text;
+      const prefSummary = recall({ userId, tripId: tripId || null, query: message }).text;
 
       getSession(sessionId);
       setTripContext(sessionId, tripContext || {});
@@ -67,7 +67,7 @@ function register(app) {
       const rawText = response.choices?.[0]?.message?.content?.trim() || '';
 
       const { reply, signals } = parseChatResponse(rawText);
-      processChatSignals(signals, userId, sessionId);
+      processChatSignals(signals, userId, tripId || null);
 
       addMessage(sessionId, 'assistant', reply);
       await compactHistory(sessionId);

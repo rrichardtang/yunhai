@@ -18,11 +18,3 @@
 
 ---
 
-## [2026-05-28] Plumb `tripId` from frontend into plan/arrange/refine/replace bodies
-
-**Status:** Deferred
-**Description:** Per-trip working memory only engages when `tripId` (itinerary id) is passed. Chat already passes it (sessionId); plan/arrange/refine/replace accept an optional `tripId` in the request body but the frontend doesn't yet send it, so those sites currently use user-scoped memory only.
-**Context:** Backend is ready (optional param, null ⇒ user-scoped). Purely a frontend payload addition.
-**Next action:** Add `tripId: state.currentItineraryId` to the `/api/arrange`, `/api/activity/refine`, and `/api/activity/replace` POST bodies in `public/app.js` (and plan if an itinerary id exists at generation time).
-
----
