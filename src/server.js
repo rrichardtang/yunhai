@@ -15,9 +15,10 @@ const CLERK_BYPASS_PATHS = new Set([
   '/api/auth/entitlement',
   '/api/auth/redeem-code'
 ]);
+const clerkBypassed = (p) => CLERK_BYPASS_PATHS.has(p) || p.startsWith('/api/admin/');
 const _clerk = clerkMiddleware();
 app.use((req, res, next) => {
-  if (CLERK_BYPASS_PATHS.has(req.path)) {
+  if (clerkBypassed(req.path)) {
     debugLog('clerk-middleware', `bypassed ${req.method} ${req.path}`);
     return next();
   }
