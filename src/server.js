@@ -22,11 +22,18 @@ app.use((req, res, next) => {
     debugLog('clerk-middleware', `bypassed ${req.method} ${req.path}`);
     return next();
   }
+  if (req.path.startsWith('/api/')) {
+    const auth = req.headers.authorization || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    const dots = (token.match(/\./g) || []).length;
+    debugLog('clerk-rawauth', `${req.method} ${req.path} authLen=${auth.length} tokenLen=${token.length} dots=${dots} head=${token.slice(0, 24)} tail=${token.slice(-12)}`);
+  }
   _clerk(req, res, (err) => {
     if (err) {
-      debugLog('clerk-middleware', `swallowed err on ${req.method} ${req.path}: ${err?.message || err}`);
+      debugLog('clerk-middleware', `err on ${req.method} ${req.path}: ${err?.message || err}`);
       return next();
     }
+    debugLog('clerk-middleware', `resolved ${req.method} ${req.path} userId=${req?.auth?.userId || 'null'} reason=${req?.auth?.reason || ''}`);
     return next();
   });
 });
