@@ -1,6 +1,6 @@
 const OpenAI = require('openai');
 const { getAuthedUserId, parseUserId } = require('../middleware/auth');
-const { getSummary: getPreferenceSummary } = require('../preferences');
+const { recall } = require('../memory');
 const {
   getSession,
   setTripContext,
@@ -33,7 +33,7 @@ function register(app) {
 
     try {
       const userId = parseUserId(getAuthedUserId(req));
-      const prefSummary = getPreferenceSummary(userId);
+      const prefSummary = recall({ userId, tripId: sessionId, query: message }).text;
 
       getSession(sessionId);
       setTripContext(sessionId, tripContext || {});
@@ -67,7 +67,7 @@ function register(app) {
       const rawText = response.choices?.[0]?.message?.content?.trim() || '';
 
       const { reply, signals } = parseChatResponse(rawText);
-      processChatSignals(signals, userId);
+      processChatSignals(signals, userId, sessionId);
 
       addMessage(sessionId, 'assistant', reply);
       await compactHistory(sessionId);

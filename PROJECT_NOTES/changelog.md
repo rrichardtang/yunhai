@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-28] Modular agent-memory layer (A-MEM / Mem0-inspired)
+
+- New `src/memory/store.js`: swappable `MemoryStore` (flat-JSON at `/data/memory/{userId}.json`, atomic temp-file write). Record shape `{id, text, type, scope, tripId, keywords, salience, source, createdTs, updatedTs, supersedes}`. CRUD (`loadAll/saveAll/add/update/remove`), `makeRecord`, `trimUserScoped` (caps user-scoped to 30 prefs / 20 constraints), `formatRecords`.
+- New `src/memory/reconcile.js`: `reconcile()` — one Claude Haiku 4.5 call returning ADD/UPDATE/DELETE/NOOP ops; gated by the global LLM semaphore; returns `null` (caller falls back to plain dedup'd ADD) when no key / unparseable. `buildPrompt`/`parseOps` are pure and tested.
+- New `src/memory/index.js`: `recall()` (sync, no LLM — merges user-scoped + matching-trip records, ranks via `score()` = salience + recency + lexical overlap, returns prompt-ready `.text` incl. profileInstruction) and `observe()` (detached, fire-and-forget — reconciles candidates into the store, never throws). `computeRecords()` is the pure op-application transform (unit-tested).
+- `src/preferences.js`: rewritten as a facade over the store. Keeps all exports (+ new `getProfileInstruction`). `profileInstruction` stays in `/data/users/{userId}.json`; preferences/constraints derive from user-scoped store records. `save()` does diff-based sync (preserves learned-record metadata); legacy `{preferences,constraints}` arrays migrate into the store once on first access.
+- Read sites wired to `recall()`: `src/claude.js` planCity (+ optional `tripId` param), `src/routes/activities.js` arrange + activity/replace + activity/refine (refine was previously memory-blind), `src/routes/chat.js` (tripId = sessionId).
+- Write sites wired to `observe()`: `src/services/chatPrompt.js` `processChatSignals` (chat signals, detached), `src/routes/activities.js` activity/replace (decline signals, detached) and arrange (new feedback pathway — `buildArrangeFeedback` over scheduling-prefs notes + structured prefs, gated on a free-text note to avoid a Haiku call per draft).
+- Tests: new `src/memory.test.js` (9 cases: store CRUD, ADD/UPDATE/DELETE/NOOP, user+trip scope merge, query ranking, legacy migration, diff-sync, reset) and `src/memoryReconcile.test.js` (5 cases: parseOps + buildPrompt). 113/113 pass (was 99). Server boots clean.
+
 ## [2026-05-25] Rewrite Tianhe suggestion-chip bank — concrete questions, not UX-copy labels
 
 - `public/app.js` `STEP_SUGGESTED_QUESTIONS` (~L8032): replaced all 12 chips. Old bank was 7-of-12 "where is the button" UI-help questions (e.g. "What does the 'leave time' field do?", "Where do I put my hotel address?") — framed Tianhe as a help-doc lookup. New bank reframes chips as *demonstrations* of what Tianhe is good at, using concrete place names (Tokyo / Harajuku / Madrid / Barcelona / Shibuya–Asakusa) as templates users can read, tweak, and submit.

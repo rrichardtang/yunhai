@@ -1,27 +1,46 @@
 # Current State
 
-_Last updated: 2026-05-22_
+_Last updated: 2026-05-28_
 
 ## Objective
-Ship the new YunHai landing page with a live-product demo reel embedded as an iframe of the real `planner.html`.
+Ship a modular agent-memory layer (A-MEM / Mem0-inspired) that all four LLM touchpoints
+(activity generation, activity refine/replace, TianHe chat, arrange) share, with both
+long-term (user) and per-trip working memory, while staying on flat-JSON (no DB).
 
 ## Active Workstream
-Branch `feature/yunhai-landing`. Landing page, embed mode, and demo reel engine all built. 99/99 tests pass. Awaiting browser smoke test + manual verification of the scripted Setup beat against the real Cities UI.
+Branch `claude/website-memory-architecture-3BI4W`. New `src/memory/` module shipped:
+`recall()` (sync, no-LLM, relevance-ranked retrieval merging user + trip scope) and
+`observe()` (detached LLM-driven ADD/UPDATE/DELETE reconciliation via Haiku, gated by the
+global semaphore), backed by a swappable `MemoryStore` (`store.js`, flat-JSON at
+`/data/memory/{userId}.json`). `preferences.js` is now a thin facade preserving its old API +
+diff-based sync + legacy migration. Wired into all five read sites and three write sites.
+113/113 tests pass (99 baseline + 14 new); server boots clean.
 
 ## Constraints
-- Brand on the new landing is **YunHai** (not GuideMe, not TravelPlanner). Internal app header in `planner.html` also renamed to YunHai for consistency inside the demo iframe.
-- Demo iframe loads `/planner.html?embed=1`. `?embed=1` bypasses Clerk, hides chrome, seeds a Córdoba city, and unlocks `state.maxStep = 4` so `setStep(2..4)` works.
-- Landing CSS is namespaced under `public/styles/landing/` so it never collides with the planner's own CSS.
-- Demo reel targets the *real* Cities-step selectors (`#addCityBtn`, `.city-row:last-child [data-field=…]`, `[data-logistics=…]`, `[data-tab=…]`, `[data-accommodation-field=…]`) — no `data-demo-anchor` injection.
-- Transport-mode select in the real app has no Bus option; departure beat uses `other` with narrator copy that says "ground transit."
+- Stay flat-JSON / no-DB. The `MemoryStore` interface is the single swap point for a future
+  Postgres + pgvector backend.
+- `recall()` is on the hot path of every LLM call → must stay synchronous and make zero LLM
+  calls. `observe()` is detached so reconciliation latency never blocks user responses.
+- Retrieval is heuristic (salience + recency + lexical overlap); embeddings are deferred
+  behind the pluggable `score()` signature.
+- Approve/decline is intentionally NOT a write pathway (honors the 2026-04-16 decision).
+- `tripId` is optional everywhere (null ⇒ user-scoped only); request bodies pass it when
+  available. The frontend does not yet send `tripId` for plan/arrange/refine/replace.
 
 ## Risks
-- Clerk SDK script tags 404 in embed mode when `CLERK_PUBLISHABLE_KEY` env is unset (URL becomes `https:///…`). Noisy in console, harmless functionally because we never touch `window.Clerk` in embed mode.
-- The iframe re-renders the cities container on tab switch (real-app behavior). Selectors are based on `.city-row:last-child` so they survive, but visual cursor jitter is possible between tab clicks.
-- (Carried over) Google OAuth client secret was briefly exposed; should be rotated.
-- (Carried over) `client_secret_*.json` should be added to `.gitignore`.
+- Arrange feedback ingestion is gated on a free-text scheduling note to avoid a Haiku call on
+  every draft click; structured prefs only ride along when a note is present. If users rarely
+  type notes, arrange-derived learning will be thin.
+- Live end-to-end (chat → memory write → reflected in a later plan; contradiction reconcile)
+  is UNVERIFIED in this container — no API keys present. Needs a keyed environment.
+- (Carried over) Google OAuth client secret should be rotated; `client_secret_*.json` should
+  be gitignored.
 
 ## Next Actions
-- Browser smoke test at `http://localhost:3457/`: verify hero stage animates, marquee renders, demo reel boots, iframe loads without Clerk gate, Setup beat completes through all 7 narrator substeps, dots advance to Review/Arrange/Finalize.
-- Push `feature/yunhai-landing` and verify on staging.
-- Rotate Google OAuth secret + `.gitignore` the `client_secret` file (deferred from prior sessions).
+- Verify end-to-end in a keyed environment: state a preference in chat → confirm a record is
+  written and appears in a later plan/arrange prompt; state a contradicting preference →
+  confirm reconciler UPDATEs/DELETEs instead of appending a duplicate; decline with a note →
+  replacement reflects memory; refine now reflects memory.
+- Optionally plumb `tripId` (itinerary id) from the frontend into the plan/arrange/refine/
+  replace request bodies so per-trip memory engages outside chat.
+- Commit + push branch `claude/website-memory-architecture-3BI4W`.

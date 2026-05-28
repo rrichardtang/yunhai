@@ -4,6 +4,25 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-28] Agent-memory layer lives behind a `recall()`/`observe()` module, not a shared LLM wrapper
+
+**Decision:** Introduce a dedicated `src/memory/` module (A-MEM / Mem0-inspired) as the modular seam all four LLM touchpoints share. `recall()` is synchronous, makes no LLM call, and returns a prompt-ready `.text` (relevance-ranked, merging user-scoped + per-trip records); `observe()` is detached/fire-and-forget and runs one Haiku ADD/UPDATE/DELETE reconciliation call (gated by the global semaphore). Storage is a swappable `MemoryStore` (`store.js`) — flat-JSON at `/data/memory/{userId}.json` now, the single file to re-implement for a DB. `preferences.js` becomes a thin facade over the store (same exported API + diff-based sync + one-time legacy migration). Memory is scoped at both user (durable) and trip (working) levels. Read sites: activity generation, arrange, chat, activity/refine (newly wired), activity/replace. Write sites: chat signals, activity-decline, arrange feedback.
+
+**Reasoning:** Exploration confirmed there is no shared LLM wrapper — all 9 call sites instantiate the SDK directly with heterogeneous formats (text / JSON-mode / tool-use). Building a central `callLlm()` to inject memory would be a high-risk refactor across all of them and isn't required for memory. The existing preference seam (`getPreferenceSummary` / `recordPreference`) is already narrow and wired into four of the five sites, so evolving *that* boundary is the robust, low-blast-radius path. Keeping `recall()` synchronous and LLM-free protects the hot path (it runs on every plan/arrange/chat/refine/replace); putting the only LLM call in a detached `observe()` keeps user latency unchanged. The Mem0 ADD/UPDATE/DELETE reconciliation replaces the old append+exact-dedup, which could never resolve contradictions ("loves seafood" + later "went vegetarian" both persisted).
+
+**Alternatives rejected:**
+- *Central `callLlm()` wrapper refactoring all 9 sites.* High risk, touches heterogeneous SDKs/formats, and delivers no memory-specific benefit over the module seam.
+- *Pull in the `mem0ai` SDK + a vector store (Qdrant/Chroma/hosted).* Hard departure from the flat-file ethos; adds infra/hosted dependency for a user base where per-user memory is tiny.
+- *Embedding-based semantic retrieval now.* Deferred behind the pluggable `score()` signature — it would add an embedding API call to every `recall()` (hot path) for negligible gain at current scale (≤ low-hundreds of records/user).
+- *Approve/decline as a learning signal.* Rejected again per the 2026-04-16 decision (too noisy).
+- *Overloading the existing `/data/users/{userId}.json`.* Kept `profileInstruction` there but put memory records in a separate `/data/memory/{userId}.json` so the editable profile and migration stay cleanly separated.
+
+**Tradeoffs:**
+- Two persistence files per user (`users/` for `profileInstruction`, `memory/` for records); the facade keeps them coherent and migrates legacy arrays once.
+- `observe()` adds one Haiku reconciliation call per ingestion turn (only when there's something to ingest); detached, so no user-facing latency, but it is new cost. Arrange feedback is gated on a free-text note to avoid a call per draft click.
+- Within a single chat session, a newly stated preference won't bust the cached system prompt until trip context changes — acceptable because the statement is still in the live message history.
+- Flat-JSON `MemoryStore` is local to one process/host; horizontal scaling (>1 Node instance) is the migration trigger to Postgres + pgvector. Other triggers: same-user multi-device write contention, embeddings at scale, cross-user/analytics queries.
+
 ## [2026-05-22] Landing demo reel drives the real `planner.html` via `?embed=1` iframe — no static screenshots, no separate demo screens
 
 **Decision:** The marketing landing's "See it in motion" demo embeds the real `planner.html` in an iframe (`?embed=1` mode) and reaches into the same-origin DOM at scripted timestamps to move a synthetic cursor, fire real clicks, type into real inputs, and jump between the app's 4 setup steps via `iframe.contentWindow.setStep(n)`. `?embed=1` bypasses Clerk, hides topbar/chat/banner chrome, unlocks `state.maxStep=4`, and seeds a baseline Córdoba city so the Setup beat has something to add to.
