@@ -1,19 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const store = require('./memory/store');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const USERS_DIR = path.join(DATA_DIR, 'users');
-const MAX_CONSTRAINTS = 20;
-const MAX_PREFERENCES = 30;
 const DEFAULT_USER_ID = 'default';
-
-function defaults() {
-  return {
-    profileInstruction: '',
-    preferences: [],
-    constraints: []
-  };
-}
 
 function ensureDataDir() {
   fs.mkdirSync(USERS_DIR, { recursive: true });
@@ -34,91 +25,133 @@ function resolveUserId(userId) {
   return resolved;
 }
 
-function userPrefsPath(userId) {
-  return path.join(USERS_DIR, `${resolveUserId(userId)}.json`);
+function userPrefsPath(resolvedUserId) {
+  return path.join(USERS_DIR, `${resolvedUserId}.json`);
 }
 
-function normalize(prefs) {
-  const safe = defaults();
-  if (!prefs || typeof prefs !== 'object') return safe;
-  safe.profileInstruction = typeof prefs.profileInstruction === 'string' ? prefs.profileInstruction : '';
-  safe.constraints = Array.isArray(prefs.constraints) ? prefs.constraints.slice(-MAX_CONSTRAINTS) : [];
-  safe.preferences = Array.isArray(prefs.preferences) ? prefs.preferences.slice(-MAX_PREFERENCES) : [];
-  return safe;
+// The user file is now the home of profileInstruction only; preferences and
+// constraints live in the memory store. Legacy fields are read for migration.
+function readUserFile(resolvedUserId) {
+  ensureDataDir();
+  const p = userPrefsPath(resolvedUserId);
+  try {
+    if (!fs.existsSync(p)) return null;
+    const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return raw && typeof raw === 'object' ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeProfileInstruction(resolvedUserId, profileInstruction) {
+  ensureDataDir();
+  const p = userPrefsPath(resolvedUserId);
+  const tmp = `${p}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify({ profileInstruction: profileInstruction || '' }, null, 2));
+  fs.renameSync(tmp, p);
+}
+
+// One-time import of legacy {preferences,constraints} arrays into the store the
+// first time a user is touched after the memory layer ships.
+function migrateLegacy(resolvedUserId, userFile) {
+  if (store.exists(resolvedUserId) || !userFile) return;
+  const legacy = [];
+  for (const c of Array.isArray(userFile.constraints) ? userFile.constraints : []) {
+    const text = String(c?.text || c || '').trim();
+    if (text) legacy.push(store.makeRecord({ text, type: 'constraint', scope: 'user', source: 'manual', createdTs: c?.ts }));
+  }
+  for (const p of Array.isArray(userFile.preferences) ? userFile.preferences : []) {
+    const text = String(p?.text || p || '').trim();
+    if (text) legacy.push(store.makeRecord({ text, type: 'preference', scope: 'user', source: 'manual', createdTs: p?.ts }));
+  }
+  store.saveAll(resolvedUserId, legacy.filter(Boolean));
+}
+
+function userScoped(resolvedUserId, type) {
+  return store.loadAll(resolvedUserId)
+    .filter((r) => r.scope === 'user' && r.type === type)
+    .sort((a, b) => (a.createdTs || 0) - (b.createdTs || 0));
+}
+
+function getProfileInstruction(userId = DEFAULT_USER_ID) {
+  const resolved = resolveUserId(userId);
+  const file = readUserFile(resolved);
+  migrateLegacy(resolved, file);
+  return typeof file?.profileInstruction === 'string' ? file.profileInstruction : '';
 }
 
 function load(userId = DEFAULT_USER_ID) {
-  ensureDataDir();
-  const resolvedUserId = resolveUserId(userId);
-  const prefsPath = userPrefsPath(resolvedUserId);
-  try {
-    if (!fs.existsSync(prefsPath)) {
-      const initial = defaults();
-      save(initial, resolvedUserId);
-      return initial;
-    }
-    const raw = fs.readFileSync(prefsPath, 'utf8');
-    return normalize(JSON.parse(raw));
-  } catch {
-    const fresh = defaults();
-    save(fresh, resolvedUserId);
-    return fresh;
-  }
+  const resolved = resolveUserId(userId);
+  const file = readUserFile(resolved);
+  migrateLegacy(resolved, file);
+  const toItem = (r) => ({ text: r.text, ts: r.updatedTs || r.createdTs });
+  return {
+    profileInstruction: typeof file?.profileInstruction === 'string' ? file.profileInstruction : '',
+    preferences: userScoped(resolved, 'preference').map(toItem),
+    constraints: userScoped(resolved, 'constraint').map(toItem)
+  };
 }
 
-function save(prefs, userId = DEFAULT_USER_ID) {
-  ensureDataDir();
-  const prefsPath = userPrefsPath(userId);
-  const tmpPath = `${prefsPath}.tmp`;
-  fs.writeFileSync(tmpPath, JSON.stringify(normalize(prefs), null, 2));
-  fs.renameSync(tmpPath, prefsPath);
+// Diff-based sync so unchanged records keep their store metadata (keywords,
+// salience, source) instead of being flattened to the {text,ts} editor shape.
+function syncUserScoped(resolvedUserId, type, arr) {
+  const desired = arr.map((item) => String(item?.text ?? item ?? '').trim()).filter(Boolean);
+  const desiredSet = new Set(desired.map((t) => t.toLowerCase()));
+  const records = store.loadAll(resolvedUserId);
+  const currentTexts = new Set(
+    records.filter((r) => r.scope === 'user' && r.type === type).map((r) => r.text.toLowerCase())
+  );
+  const kept = records.filter((r) => !(r.scope === 'user' && r.type === type && !desiredSet.has(r.text.toLowerCase())));
+  const additions = desired
+    .filter((t) => !currentTexts.has(t.toLowerCase()))
+    .map((text) => store.makeRecord({ text, type, scope: 'user', source: 'manual' }))
+    .filter(Boolean);
+  store.saveAll(resolvedUserId, store.trimUserScoped(kept.concat(additions)));
+}
+
+function save(prefs = {}, userId = DEFAULT_USER_ID) {
+  const resolved = resolveUserId(userId);
+  writeProfileInstruction(resolved, typeof prefs.profileInstruction === 'string' ? prefs.profileInstruction : getProfileInstruction(resolved));
+  if (Array.isArray(prefs.constraints)) syncUserScoped(resolved, 'constraint', prefs.constraints);
+  if (Array.isArray(prefs.preferences)) syncUserScoped(resolved, 'preference', prefs.preferences);
+}
+
+function recordEntry(resolvedUserId, type, text) {
+  const clean = String(text || '').trim();
+  if (!clean) return null;
+  const records = store.loadAll(resolvedUserId);
+  const lower = clean.toLowerCase();
+  if (records.some((r) => r.scope === 'user' && r.type === type && r.text.toLowerCase() === lower)) return load(resolvedUserId);
+  records.push(store.makeRecord({ text: clean, type, scope: 'user', source: 'manual' }));
+  store.saveAll(resolvedUserId, store.trimUserScoped(records));
+  return load(resolvedUserId);
 }
 
 function recordConstraint(userId = DEFAULT_USER_ID, constraint) {
-  const text = String(constraint || '').trim();
-  if (!text) return null;
-  const prefs = load(userId);
-  const lower = text.toLowerCase();
-  if (prefs.constraints.some((c) => c.text.toLowerCase() === lower)) return prefs;
-  prefs.constraints.push({ text, ts: Math.floor(Date.now() / 1000) });
-  prefs.constraints = prefs.constraints.slice(-MAX_CONSTRAINTS);
-  save(prefs, userId);
-  return prefs;
+  return recordEntry(resolveUserId(userId), 'constraint', constraint);
 }
 
 function recordPreference(userId = DEFAULT_USER_ID, preference) {
-  const text = String(preference || '').trim();
-  if (!text) return null;
-  const prefs = load(userId);
-  const lower = text.toLowerCase();
-  if (prefs.preferences.some((p) => p.text.toLowerCase() === lower)) return prefs;
-  prefs.preferences.push({ text, ts: Math.floor(Date.now() / 1000) });
-  prefs.preferences = prefs.preferences.slice(-MAX_PREFERENCES);
-  save(prefs, userId);
-  return prefs;
+  return recordEntry(resolveUserId(userId), 'preference', preference);
 }
 
 function getSummary(userId = DEFAULT_USER_ID) {
-  const prefs = load(userId);
+  const resolved = resolveUserId(userId);
+  const file = readUserFile(resolved);
+  migrateLegacy(resolved, file);
   const parts = [];
-
-  if (prefs.profileInstruction) parts.push(prefs.profileInstruction);
-
-  if (prefs.preferences.length) {
-    parts.push(`Learned preferences:\n${prefs.preferences.map((p) => `- ${p.text}`).join('\n')}`);
-  }
-
-  if (prefs.constraints.length) {
-    parts.push(`Constraints:\n${prefs.constraints.map((c) => `- ${c.text}`).join('\n')}`);
-  }
-
+  const profileInstruction = typeof file?.profileInstruction === 'string' ? file.profileInstruction : '';
+  if (profileInstruction) parts.push(profileInstruction);
+  const block = store.formatRecords(store.loadAll(resolved).filter((r) => r.scope === 'user'));
+  if (block) parts.push(block);
   return parts.join('\n\n');
 }
 
 function reset(userId = DEFAULT_USER_ID) {
-  const fresh = defaults();
-  save(fresh, userId);
-  return fresh;
+  const resolved = resolveUserId(userId);
+  writeProfileInstruction(resolved, '');
+  store.saveAll(resolved, []);
+  return load(resolved);
 }
 
-module.exports = { load, save, recordConstraint, recordPreference, getSummary, reset, resolveUserId, DEFAULT_USER_ID };
+module.exports = { load, save, recordConstraint, recordPreference, getSummary, getProfileInstruction, reset, resolveUserId, DEFAULT_USER_ID };

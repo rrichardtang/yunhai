@@ -8,3 +8,21 @@
 **Next action:** Check analytics monthly; when monthly unique visitors cross ~80k, begin the Partner API application so it is approved before we hit the gate.
 
 ---
+
+## [2026-05-28] Verify agent-memory layer end-to-end in a keyed environment
+
+**Status:** Pending input (needs API keys)
+**Description:** The memory layer (`src/memory/`) is built, unit-tested (113/113), and boots clean, but the live LLM path is unverified because this container has no API keys.
+**Context:** `observe()` runs a Haiku reconciliation call; `recall()` is LLM-free. Reconciliation (ADD/UPDATE/DELETE) only exercises with a real Anthropic key.
+**Next action:** In a keyed env: (1) state a preference in chat → confirm a record is written and appears in a later plan/arrange prompt; (2) state a contradicting preference → confirm reconciler UPDATEs/DELETEs instead of duplicating; (3) decline an activity with a note → replacement reflects memory; (4) confirm `/api/activity/refine` now reflects memory.
+
+---
+
+## [2026-05-28] Plumb `tripId` from frontend into plan/arrange/refine/replace bodies
+
+**Status:** Deferred
+**Description:** Per-trip working memory only engages when `tripId` (itinerary id) is passed. Chat already passes it (sessionId); plan/arrange/refine/replace accept an optional `tripId` in the request body but the frontend doesn't yet send it, so those sites currently use user-scoped memory only.
+**Context:** Backend is ready (optional param, null ⇒ user-scoped). Purely a frontend payload addition.
+**Next action:** Add `tripId: state.currentItineraryId` to the `/api/arrange`, `/api/activity/refine`, and `/api/activity/replace` POST bodies in `public/app.js` (and plan if an itinerary id exists at generation time).
+
+---

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { recordPreference, recordConstraint } = require('../preferences');
+const { observe } = require('../memory');
 
 const WEBSITE_GUIDE = fs.readFileSync(path.join(__dirname, 'websiteGuide.md'), 'utf8');
 
@@ -83,12 +83,12 @@ function parseChatResponse(raw) {
   }
 }
 
-function processChatSignals(signals, userId) {
+function processChatSignals(signals, userId, tripId = null) {
   if (!signals.length) return;
-  for (const sig of signals) {
-    if (sig.preference) recordPreference(userId, sig.preference);
-    else if (sig.constraint) recordConstraint(userId, sig.constraint);
-  }
+  const candidates = signals.map((sig) => sig.preference || sig.constraint).filter(Boolean);
+  if (!candidates.length) return;
+  // Detached: reconciliation must not block the chat response.
+  observe({ userId, tripId, source: 'chat', candidates });
 }
 
 function toOpenAiMessages(history = []) {

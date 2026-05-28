@@ -8,11 +8,7 @@ const {
   normalizeActivity,
   SYSTEM_PROMPT: ACTIVITY_SYSTEM_PROMPT
 } = require('../claude');
-const {
-  getSummary: getPreferenceSummary,
-  recordPreference,
-  recordConstraint
-} = require('../preferences');
+const { recall, observe } = require('../memory');
 const { search, isConfigured: isBraveConfigured, shouldUseBrave } = require('../braveSearch');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('../arrangeConfig');
 const { buildBookingLinks } = require('../services/bookingLinks');
@@ -27,6 +23,22 @@ const { debugLog } = require('../services/debugLog');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
 const ARRANGE_MODEL = 'claude-sonnet-4-6';
+
+const BREAKS_LABELS = ['back-to-back days', 'short breaks between activities', 'moderate breaks between activities', 'generous breaks between activities', 'lots of downtime between activities'];
+
+function buildArrangeFeedback(sp) {
+  if (!sp || typeof sp !== 'object') return [];
+  const fb = [];
+  const note = String(sp.notes || '').trim();
+  if (note) fb.push(note);
+  if (sp.tourTiming) fb.push(`Prefers ${sp.tourTiming} tours`);
+  if (sp.dayStartTime && sp.dayEndTime) fb.push(`Prefers each day to run roughly ${sp.dayStartTime}–${sp.dayEndTime}`);
+  if (sp.lunchTime) fb.push(`Prefers lunch around ${sp.lunchTime}`);
+  if (sp.dinnerTime) fb.push(`Prefers dinner around ${sp.dinnerTime}`);
+  const b = Number(sp.breaksBetween);
+  if (Number.isFinite(b) && b >= 1 && b <= 5) fb.push(`Prefers ${BREAKS_LABELS[Math.round(b) - 1]}`);
+  return fb;
+}
 
 const placesCache = new Map();
 const PLACES_CACHE_MAX = 500;
@@ -205,7 +217,7 @@ function register(app) {
       return res.status(503).json({ error: 'OpenAI API key not configured' });
     }
 
-    const { activity, note, budget_target } = req.body || {};
+    const { activity, note, budget_target, tripId = null } = req.body || {};
     debugLog('activity-refine', `INBOUND name="${activity?.name || ''}" city="${activity?.city || ''}" note_chars=${(note || '').length}`);
     if (!activity?.name || !note) {
       debugLog('activity-refine', `REJECT reason=missing_activity_or_note`);
@@ -222,11 +234,13 @@ function register(app) {
       const budgetClause = budget_target != null
         ? `\nThe refined activity's estimated_cost_usd must be at or below ${budget_target}. Downscale the venue or choose a cheaper equivalent within the same activity type and city.`
         : '';
+      const memText = recall({ userId: parseUserId(getAuthedUserId(req)), tripId, query: `${activity.name} ${note}` }).text;
+      const memBlock = memText ? `\n\nTraveler profile & learned preferences (honor these in the refinement):\n${memText}` : '';
 
       const userContent = `You are refining an existing travel activity. The traveler wants a tweak, not a replacement.
 
 Current activity: ${JSON.stringify(activity)}
-Traveler's note: "${note}"${braveBlock}${budgetClause}
+Traveler's note: "${note}"${braveBlock}${budgetClause}${memBlock}
 
 Return ONLY a JSON object containing the fields that should change. Preserve all field names from the current activity. If the traveler names a specific place, the "name" field must include it verbatim.`;
 
@@ -285,7 +299,7 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
       return res.status(503).json({ error: 'Anthropic API key not configured' });
     }
 
-    const { activity, reason, notes, userId } = req.body || {};
+    const { activity, reason, notes, userId, tripId = null } = req.body || {};
     debugLog('activity-replace', `INBOUND name="${activity?.name || ''}" city="${activity?.city || ''}" type="${activity?.type || ''}" reason_chars=${(reason || '').length}`);
     if (!activity?.name || !activity?.city) {
       debugLog('activity-replace', `REJECT reason=missing_name_or_city`);
@@ -293,7 +307,7 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
     }
 
     const resolvedUserId = parseUserId(userId);
-    const prefSummary = getPreferenceSummary(resolvedUserId);
+    const prefSummary = recall({ userId: resolvedUserId, tripId, query: `${activity.name} ${reason || ''}` }).text;
     const systemPrompt = prefSummary ? `${ACTIVITY_SYSTEM_PROMPT}\n\n${prefSummary}` : ACTIVITY_SYSTEM_PROMPT;
 
     const reasonText = String(reason || '').trim();
@@ -353,8 +367,12 @@ Return ONLY valid JSON (no markdown fences):
       const normalized = normalizeActivity(parsed.activity, activity.city);
       await enrichWithPlaceDetails([normalized], activity.city);
 
-      for (const p of (Array.isArray(parsed.preferences) ? parsed.preferences : [])) recordPreference(resolvedUserId, p);
-      for (const c of (Array.isArray(parsed.constraints) ? parsed.constraints : [])) recordConstraint(resolvedUserId, c);
+      const declineSignals = [
+        ...(Array.isArray(parsed.preferences) ? parsed.preferences : []),
+        ...(Array.isArray(parsed.constraints) ? parsed.constraints : [])
+      ];
+      // Detached: reconciliation must not delay the replacement response.
+      observe({ userId: resolvedUserId, tripId, source: 'decline', candidates: declineSignals });
 
       const hasCoords = Number.isFinite(Number(normalized?.location?.lat)) && Number.isFinite(Number(normalized?.location?.lng));
       debugLog('activity-replace', `DONE name="${normalized?.name || ''}" has_coords=${hasCoords} elapsed_ms=${Date.now() - replaceStartTs}`);
@@ -374,7 +392,7 @@ Return ONLY valid JSON (no markdown fences):
       return res.status(503).json({ error: 'Anthropic API key not configured' });
     }
 
-    const { days, activities, lockedActivities, commuteMatrix, profile, numTravelers, numChildren, schedulingPrefs } = req.body || {};
+    const { days, activities, lockedActivities, commuteMatrix, profile, numTravelers, numChildren, schedulingPrefs, tripId = null } = req.body || {};
     debugLog('arrange', `INBOUND activities=${Array.isArray(activities) ? activities.length : 'N/A'} locked=${Array.isArray(lockedActivities) ? lockedActivities.length : 0} days=${Array.isArray(days) ? days.length : 'N/A'} city="${Array.isArray(days) ? (days[0]?.city || '') : ''}"`);
     if (!Array.isArray(days) || !Array.isArray(activities)) {
       return res.status(400).json({ error: 'days and activities are required arrays' });
@@ -388,7 +406,7 @@ Return ONLY valid JSON (no markdown fences):
     }
 
     const userId = parseUserId(getAuthedUserId(req));
-    const prefSummary = getPreferenceSummary(userId);
+    const prefSummary = recall({ userId, tripId, query: days[0]?.city || '' }).text;
     const activitiesById = Object.fromEntries(flexible.map((a) => [String(a.id), a]));
     const matrix = commuteMatrix && typeof commuteMatrix === 'object' ? commuteMatrix : {};
     const matrixPairCount = Object.values(matrix).reduce((sum, row) => sum + (row && typeof row === 'object' ? Object.keys(row).length : 0), 0);
@@ -610,6 +628,14 @@ Return ONLY valid JSON (no markdown fences):
         flexibleCount: flexible.length,
         lockedCount: resolvedLocked.length
       });
+
+      // Arrange feedback → memory. Gated on a deliberate free-text note so we
+      // don't fire a reconciliation call on every draft click; structured prefs
+      // ride along as context to that one call. Detached.
+      const schedNote = String(schedulingPrefs?.notes || '').trim();
+      if (schedNote) {
+        observe({ userId, tripId, source: 'arrange', candidates: buildArrangeFeedback(schedulingPrefs) });
+      }
 
       return res.json({
         placements,
