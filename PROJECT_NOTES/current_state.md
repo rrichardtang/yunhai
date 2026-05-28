@@ -8,13 +8,15 @@ Ship a modular agent-memory layer (A-MEM / Mem0-inspired) that all four LLM touc
 long-term (user) and per-trip working memory, while staying on flat-JSON (no DB).
 
 ## Active Workstream
-Branch `claude/website-memory-architecture-3BI4W`. New `src/memory/` module shipped:
+Branch `claude/website-memory-architecture-3BI4W`. `src/memory/` module shipped:
 `recall()` (sync, no-LLM, relevance-ranked retrieval merging user + trip scope) and
 `observe()` (detached LLM-driven ADD/UPDATE/DELETE reconciliation via Haiku, gated by the
 global semaphore), backed by a swappable `MemoryStore` (`store.js`, flat-JSON at
 `/data/memory/{userId}.json`). `preferences.js` is now a thin facade preserving its old API +
 diff-based sync + legacy migration. Wired into all five read sites and three write sites.
-113/113 tests pass (99 baseline + 14 new); server boots clean.
+Follow-up shipped: `tripId` plumbed through every touchpoint (frontend POST bodies + chat/plan
+routes), standardized on the itinerary id as the canonical per-trip key — per-trip memory is now
+coherent across chat/arrange/refine/replace/plan. 113/113 tests pass; server boots clean.
 
 ## Constraints
 - Stay flat-JSON / no-DB. The `MemoryStore` interface is the single swap point for a future
@@ -24,8 +26,8 @@ diff-based sync + legacy migration. Wired into all five read sites and three wri
 - Retrieval is heuristic (salience + recency + lexical overlap); embeddings are deferred
   behind the pluggable `score()` signature.
 - Approve/decline is intentionally NOT a write pathway (honors the 2026-04-16 decision).
-- `tripId` is optional everywhere (null ⇒ user-scoped only); request bodies pass it when
-  available. The frontend does not yet send `tripId` for plan/arrange/refine/replace.
+- `tripId` is optional everywhere (null ⇒ user-scoped only); canonical key is the itinerary id
+  (`state.currentItineraryId`). The frontend now sends it on all relevant POST bodies.
 
 ## Risks
 - Arrange feedback ingestion is gated on a free-text scheduling note to avoid a Haiku call on
@@ -40,7 +42,6 @@ diff-based sync + legacy migration. Wired into all five read sites and three wri
 - Verify end-to-end in a keyed environment: state a preference in chat → confirm a record is
   written and appears in a later plan/arrange prompt; state a contradicting preference →
   confirm reconciler UPDATEs/DELETEs instead of appending a duplicate; decline with a note →
-  replacement reflects memory; refine now reflects memory.
-- Optionally plumb `tripId` (itinerary id) from the frontend into the plan/arrange/refine/
-  replace request bodies so per-trip memory engages outside chat.
+  replacement reflects memory; refine now reflects memory. Also confirm a trip-only statement is
+  tagged trip-scoped to the itinerary id and surfaces in arrange for that trip but not another.
 - Commit + push branch `claude/website-memory-architecture-3BI4W`.

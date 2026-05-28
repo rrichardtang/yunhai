@@ -4,6 +4,18 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-28] Canonical per-trip memory key is the itinerary id, not the chat session UUID
+
+**Decision:** Per-trip memory `tripId` is standardized on `state.currentItineraryId` (the `it_...` itinerary id) across every touchpoint — chat, arrange, refine, replace, and plan. The chat route now reads `tripId` from the request body for memory `recall`/`observe`; the random UUID `sessionId` (from `ensureChatSessionId()`) reverts to keying chat *history* only. `null` (trip not yet saved) falls back to user-scoped memory.
+
+**Reasoning:** When the memory layer first shipped, chat passed its UUID `sessionId` as the memory `tripId` because that was the only trip-ish identifier the chat route had. But the itinerary id is the one identifier shared by all flows. Had arrange/refine/replace started sending `it_...` while chat kept sending the UUID, the same trip would have had two disjoint trip-memory namespaces — chat-written trip memory invisible to arrange and vice versa. One canonical key keeps per-trip memory coherent.
+
+**Alternatives rejected:**
+- *Keep chat on the UUID `sessionId` and have other endpoints send the UUID too.* The UUID is chat-specific and doesn't exist for non-chat flows; the itinerary id is the natural shared key.
+- *Map both keys to each other server-side.* Needless indirection; the frontend already has the itinerary id at every call site.
+
+**Tradeoffs:** Before a trip is first saved (`currentItineraryId` is `null`), trip-specific statements are stored as user-scoped (durable) memory. Acceptable — an unsaved trip has no stable id to scope to, and durable is the safe fallback. Chat history remains keyed by the UUID `sessionId`, so the two concepts (history vs memory scope) are now cleanly separated.
+
 ## [2026-05-28] Agent-memory layer lives behind a `recall()`/`observe()` module, not a shared LLM wrapper
 
 **Decision:** Introduce a dedicated `src/memory/` module (A-MEM / Mem0-inspired) as the modular seam all four LLM touchpoints share. `recall()` is synchronous, makes no LLM call, and returns a prompt-ready `.text` (relevance-ranked, merging user-scoped + per-trip records); `observe()` is detached/fire-and-forget and runs one Haiku ADD/UPDATE/DELETE reconciliation call (gated by the global semaphore). Storage is a swappable `MemoryStore` (`store.js`) — flat-JSON at `/data/memory/{userId}.json` now, the single file to re-implement for a DB. `preferences.js` becomes a thin facade over the store (same exported API + diff-based sync + one-time legacy migration). Memory is scoped at both user (durable) and trip (working) levels. Read sites: activity generation, arrange, chat, activity/refine (newly wired), activity/replace. Write sites: chat signals, activity-decline, arrange feedback.

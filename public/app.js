@@ -3889,7 +3889,8 @@ async function onConfirmLocks() {
           activity: a,
           note: 'find a cheaper alternative within the same activity type and city',
           budget_target: perActivityTarget,
-          userId: ensureUserId()
+          userId: ensureUserId(),
+          tripId: state.currentItineraryId || null
         })
       })
         .then((r) => (r.ok ? r.json() : Promise.reject()))
@@ -4191,7 +4192,7 @@ function renderActivities() {
         const resp = await apiFetch('/api/activity/replace', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity: a, reason, notes, userId: ensureUserId() })
+          body: JSON.stringify({ activity: a, reason, notes, userId: ensureUserId(), tripId: state.currentItineraryId || null })
         });
         if (!resp.ok) throw new Error('Replace failed');
         const { activity: rawReplacement } = await resp.json();
@@ -4303,7 +4304,7 @@ function renderActivities() {
         const resp = await apiFetch('/api/activity/replace', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity: a, reason, notes, userId: ensureUserId() })
+          body: JSON.stringify({ activity: a, reason, notes, userId: ensureUserId(), tripId: state.currentItineraryId || null })
         });
         if (!resp.ok) throw new Error('Replace failed');
         const { activity: rawReplacement } = await resp.json();
@@ -4504,7 +4505,7 @@ function submitAddActivity() {
   apiFetch('/api/activity/replace', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ activity: stub, reason: why || null, userId: ensureUserId() }),
+    body: JSON.stringify({ activity: stub, reason: why || null, userId: ensureUserId(), tripId: state.currentItineraryId || null }),
   })
     .then((res) => {
       if (!res.ok) throw new Error(`server ${res.status}`);
@@ -6380,7 +6381,8 @@ async function autoArrangeActiveCity(opts = {}) {
         profile: getProfilePayload(),
         numTravelers: state.numTravelers,
         numChildren: state.numChildren,
-        schedulingPrefs: state.schedulingPrefs || defaultSchedulingPrefs()
+        schedulingPrefs: state.schedulingPrefs || defaultSchedulingPrefs(),
+        tripId: state.currentItineraryId || null
       })
     });
 
@@ -7848,6 +7850,7 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
     budget: state.tripBudget,
     numTravelers: state.numTravelers,
     numChildren: state.numChildren,
+    tripId: state.currentItineraryId || null,
     ...(Object.keys(lockedForApi).length && { lockedActivities: lockedForApi })
   };
 
@@ -8221,7 +8224,8 @@ async function sendChatMessage() {
         sessionId: ensureChatSessionId(),
         message,
         tripContext: getTripContext(),
-        userId: ensureUserId()
+        userId: ensureUserId(),
+        tripId: state.currentItineraryId || null
       })
     });
     const data = await res.json();

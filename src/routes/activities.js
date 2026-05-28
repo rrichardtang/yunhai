@@ -675,7 +675,7 @@ Return ONLY valid JSON (no markdown fences):
 
   app.post('/api/plan', async (req, res) => {
     const planStartTs = Date.now();
-    const { cities, travels, profile, budget, numTravelers, numChildren, lockedActivities } = req.body || {};
+    const { cities, travels, profile, budget, numTravelers, numChildren, lockedActivities, tripId = null } = req.body || {};
     debugLog('plan', `INBOUND cities=${Array.isArray(cities) ? cities.length : 'N/A'} travelers=${numTravelers || 1} children=${numChildren || 0} budget=${budget || 'none'}`);
     const resolvedBudget = Number.isFinite(Number(budget)) && Number(budget) > 0 ? Number(budget) : null;
     const resolvedTravelers = Math.max(1, Math.round(Number(numTravelers) || 1));
@@ -717,7 +717,7 @@ Return ONLY valid JSON (no markdown fences):
         try {
           let activities;
           try {
-            activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren, cityLocked);
+            activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren, cityLocked, tripId || null);
           } catch (planErr) {
             debugLog('plan', `planCity THREW city=${city.name} err=${planErr?.message || planErr}`);
             throw planErr;
