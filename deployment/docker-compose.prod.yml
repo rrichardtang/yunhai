@@ -12,5 +12,5 @@ services:
     volumes:
       - /docker/openclaw-fbdq/data/.openclaw/workspace-sherlock/projects/travelplanner:/app
     env_file:
-      - /docker/travelplanner/.env
+      - /docker/travelplanner/.env.prod
     restart: unless-stopped
