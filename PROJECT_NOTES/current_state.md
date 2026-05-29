@@ -1,33 +1,33 @@
 # Current State
 
-_Last updated: 2026-05-27_
+_Last updated: 2026-05-29_
 
 ## Objective
-Roll out YunHai to a small private beta. Distribute access via magic invite links; manage codes from a browser admin page (no CLI on VPS).
+Roll out YunHai to a small private beta. Distribute access via magic invite links; manage codes from the browser admin page (`/admin.html`, owner-only). Production is `yunhai.io`.
 
 ## Active Workstream
-Branch `feature/invite-link-magic`. Built:
-- `?invite=ABC` URLs that auto-redeem after Clerk sign-up (no manual paste).
-- `/admin.html` browser UI to mint / list / revoke codes, gated by `OWNER_USER_ID`.
-- `src/routes/admin.js` endpoints.
+Branch `feature/clerk-server-auth`. Fixed server-side Clerk auth and hardened the admin page:
+- Root cause of `userId=null`: `@clerk/express` v2 exposes `req.auth` as a function; code read it as a property. Fixed all read sites.
+- Added `trust proxy` + `authorizedParties` (`CLERK_AUTHORIZED_PARTIES` env) for verification behind Traefik.
+- Admin routes now use real Clerk verification (`req.auth().userId` vs `OWNER_USER_ID`), not a spoofable query param.
 
-Awaiting deploy to staging (`https://staging.travelplanner.srv1553531.hstgr.cloud/`) for smoke test. Production target: `yunhai.io`.
+Verified end-to-end on staging (minting works, real userId resolves). **Awaiting promote to prod.**
 
 ## Constraints
-- Node isn't on the VPS PATH — admin must be browser-driven, not CLI.
-- Test domain: `https://staging.travelplanner.srv1553531.hstgr.cloud/` before any prod (`yunhai.io`) rollout.
-- Clerk dev tier — don't rely on Backend API invitations / allowlist (low caps).
-- `OWNER_USER_ID` env var must be set on the VPS for the admin page to work. The page surfaces the current Clerk user id when access is denied, so the owner can copy it into the env var.
+- Staging and prod are separate deployments with split env files: staging reads `/docker/travelplanner/.env` (test Clerk instance, `pk_test_`); prod reads `/docker/travelplanner/.env.prod` (live instance, `pk_live_`). Same email → different Clerk userId per instance, so `OWNER_USER_ID` differs between them.
+- `CLERK_AUTHORIZED_PARTIES` must be set per env (staging URL vs `https://yunhai.io`).
+- Deploys must go through `deployment/promotion.sh` (`deploy-staging` / `promote`) — file-by-file `git checkout` does NOT restart the Node process.
+- Node isn't on the VPS PATH — admin is browser-driven, not CLI.
+- Clerk dev tier on staging — don't rely on Backend API invitations.
 
 ## Risks
-- `data/invite-codes.json` lives on the VPS and is not in git. If the data dir is wiped, all invites are lost. Worth backing up.
-- `/debug/codes` (pre-existing) exposes the code list unauthenticated. Not exploited by attackers since redemption still requires a Clerk userId, but the list of valid codes is readable. Worth restricting later.
-- (Carried over) Google OAuth client secret was briefly exposed; should be rotated.
-- (Carried over) `client_secret_*.json` should be added to `.gitignore`.
+- `data/invite-codes.json` lives on the VPS, not in git. If the data dir is wiped, all invites are lost. Worth backing up.
+- `/debug` and `/debug/codes` expose internal logs / the code list. Now Clerk-gated (resolves a userId), but worth restricting to owner-only later.
+- (Carried over) Google OAuth client secret was briefly exposed; should be rotated. `client_secret_*.json` should be `.gitignore`d.
 
 ## Next Actions
-- Push `feature/invite-link-magic` and deploy to staging.
-- Set `OWNER_USER_ID` env var on staging VPS to the Clerk userId of c3u2b4e@gmail.com.
-- Visit `https://staging.travelplanner.srv1553531.hstgr.cloud/admin.html`, mint a few codes, verify the invite-link flow end-to-end in an incognito window.
-- Once smoke test passes, promote to `yunhai.io` and start sending links.
+- `bash deployment/promotion.sh promote --yes` (ensure both checkouts clean first) → merges to `main`, redeploys prod.
+- Verify on `yunhai.io/admin.html`: sign in, mint a real code, confirm the `?invite=` redeem flow in an incognito window.
+- Confirm `CLERK_AUTHORIZED_PARTIES=https://yunhai.io` is set in `.env.prod` (and staging URL in `.env`).
+- Once verified, start sending invite links.
 - Rotate Google OAuth secret + `.gitignore` the `client_secret` file (deferred from prior sessions).

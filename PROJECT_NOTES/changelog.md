@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-29] Fix server-side Clerk auth (userId=null) + collapse admin onto Clerk
+
+- **Root cause:** `@clerk/express` v2 exposes `req.auth` as a *function* (`req.auth()`), but the code read it as a property (`req.auth?.userId` → `undefined`). Every authenticated `/api/*` request resolved `userId=null` and silently fell back to the shared `default` bucket. Fixed all read sites: `src/middleware/auth.js` (`getAuthedUserId`), `src/routes/admin.js`, `src/server.js` (debug log), `src/routes/itinerary.js`, `src/routes/status.js`.
+- `src/server.js`: added `app.set('trust proxy', true)` and `clerkMiddleware({ authorizedParties })` from new `CLERK_AUTHORIZED_PARTIES` env var (needed behind Traefik). Removed `/api/admin/` from `clerkBypassed` so admin routes get real Clerk verification.
+- `src/routes/admin.js`: `requireOwner` now checks `req.auth().userId` against `OWNER_USER_ID` (was a spoofable `?userId=` query param). Routes gated with `requireConfiguredAuth` + `requireOwner`.
+- `public/admin.html`: `api()` sends `Authorization: Bearer <token>` (via `Clerk.session.getToken()`) instead of the query param.
+- `.env.example`: documented `CLERK_AUTHORIZED_PARTIES`.
+- Verified end-to-end on staging: minting `/api/admin/invites` resolves real `userId` and succeeds. 99/99 tests pass.
+- Deploy lesson: file-by-file `git checkout <ref> -- <files>` into the prod checkout does **not** restart the Node process; only the `deploy-staging`/`promote` scripts (full `--force-recreate`) actually swap running code.
+
 ## [2026-05-27] Invite admin UI + magic invite links
 
 - `public/app.js`: gate now auto-fills + auto-submits when `?invite=ABC` is in the URL; strips the param after success or if already entitled. Added `readInviteCodeFromUrl()` / `clearInviteCodeFromUrl()` helpers.

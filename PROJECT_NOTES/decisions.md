@@ -4,6 +4,18 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-29] `@clerk/express` v2: `req.auth` is a function; admin uses verified identity
+
+**Decision:** Always access Clerk auth via `req.auth()` (call it), never `req.auth.userId`. Admin routes (`/api/admin/*`) are verified by Clerk like every other route — `requireConfiguredAuth` + `requireOwner` checking `req.auth().userId` against `OWNER_USER_ID` — instead of trusting a client-supplied `?userId=` query param. Behind a reverse proxy, set `trust proxy` and pass `authorizedParties` (from `CLERK_AUTHORIZED_PARTIES`) to `clerkMiddleware`.
+
+**Reasoning:** In `@clerk/express` v2 the middleware assigns `req.auth = (opts) => requestState.toAuth(opts)` — a function. Reading `.userId` off it returns `undefined`, so server-side auth silently never resolved a real user (everyone became `userId=default`). The prior admin design bypassed Clerk entirely and string-compared a query-param userId, which was both spoofable and a parallel second auth system. Collapsing onto `req.auth()` gives one identity path and closes the spoof.
+
+**Alternatives rejected:**
+- *Keep the query-param admin bypass.* Anyone could pass any `userId`; also meant two different ways to know "who is this."
+- *Blanket `treatPendingAsSignedOut: false`.* Considered when "pending session" was a suspected cause; rejected once the token was confirmed `active` and the real bug was the accessor. Would weaken auth semantics app-wide for no benefit.
+
+**Tradeoffs:** `authorizedParties` must be configured per environment (staging vs prod URLs) or token verification origin checks can reject. Documented in `.env.example`.
+
 ## [2026-05-27] Invite management is a browser admin UI, not a CLI
 
 **Decision:** Mint, list, and revoke beta access codes via `/admin.html` (Clerk-gated by `OWNER_USER_ID` env var) instead of the existing `scripts/mint-invite-codes.js`. Endpoints live in `src/routes/admin.js` and mount before `requireEntitlement` so the owner can administer without being entitled themselves.
