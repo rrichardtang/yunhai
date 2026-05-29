@@ -62,13 +62,12 @@ const showError = (msg) => { const e = $('error'); e.textContent = msg; e.style.
 const clearError = () => { $('error').style.display = 'none'; };
 
 async function api(path, opts = {}) {
-  const userId = window.Clerk?.user?.id || '';
-  const sep = path.includes('?') ? '&' : '?';
-  const url = `${path}${sep}userId=${encodeURIComponent(userId)}`;
-  const res = await fetch(url, {
+  const token = window.Clerk?.session ? await window.Clerk.session.getToken() : '';
+  const res = await fetch(path, {
     ...opts,
     headers: {
       ...(opts.headers || {}),
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     }

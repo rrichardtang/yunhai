@@ -9,14 +9,19 @@ const { readDebugLog, clearDebugLog, debugLog } = require('./services/debugLog')
 const app = express();
 const PORT = Number(process.env.PORT || 3457);
 
+app.set('trust proxy', true);
 app.use(express.json({ limit: '1mb' }));
 
 const CLERK_BYPASS_PATHS = new Set([
   '/api/auth/entitlement',
   '/api/auth/redeem-code'
 ]);
-const clerkBypassed = (p) => CLERK_BYPASS_PATHS.has(p) || p.startsWith('/api/admin/');
-const _clerk = clerkMiddleware();
+const clerkBypassed = (p) => CLERK_BYPASS_PATHS.has(p);
+const AUTHORIZED_PARTIES = (process.env.CLERK_AUTHORIZED_PARTIES || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+const _clerk = clerkMiddleware(
+  AUTHORIZED_PARTIES.length ? { authorizedParties: AUTHORIZED_PARTIES } : {}
+);
 app.use((req, res, next) => {
   if (clerkBypassed(req.path)) {
     debugLog('clerk-middleware', `bypassed ${req.method} ${req.path}`);
