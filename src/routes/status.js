@@ -21,7 +21,8 @@ function register(app) {
 
   app.get('/api/auth/session', requireConfiguredAuth, (req, res) => {
     const userId = getAuthedUserId(req);
-    const userEmail = String(req?.auth?.sessionClaims?.email || req?.auth?.sessionClaims?.email_address || '').trim();
+    const claims = req.auth?.().sessionClaims || {};
+    const userEmail = String(claims.email || claims.email_address || '').trim();
     const forwardingAddress = getOrCreateForwardingAddress(userId, userEmail);
 
     return res.json({
