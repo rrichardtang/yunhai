@@ -5,7 +5,7 @@ services:
     command: sh -c "npm install && node src/server.js"
     labels:
       - traefik.enable=true
-      - traefik.http.routers.travelplanner-prod.rule=Host(`${PROD_HOST:-travelplanner.srv1553531.hstgr.cloud}`)
+      - traefik.http.routers.travelplanner-prod.rule=Host(`yunhai.io`) || Host(`www.yunhai.io`) || Host(`${PROD_HOST:-travelplanner.srv1553531.hstgr.cloud}`)
       - traefik.http.routers.travelplanner-prod.entrypoints=websecure
       - traefik.http.routers.travelplanner-prod.tls.certresolver=letsencrypt
       - traefik.http.services.travelplanner-prod.loadbalancer.server.port=3457
