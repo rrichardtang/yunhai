@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-29] Fix server-side Clerk auth (userId=null) + collapse admin onto Clerk
+
+- **Root cause:** `@clerk/express` v2 exposes `req.auth` as a *function* (`req.auth()`), but the code read it as a property (`req.auth?.userId` → `undefined`). Every authenticated `/api/*` request resolved `userId=null` and silently fell back to the shared `default` bucket. Fixed all read sites: `src/middleware/auth.js` (`getAuthedUserId`), `src/routes/admin.js`, `src/server.js` (debug log), `src/routes/itinerary.js`, `src/routes/status.js`.
+- `src/server.js`: added `app.set('trust proxy', true)` and `clerkMiddleware({ authorizedParties })` from new `CLERK_AUTHORIZED_PARTIES` env var (needed behind Traefik). Removed `/api/admin/` from `clerkBypassed` so admin routes get real Clerk verification.
+- `src/routes/admin.js`: `requireOwner` now checks `req.auth().userId` against `OWNER_USER_ID` (was a spoofable `?userId=` query param). Routes gated with `requireConfiguredAuth` + `requireOwner`.
+- `public/admin.html`: `api()` sends `Authorization: Bearer <token>` (via `Clerk.session.getToken()`) instead of the query param.
+- `.env.example`: documented `CLERK_AUTHORIZED_PARTIES`.
+- Verified end-to-end on staging: minting `/api/admin/invites` resolves real `userId` and succeeds. 99/99 tests pass.
+- Deploy lesson: file-by-file `git checkout <ref> -- <files>` into the prod checkout does **not** restart the Node process; only the `deploy-staging`/`promote` scripts (full `--force-recreate`) actually swap running code.
+
 ## [2026-05-28] Engage per-trip memory: plumb `tripId` through all touchpoints
 
 - `public/app.js`: added `tripId: state.currentItineraryId || null` to every relevant POST body — `/api/arrange` (autoArrangeActiveCity), `/api/activity/refine` (onConfirmLocks budget path), `/api/activity/replace` (all 3 call sites), `/api/plan` payload, and `/api/chat/message`.
@@ -21,6 +31,44 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Read sites wired to `recall()`: `src/claude.js` planCity (+ optional `tripId` param), `src/routes/activities.js` arrange + activity/replace + activity/refine (refine was previously memory-blind), `src/routes/chat.js` (tripId = sessionId).
 - Write sites wired to `observe()`: `src/services/chatPrompt.js` `processChatSignals` (chat signals, detached), `src/routes/activities.js` activity/replace (decline signals, detached) and arrange (new feedback pathway — `buildArrangeFeedback` over scheduling-prefs notes + structured prefs, gated on a free-text note to avoid a Haiku call per draft).
 - Tests: new `src/memory.test.js` (9 cases: store CRUD, ADD/UPDATE/DELETE/NOOP, user+trip scope merge, query ranking, legacy migration, diff-sync, reset) and `src/memoryReconcile.test.js` (5 cases: parseOps + buildPrompt). 113/113 pass (was 99). Server boots clean.
+
+## [2026-05-27] Invite admin UI + magic invite links
+
+- `public/app.js`: gate now auto-fills + auto-submits when `?invite=ABC` is in the URL; strips the param after success or if already entitled. Added `readInviteCodeFromUrl()` / `clearInviteCodeFromUrl()` helpers.
+- New `src/routes/admin.js`: `GET /api/admin/invites`, `POST /api/admin/invites`, `DELETE /api/admin/invites/:code` — owner-only (gated by `OWNER_USER_ID` env var). Mounted before the global `requireEntitlement` so the owner doesn't need to be entitled themselves.
+- New `public/admin.html`: minimal browser UI to mint, list, and revoke codes. Shows full invite links so they can be copied and sent. Reuses Clerk for auth.
+- `src/entitlements.js`: added `revokeCode(code)`.
+- `src/server.js`: refactored Clerk-key HTML substitution into `serveWithClerkKey(filename)`, applied to `/planner.html` and new `/admin.html`.
+- Approach: replaces the failed Clerk Backend API token-script attempt. Node isn't on PATH on the VPS, so admin is browser-driven.
+- 99/99 tests pass.
+
+## [2026-05-26] Invite-code entitlement gate (replaces failed Basic Auth attempt)
+
+- Removed the HTTP Basic Auth site gate from `src/server.js` — it caused a re-prompt loop in production (reverse proxy likely strips `Authorization` on subresources). Also dropped the `SITE_USERNAME` / `SITE_PASSWORD` env vars from `.env.example`.
+- New `src/entitlements.js`: per-user entitlement store backed by `data/invite-codes.json`. Exports `generateCodes(n)`, `listCodes()`, `isEntitled(userId)`, `redeemCode(code, userId)`, `seedOwnerEntitlement(userId)`. Codes are single-use, 8-char base64url uppercase.
+- New `scripts/mint-invite-codes.js` CLI: `node scripts/mint-invite-codes.js 10` mints 10 codes; `--owner <clerk-user-id>` seeds owner access without consuming a code.
+- `src/middleware/auth.js`: added `requireEntitlement` — 403 `{error:'not_entitled'}` unless the caller has redeemed a code. Bypasses `/api/auth/session`, `/api/auth/entitlement`, `/api/auth/redeem-code` so the redeem screen can do its work.
+- `src/server.js`: chained `requireEntitlement` after `requireConfiguredAuth` on `/api`. Public share endpoint (`/api/public/itinerary/:id`) is mounted before both gates and remains open.
+- `src/routes/status.js`: added `GET /api/auth/entitlement` and `POST /api/auth/redeem-code`.
+- `public/app.js`: after Clerk auth resolves, call `/api/auth/entitlement`. If unentitled, show a full-page overlay with an access-code form. Skip entirely when the URL has `?itinerary=…` so share-link recipients aren't blocked.
+- `public/styles.css`: styling for `.entitlement-gate` / `.entitlement-card` overlay.
+- 105/105 tests still pass.
+
+## [2026-05-25] Fix accommodation autocomplete dropdown clipping in Setup step
+
+- Bug: in the city Stay tab, the Accommodation address Google Places dropdown was cut off — only the top of the first suggestion was visible.
+- `public/styles.css`: removed `overflow: hidden` from `.city-row.gm-city` (line ~3296). The rounded card was clipping the absolutely-positioned `<gmp-place-autocomplete>` dropdown that paints outside the input row.
+- Added `position: relative; z-index: 30;` to `.tp-place-autocomplete` so the dropdown stacks above subsequent sibling cards (e.g. trip-health placeholder).
+- Removed unused `overflow: hidden` from `.tp-place-autocomplete` / `.city-autocomplete` mobile rules — same clipping concern. `max-width: 100%` is kept to prevent horizontal overflow.
+
+## [2026-05-25] Fix share-link routing — public read-only itinerary endpoint
+
+- Bug: clicking a shared `/planner.html?itinerary=…&mode=itinerary` link dropped recipients on the home/My Trips view. Root cause: frontend hit authed `/api/itinerary/:id` (scoped by ownerId), got 401/404 for anonymous or non-owner viewers, fell through to `renderMyTrips()`.
+- `src/itineraryStore.js`: added `getItineraryByIdPublic(id)` — id-only lookup, no userId scope. Exported alongside existing fns.
+- `src/routes/itinerary.js`: added `registerPublic(app)` + `toPublicItinerary()` helper. New route `GET /api/public/itinerary/:id` strips owner-private fields (userId, notificationPrefs, issueMeta) before returning.
+- `src/server.js`: registered public route before `app.use('/api', requireConfiguredAuth)` so it bypasses auth gate.
+- `public/app.js`: extracted `hydrateLoadedItinerary(itinerary)` helper from `loadItineraryById`. Added `loadPublicSharedItinerary(id)` which fetches via the public endpoint and sets `state.readOnlyShare = true`. `maybeLoadSharedItineraryFromUrl()` now uses the public path; the unused `mode` URL param read was removed (always forces itinerary view).
+- 99/99 tests still passing.
 
 ## [2026-05-25] Rewrite Tianhe suggestion-chip bank — concrete questions, not UX-copy labels
 

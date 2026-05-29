@@ -1,6 +1,9 @@
 const fs = require('fs');
+const path = require('path');
 
-const DEBUG_LOG_PATH = '/tmp/debug.log';
+const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch {}
+const DEBUG_LOG_PATH = path.join(DATA_DIR, 'debug.log');
 const MAX_LINE_LEN = 2000;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 

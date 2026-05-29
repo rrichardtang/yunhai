@@ -2976,6 +2976,9 @@ async function getAuthToken() {
 
 async function apiFetch(url, options = {}) {
   const token = await getAuthToken();
+  if (url.includes('/api/auth/redeem-code') || url.includes('/api/auth/entitlement')) {
+    sendDebug('apiFetch', `url=${url} tokenLen=${token ? token.length : 0} tokenHead=${token ? token.slice(0, 16) : ''}`);
+  }
   const headers = new Headers(options.headers || {});
   if (token) headers.set('Authorization', `Bearer ${token}`);
   const next = { ...options, headers };
@@ -7728,6 +7731,43 @@ function renderSavedItineraries() {
   });
 }
 
+function hydrateLoadedItinerary(itinerary) {
+  state.itinerary = itinerary;
+  state.currentItineraryId = itinerary.id || null;
+  state.tripName = itinerary.tripName || state.tripName;
+  state.tripBudget = itinerary.tripBudget ?? state.tripBudget;
+  state.numTravelers = itinerary.numTravelers ?? state.numTravelers;
+  state.numChildren = itinerary.numChildren ?? state.numChildren;
+  if (els.tripName) els.tripName.value = state.tripName;
+  if (els.tripBudget && state.tripBudget != null) els.tripBudget.value = state.tripBudget;
+  if (els.numTravelers) els.numTravelers.value = state.numTravelers;
+  if (els.numChildren) els.numChildren.value = state.numChildren;
+  state.bookingChecklist = Array.isArray(itinerary?.bookingChecklist?.checklist)
+    ? itinerary.bookingChecklist.checklist.map(normalizeChecklistItem)
+    : [];
+  state.bookingChecklistNotificationPrefs = itinerary?.bookingChecklist?.notificationPrefs || state.bookingChecklistNotificationPrefs;
+  state.bookingChecklistIssueMeta = itinerary?.bookingChecklist?.issueMeta || {};
+  state.cities = Array.isArray(itinerary.cities)
+    ? itinerary.cities.map(normalizeCityData)
+    : state.cities;
+  state.travels = Array.isArray(itinerary.travels) ? itinerary.travels.slice(0, 1).map(normalizeTravelEntry) : state.travels;
+  state.days = Array.isArray(itinerary.days)
+    ? itinerary.days.map((day) => ({ id: day.id || `${day.city}-${day.date}`, city: day.city, date: day.date }))
+    : [];
+  state.activities = (itinerary.activities || []).map((a) => normalizeActivityMetadata(a));
+  state.reviewed = itinerary.reviewed || {};
+  state.placements = itinerary.placements || {};
+  state.commutes = normalizeCommuteStateMap(itinerary.commutes || {});
+  state.schedulingPrefs = itinerary.schedulingPrefs
+    ? saveSchedulingPrefs(itinerary.schedulingPrefs)
+    : loadSchedulingPrefs();
+  hydrateTravelIntoCities();
+  renderCities();
+  state.lastPlannedFingerprint = step1Fingerprint();
+  updateCalendarControls();
+  renderItinerary();
+}
+
 async function loadItineraryById(id) {
   if (!id) return;
   try {
@@ -7735,42 +7775,7 @@ async function loadItineraryById(id) {
     const data = await res.json();
     if (!res.ok || !data?.itinerary) throw new Error('Failed to load itinerary');
 
-    const itinerary = data.itinerary;
-    state.itinerary = itinerary;
-    state.currentItineraryId = itinerary.id || null;
-    state.tripName = itinerary.tripName || state.tripName;
-    state.tripBudget = itinerary.tripBudget ?? state.tripBudget;
-    state.numTravelers = itinerary.numTravelers ?? state.numTravelers;
-    state.numChildren = itinerary.numChildren ?? state.numChildren;
-    if (els.tripName) els.tripName.value = state.tripName;
-    if (els.tripBudget && state.tripBudget != null) els.tripBudget.value = state.tripBudget;
-    if (els.numTravelers) els.numTravelers.value = state.numTravelers;
-    if (els.numChildren) els.numChildren.value = state.numChildren;
-    state.bookingChecklist = Array.isArray(itinerary?.bookingChecklist?.checklist)
-      ? itinerary.bookingChecklist.checklist.map(normalizeChecklistItem)
-      : [];
-    state.bookingChecklistNotificationPrefs = itinerary?.bookingChecklist?.notificationPrefs || state.bookingChecklistNotificationPrefs;
-    state.bookingChecklistIssueMeta = itinerary?.bookingChecklist?.issueMeta || {};
-    state.cities = Array.isArray(itinerary.cities)
-      ? itinerary.cities.map(normalizeCityData)
-      : state.cities;
-    state.travels = Array.isArray(itinerary.travels) ? itinerary.travels.slice(0, 1).map(normalizeTravelEntry) : state.travels;
-    state.days = Array.isArray(itinerary.days)
-      ? itinerary.days.map((day) => ({ id: day.id || `${day.city}-${day.date}`, city: day.city, date: day.date }))
-      : [];
-
-    state.activities = (itinerary.activities || []).map((a) => normalizeActivityMetadata(a));
-    state.reviewed = itinerary.reviewed || {};
-    state.placements = itinerary.placements || {};
-    state.commutes = normalizeCommuteStateMap(itinerary.commutes || {});
-    state.schedulingPrefs = itinerary.schedulingPrefs
-      ? saveSchedulingPrefs(itinerary.schedulingPrefs)
-      : loadSchedulingPrefs();
-    hydrateTravelIntoCities();
-    renderCities();
-    state.lastPlannedFingerprint = step1Fingerprint();
-    updateCalendarControls();
-    renderItinerary();
+    hydrateLoadedItinerary(data.itinerary);
     await fetchSavedItineraries();
     renderSavedItineraries();
     ensureChatSessionId();
@@ -7780,6 +7785,15 @@ async function loadItineraryById(id) {
   } catch {
     showToast('Could not load itinerary.', 'error');
   }
+}
+
+async function loadPublicSharedItinerary(id) {
+  const res = await fetch(`/api/public/itinerary/${encodeURIComponent(id)}`);
+  if (!res.ok) throw new Error('Failed to load shared itinerary');
+  const data = await res.json();
+  if (!data?.itinerary) throw new Error('Failed to load shared itinerary');
+  state.readOnlyShare = true;
+  hydrateLoadedItinerary(data.itinerary);
 }
 
 function syncTripMetaFromInputs() {
@@ -8723,13 +8737,12 @@ function renderMyTrips() {
 async function maybeLoadSharedItineraryFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const itineraryId = String(params.get('itinerary') || '').trim();
-  const mode = String(params.get('mode') || '').trim().toLowerCase();
 
   if (!itineraryId) return false;
 
   try {
-    await loadItineraryById(itineraryId);
-    if (mode === 'itinerary' || mode === 'execution') setViewMode('itinerary');
+    await loadPublicSharedItinerary(itineraryId);
+    setViewMode('itinerary');
     return true;
   } catch {
     const offline = loadMinimalOfflinePayload(itineraryId);
@@ -8769,9 +8782,9 @@ async function maybeLoadSharedItineraryFromUrl() {
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
+  navigator.serviceWorker.getRegistrations()
+    .then((regs) => regs.forEach((r) => r.unregister().catch(() => {})))
+    .catch(() => {});
 }
 
 function renderAuthUi() {
@@ -8905,6 +8918,130 @@ async function loadAuthSessionData() {
   }
 
   renderAuthUi();
+}
+
+function readInviteCodeFromUrl() {
+  try {
+    const code = new URLSearchParams(window.location.search).get('invite');
+    return code ? code.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
+function clearInviteCodeFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('invite')) return;
+    url.searchParams.delete('invite');
+    window.history.replaceState({}, '', url.toString());
+  } catch {}
+}
+
+async function enforceEntitlementGate() {
+  const userId = state.authUserId || '';
+  let entitled = false;
+  try {
+    const res = await fetch(`/api/auth/entitlement?userId=${encodeURIComponent(userId)}`, { headers: { 'Accept': 'application/json' } });
+    sendDebug('entitlement-client', `check userId=${userId} status=${res.status}`);
+    if (res.ok) {
+      const body = await res.json();
+      sendDebug('entitlement-client', `body=${JSON.stringify(body)}`);
+      entitled = Boolean(body?.entitled);
+    }
+  } catch (err) {
+    sendDebug('entitlement-client', `check-threw msg=${err?.message || err}`);
+  }
+  sendDebug('entitlement-client', `decision entitled=${entitled}`);
+  if (entitled) {
+    clearInviteCodeFromUrl();
+    return true;
+  }
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'entitlement-gate';
+    overlay.innerHTML = `
+      <div class="entitlement-card">
+        <h1>Private beta</h1>
+        <p>YunHai is invite-only right now. Enter your access code to continue.</p>
+        <form class="entitlement-form">
+          <input type="text" name="code" placeholder="Access code" autocomplete="off" required />
+          <div class="entitlement-error hidden"></div>
+          <button type="submit">Unlock</button>
+        </form>
+        <p class="entitlement-foot">Don't have a code? Ask whoever invited you, or <a href="#" data-signout>sign out</a>.</p>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const form = overlay.querySelector('.entitlement-form');
+    const input = form.querySelector('input[name="code"]');
+    const errorEl = overlay.querySelector('.entitlement-error');
+    const signOut = overlay.querySelector('[data-signout]');
+
+    const showError = (msg) => {
+      errorEl.textContent = msg;
+      errorEl.classList.remove('hidden');
+    };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.classList.add('hidden');
+      const code = input.value.trim();
+      if (!code) return;
+      const userId = state.authUserId || '';
+      sendDebug('redeem-client', `submit userId=${userId} codeLen=${code.length}`);
+      let res;
+      try {
+        res = await fetch('/api/auth/redeem-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ code, userId })
+        });
+      } catch (err) {
+        sendDebug('redeem-client', `fetch-threw msg=${err?.message || err} name=${err?.name || ''}`);
+        showError(`Network error: ${err?.message || err}`);
+        return;
+      }
+      sendDebug('redeem-client', `response status=${res.status} ok=${res.ok}`);
+      let data;
+      try {
+        data = await res.json();
+      } catch (err) {
+        sendDebug('redeem-client', `json-parse-threw status=${res.status} msg=${err?.message || err}`);
+        showError(`Could not parse response (status ${res.status})`);
+        return;
+      }
+      sendDebug('redeem-client', `body=${JSON.stringify(data)}`);
+      if (data?.ok) {
+        clearInviteCodeFromUrl();
+        overlay.remove();
+        resolve(true);
+        return;
+      }
+      const reasons = {
+        invalid: 'That code isn’t recognized.',
+        already_used: 'That code has already been used.',
+        already_entitled: 'Your account already has access — reload the page.'
+      };
+      showError(reasons[data?.reason] || `Could not redeem code (reason=${data?.reason || 'unknown'})`);
+    });
+
+    signOut.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try { await window.Clerk?.signOut({ redirectUrl: window.location.href }); } catch {}
+    });
+
+    const presetCode = readInviteCodeFromUrl();
+    if (presetCode) {
+      input.value = presetCode;
+      sendDebug('redeem-client', `auto-submit from url codeLen=${presetCode.length}`);
+      form.requestSubmit();
+    } else {
+      input.focus();
+    }
+  });
 }
 
 async function initClerkAuth() {
@@ -9400,6 +9537,12 @@ history.replaceState({ spa: true, step: 1 }, '');
       els.apiBanner.classList.remove('hidden');
     }
     return;
+  }
+
+  const hasShareLink = new URLSearchParams(location.search).has('itinerary');
+  if (!hasShareLink) {
+    const entitled = await enforceEntitlementGate();
+    if (!entitled) return;
   }
 
   state.profilesStore = loadProfiles();

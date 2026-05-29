@@ -4,6 +4,31 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-29] `@clerk/express` v2: `req.auth` is a function; admin uses verified identity
+
+**Decision:** Always access Clerk auth via `req.auth()` (call it), never `req.auth.userId`. Admin routes (`/api/admin/*`) are verified by Clerk like every other route — `requireConfiguredAuth` + `requireOwner` checking `req.auth().userId` against `OWNER_USER_ID` — instead of trusting a client-supplied `?userId=` query param. Behind a reverse proxy, set `trust proxy` and pass `authorizedParties` (from `CLERK_AUTHORIZED_PARTIES`) to `clerkMiddleware`.
+
+**Reasoning:** In `@clerk/express` v2 the middleware assigns `req.auth = (opts) => requestState.toAuth(opts)` — a function. Reading `.userId` off it returns `undefined`, so server-side auth silently never resolved a real user (everyone became `userId=default`). The prior admin design bypassed Clerk entirely and string-compared a query-param userId, which was both spoofable and a parallel second auth system. Collapsing onto `req.auth()` gives one identity path and closes the spoof.
+
+**Alternatives rejected:**
+- *Keep the query-param admin bypass.* Anyone could pass any `userId`; also meant two different ways to know "who is this."
+- *Blanket `treatPendingAsSignedOut: false`.* Considered when "pending session" was a suspected cause; rejected once the token was confirmed `active` and the real bug was the accessor. Would weaken auth semantics app-wide for no benefit.
+
+**Tradeoffs:** `authorizedParties` must be configured per environment (staging vs prod URLs) or token verification origin checks can reject. Documented in `.env.example`.
+
+## [2026-05-27] Invite management is a browser admin UI, not a CLI
+
+**Decision:** Mint, list, and revoke beta access codes via `/admin.html` (Clerk-gated by `OWNER_USER_ID` env var) instead of the existing `scripts/mint-invite-codes.js`. Endpoints live in `src/routes/admin.js` and mount before `requireEntitlement` so the owner can administer without being entitled themselves.
+
+**Reasoning:** Node isn't on PATH on the VPS, so the CLI script can't run there. Minting locally and shipping `data/invite-codes.json` would couple invite issuance to a deploy. A browser-driven admin page is operable from any device, scales to ad-hoc beta growth, and reuses the existing Clerk session.
+
+**Alternatives rejected:**
+- *Clerk Backend API invitations.* Dev tier caps invitations and requires SMTP/domain setup. This was the original failed attempt.
+- *Mint locally, sync the JSON file.* Couples invites to deploys; also fragile across multiple devices.
+- *Add node to the VPS PATH.* Possible but a yak-shave; doesn't solve "I want to mint from my phone."
+
+**Tradeoffs:** Trusts a single owner userId. If the owner account is compromised, an attacker can mint unlimited codes — but they could also already access the gate as the owner, so the marginal risk is small. The script (`scripts/mint-invite-codes.js`) remains for local emergency use.
+
 ## [2026-05-28] Canonical per-trip memory key is the itinerary id, not the chat session UUID
 
 **Decision:** Per-trip memory `tripId` is standardized on `state.currentItineraryId` (the `it_...` itinerary id) across every touchpoint — chat, arrange, refine, replace, and plan. The chat route now reads `tripId` from the request body for memory `recall`/`observe`; the random UUID `sessionId` (from `ensureChatSessionId()`) reverts to keying chat *history* only. `null` (trip not yet saved) falls back to user-scoped memory.
