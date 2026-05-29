@@ -40,10 +40,6 @@ app.use((req, res, next) => {
     }
     const a = typeof req.auth === 'function' ? req.auth() : null;
     debugLog('clerk-middleware', `resolved ${req.method} ${req.path} userId=${a?.userId || 'null'} reason=${a?.reason || ''}`);
-    if (req.path.startsWith('/api/') && !a?.userId) {
-      const probe = typeof req.auth === 'function' ? req.auth({ treatPendingAsSignedOut: false }) : null;
-      debugLog('clerk-authdump', `${req.path} authType=${typeof req.auth} keys=${a ? Object.keys(a).join(',') : 'NO_AUTH_OBJ'} sessionId=${a?.sessionId || 'none'} sessionStatus=${a?.sessionStatus || 'none'} probeUserId=${probe?.userId || 'none'}`);
-    }
     return next();
   });
 });
