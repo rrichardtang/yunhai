@@ -4,7 +4,8 @@ const { requireConfiguredAuth } = require('../middleware/auth');
 function requireOwner(req, res, next) {
   const ownerId = String(process.env.OWNER_USER_ID || '').trim();
   if (!ownerId) return res.status(503).json({ error: 'OWNER_USER_ID not configured' });
-  const userId = String(req.auth?.userId || '').trim();
+  const auth = typeof req.auth === 'function' ? req.auth() : null;
+  const userId = String(auth?.userId || '').trim();
   if (userId !== ownerId) return res.status(403).json({ error: 'not_owner' });
   return next();
 }

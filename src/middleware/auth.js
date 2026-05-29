@@ -11,7 +11,8 @@ function requireConfiguredAuth(req, res, next) {
 }
 
 function getAuthedUserId(req) {
-  return String(req?.auth?.userId || '').trim() || null;
+  const auth = typeof req?.auth === 'function' ? req.auth() : null;
+  return String(auth?.userId || '').trim() || null;
 }
 
 function parseUserId(rawUserId) {

@@ -38,7 +38,8 @@ app.use((req, res, next) => {
       debugLog('clerk-middleware', `err on ${req.method} ${req.path}: ${err?.message || err}`);
       return next();
     }
-    debugLog('clerk-middleware', `resolved ${req.method} ${req.path} userId=${req?.auth?.userId || 'null'} reason=${req?.auth?.reason || ''}`);
+    const a = typeof req.auth === 'function' ? req.auth() : null;
+    debugLog('clerk-middleware', `resolved ${req.method} ${req.path} userId=${a?.userId || 'null'} reason=${a?.reason || ''}`);
     return next();
   });
 });

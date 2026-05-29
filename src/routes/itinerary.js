@@ -111,7 +111,7 @@ function register(app) {
       const itinerary = getItineraryById(req.params.id, userId);
       if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
 
-      const session = req.auth?.sessionClaims || {};
+      const session = req.auth?.().sessionClaims || {};
       const toEmail = String(session?.email || session?.email_address || '').trim();
       if (!toEmail) return res.status(400).json({ error: 'No authenticated email found for this account' });
 
