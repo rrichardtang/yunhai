@@ -26,14 +26,12 @@ const ENTITLEMENT_BYPASS_PATHS = new Set([
 ]);
 
 function requireEntitlement(req, res, next) {
-  const bypass = ENTITLEMENT_BYPASS_PATHS.has(req.path);
-  const rawUserId = getAuthedUserId(req);
-  debugLog('entitlement-gate', `path=${req.path} method=${req.method} bypass=${bypass} rawUserId=${rawUserId}`);
-  if (bypass) return next();
-  const userId = parseUserId(rawUserId);
-  const entitled = isEntitled(userId);
-  debugLog('entitlement-gate', `path=${req.path} userId=${userId} entitled=${entitled}`);
-  if (!entitled) return res.status(403).json({ error: 'not_entitled' });
+  if (ENTITLEMENT_BYPASS_PATHS.has(req.path)) return next();
+  const userId = parseUserId(getAuthedUserId(req));
+  if (!isEntitled(userId)) {
+    debugLog('entitlement-gate', `denied path=${req.path} userId=${userId}`);
+    return res.status(403).json({ error: 'not_entitled' });
+  }
   return next();
 }
 
