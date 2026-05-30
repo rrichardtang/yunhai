@@ -20,12 +20,6 @@ async function searchCityActivities(cityName, { count = 5, year } = {}) {
   return buildPromptFragment(retrieval, { title: 'Web research', maxItems: count });
 }
 
-async function searchForChat(query, { count = 5 } = {}) {
-  const retrieval = await retrieve(query, { count, task: 'chat_concierge' });
-  if (!retrieval.results?.length) return '';
-  return buildPromptFragment(retrieval, { title: 'Web Search Results', maxItems: count });
-}
-
 async function searchTopRestaurants(cityName, { count = 7, year } = {}) {
   const y = Number.isInteger(year) ? year : new Date().getFullYear();
   const retrieval = await retrieve(`best restaurants in ${cityName} ${y} must order dishes`, {
@@ -69,7 +63,6 @@ module.exports = {
   searchTopRestaurants,
   searchInsiderTips,
   searchShoppingDistricts,
-  searchForChat,
   isConfigured,
   shouldUseBrave
 };

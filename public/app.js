@@ -8116,6 +8116,25 @@ async function generateItinerary() {
   setStep(4);
 }
 
+function buildActivityDigest(a) {
+  return {
+    name: a.name,
+    type: a.type,
+    durationMin: a.timing?.duration_minutes ?? null,
+    location: actAddress(a),
+    lat: a.location?.lat ?? null,
+    lng: a.location?.lng ?? null,
+    costUsd: actCostUsd(a),
+    costType: actCostType(a),
+    booking: { type: actBookingType(a), reference: a.booking?.reference || null, links: actBookingLinks(a) },
+    openingHours: actOpeningHours(a),
+    whyItFits: a.why_it_fits || '',
+    pitfall: a.pitfall || '',
+    insiderTips: a.insider_tips || null,
+    smarterAlternative: a.smarter_alternative || null
+  };
+}
+
 function buildScheduledDays() {
   return state.days.map((d) => ({
     date: d.date,
@@ -8123,7 +8142,7 @@ function buildScheduledDays() {
     activities: state.activities
       .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === d.id)
       .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)))
-      .map((a) => ({ name: a.name, type: a.type, time: state.placements[a.id]?.time, duration: a.duration, location: actAddress(a) }))
+      .map((a) => ({ time: state.placements[a.id]?.time, ...buildActivityDigest(a) }))
   })).filter((d) => d.activities.length);
 }
 
@@ -8153,14 +8172,24 @@ const STEP_SUGGESTED_QUESTIONS = {
 };
 
 function slimCities() {
-  return state.cities.map((c) => ({
-    name: c.name,
-    startDate: c.startDate,
-    endDate: c.endDate,
-    leaveTime: c.leaveTime,
-    notes: c.notes || '',
-    accommodations: [c.accommodation?.address].filter(Boolean)
-  }));
+  return state.cities.map((c) => {
+    const arr = c.logistics?.arrival;
+    return {
+      name: c.name,
+      startDate: c.startDate,
+      endDate: c.endDate,
+      leaveTime: c.leaveTime,
+      notes: c.notes || '',
+      accommodation: c.accommodation?.address ? {
+        address: c.accommodation.address,
+        checkIn: c.accommodation.checkIn || '',
+        checkOut: c.accommodation.checkOut || '',
+        lat: c.accommodation.latitude ?? null,
+        lng: c.accommodation.longitude ?? null
+      } : null,
+      arrival: arr?.time ? { mode: arr.mode || '', time: arr.time } : null
+    };
+  });
 }
 
 function getTripContext() {
@@ -8171,8 +8200,8 @@ function getTripContext() {
     step: STEP_LABELS[state.step] || 'unknown',
     tripName: state.tripName,
     cities: slimCities(),
-    approvedActivities: hasSchedule ? [] : state.activities.filter((a) => state.reviewed[a.id]?.approved).map((a) => a.name),
-    declinedActivities: hasSchedule ? [] : state.activities.filter((a) => state.reviewed[a.id]?.approved === false).map((a) => a.name),
+    approvedActivities: hasSchedule ? [] : state.activities.filter((a) => state.reviewed[a.id]?.approved).map(buildActivityDigest),
+    declinedActivities: hasSchedule ? [] : state.activities.filter((a) => state.reviewed[a.id]?.approved === false).map(buildActivityDigest),
     scheduledByDay: scheduled
   };
 }

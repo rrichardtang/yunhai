@@ -4,6 +4,18 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-30] Concierge search is model-driven tool-calling, not a regex gate
+
+**Decision:** The chat concierge no longer decides whether/what to search via regex. It is given a single `web_search` OpenAI function tool (`src/services/chatTools.js`) and writes its own query; `runChatTurn` in `src/routes/chat.js` runs a bounded tool loop (max 2 searches) feeding results back. Deleted: the `chat_concierge` branch of `shouldUseBrave`, `scopeQueryToTrip`/`HOTEL_PHRASE`, and `braveSearch.searchForChat`. The model reads the now-enriched trip context (accommodation address + coords, per-activity cost/booking/why_it_fits/etc.) to ground location/value/booking/rationale questions directly. `response_format: json_object` was dropped — it conflicts with mid-loop tool calls; the `{reply,signals}` contract now rests on the system-prompt instruction plus `parseChatResponse`'s existing prose fallback.
+
+**Reasoning:** Two brittle regexes (search-gate + query-builder) caused repeated whack-a-mole patches (shopping, geo-scope, hotel field, hotel anchor). Giving the model agency + sufficient context fixes the class of bug, not each instance. "Dinner near my hotel" now works because the model reads the address and writes the query itself.
+
+**Alternatives rejected:**
+- *Broaden the regex / add an LLM classifier pre-fetch.* Still no agency; edge cases recur.
+- *`record_signal` tool or a second forced-JSON turn for signals.* Extra round-trips; the prompt-instruction + parser fallback is cheaper and already robust.
+
+**Tradeoffs:** Up to one extra OpenAI round-trip when a search occurs (bounded by the 2-search cap, ~700 tokens, and the 10-min Brave cache). Slightly less guaranteed JSON, mitigated by the parser fallback. Tool/tool_calls messages are kept OUT of persisted `session.history` (only the final reply text is stored) so `compactHistory`/`summarizeHistory` stay untouched.
+
 ## [2026-05-29] "Learned by AI" categories are derived client-side from text, not stored
 
 **Decision:** Group the learned-prefs UI by topic using a client-side regex matcher (`categorizeLearned` / `LEARNED_CATEGORIES` in `public/app.js`) over each item's `text`, with a final "Other" bucket. No category field is added to the memory record, and inline edits ride the existing `PUT /api/preferences` diff-sync rather than a new id-based update path.

@@ -4,6 +4,14 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-30] Concierge bot: agentic web_search + minimum-sufficient trip context
+
+- **Root-cause fix** for repeated whack-a-mole on chat search. Replaced the regex search-gate and regex query-builder with a model-driven `web_search` tool (`src/services/chatTools.js`: `WEB_SEARCH_TOOL`, `MAX_SEARCH_CALLS=2`, `formatSearchResultsForModel`, `runWebSearch`). New `runChatTurn()` in `src/routes/chat.js` runs a bounded tool loop (reuses `braveSearch.search`); dropped `response_format: json_object`.
+- **Deleted dead code:** `HOTEL_PHRASE`/`scopeQueryToTrip`/`accommodationsOf` and the chat-gate debug lines (`src/routes/chat.js`); the `chat_concierge` branch of `shouldUseBrave` + its live/non-live patterns (`src/braveRetrieval.js`); `searchForChat` (`src/braveSearch.js`).
+- **Enriched trip context to "minimum sufficient"** (`public/app.js`): `slimCities` now sends `accommodation {address,checkIn,checkOut,lat,lng}` + `arrival {mode,time}`; new `buildActivityDigest` carries cost/booking/coords/why_it_fits/pitfall/insiderTips/alt/durationMin; `buildScheduledDays` uses it (**fixes the long-standing duration bug** — was `a.duration`, always undefined; now `timing.duration_minutes`); approved/declined activities sent as rich digests instead of bare names.
+- **Backend serializer** (`src/services/chatPrompt.js`): redesigned `formatCityLine`/`formatScheduleBlock` + new `formatActivityList`/`formatActivityDetail`/`bookingStatus`/`truncate`, with a 25-activity detail cap (token guard). Updated Bucket A guidance to tell the model it has the full itinerary and to call `web_search` with its own address-aware query.
+- **Tests:** new `src/services/chatPrompt.test.js` (serializer fields, duration regression, booking status, token guard, parseChatResponse fallback) and `src/routes/chatLoop.test.js` (tool-call loop, 2-search cap, no-search path, Brave-unconfigured). Updated `src/braveRetrieval.test.js` (removed chat_concierge assertions). Broadened test glob to `src/**/*.test.js` in `package.json`. 124/124 pass.
+
 ## [2026-05-29] Reorganize "Learned by AI" profile section + fix pill contrast
 
 - **Legibility fix:** `.learned-pref-tag` was defined twice in `public/styles.css`; the later-cascading block painted pills `background: var(--surface)` (= `--ink-900`, near-black) with `color: var(--text)` (= `--text-700`, dark slate) → unreadable dark-on-dark. Consolidated to one canonical rule (light `--paper-2` bg + dark `--text-700` text); removed the redundant earlier re-skin block.

@@ -10,41 +10,48 @@ const {
   clearSession,
   getCachedPrompt
 } = require('../chat');
-const { searchForChat, isConfigured: isBraveConfigured, shouldUseBrave } = require('../braveSearch');
-const { debugLog } = require('../services/debugLog');
+const { isConfigured: isBraveConfigured } = require('../braveSearch');
 const {
   buildChatSystemPrompt,
   parseChatResponse,
   processChatSignals,
   toOpenAiMessages
 } = require('../services/chatPrompt');
+const { WEB_SEARCH_TOOL, MAX_SEARCH_CALLS, runWebSearch } = require('../services/chatTools');
 
 const CHAT_CONCIERGE_MODEL = 'gpt-5.4-mini';
 
-const HOTEL_PHRASE = /\b(my hotel|our hotel|the hotel|my accommodation|where (i'm|i am|we're|we are) staying|near me)\b/i;
-
-function accommodationsOf(city) {
-  return (city.accommodations || []).filter(Boolean);
-}
-
-function scopeQueryToTrip(message, tripContext = {}) {
-  const allCities = (tripContext.cities || []).filter((c) => c.name);
-  if (!allCities.length) return message;
-  const lower = message.toLowerCase();
-  const namedCity = allCities.find((c) => lower.includes(c.name.toLowerCase()));
-
-  if (HOTEL_PHRASE.test(message)) {
-    if (namedCity) {
-      const addr = accommodationsOf(namedCity)[0];
-      if (addr) return `${message} near ${addr}`;
-    } else {
-      const allAddrs = allCities.flatMap(accommodationsOf);
-      if (allAddrs.length === 1) return `${message} near ${allAddrs[0]}`;
+async function runChatTurn({ openai, messages, braveConfigured, search = runWebSearch }) {
+  let searchesUsed = 0;
+  for (;;) {
+    const offerTools = braveConfigured && searchesUsed < MAX_SEARCH_CALLS;
+    const response = await openai.chat.completions.create({
+      model: CHAT_CONCIERGE_MODEL,
+      max_completion_tokens: 700,
+      messages,
+      ...(offerTools ? { tools: [WEB_SEARCH_TOOL], tool_choice: 'auto' } : {})
+    });
+    const msg = response.choices?.[0]?.message;
+    if (!msg?.tool_calls?.length) {
+      return parseChatResponse(msg?.content?.trim() || '');
+    }
+    messages.push(msg);
+    for (const call of msg.tool_calls) {
+      let content;
+      if (searchesUsed >= MAX_SEARCH_CALLS) {
+        content = 'Search limit reached. Answer with what you have.';
+      } else {
+        searchesUsed++;
+        try {
+          const { query } = JSON.parse(call.function.arguments || '{}');
+          content = await search(query);
+        } catch (e) {
+          content = `Search failed: ${e.message}. Answer with what you have.`;
+        }
+      }
+      messages.push({ role: 'tool', tool_call_id: call.id, content });
     }
   }
-
-  if (namedCity) return message;
-  return `${message} in ${allCities.map((c) => c.name).join(', ')}`;
 }
 
 function register(app) {
@@ -68,40 +75,15 @@ function register(app) {
 
       const systemPrompt = getCachedPrompt(sessionId, tripContext || {}, () => buildChatSystemPrompt(tripContext || {}, prefSummary));
 
-      let searchContext = '';
-      const braveConfigured = isBraveConfigured();
-      const braveTriggered = shouldUseBrave('chat_concierge', { userMessage: message });
-      debugLog('chat', `gate configured=${braveConfigured} triggered=${braveTriggered}`);
-      if (braveConfigured && braveTriggered) {
-        try {
-          const searchQuery = scopeQueryToTrip(message, tripContext || {});
-          const cityCount = (tripContext?.cities || []).filter((c) => c.name).length;
-          debugLog('chat', `searchQuery scoped to ${cityCount} trip cities`);
-          const searchResults = await searchForChat(searchQuery, { count: 5 });
-          debugLog('chat', `searchForChat returned ${searchResults ? `${searchResults.length} chars` : 'empty'}`);
-          if (searchResults) {
-            searchContext = `\n\n## Web Search Results\nThese are real-time search results for the user's question. When answering factual questions (recommendations, rankings, ratings, hours, prices), you MUST ground your answer in these results — name specific places, cite the source, and include actionable links. Be concise and confident. If results are sparse or conflicting, say so plainly and provide the best fallback recommendation.\n${searchResults}`;
-          }
-        } catch (e) {
-          debugLog('chat', `brave search failed: ${e.message}`);
-          console.error('[chat] brave search failed, continuing without:', e.message);
-        }
-      }
-
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const response = await openai.chat.completions.create({
-        model: CHAT_CONCIERGE_MODEL,
-        max_completion_tokens: 600,
-        response_format: { type: 'json_object' },
+      const { reply, signals } = await runChatTurn({
+        openai,
+        braveConfigured: isBraveConfigured(),
         messages: [
-          { role: 'system', content: systemPrompt + searchContext },
+          { role: 'system', content: systemPrompt },
           ...toOpenAiMessages(getHistory(sessionId))
         ]
       });
-
-      const rawText = response.choices?.[0]?.message?.content?.trim() || '';
-
-      const { reply, signals } = parseChatResponse(rawText);
       processChatSignals(signals, userId, tripId || null);
 
       addMessage(sessionId, 'assistant', reply);
@@ -132,4 +114,4 @@ function register(app) {
   });
 }
 
-module.exports = { register };
+module.exports = { register, runChatTurn };
