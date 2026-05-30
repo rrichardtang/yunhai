@@ -2293,6 +2293,17 @@ async function goToNextStep(fromStep = state.step) {
       lockedByCity = result.lockedByCity;
     }
 
+    // Resolve any city whose coords haven't landed yet (e.g. Continue clicked
+    // before the name-field blur's async geocode finished) so validation can't
+    // race ahead of an in-flight resolve.
+    const pending = state.cities.filter(
+      (c) => String(c.name || '').trim() && !(Number.isFinite(c.latitude) && Number.isFinite(c.longitude))
+    );
+    if (pending.length) {
+      await Promise.all(pending.map(resolveCityCoords));
+      renderCities();
+    }
+
     if (!validateLocationsBeforePlanning()) {
       showToast('Please validate all locations before planning your trip.', 'error');
       return;
@@ -2511,6 +2522,38 @@ function shortenAddr(addr) {
   if (!s) return '';
   const first = s.split(',')[0].trim();
   return first.length > 30 ? first.slice(0, 28) + '…' : first;
+}
+
+// Resolve a city's coordinates from its typed name via Google Places. Mutates
+// the city in place and returns true if it now has valid coords. Shared by the
+// name-field blur handler and the pre-planning validation gate so a fast click
+// on Continue can't race ahead of an in-flight resolve.
+async function resolveCityCoords(city) {
+  const query = String(city?.name || '').trim();
+  if (!query) return false;
+  if (Number.isFinite(city.latitude) && Number.isFinite(city.longitude)) return true;
+  try {
+    const res = await fetch(`/api/places/resolve?q=${encodeURIComponent(query)}`, { cache: 'no-store' });
+    if (!res.ok) {
+      sendDebug('city-blur', `id=${city.id} typed="${query}" geocode_http=${res.status}`);
+      return false;
+    }
+    const place = await res.json();
+    if (!place?.placeId || !Number.isFinite(place?.lat) || !Number.isFinite(place?.lng)) {
+      sendDebug('city-blur', `id=${city.id} typed="${query}" geocode=no_match raw=${JSON.stringify(place).slice(0, 200)}`);
+      return false;
+    }
+    city.placeId = place.placeId;
+    city.latitude = place.lat;
+    city.longitude = place.lng;
+    const formatted = String(place.formattedAddress || '').trim();
+    if (formatted) city.name = formatted;
+    sendDebug('city-blur', `id=${city.id} name="${city.name}" placeId=${city.placeId} lat=${city.latitude} lng=${city.longitude}`);
+    return true;
+  } catch (err) {
+    sendDebug('city-blur', `id=${city.id} typed="${query}" error=${err?.message || err}`);
+    return false;
+  }
 }
 
 function renderCities() {
@@ -2772,29 +2815,11 @@ function renderCities() {
           sendDebug('city-blur', `id=${city.id} typed="" (no geocode)`);
           return;
         }
-        try {
-          const res = await fetch(`/api/places/resolve?q=${encodeURIComponent(query)}`, { cache: 'no-store' });
-          if (!res.ok) {
-            sendDebug('city-blur', `id=${city.id} typed="${query}" geocode_http=${res.status}`);
-            return;
-          }
-          const place = await res.json();
-          if (!place?.placeId || !Number.isFinite(place?.lat) || !Number.isFinite(place?.lng)) {
-            sendDebug('city-blur', `id=${city.id} typed="${query}" geocode=no_match raw=${JSON.stringify(place).slice(0, 200)}`);
-            return;
-          }
-          city.placeId = place.placeId;
-          city.latitude = place.lat;
-          city.longitude = place.lng;
-          const formatted = String(place.formattedAddress || '').trim();
-          if (formatted && formatted !== city.name) {
-            city.name = formatted;
-            cityNameInput.value = formatted;
-            renderCities();
-          }
-          sendDebug('city-blur', `id=${city.id} name="${city.name}" placeId=${city.placeId} lat=${city.latitude} lng=${city.longitude}`);
-        } catch (err) {
-          sendDebug('city-blur', `id=${city.id} typed="${query}" error=${err?.message || err}`);
+        const before = city.name;
+        const ok = await resolveCityCoords(city);
+        if (ok && city.name !== before) {
+          cityNameInput.value = city.name;
+          renderCities();
         }
       });
     }
