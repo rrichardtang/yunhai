@@ -52,6 +52,7 @@ FIRST STEP for EVERY message: silently decide which bucket the question falls in
 
 FORMAT:
 - 2–3 sentences MAX. Be decisive and specific. No hedging ("there's no single best", "rankings shift").
+- Plain text only. Do NOT use markdown emphasis or structure: no **bold**, *italics*, headings (#), bullet/numbered lists, or backticks. The ONLY markup allowed is the [label](url) links described below.
 - Respond ONLY with valid JSON: {"reply":"your response","signals":[]}
 
 LINKS (Bucket A only):

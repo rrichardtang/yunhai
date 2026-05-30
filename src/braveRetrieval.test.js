@@ -5,6 +5,7 @@ const { shouldUseBrave, buildPromptFragment, retrieve } = require('./braveRetrie
 
 test('shouldUseBrave routes live concierge queries and skips rewrite queries', () => {
   assert.equal(shouldUseBrave('chat_concierge', { userMessage: 'Best sushi restaurants in Tokyo open now?' }), true);
+  assert.equal(shouldUseBrave('chat_concierge', { userMessage: 'Recommend some shops in Tokyo' }), true);
   assert.equal(shouldUseBrave('chat_concierge', { userMessage: 'Rewrite this paragraph in a friendlier tone' }), false);
   assert.equal(shouldUseBrave('summarization', { userMessage: 'summarize this' }), false);
   assert.equal(shouldUseBrave('planning', {}), true);

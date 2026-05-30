@@ -1,3 +1,5 @@
+const { debugLog } = require('./services/debugLog');
+
 const BRAVE_API_URL = 'https://api.search.brave.com/res/v1/web/search';
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -22,6 +24,7 @@ function nowIso() {
 function telemetry(event, payload = {}) {
   const body = JSON.stringify({ event, at: nowIso(), ...payload });
   console.log(`[brave] ${body}`);
+  debugLog('brave', body);
 }
 
 function cacheKey(query, options = {}) {
@@ -273,6 +276,7 @@ function shouldUseBrave(taskType, context = {}) {
       /restaurant|eat|dinner|lunch|breakfast|bar|cafe/,
       /hotel|stay|accommodation|hostel|resort/,
       /activity|things to do|tour|ticket|attraction|museum|show|concert/,
+      /shop|shopping|store|buy|boutique|market|mall|souvenir|outlet|district/,
       /flight|train|bus|transit|metro|ferry|transport/,
       /open now|hours|price|pricing|availability|book|booking|reservation|current/
     ];
