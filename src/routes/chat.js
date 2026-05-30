@@ -21,12 +21,30 @@ const {
 
 const CHAT_CONCIERGE_MODEL = 'gpt-5.4-mini';
 
+const HOTEL_PHRASE = /\b(my hotel|our hotel|the hotel|my accommodation|where (i'm|i am|we're|we are) staying|near me)\b/i;
+
+function accommodationsOf(city) {
+  return (city.accommodations || []).filter(Boolean);
+}
+
 function scopeQueryToTrip(message, tripContext = {}) {
-  const cities = (tripContext.cities || []).map((c) => c.name).filter(Boolean);
-  if (!cities.length) return message;
+  const allCities = (tripContext.cities || []).filter((c) => c.name);
+  if (!allCities.length) return message;
   const lower = message.toLowerCase();
-  if (cities.some((name) => lower.includes(name.toLowerCase()))) return message;
-  return `${message} in ${cities.join(', ')}`;
+  const namedCity = allCities.find((c) => lower.includes(c.name.toLowerCase()));
+
+  if (HOTEL_PHRASE.test(message)) {
+    if (namedCity) {
+      const addr = accommodationsOf(namedCity)[0];
+      if (addr) return `${message} near ${addr}`;
+    } else {
+      const allAddrs = allCities.flatMap(accommodationsOf);
+      if (allAddrs.length === 1) return `${message} near ${allAddrs[0]}`;
+    }
+  }
+
+  if (namedCity) return message;
+  return `${message} in ${allCities.map((c) => c.name).join(', ')}`;
 }
 
 function register(app) {

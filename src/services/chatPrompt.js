@@ -5,7 +5,7 @@ const { observe } = require('../memory');
 const WEBSITE_GUIDE = fs.readFileSync(path.join(__dirname, 'websiteGuide.md'), 'utf8');
 
 function formatCityLine(city) {
-  const accomLabel = city.accommodation?.address || 'none listed';
+  const accomLabel = (city.accommodations || []).join('; ') || 'none listed';
   return `${city.name} (${city.startDate} → ${city.endDate}, leaving ${city.leaveTime || '18:00'}) — staying: ${accomLabel}`;
 }
 
