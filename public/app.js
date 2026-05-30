@@ -2986,6 +2986,80 @@ async function apiFetch(url, options = {}) {
 }
 
 
+const LEARNED_CATEGORIES = [
+  { id: 'dining', label: 'Dining & Food', re: /\b(dining|food|restaurant|meal|lunch|dinner|breakfast|cuisine|eat|ramen|tapas|seafood|vegetarian|vegan|dish|flavou?r|coffee|cafe|bar|drink)\b/i },
+  { id: 'lodging', label: 'Lodging & Location', re: /\b(accommodat|hotel|stay|lodging|walkable|walking distance|base|neighbou?rhood|central|transit|taxi|commute|near)\b/i },
+  { id: 'pace', label: 'Pace & Timing', re: /\b(pace|slow|fast|relax|packed|early|late|morning|evening|night|rest|break|busy|leisure)\b/i },
+  { id: 'interests', label: 'Activities & Interests', re: /\b(museum|art|history|nature|hike|hiking|outdoor|shopping|nightlife|culture|tour|beach|adventure|music|architecture|local)\b/i },
+  { id: 'budget', label: 'Budget', re: /\b(budget|cheap|expensive|cost|price|afford|splurge|value|luxury)\b/i }
+];
+const LEARNED_OTHER = { id: 'other', label: 'Other' };
+
+function categorizeLearned(text) {
+  for (const c of LEARNED_CATEGORIES) if (c.re.test(text)) return c;
+  return LEARNED_OTHER;
+}
+
+function renderLearnedPrefs() {
+  if (!els.learnedPrefsSection || !els.learnedPrefsTags) return;
+  const lp = state.learnedPrefs;
+  const all = [
+    ...(lp?.constraints || []).map((c) => ({ text: c.text, kind: 'constraint' })),
+    ...(lp?.preferences || []).map((p) => ({ text: p.text, kind: 'preference' }))
+  ];
+  if (!all.length) {
+    els.learnedPrefsSection.classList.add('hidden');
+    return;
+  }
+  els.learnedPrefsSection.classList.remove('hidden');
+
+  const filter = (state.learnedFilter || '').trim().toLowerCase();
+  const collapsed = state.learnedCollapsed || (state.learnedCollapsed = new Set());
+
+  const groups = new Map();
+  for (const item of all) {
+    if (filter && !item.text.toLowerCase().includes(filter)) continue;
+    const cat = categorizeLearned(item.text);
+    if (!groups.has(cat.id)) groups.set(cat.id, { cat, items: [] });
+    groups.get(cat.id).items.push(item);
+  }
+
+  const order = [...LEARNED_CATEGORIES, LEARNED_OTHER];
+  const pill = (item) =>
+    `<span class="learned-pref-tag" data-kind="${item.kind}" data-text="${esc(item.text)}">` +
+    `<span class="learned-pref-text">${esc(item.text)}</span>` +
+    `<button class="learned-pref-edit" aria-label="Edit"><i class="ph-bold ph-pencil-simple"></i></button>` +
+    `<button class="learned-pref-remove" aria-label="Remove"><i class="ph-bold ph-x"></i></button>` +
+    `</span>`;
+
+  const sections = order
+    .map((cat) => groups.get(cat.id))
+    .filter(Boolean)
+    .map(({ cat, items }) => {
+      const isCollapsed = collapsed.has(cat.id);
+      return `<div class="learned-group${isCollapsed ? ' collapsed' : ''}" data-cat="${cat.id}">` +
+        `<button class="learned-group-header" type="button">` +
+        `<span class="learned-group-caret"><i class="ph-bold ph-caret-down"></i></span>` +
+        `<span>${esc(cat.label)}</span><span class="learned-group-count">(${items.length})</span>` +
+        `</button>` +
+        `<div class="learned-group-body">${items.map(pill).join('')}</div>` +
+        `</div>`;
+    })
+    .join('');
+
+  const searchHtml =
+    `<input type="text" class="learned-search" placeholder="Search learned items…" aria-label="Search learned items" value="${esc(state.learnedFilter || '')}">`;
+  const body = sections || '<p class="learned-empty">No matches.</p>';
+  els.learnedPrefsTags.innerHTML = searchHtml + body;
+
+  const search = els.learnedPrefsTags.querySelector('.learned-search');
+  if (search && state.learnedFilter) {
+    search.focus();
+    const len = search.value.length;
+    search.setSelectionRange(len, len);
+  }
+}
+
 function renderPreferencesModal() {
   if (!els.profileQuestions) return;
   const store = state.profilesStore || loadProfiles();
@@ -3069,23 +3143,7 @@ function renderPreferencesModal() {
     }
   }
 
-  if (els.learnedPrefsSection && els.learnedPrefsTags) {
-    const lp = state.learnedPrefs;
-    const constraints = lp?.constraints || [];
-    const preferences = lp?.preferences || [];
-    const all = [
-      ...constraints.map((c) => ({ text: c.text, kind: 'constraint' })),
-      ...preferences.map((p) => ({ text: p.text, kind: 'preference' }))
-    ];
-    if (all.length) {
-      els.learnedPrefsTags.innerHTML = all.map((item) =>
-        `<span class="learned-pref-tag" data-kind="${item.kind}" data-text="${esc(item.text)}">${esc(item.text)}<button class="learned-pref-remove" aria-label="Remove"><i class="ph-bold ph-x"></i></button></span>`
-      ).join('');
-      els.learnedPrefsSection.classList.remove('hidden');
-    } else {
-      els.learnedPrefsSection.classList.add('hidden');
-    }
-  }
+  renderLearnedPrefs();
 
   els.profileQuestions.querySelectorAll('[data-rating]').forEach((scaleEl) => {
     scaleEl.addEventListener('click', (e) => {
@@ -9338,23 +9396,100 @@ els.prefsClose.addEventListener('click', closePreferencesModal);
 els.prefsModal.addEventListener('click', (e) => {
   if (e.target === els.prefsModal) closePreferencesModal();
 });
-els.learnedPrefsTags?.addEventListener('click', (e) => {
-  const btn = e.target.closest('.learned-pref-remove');
-  if (!btn) return;
-  const tag = btn.closest('.learned-pref-tag');
-  if (!tag) return;
-  const kind = tag.dataset.kind;
-  const text = tag.dataset.text;
+function persistLearnedPrefs() {
   const lp = state.learnedPrefs;
   if (!lp) return;
-  if (kind === 'constraint') lp.constraints = lp.constraints.filter((c) => c.text !== text);
-  if (kind === 'preference') lp.preferences = lp.preferences.filter((p) => p.text !== text);
   apiFetch('/api/preferences', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ constraints: lp.constraints, preferences: lp.preferences, profileInstruction: lp.profileInstruction })
   }).catch(() => {});
-  renderPreferencesModal();
+}
+
+function learnedListFor(kind) {
+  const lp = state.learnedPrefs;
+  if (!lp) return null;
+  if (kind === 'constraint') return lp.constraints || (lp.constraints = []);
+  return lp.preferences || (lp.preferences = []);
+}
+
+function startLearnedEdit(tag) {
+  if (tag.classList.contains('editing')) return;
+  const textEl = tag.querySelector('.learned-pref-text');
+  const current = tag.dataset.text;
+  tag.classList.add('editing');
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'learned-pref-edit-input';
+  input.value = current;
+  textEl.replaceWith(input);
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+
+  const commit = () => {
+    const next = input.value.trim();
+    const kind = tag.dataset.kind;
+    const list = learnedListFor(kind);
+    if (!list) return renderLearnedPrefs();
+    const dup = list.some((i) => i.text.toLowerCase() === next.toLowerCase() && i.text !== current);
+    if (!next || dup || next === current) return renderLearnedPrefs();
+    const idx = list.findIndex((i) => i.text === current);
+    if (idx === -1) return renderLearnedPrefs();
+    list[idx] = { ...list[idx], text: next };
+    persistLearnedPrefs();
+    renderLearnedPrefs();
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); renderLearnedPrefs(); }
+  });
+  input.addEventListener('blur', commit);
+}
+
+els.learnedPrefsTags?.addEventListener('input', (e) => {
+  const search = e.target.closest('.learned-search');
+  if (!search) return;
+  state.learnedFilter = search.value;
+  renderLearnedPrefs();
+});
+
+els.learnedPrefsTags?.addEventListener('click', async (e) => {
+  const header = e.target.closest('.learned-group-header');
+  if (header) {
+    const group = header.closest('.learned-group');
+    const id = group?.dataset.cat;
+    if (!id) return;
+    const set = state.learnedCollapsed || (state.learnedCollapsed = new Set());
+    if (set.has(id)) set.delete(id); else set.add(id);
+    group.classList.toggle('collapsed');
+    return;
+  }
+
+  const tag = e.target.closest('.learned-pref-tag');
+  if (!tag) return;
+
+  if (e.target.closest('.learned-pref-edit')) {
+    startLearnedEdit(tag);
+    return;
+  }
+
+  if (e.target.closest('.learned-pref-remove')) {
+    const kind = tag.dataset.kind;
+    const text = tag.dataset.text;
+    const ok = await showConfirmDialog(
+      'Remove this?',
+      `"${text}" will be removed from what the planner has learned.`,
+      'Remove'
+    );
+    if (!ok) return;
+    const list = learnedListFor(kind);
+    if (!list) return;
+    if (kind === 'constraint') state.learnedPrefs.constraints = list.filter((c) => c.text !== text);
+    else state.learnedPrefs.preferences = list.filter((p) => p.text !== text);
+    persistLearnedPrefs();
+    renderLearnedPrefs();
+  }
 });
 
 // Textarea expand modal
