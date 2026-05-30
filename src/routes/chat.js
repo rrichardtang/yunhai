@@ -21,6 +21,14 @@ const {
 
 const CHAT_CONCIERGE_MODEL = 'gpt-5.4-mini';
 
+function scopeQueryToTrip(message, tripContext = {}) {
+  const cities = (tripContext.cities || []).map((c) => c.name).filter(Boolean);
+  if (!cities.length) return message;
+  const lower = message.toLowerCase();
+  if (cities.some((name) => lower.includes(name.toLowerCase()))) return message;
+  return `${message} in ${cities.join(', ')}`;
+}
+
 function register(app) {
   app.post('/api/chat/message', async (req, res) => {
     const { sessionId, message, tripContext, tripId = null } = req.body || {};
@@ -45,10 +53,13 @@ function register(app) {
       let searchContext = '';
       const braveConfigured = isBraveConfigured();
       const braveTriggered = shouldUseBrave('chat_concierge', { userMessage: message });
-      debugLog('chat', `gate configured=${braveConfigured} triggered=${braveTriggered} msg=${JSON.stringify(message)}`);
+      debugLog('chat', `gate configured=${braveConfigured} triggered=${braveTriggered}`);
       if (braveConfigured && braveTriggered) {
         try {
-          const searchResults = await searchForChat(message, { count: 5 });
+          const searchQuery = scopeQueryToTrip(message, tripContext || {});
+          const cityCount = (tripContext?.cities || []).filter((c) => c.name).length;
+          debugLog('chat', `searchQuery scoped to ${cityCount} trip cities`);
+          const searchResults = await searchForChat(searchQuery, { count: 5 });
           debugLog('chat', `searchForChat returned ${searchResults ? `${searchResults.length} chars` : 'empty'}`);
           if (searchResults) {
             searchContext = `\n\n## Web Search Results\nThese are real-time search results for the user's question. When answering factual questions (recommendations, rankings, ratings, hours, prices), you MUST ground your answer in these results — name specific places, cite the source, and include actionable links. Be concise and confident. If results are sparse or conflicting, say so plainly and provide the best fallback recommendation.\n${searchResults}`;

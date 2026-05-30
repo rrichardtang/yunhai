@@ -22,9 +22,9 @@ function nowIso() {
 }
 
 function telemetry(event, payload = {}) {
-  const body = JSON.stringify({ event, at: nowIso(), ...payload });
-  console.log(`[brave] ${body}`);
-  debugLog('brave', body);
+  console.log(`[brave] ${JSON.stringify({ event, at: nowIso(), ...payload })}`);
+  const { query, ...safe } = payload;
+  debugLog('brave', JSON.stringify({ event, at: nowIso(), ...safe }));
 }
 
 function cacheKey(query, options = {}) {
