@@ -4,6 +4,19 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-05-29] "Learned by AI" categories are derived client-side from text, not stored
+
+**Decision:** Group the learned-prefs UI by topic using a client-side regex matcher (`categorizeLearned` / `LEARNED_CATEGORIES` in `public/app.js`) over each item's `text`, with a final "Other" bucket. No category field is added to the memory record, and inline edits ride the existing `PUT /api/preferences` diff-sync rather than a new id-based update path.
+
+**Reasoning:** The store already carries `keywords`, but they're only populated by the Haiku reconciler — manually-added/edited records have empty `keywords`, so keyword-based grouping would be inconsistent. Deriving from `text` is uniform across all records and needs zero backend/API change, keeping `recall()` and the hot path untouched. Categorization is a navigation nicety, not correctness: a mis-bucketed item just lands in Other or an adjacent topic.
+
+**Alternatives rejected:**
+- *Add a `category` field to the record + LLM classification.* Adds write-path cost and a schema change for a cosmetic grouping; reconciler already has enough to do.
+- *Group by stored `keywords`.* Inconsistent for manual/edited records (empty keywords).
+- *id-based edit endpoint to preserve metadata across edits.* Out of scope; the text-keyed diff-sync already treats a rename as remove-old + add-new.
+
+**Tradeoffs:** Editing an item's wording drops that record's learned metadata (`keywords`/`salience`/`source` reset to a fresh `manual` record) because `syncUserScoped` keys on text. Acceptable — matches how manually-typed items already behave. The regex category list is hand-maintained and English-only; it degrades gracefully to "Other."
+
 ## [2026-05-29] `@clerk/express` v2: `req.auth` is a function; admin uses verified identity
 
 **Decision:** Always access Clerk auth via `req.auth()` (call it), never `req.auth.userId`. Admin routes (`/api/admin/*`) are verified by Clerk like every other route — `requireConfiguredAuth` + `requireOwner` checking `req.auth().userId` against `OWNER_USER_ID` — instead of trusting a client-supplied `?userId=` query param. Behind a reverse proxy, set `trust proxy` and pass `authorizedParties` (from `CLERK_AUTHORIZED_PARTIES`) to `clerkMiddleware`.

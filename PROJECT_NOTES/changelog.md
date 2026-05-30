@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-29] Reorganize "Learned by AI" profile section + fix pill contrast
+
+- **Legibility fix:** `.learned-pref-tag` was defined twice in `public/styles.css`; the later-cascading block painted pills `background: var(--surface)` (= `--ink-900`, near-black) with `color: var(--text)` (= `--text-700`, dark slate) → unreadable dark-on-dark. Consolidated to one canonical rule (light `--paper-2` bg + dark `--text-700` text); removed the redundant earlier re-skin block.
+- `public/app.js`: extracted `renderLearnedPrefs()` from `renderPreferencesModal()`. Learned items now **grouped into collapsible topic categories** (Dining & Food, Lodging & Location, Pace & Timing, Activities & Interests, Budget, Other) via a client-side `categorizeLearned()` regex matcher (`LEARNED_CATEGORIES`); unmatched → Other. Added a **search/filter box** (`state.learnedFilter`), per-group collapse state (`state.learnedCollapsed` Set, survives re-render).
+- **Inline edit:** each pill gets a pencil button → inline `<input>`; Enter/blur commits, Escape cancels. Edit replaces old text with new in `state.learnedPrefs` and rides the existing `PUT /api/preferences` diff-sync (no backend change). Empty/duplicate/unchanged edits are no-ops.
+- **Delete confirm:** the × now gates removal behind the existing `showConfirmDialog(...)` so items can't be deleted by accident.
+- `public/styles.css`: added `.learned-search`, `.learned-group*` (collapsible header/caret/count/body), `.learned-pref-edit`, and inline edit-input styles. Confirm dialog reuses `.modal`.
+- Frontend-only — no changes to `src/preferences.js`, `src/routes/preferences.js`, `src/memory/store.js`, or the API. 113/113 tests still pass; `node --check public/app.js` clean.
+
 ## [2026-05-29] Fix server-side Clerk auth (userId=null) + collapse admin onto Clerk
 
 - **Root cause:** `@clerk/express` v2 exposes `req.auth` as a *function* (`req.auth()`), but the code read it as a property (`req.auth?.userId` → `undefined`). Every authenticated `/api/*` request resolved `userId=null` and silently fell back to the shared `default` bucket. Fixed all read sites: `src/middleware/auth.js` (`getAuthedUserId`), `src/routes/admin.js`, `src/server.js` (debug log), `src/routes/itinerary.js`, `src/routes/status.js`.
