@@ -2423,18 +2423,31 @@ body.overlay-active #chatWidget {
   margin: 4px 0 0;
 }
 
-/* Inline edit input on a pill */
-.learned-pref-tag.editing { padding-left: 8px; }
+/* Inline edit input on a pill — expands to full row so long items stay readable */
+.learned-pref-tag.editing {
+  flex: 1 1 100%;
+  align-items: flex-start;
+  padding: 6px 8px 6px 12px;
+  border-radius: 14px;
+}
 .learned-pref-edit-input {
+  flex: 1 1 auto;
+  width: 100%;
+  box-sizing: border-box;
   border: 1px solid var(--hair);
-  border-radius: 999px;
-  padding: 2px 8px;
+  border-radius: 10px;
+  padding: 4px 8px;
+  font: inherit;
   font-size: 0.82rem;
+  line-height: 1.4;
   color: var(--text-700);
   background: var(--paper-0);
-  min-width: 160px;
+  resize: none;
+  overflow: hidden;
 }
 .learned-pref-edit-input:focus { outline: none; border-color: var(--text-400); }
+.learned-pref-tag.editing .learned-pref-edit,
+.learned-pref-tag.editing .learned-pref-remove { margin-top: 4px; }
 
 /* ── Budget Optimization Overlay ── */
 .budget-opt-overlay {

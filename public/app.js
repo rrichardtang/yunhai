@@ -9418,16 +9418,22 @@ function startLearnedEdit(tag) {
   const textEl = tag.querySelector('.learned-pref-text');
   const current = tag.dataset.text;
   tag.classList.add('editing');
-  const input = document.createElement('input');
-  input.type = 'text';
+  const input = document.createElement('textarea');
   input.className = 'learned-pref-edit-input';
+  input.rows = 1;
   input.value = current;
   textEl.replaceWith(input);
+  const autosize = () => {
+    input.style.height = 'auto';
+    input.style.height = `${input.scrollHeight}px`;
+  };
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);
+  autosize();
+  input.addEventListener('input', autosize);
 
   const commit = () => {
-    const next = input.value.trim();
+    const next = input.value.trim().replace(/\s+/g, ' ');
     const kind = tag.dataset.kind;
     const list = learnedListFor(kind);
     if (!list) return renderLearnedPrefs();
@@ -9441,8 +9447,8 @@ function startLearnedEdit(tag) {
   };
 
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); commit(); }
-    else if (e.key === 'Escape') { e.preventDefault(); renderLearnedPrefs(); }
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    else if (e.key === 'Escape') { e.preventDefault(); input.removeEventListener('blur', commit); renderLearnedPrefs(); }
   });
   input.addEventListener('blur', commit);
 }
