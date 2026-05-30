@@ -63,6 +63,10 @@ SIGNALS:
 The "signals" array captures travel preferences or constraints the user explicitly states about themselves. Each signal is one of:
 - {"preference":"Gets seasick easily — avoid boat-based activities"} — specific, actionable details to remember.
 - {"constraint":"no activities before 9am"} — hard limits.
+Rules for accuracy:
+- Allergies, intolerances, medical/dietary restrictions, mobility limits, and safety issues are CONSTRAINTS, never preferences. Do NOT soften them: "allergic to X" must stay "Allergic to X" — never rewrite it as "avoids X" or "dislikes X".
+- Capture the actual thing stated. If the user names a specific food, keep that food (e.g. "allergic to sushi" → constraint "Allergic to sushi"). Do not narrow or broaden it to a different item unless the user said so.
+- Preserve severity and the user's own framing; don't downgrade a hard limit to a taste.
 Only include signals when the user clearly states something personal. Omit if empty. Do NOT extract signals from your own suggestions.`;
   const profileBlock = prefSummary ? `\n\n## Traveler\n${prefSummary}` : '';
   const tripBlock = `\n\n## Trip: ${tripContext.tripName || 'Untitled'} (${tripContext.step || 'unknown'})\n${cities}${activityLines}`;

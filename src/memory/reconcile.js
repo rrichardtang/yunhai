@@ -26,7 +26,7 @@ For each new observation decide ONE operation:
 - NOOP: already captured, or one-off/situational (e.g. "already did this", "too expensive this trip", "running late today"). Drop it.
 
 Classify each stored memory:
-- type: "preference" (reusable taste/detail, e.g. "prefers boutique hotels") or "constraint" (hard limit, e.g. "no activities before 9am").
+- type: "preference" (reusable taste/detail, e.g. "prefers boutique hotels") or "constraint" (hard limit, e.g. "no activities before 9am"). Allergies, intolerances, medical/dietary restrictions, mobility limits, and safety needs are ALWAYS "constraint" — and keep their wording faithful (don't turn "allergic to X" into "avoids X").
 - scope: "user" (durable across all trips) or "trip" (only this trip — e.g. a date-specific or this-trip-only note). Default to "user" unless the observation is clearly trip-specific.
 - salience: 0.0–1.0 confidence that this is a real, lasting signal.
 - keywords: 2–5 lowercase tags for retrieval.
