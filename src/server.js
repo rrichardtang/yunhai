@@ -24,22 +24,12 @@ const _clerk = clerkMiddleware(
 );
 app.use((req, res, next) => {
   if (clerkBypassed(req.path)) {
-    debugLog('clerk-middleware', `bypassed ${req.method} ${req.path}`);
     return next();
-  }
-  if (req.path.startsWith('/api/')) {
-    const auth = req.headers.authorization || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    const dots = (token.match(/\./g) || []).length;
-    debugLog('clerk-rawauth', `${req.method} ${req.path} authLen=${auth.length} tokenLen=${token.length} dots=${dots} head=${token.slice(0, 24)} tail=${token.slice(-12)}`);
   }
   _clerk(req, res, (err) => {
     if (err) {
       debugLog('clerk-middleware', `err on ${req.method} ${req.path}: ${err?.message || err}`);
-      return next();
     }
-    const a = typeof req.auth === 'function' ? req.auth() : null;
-    debugLog('clerk-middleware', `resolved ${req.method} ${req.path} userId=${a?.userId || 'null'} reason=${a?.reason || ''}`);
     return next();
   });
 });
