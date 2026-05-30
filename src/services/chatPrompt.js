@@ -4,18 +4,68 @@ const { observe } = require('../memory');
 
 const WEBSITE_GUIDE = fs.readFileSync(path.join(__dirname, 'websiteGuide.md'), 'utf8');
 
+const MAX_DETAILED_ACTIVITIES = 25;
+
+function truncate(text, max = 140) {
+  const s = String(text || '').replace(/\s+/g, ' ').trim();
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
+function bookingStatus(booking) {
+  if (!booking || booking.type === 'none' || !booking.type) return '';
+  if (booking.reference) return `booked (ref ${booking.reference})`;
+  return `needs booking via ${booking.type}`;
+}
+
 function formatCityLine(city) {
-  const accomLabel = (city.accommodations || []).join('; ') || 'none listed';
-  return `${city.name} (${city.startDate} → ${city.endDate}, leaving ${city.leaveTime || '18:00'}) — staying: ${accomLabel}`;
+  const a = city.accommodation;
+  const parts = [`${city.name} (${city.startDate} → ${city.endDate}, leaving ${city.leaveTime || '18:00'})`];
+  if (a?.address) {
+    const coords = a.lat != null && a.lng != null ? ` (${a.lat},${a.lng})` : '';
+    const checks = a.checkIn || a.checkOut ? `, check-in ${a.checkIn || '?'} → check-out ${a.checkOut || '?'}` : '';
+    parts.push(`staying: ${a.address}${coords}${checks}`);
+  } else {
+    parts.push('staying: none listed');
+  }
+  if (city.arrival?.time) parts.push(`arriving by ${city.arrival.mode || 'transport'} at ${city.arrival.time}`);
+  if (city.notes) parts.push(`notes: ${truncate(city.notes)}`);
+  return parts.join(' — ');
+}
+
+function formatActivityDetail(a, withTime = false) {
+  const head = [
+    withTime ? (a.time || '?') : null,
+    a.name,
+    `(${a.type}${a.durationMin ? `, ${a.durationMin}min` : ''})`,
+    a.location ? `@ ${a.location}` : null,
+    a.costUsd != null ? `— $${a.costUsd}/${a.costType || 'per_person'}` : null
+  ].filter(Boolean).join(' ');
+  const extra = [];
+  if (a.whyItFits) extra.push(`why: ${truncate(a.whyItFits)}`);
+  if (a.pitfall) extra.push(`pitfall: ${truncate(a.pitfall)}`);
+  const booking = bookingStatus(a.booking);
+  if (booking) extra.push(booking);
+  if (a.smarterAlternative) extra.push(`alt: ${truncate(a.smarterAlternative)}`);
+  return extra.length ? `${head}\n      ${extra.join('; ')}` : head;
 }
 
 function formatScheduleBlock(scheduledByDay) {
   if (!Array.isArray(scheduledByDay) || !scheduledByDay.length) return '';
+  let detailed = 0;
   const lines = scheduledByDay.map((day) => {
-    const acts = day.activities.map((a) => `  ${a.time || '?'} ${a.name} (${a.type}, ${a.duration || '?'})`);
+    const acts = day.activities.map((a) => {
+      if (detailed < MAX_DETAILED_ACTIVITIES) { detailed++; return `  ${formatActivityDetail(a, true)}`; }
+      return `  ${a.time || '?'} ${a.name}`;
+    });
     return `${day.date} ${day.city}\n${acts.join('\n')}`;
   });
   return `\n\n## Scheduled Itinerary\n${lines.join('\n')}`;
+}
+
+function formatActivityList(title, activities) {
+  if (!Array.isArray(activities) || !activities.length) return '';
+  const lines = activities.slice(0, MAX_DETAILED_ACTIVITIES).map((a) => `  ${formatActivityDetail(a, false)}`);
+  return `\n\n## ${title}\n${lines.join('\n')}`;
 }
 
 function buildWebsiteGuideBlock() {
@@ -29,18 +79,15 @@ function buildChatSystemPrompt(tripContext = {}, prefSummary = '') {
     : 'None yet';
 
   const hasSchedule = Array.isArray(tripContext.scheduledByDay) && tripContext.scheduledByDay.length > 0;
-  let activityLines = '';
-  if (!hasSchedule) {
-    const approved = Array.isArray(tripContext.approvedActivities) && tripContext.approvedActivities.length
-      ? tripContext.approvedActivities.join(', ') : '';
-    if (approved) activityLines = `\n- Approved: ${approved}`;
-  }
+  const approvedBlock = hasSchedule ? '' : formatActivityList('Activities on the shortlist', tripContext.approvedActivities);
+  const declinedBlock = hasSchedule ? '' : formatActivityList('Activities the traveler declined', tripContext.declinedActivities);
 
   const base = `You are the GuideMe travel concierge. Every user message falls into exactly ONE of two buckets, and you must answer accordingly:
 
-BUCKET A — TRAVEL SUGGESTIONS (restaurants, activities, timing, weather, what to do, what to skip, what to swap):
-- Ground your answer in the "Web Search Results" section if it is present below. Name concrete places/operators from those results.
-- If no search results are present for a travel question, say so plainly in one sentence — do not guess from general knowledge.
+BUCKET A — TRAVEL SUGGESTIONS (restaurants, activities, timing, weather, safety, what to do/skip/swap, "is X worth it", what to book ahead):
+- You have the full itinerary below, including accommodation addresses and coordinates. Read it to answer questions about the trip directly (why an activity is on the list, its cost, whether it's booked, what's near where they're staying).
+- Call the web_search tool whenever the answer depends on current real-world facts you don't already have (specific venues, hours, prices, weather, events, safety). Write a complete query yourself — include the city, and for "near my hotel"/"near me"/"where I'm staying" put the actual accommodation address from the itinerary into the query.
+- After searching, name concrete places from the results with their links. If a search returns nothing useful, say so plainly and offer the best fallback — do not invent places.
 
 BUCKET B — HOW THE WEBSITE WORKS (any question about a button, step, feature, menu, icon, control, or how to do something in the app, including questions like "what does X do" where X is part of the UI):
 - Your ONLY source of truth is the "How this website works" guide below. Do NOT answer from memory or by inferring meaning from the button/feature name.
@@ -56,7 +103,7 @@ FORMAT:
 - Respond ONLY with valid JSON: {"reply":"your response","signals":[]}
 
 LINKS (Bucket A only):
-- Only link to URLs that appear in the Web Search Results. Copy the exact URL — do not shorten or guess.
+- Only link to URLs that appear in your web_search results. Copy the exact URL — do not shorten or guess.
 - NEVER invent URLs. NEVER use placeholder hosts (e.g. "tabelog.com/...", "example.com", a bare domain). If you don't have a real URL, just name the place in plain text — no link.
 - Use markdown links: [label](url). Never paste a raw URL.
 
@@ -70,10 +117,10 @@ Rules for accuracy:
 - Preserve severity and the user's own framing; don't downgrade a hard limit to a taste.
 Only include signals when the user clearly states something personal. Omit if empty. Do NOT extract signals from your own suggestions.`;
   const profileBlock = prefSummary ? `\n\n## Traveler\n${prefSummary}` : '';
-  const tripBlock = `\n\n## Trip: ${tripContext.tripName || 'Untitled'} (${tripContext.step || 'unknown'})\n${cities}${activityLines}`;
+  const tripBlock = `\n\n## Trip: ${tripContext.tripName || 'Untitled'} (${tripContext.step || 'unknown'})\n${cities}`;
   const scheduleBlock = formatScheduleBlock(tripContext.scheduledByDay);
 
-  return base + profileBlock + tripBlock + scheduleBlock + buildWebsiteGuideBlock();
+  return base + profileBlock + tripBlock + approvedBlock + declinedBlock + scheduleBlock + buildWebsiteGuideBlock();
 }
 
 function parseChatResponse(raw) {

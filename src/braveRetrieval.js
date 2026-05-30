@@ -262,27 +262,8 @@ function buildPromptFragment(retrieval, options = {}) {
 
 function shouldUseBrave(taskType, context = {}) {
   const task = String(taskType || '').toLowerCase();
-  const text = String(context.userMessage || context.query || '').toLowerCase();
 
   if (['rewrite', 'summarization', 'formatting', 'internal_reasoning'].includes(task)) return false;
-
-  if (task === 'chat_concierge') {
-    const nonLivePatterns = [
-      /\brewrite\b/, /\bsummarize\b/, /\breformat\b/, /\bformat\b/, /\bbrainstorm\b/, /\bthink step by step\b/
-    ];
-    if (nonLivePatterns.some((rx) => rx.test(text))) return false;
-
-    const livePatterns = [
-      /restaurant|eat|dinner|lunch|breakfast|bar|cafe/,
-      /hotel|stay|accommodation|hostel|resort/,
-      /activity|things to do|tour|ticket|attraction|museum|show|concert/,
-      /shop|shopping|store|buy|boutique|market|mall|souvenir|outlet|district/,
-      /flight|train|bus|transit|metro|ferry|transport/,
-      /open now|hours|price|pricing|availability|book|booking|reservation|current/
-    ];
-    return livePatterns.some((rx) => rx.test(text));
-  }
-
   if (task === 'planning' || task === 'entity_enrichment') return true;
 
   return Boolean(context.needsLiveGrounding);

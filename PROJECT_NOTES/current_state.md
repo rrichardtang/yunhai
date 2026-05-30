@@ -58,6 +58,7 @@ distributed via magic invite links managed from `/admin.html` (owner-only).
   `client_secret_*.json` should be `.gitignore`d.
 
 ## Next Actions
+- (Concierge, 2026-05-30) Deploy branch `feature/concierge-shopping-search-fix` to staging and verify the agentic `web_search` end-to-end: "dinner near my hotel" issues an address-scoped query (check `/debug` Brave telemetry), former regex-gate misses (nightlife/day-trip/weather/safety/souvenirs) all search, "what does Finalize do?" does NOT search, and rationale/booking questions answer from context. Then promote.
 - `bash deployment/promotion.sh deploy-staging claude/website-memory-architecture-3BI4W`, then
   verify the memory layer end-to-end on staging in a keyed environment: state a preference in
   chat → confirm a record is written and appears in a later plan/arrange prompt; state a

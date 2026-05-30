@@ -3,13 +3,13 @@ const assert = require('node:assert/strict');
 
 const { shouldUseBrave, buildPromptFragment, retrieve } = require('./braveRetrieval');
 
-test('shouldUseBrave routes live concierge queries and skips rewrite queries', () => {
-  assert.equal(shouldUseBrave('chat_concierge', { userMessage: 'Best sushi restaurants in Tokyo open now?' }), true);
-  assert.equal(shouldUseBrave('chat_concierge', { userMessage: 'Recommend some shops in Tokyo' }), true);
-  assert.equal(shouldUseBrave('chat_concierge', { userMessage: 'Rewrite this paragraph in a friendlier tone' }), false);
-  assert.equal(shouldUseBrave('summarization', { userMessage: 'summarize this' }), false);
+test('shouldUseBrave always searches for planning/enrichment and skips rewrite/summarization', () => {
   assert.equal(shouldUseBrave('planning', {}), true);
   assert.equal(shouldUseBrave('entity_enrichment', {}), true);
+  assert.equal(shouldUseBrave('summarization', { userMessage: 'summarize this' }), false);
+  assert.equal(shouldUseBrave('rewrite', {}), false);
+  assert.equal(shouldUseBrave('unknown', { needsLiveGrounding: true }), true);
+  assert.equal(shouldUseBrave('unknown', {}), false);
 });
 
 test('buildPromptFragment includes links and sparse fallback language', () => {
