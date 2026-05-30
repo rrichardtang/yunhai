@@ -11,6 +11,7 @@ const {
   getCachedPrompt
 } = require('../chat');
 const { searchForChat, isConfigured: isBraveConfigured, shouldUseBrave } = require('../braveSearch');
+const { debugLog } = require('../services/debugLog');
 const {
   buildChatSystemPrompt,
   parseChatResponse,
@@ -42,13 +43,18 @@ function register(app) {
       const systemPrompt = getCachedPrompt(sessionId, tripContext || {}, () => buildChatSystemPrompt(tripContext || {}, prefSummary));
 
       let searchContext = '';
-      if (isBraveConfigured() && shouldUseBrave('chat_concierge', { userMessage: message })) {
+      const braveConfigured = isBraveConfigured();
+      const braveTriggered = shouldUseBrave('chat_concierge', { userMessage: message });
+      debugLog('chat', `gate configured=${braveConfigured} triggered=${braveTriggered} msg=${JSON.stringify(message)}`);
+      if (braveConfigured && braveTriggered) {
         try {
           const searchResults = await searchForChat(message, { count: 5 });
+          debugLog('chat', `searchForChat returned ${searchResults ? `${searchResults.length} chars` : 'empty'}`);
           if (searchResults) {
             searchContext = `\n\n## Web Search Results\nThese are real-time search results for the user's question. When answering factual questions (recommendations, rankings, ratings, hours, prices), you MUST ground your answer in these results — name specific places, cite the source, and include actionable links. Be concise and confident. If results are sparse or conflicting, say so plainly and provide the best fallback recommendation.\n${searchResults}`;
           }
         } catch (e) {
+          debugLog('chat', `brave search failed: ${e.message}`);
           console.error('[chat] brave search failed, continuing without:', e.message);
         }
       }
