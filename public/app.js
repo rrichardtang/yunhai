@@ -3012,7 +3012,7 @@ async function apiFetch(url, options = {}) {
 
 
 const LEARNED_CATEGORIES = [
-  { id: 'dining', label: 'Dining & Food', re: /\b(dining|food|restaurant|meal|lunch|dinner|breakfast|cuisine|eat|ramen|tapas|seafood|vegetarian|vegan|dish|flavou?r|coffee|cafe|bar|drink)\b/i },
+  { id: 'dining', label: 'Dining & Food', re: /\b(dining|food|restaurant|meal|lunch|dinner|breakfast|brunch|snack|cuisine|eat|ramen|sushi|tapas|seafood|fish|shellfish|meat|beef|pork|chicken|vegetarian|vegan|pescatarian|dish|flavou?r|coffee|cafe|bar|drink|allerg(y|ic|ies|en)|intoleran|gluten|dairy|lactose|nut|peanut|spicy|halal|kosher|diet(ary)?)\b/i },
   { id: 'lodging', label: 'Lodging & Location', re: /\b(accommodat|hotel|stay|lodging|walkable|walking distance|base|neighbou?rhood|central|transit|taxi|commute|near)\b/i },
   { id: 'pace', label: 'Pace & Timing', re: /\b(pace|slow|fast|relax|packed|early|late|morning|evening|night|rest|break|busy|leisure)\b/i },
   { id: 'interests', label: 'Activities & Interests', re: /\b(museum|art|history|nature|hike|hiking|outdoor|shopping|nightlife|culture|tour|beach|adventure|music|architecture|local)\b/i },
