@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-30] Budget Optimization: fix confirm button + surface budget in lock stage
+
+- **Fixed permanently-greyed confirm button** (`public/app.js`): `transitionToFlipPhase` previously swapped the button `id` and stacked a second listener while never resetting `disabled`, killing the button in the flip phase. Now a single phase-routed click handler in `mountBudgetOptOverlay` dispatches on `budgetOptState.phase` (`lock`→`onConfirmLocks`, `flip`→`onConfirmSelections`); `onConfirmLocks` always resets `btn.disabled`/label after refine calls and, if all refines fail, re-enables with a `showToast` error instead of transitioning to an empty flip phase.
+- **Lock-stage budget signal** (`public/app.js`): footer progress bar + label now un-hidden in `enterBudgetOptMode`; `updateBudgetOptProgressBar` is phase-aware — lock phase shows current total cost vs `state.tripBudget` (reusing `computeBudgetLensBreakdown`, green/yellow/red at .6/.9), flip phase keeps selected-vs-original behavior. New `optActivityCost(act)` helper (per-group vs per-person × travelers + 60%/child) shared by the bar and the per-card cost chip.
+- **Per-card cost chip**: `faceHtml` renders an `.opt-cost-chip` per face (each flip face shows its own cost); un-gated the previously mobile-only `.opt-cost-chip` style in `public/styles.css`.
+- Branch `feature/budget-opt-confirm-and-lock-budget`; pending VPS verification.
+
 ## [2026-05-30] Concierge bot: agentic web_search + minimum-sufficient trip context
 
 - **Root-cause fix** for repeated whack-a-mole on chat search. Replaced the regex search-gate and regex query-builder with a model-driven `web_search` tool (`src/services/chatTools.js`: `WEB_SEARCH_TOOL`, `MAX_SEARCH_CALLS=2`, `formatSearchResultsForModel`, `runWebSearch`). New `runChatTurn()` in `src/routes/chat.js` runs a bounded tool loop (reuses `braveSearch.search`); dropped `response_format: json_object`.
