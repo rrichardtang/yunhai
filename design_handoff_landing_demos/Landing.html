@@ -3,25 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YunHai — Plan trips that actually happen.</title>
-  <meta name="description" content="YunHai turns twenty open tabs and a half-idea into a day-by-day itinerary — grounded in real venues, checked for conflicts before you book, and synced to your calendar.">
+  <title>GuideMe — Plan trips that actually happen.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles/landing/tokens.css">
-  <link rel="stylesheet" href="/styles/landing/landing.css">
-  <link rel="stylesheet" href="/styles/landing/landing-demos.css">
-  <link rel="stylesheet" href="/styles/landing/landing-demo-profile.css">
-  <link rel="stylesheet" href="/styles/landing/landing-demo-sequence.css">
-  <link rel="stylesheet" href="/styles/landing/landing-demo-organize.css">
-  <link rel="stylesheet" href="/styles/landing/landing-demo.css">
-  <link rel="stylesheet" href="/styles/landing/landing-pricing.css">
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/landing.css">
+  <link rel="stylesheet" href="styles/landing-demos.css">
+  <link rel="stylesheet" href="styles/landing-demo-profile.css">
+  <link rel="stylesheet" href="styles/landing-demo-sequence.css">
+  <link rel="stylesheet" href="styles/landing-demo-organize.css">
+  <link rel="stylesheet" href="styles/landing-pricing.css">
 </head>
 <body class="landing">
 
+  <!-- NAV -->
   <nav class="nav">
     <div class="nav__inner">
-      <a href="/" class="gm-logo" aria-label="YunHai">
+      <a href="Landing.html" class="gm-logo" aria-label="GuideMe">
         <span class="gm-logo__mark">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <circle cx="12" cy="12" r="10.5" stroke="currentColor" stroke-width="1" opacity="0.35"/>
@@ -29,19 +28,20 @@
             <circle cx="12" cy="12" r="2.2" fill="#2F7DFB"/>
           </svg>
         </span>
-        <span class="gm-logo__word">Yun<span class="me">Hai</span></span>
+        <span class="gm-logo__word">Guide<span class="me">me</span></span>
       </a>
       <div class="nav__links">
         <a href="#why">How it works</a>
         <a href="#pricing">Pricing</a>
       </div>
       <div class="nav__cta">
-        <a href="/planner.html" class="gm-btn gm-btn--ghost gm-btn--sm">Sign in</a>
-        <a href="/planner.html" class="gm-btn gm-btn--primary gm-btn--sm">Open app →</a>
+        <button class="gm-btn gm-btn--ghost gm-btn--sm">Sign in</button>
+        <a href="Planner.html" class="gm-btn gm-btn--primary gm-btn--sm">Open app →</a>
       </div>
     </div>
   </nav>
 
+  <!-- HERO -->
   <header class="hero">
     <div class="hero__grid">
       <div>
@@ -58,7 +58,7 @@
           Generic top-ten lists waste good trips. YunHai learns what you actually like, plans each day in the order that saves the most time, and keeps every ticket and booking in one place your whole group can open.
         </p>
         <div class="hero__ctas">
-          <a href="/planner.html" class="gm-btn gm-btn--accent">Start planning</a>
+          <a href="Planner.html" class="gm-btn gm-btn--accent">Start planning</a>
           <a href="#why" class="gm-btn gm-btn--ghost">See how it works</a>
         </div>
         <div class="hero__trust">
@@ -66,8 +66,23 @@
           <span><span class="dot ok"></span> Sequenced by real data</span>
           <span><span class="dot ok"></span> One plan · share or go offline</span>
         </div>
+        <div class="hero__stats">
+          <div class="hero__stat">
+            <span class="n">12<span class="unit">min</span></span>
+            <span class="label">Avg. plan time</span>
+          </div>
+          <div class="hero__stat">
+            <span class="n">94<span class="unit">%</span></span>
+            <span class="label">Kept as planned</span>
+          </div>
+          <div class="hero__stat">
+            <span class="n">4.8<span class="unit">/5</span></span>
+            <span class="label">Traveler rating</span>
+          </div>
+        </div>
       </div>
 
+      <!-- PRODUCT WINDOW — a faithful slice of the real itinerary -->
       <div class="heroapp">
         <div class="heroapp__glow"></div>
 
@@ -146,6 +161,7 @@
     </div>
   </header>
 
+  <!-- LOGO MARQUEE -->
   <section class="marquee">
     <div class="marquee__inner">
       <span class="marquee__label">Trusted by travelers from</span>
@@ -160,12 +176,13 @@
     </div>
   </section>
 
+  <!-- ============ CHAPTER 01 · PERSONALIZE ============ -->
   <section class="chapter chapter--light" id="why" data-screen-label="Demo 01 · Personalization">
     <div class="chapter__inner">
       <div class="chapter__copy">
         <span class="chapter__kicker"><span class="i">01</span> Completely yours</span>
         <h2>It learns what <span class="serif">you</span> love — and gets sharper every trip.</h2>
-        <p class="chapter__lede">Every save, skip, and lingering scroll teaches YunHai your taste. It reaches past the generic top-10 to surface places that are actually <em>you</em> — and the picks get more accurate the more you travel.</p>
+        <p class="chapter__lede">Every save, skip, and lingering scroll teaches GuideMe your taste. It reaches past the generic top-10 to surface places that are actually <em>you</em> — and the picks get more accurate the more you travel.</p>
         <ul class="chapter__points">
           <li><span class="b">Learns from every interaction</span> — pace, budget, food, crowds, novelty.</li>
           <li><span class="b">Beyond the top-10</span> — the spots guidebooks skip.</li>
@@ -186,6 +203,7 @@
           </div>
 
           <div class="pf">
+            <!-- SCENE 1 · profile builder -->
             <div class="pf__scene is-active" data-scene="build">
               <div class="pf__qs">
                 <div class="pfq" data-q="1">
@@ -223,6 +241,7 @@
               </div>
             </div>
 
+            <!-- SCENE 2 · activity card + live signal -->
             <div class="pf__scene" data-scene="use">
               <div class="pf__use">
                 <article class="acard2">
@@ -278,12 +297,13 @@
     </div>
   </section>
 
+  <!-- ============ CHAPTER 02 · SEQUENCE ============ -->
   <section class="chapter chapter--dark chapter--rev" data-screen-label="Demo 02 · Sequencing">
     <div class="chapter__inner">
       <div class="chapter__copy">
         <span class="chapter__kicker"><span class="i">02</span> Sequenced by data</span>
         <h2>Your days, ordered around <span class="serif">real</span> transit times.</h2>
-        <p class="chapter__lede">Tell YunHai your pace once. It places every activity into your day in the right order — pulling <em>live</em> transit times between stops so the schedule actually holds up, with buffers baked in.</p>
+        <p class="chapter__lede">Tell GuideMe your pace once. It places every activity into your day in the right order — pulling <em>live</em> transit times between stops so the schedule actually holds up, with buffers baked in.</p>
         <ul class="chapter__points">
           <li><span class="b">Set your pace</span> — caps each day's hours and bakes in buffers.</li>
           <li><span class="b">Real transit times between stops</span> — pulled from live maps.</li>
@@ -304,6 +324,7 @@
           </div>
 
           <div class="sq2">
+            <!-- SCENE 1 · scheduling preference (pace) -->
             <div class="sq2__scene is-active" data-sq-scene="pref">
               <div class="sqp">
                 <div class="sqp__eyebrow">Scheduling preference</div>
@@ -329,6 +350,7 @@
               </div>
             </div>
 
+            <!-- SCENE 2 · itinerary fill -->
             <div class="sq2__scene" data-sq-scene="fill">
               <div class="sqf">
                 <div class="sqf__head">
@@ -386,6 +408,7 @@
     </div>
   </section>
 
+  <!-- ============ CHAPTER 03 · ORGANIZE ============ -->
   <section class="chapter chapter--light" data-screen-label="Demo 03 · All in one place">
     <div class="chapter__inner">
       <div class="chapter__copy">
@@ -480,10 +503,12 @@
               </div>
             </div>
 
+            <!-- faux cursor -->
             <div class="og__cursor">
               <svg viewBox="0 0 24 24" fill="#0A1628" aria-hidden="true"><path d="M5 3 L19 12 L12 13.5 L9 21 Z" stroke="#FAF8F4" stroke-width="1.4" stroke-linejoin="round"/></svg>
             </div>
 
+            <!-- upload progress card -->
             <div class="og__upload">
               <div class="og__upload-row">
                 <span class="og__filetag">PDF</span>
@@ -497,6 +522,7 @@
               <div class="og__upload-track"><div class="og__upload-bar"></div></div>
             </div>
 
+            <!-- files popover -->
             <div class="og__files">
               <div class="og__files-head">
                 <span class="t">Arrival · Haneda</span>
@@ -523,68 +549,7 @@
     </div>
   </section>
 
-  <section class="reel" id="reel">
-    <div class="reel__head">
-      <div>
-        <span class="gm-eyebrow">See it in motion</span>
-        <h2>The product, <span class="serif">actually</span> running.</h2>
-      </div>
-      <p class="reel__lede">
-        Every frame below is the live app — no mockups, no after-effects. Watch a real plan come together, step by step.
-      </p>
-    </div>
-
-    <div class="reel__stage">
-      <div class="reel__browser">
-        <div class="reel__chrome">
-          <div class="reel__lights">
-            <span></span><span></span><span></span>
-          </div>
-          <div class="reel__urlbar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="4" y="11" width="16" height="9" rx="2"/>
-              <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
-            </svg>
-            <span><span class="reel__url-host">yunhai.app</span><span class="reel__url-path" id="reelUrlPath">/setup</span></span>
-          </div>
-          <div class="reel__chrome-right">
-            <button class="reel__playbtn" id="reelPlayPause" type="button" aria-label="Pause demo">
-              <svg id="reelPlayIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <rect x="6" y="5" width="4" height="14" rx="1"/>
-                <rect x="14" y="5" width="4" height="14" rx="1"/>
-              </svg>
-            </button>
-          </div>
-          <div class="reel__progress"><div class="reel__progress-bar" id="reelProgress"></div></div>
-        </div>
-
-        <div class="reel__viewport is-loading" id="reelViewport">
-          <div class="reel__frames" id="reelFrames">
-          </div>
-
-          <div class="reel__cursor" id="reelCursor" style="left: 50%; top: 50%; opacity: 0;">
-            <svg viewBox="0 0 24 24" fill="#0A1628" aria-hidden="true">
-              <path d="M5 3 L19 12 L12 13.5 L9 21 Z" stroke="#FAF8F4" stroke-width="1.4" stroke-linejoin="round"/>
-            </svg>
-          </div>
-
-          <aside class="reel__narrator pos-br" id="reelNarrator" aria-live="polite">
-            <div class="reel__narrator-rule"></div>
-            <div class="reel__narrator-body">
-              <div class="reel__narrator-label" id="reelNarratorLabel">Step 01 · Setup</div>
-              <h3 class="reel__narrator-title" id="reelNarratorTitle">Build the trip, leg by leg.</h3>
-              <p class="reel__narrator-text" id="reelNarratorText">Every trip starts with a list of cities and dates. Watch as we add one to the plan.</p>
-            </div>
-          </aside>
-
-        </div>
-      </div>
-
-      <div class="reel__dots" id="reelDots">
-      </div>
-    </div>
-  </section>
-
+  <!-- PRICING -->
   <section class="pricing" id="pricing">
     <div class="pricing__head">
       <span class="gm-eyebrow">Pricing</span>
@@ -594,6 +559,7 @@
 
     <div class="plans">
 
+      <!-- FREE -->
       <article class="plan plan--free">
         <header class="plan__head">
           <div class="plan__tier">
@@ -647,11 +613,12 @@
         </ul>
 
         <div class="plan__foot">
-          <a href="/planner.html" class="plan__cta plan__cta--free">Get started — it's free</a>
+          <a href="Planner.html" class="plan__cta plan__cta--free">Get started — it's free</a>
           <div class="plan__finefoot">No card · No expiration</div>
         </div>
       </article>
 
+      <!-- PRO -->
       <article class="plan plan--pro">
         <span class="plan__badge">Most planners pick this</span>
 
@@ -706,13 +673,14 @@
         </ul>
 
         <div class="plan__foot">
-          <a href="/planner.html" class="plan__cta plan__cta--pro">Start 14-day Pro trial</a>
+          <a href="Planner.html" class="plan__cta plan__cta--pro">Start 14-day Pro trial</a>
           <div class="plan__finefoot">Cancel anytime · $14.99/mo after trial</div>
         </div>
       </article>
 
     </div>
 
+    <!-- Trust band -->
     <div class="pricing__trust">
       <div class="cell">
         <span class="k">No lock-in</span>
@@ -728,6 +696,7 @@
       </div>
     </div>
 
+    <!-- FAQ -->
     <div class="faq">
       <h3 class="faq__title">A few <span class="serif">honest</span> questions.</h3>
 
@@ -753,11 +722,12 @@
     </div>
   </section>
 
+  <!-- FOOTER -->
   <footer class="foot">
     <div class="foot__inner">
       <div class="foot__main">
         <div class="foot__col foot__brand">
-          <a href="/" class="gm-logo on-dark" style="color: var(--paper-0)">
+          <a href="Landing.html" class="gm-logo on-dark" style="color: var(--paper-0)">
             <span class="gm-logo__mark">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="12" cy="12" r="10.5" stroke="currentColor" stroke-width="1" opacity="0.4"/>
@@ -765,14 +735,14 @@
                 <circle cx="12" cy="12" r="2.2" fill="#2F7DFB"/>
               </svg>
             </span>
-            <span class="gm-logo__word">Yun<span class="me">Hai</span></span>
+            <span class="gm-logo__word">Guide<span class="me">me</span></span>
           </a>
           <p>The calm travel planner. Built with care in the backseat of a night train somewhere in Iberia.</p>
         </div>
         <div class="foot__col">
           <h4>Product</h4>
-          <a href="#reel">How it works</a>
-          <a href="/planner.html">Open app</a>
+          <a href="#why">How it works</a>
+          <a href="Planner.html">Open app</a>
           <a href="#pricing">Pricing</a>
         </div>
         <div class="foot__col">
@@ -789,15 +759,23 @@
         </div>
       </div>
       <div class="foot__bottom">
-        <span>© 2026 YunHai · All rights reserved</span>
+        <span>© 2026 GuideMe · All rights reserved</span>
         <span>Plan with intention</span>
       </div>
     </div>
   </footer>
 
-  <script src="/js/landing-demo-profile.js"></script>
-  <script src="/js/landing-demo-sequence.js"></script>
-  <script src="/js/landing-demo-organize.js"></script>
-  <script src="/js/landing-reel.js"></script>
+  <script src="scripts/landing-demo-profile.js"></script>
+  <script src="scripts/landing-demo-sequence.js"></script>
+  <script src="scripts/landing-demo-organize.js"></script>
+
+  <!-- Tweaks panel (React, mounted only for the in-design controls) -->
+  <div id="tweaks-root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="scripts/landing-tweaks.jsx"></script>
 </body>
 </html>
+
