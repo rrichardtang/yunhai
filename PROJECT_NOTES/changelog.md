@@ -13,6 +13,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Renamed all `GuideMe` → `YunHai` across ported assets + demo copy; repathed bundle's `Planner.html`/`Landing.html` → `/planner.html` / `#why`.
 - 113/113 unit tests pass; no backend touched. Branch `feature/yunhai-landing-demos`. Pending VPS visual verification.
 
+## [2026-05-31] Landing reel: fix card cropping, fill add-activity form, smooth motion
+
+- **No more cropped cards** (`landing-reel.js`): added `scrollIntoFrame(el)` (centers cards taller than the frame, else nudges a cropped card fully into view) and refactored scroll into a shared `scrollToTop`. The Review beat now `focusCard()`s each whole card before interacting, and all button/field taps use `{scroll:false}` so they don't re-scroll and crop the top half. The Replace re-frames the swapped card so the change is visible.
+- **Add-activity is now a worked example** (`landing-reel.js`): the demo opens the modal and fills Name ("Cooking class — Andalusian tapas"), Cost ($55), and Why-it-fits (tying back to the setup notes), hovers the Add button, then cancels. `type`/`setValue` gained a `scroll:false` passthrough for centered-overlay fields.
+- **Smoother motion** (`landing-reel.js`, `landing-demo.css`): cursor `left/top` CSS transition cut 1100ms→680ms, and `cursorTo` now sets the cursor transition duration to ~85% of the *paced* travel time, so the cursor always lands before the click at any speed (fixes click-before-arrive jitter). Scroll animations respect pause. Review beat `dur` 30s→40s for the longer choreography.
+
 ## [2026-05-31] Landing reel: 2× speed toggle + setup-notes/copy tweaks
 
 - **Speed toggle** (`public/index.html`, `public/js/landing-reel.js`, `landing-demo.css`): added a `1×/2×` pill (`#reelSpeed`) in the reel chrome. Replaced the constant `PACE` with `PACE_BASE/speedMult` via a live `pace()` accessor used by every wait, the typing loop, and the progress bar (`beatRawDur * pace()` recomputed in `tick`), so toggling mid-beat speeds everything up cleanly. Button gets `.is-fast` (inverts to navy) at 2×.

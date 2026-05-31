@@ -69,21 +69,20 @@
       }
     }
 
-    async scrollTo(el, padding = 140) {
+    async scrollToTop(target) {
       const sc = this.scroller;
       if (!sc) return;
-      const r = el.getBoundingClientRect();
-      const targetTop = sc.scrollTop + r.top - padding;
       const max = Math.max(0, sc.scrollHeight - FRAME_H);
-      const target = Math.max(0, Math.min(max, targetTop));
-      if (Math.abs(target - sc.scrollTop) < 4) return;
+      const clamped = Math.max(0, Math.min(max, target));
+      if (Math.abs(clamped - sc.scrollTop) < 4) return;
       const from = sc.scrollTop;
-      const dist = target - from;
-      const dur = Math.min(800, 220 + Math.abs(dist) * 0.45);
+      const dist = clamped - from;
+      const dur = Math.min(900, 260 + Math.abs(dist) * 0.5);
       const start = performance.now();
       await new Promise((resolve) => {
         const step = (now) => {
           if (this.cancelled) return resolve();
+          if (this.paused) { return requestAnimationFrame(step); }
           const t = Math.min(1, (now - start) / dur);
           const eased = 1 - Math.pow(1 - t, 3);
           sc.scrollTop = from + dist * eased;
@@ -92,6 +91,37 @@
         };
         requestAnimationFrame(step);
       });
+    }
+
+    // Scroll so the element's TOP sits `padding` from the viewport top.
+    async scrollTo(el, padding = 140) {
+      const sc = this.scroller;
+      if (!sc) return;
+      const r = el.getBoundingClientRect();
+      await this.scrollToTop(sc.scrollTop + r.top - padding);
+    }
+
+    // Scroll so the WHOLE element is visible — centers it when taller than the frame
+    // allows. Use before interacting with a card so nothing is cropped.
+    async scrollIntoFrame(el, { margin = 90 } = {}) {
+      const sc = this.scroller;
+      if (!sc || !el) return;
+      const r = el.getBoundingClientRect();
+      const top = sc.scrollTop + r.top;
+      const bottom = top + r.height;
+      const viewTop = sc.scrollTop;
+      const viewBottom = viewTop + FRAME_H;
+      let target = viewTop;
+      if (r.height + margin * 2 >= FRAME_H) {
+        target = top - (FRAME_H - r.height) / 2; // taller than frame: center it
+      } else if (top - margin < viewTop) {
+        target = top - margin;                    // cropped at top: bring down
+      } else if (bottom + margin > viewBottom) {
+        target = bottom + margin - FRAME_H;       // cropped at bottom: bring up
+      } else {
+        return;                                   // already fully visible
+      }
+      await this.scrollToTop(target);
     }
 
     resolve(selector) {
@@ -107,6 +137,11 @@
       const r = el.getBoundingClientRect();
       const cx = (r.left + r.width / 2 + (opts.dx || 0)) * this.scale;
       const cy = (r.top + r.height / 2 + (opts.dy || 0)) * this.scale;
+      // Glide the cursor over ~85% of the (paced) travel window so it always lands
+      // before we click — even at 2× — instead of fighting a fixed CSS duration.
+      const travel = (opts.travel || 750) * pace();
+      const glide = Math.max(220, travel * 0.85);
+      this.cursor.style.transitionDuration = `${glide}ms, ${glide}ms, 350ms`;
       this.cursor.style.opacity = '1';
       this.cursor.style.left = cx + 'px';
       this.cursor.style.top = cy + 'px';
@@ -128,7 +163,7 @@
     async type(selector, text, opts = {}) {
       const el = this.resolve(selector);
       if (!el) { console.warn('[reel] type not found:', selector); return; }
-      await this.cursorTo(el, { travel: opts.travel || 600, padding: opts.padding || 200 });
+      await this.cursorTo(el, { travel: opts.travel || 600, padding: opts.padding || 200, scroll: opts.scroll });
       if (this.cancelled) return;
       el.focus();
       el.value = '';
@@ -147,7 +182,7 @@
     }
 
     async setValue(selector, value, opts = {}) {
-      const el = await this.cursorTo(selector, { travel: opts.travel || 550, padding: opts.padding || 180 });
+      const el = await this.cursorTo(selector, { travel: opts.travel || 550, padding: opts.padding || 180, scroll: opts.scroll });
       if (!el || this.cancelled) return;
       this.cursor.classList.add('is-clicking');
       await this.wait(140);
@@ -400,7 +435,7 @@
       step: 2,
       path: '/review',
       label: '02 / REVIEW',
-      dur: 30000,
+      dur: 40000,
       run: async (eng) => {
         // Seed real activity cards, then drive the genuine review UI.
         await seed(eng, { activities: DEMO_ACTIVITIES, reviewed: { ...DEMO_REVIEWED } });
@@ -411,6 +446,16 @@
 
         const card = (id) => eng.doc.querySelector(`.activity-card[data-activity-id="${id}"]`);
         const inCard = (id, sel) => { const c = card(id); return c ? c.querySelector(sel) : null; };
+        // Bring the whole card into frame first so nothing is cropped, then settle.
+        const focusCard = async (id) => { await eng.scrollIntoFrame(card(id)); await eng.wait(260); };
+        // Click without re-scrolling (the card is already framed).
+        const tap = async (el, opts = {}) => {
+          await eng.cursorTo(el, { travel: opts.travel || 850, padding: 160, scroll: false });
+          eng.cursor.classList.add('is-clicking');
+          await eng.wait(160);
+          if (!eng.cancelled) el?.click();
+          eng.cursor.classList.remove('is-clicking');
+        };
 
         await eng.narrate(
           'Step 02 · Review',
@@ -427,12 +472,9 @@
           'Approve adds it to your trip and the running budget. Tap again to un-approve — nothing is locked until you say so.',
           'tr'
         );
-        await eng.cursorTo(inCard('demo-alcazar-cor', '.approve'), { travel: 1000, padding: 160 });
-        eng.cursor.classList.add('is-clicking');
-        await eng.wait(160);
-        inCard('demo-alcazar-cor', '.approve')?.click();
-        eng.cursor.classList.remove('is-clicking');
-        await eng.wait(1000);
+        await focusCard('demo-alcazar-cor');
+        await tap(inCard('demo-alcazar-cor', '.approve'));
+        await eng.wait(1100);
 
         // Decline
         await eng.narrate(
@@ -441,12 +483,9 @@
           'Decline dismisses a suggestion. If it was scheduled, it leaves your days too — so the plan always reflects what you actually want.',
           'tl'
         );
-        await eng.cursorTo(inCard('demo-plaza-espana', '.decline'), { travel: 1000, padding: 160 });
-        eng.cursor.classList.add('is-clicking');
-        await eng.wait(160);
-        inCard('demo-plaza-espana', '.decline')?.click();
-        eng.cursor.classList.remove('is-clicking');
-        await eng.wait(1000);
+        await focusCard('demo-plaza-espana');
+        await tap(inCard('demo-plaza-espana', '.decline'));
+        await eng.wait(1100);
 
         // Notes
         await eng.narrate(
@@ -455,26 +494,26 @@
           'Reservation refs, who’s coming, a must-try dish — saved right on the card and folded into the plan.',
           'tr'
         );
-        await eng.type(`#actNotes-demo-mezquita`, 'Book the 08:30 slot — quietest light for photos.', { padding: 200 });
-        await eng.wait(200);
-        await eng.cursorTo(inCard('demo-mezquita', '.save-activity-notes'), { travel: 700, padding: 160 });
-        eng.cursor.classList.add('is-clicking');
-        await eng.wait(160);
-        inCard('demo-mezquita', '.save-activity-notes')?.click();
-        eng.cursor.classList.remove('is-clicking');
+        await focusCard('demo-mezquita');
+        await eng.type(`#actNotes-demo-mezquita`, 'Book the 08:30 slot — quietest light for photos.', { padding: 200, scroll: false });
+        await eng.wait(250);
+        await tap(inCard('demo-mezquita', '.save-activity-notes'), { travel: 650 });
         await eng.wait(1100);
 
-        // Replace / modify (faked swap — no API)
+        // Replace / modify (faked swap — no API). Keep the whole card framed so the
+        // viewer can watch the activity actually change.
         await eng.narrate(
           'Don’t love it? Swap it.',
           'Ask for something that fits better.',
           'Say why in a line, and YunHai replaces it with a smarter match tuned to your taste — here, a calm evening over another courtyard walk.',
           'bl'
         );
-        await eng.type(`#actDecline-demo-patios`, 'Want something calmer for the evening, not another walk.', { padding: 220, speedMin: 26, speedMax: 52 });
-        await eng.wait(250);
+        await focusCard('demo-patios');
+        await eng.type(`#actDecline-demo-patios`, 'Want something calmer for the evening, not another walk.', { padding: 220, scroll: false, speedMin: 26, speedMax: 52 });
+        await eng.wait(300);
+        await focusCard('demo-patios');
         const replaceBtn = inCard('demo-patios', '.confirm-replace');
-        await eng.cursorTo(replaceBtn, { travel: 700, padding: 160 });
+        await eng.cursorTo(replaceBtn, { travel: 700, padding: 160, scroll: false });
         eng.cursor.classList.add('is-clicking');
         await eng.wait(160);
         eng.cursor.classList.remove('is-clicking');
@@ -483,26 +522,32 @@
         await eng.custom(async (doc, win) => {
           if (win.replaceActivityInState) win.replaceActivityInState('demo-patios', { ...REPLACEMENT });
         });
-        await eng.wait(1400);
+        await eng.scrollIntoFrame(card('demo-patios-replacement'));
+        await eng.wait(1800);
 
-        // Create a new activity
+        // Create a new activity — open the modal and fill it out as a worked example.
         await eng.narrate(
           'Missing something?',
           'Add your own activity.',
-          'Got a reservation or a place you already know? Drop it in and it slots into the same flow as everything else.',
+          'Got a reservation or a place you already know? Fill in a few details and it joins the trip like any other stop.',
           'br'
         );
         const addCard = eng.doc.querySelector('#activitiesGrid .add-activity-card');
-        await eng.cursorTo(addCard, { travel: 1100, padding: 200 });
-        eng.cursor.classList.add('is-clicking');
-        await eng.wait(160);
-        addCard?.click();
-        eng.cursor.classList.remove('is-clicking');
-        await eng.wait(1800);
-        await eng.custom(async (doc) => {
-          doc.getElementById('addActivityModalClose')?.click();
-        });
-        await eng.wait(400);
+        await eng.scrollIntoFrame(addCard);
+        await eng.wait(200);
+        await tap(addCard, { travel: 1000 });
+        await eng.wait(900);
+
+        // Fields live in a centered overlay — no page scroll needed (scroll:false).
+        await eng.type('#addActivityName', 'Cooking class — Andalusian tapas', { scroll: false, padding: 0 });
+        await eng.wait(250);
+        await eng.setValue('#addActivityCost', '55', { scroll: false, after: 250 });
+        await eng.type('#addActivityWhy', 'A hands-on evening making local tapas — fits the “lively nights, no seafood” notes from setup.', { scroll: false, padding: 0, speedMin: 22, speedMax: 44 });
+        await eng.wait(900);
+        await eng.cursorTo('#addActivitySubmit', { travel: 700, scroll: false });
+        await eng.wait(1100);
+        await eng.custom(async (doc) => { doc.getElementById('addActivityCancel')?.click(); });
+        await eng.wait(500);
       },
     },
 

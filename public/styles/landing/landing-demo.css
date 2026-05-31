@@ -215,8 +215,8 @@
   height: 22px;
   pointer-events: none;
   transition:
-    left 1100ms cubic-bezier(.5, 0, .15, 1),
-    top 1100ms cubic-bezier(.5, 0, .15, 1),
+    left 680ms cubic-bezier(.45, 0, .2, 1),
+    top 680ms cubic-bezier(.45, 0, .2, 1),
     opacity 350ms ease;
   filter: drop-shadow(0 2px 4px rgba(10,22,40,.25));
   z-index: 5;
