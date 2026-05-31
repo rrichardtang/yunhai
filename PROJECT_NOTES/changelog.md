@@ -13,6 +13,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Renamed all `GuideMe` → `YunHai` across ported assets + demo copy; repathed bundle's `Planner.html`/`Landing.html` → `/planner.html` / `#why`.
 - 113/113 unit tests pass; no backend touched. Branch `feature/yunhai-landing-demos`. Pending VPS visual verification.
 
+## [2026-05-31] Landing reel: cursor-drive scheduling modal + working Finalize with transit pills
+
+- **Scheduling Preferences is now actually used** (`landing-reel.js` Arrange beat): the cursor opens the modal and moves through real controls — sets day start/end (`#schedDayStart`/`#schedDayEnd`), picks a tour-timing radio (`#schedTourTiming`), nudges the downtime slider (`#schedBreaks`), then clicks **Save** (`#schedulingWizardSave`) — instead of the old JS-only slider poke + cancel.
+- **Finalize now does something** (`landing-reel.js`): clicking `#finalizeArrangeBtn` opens the real finalize checklist modal (`#finalizeModal`); the cursor ticks a couple of lock checkboxes (`[data-finalize-check]`), presses Confirm, then the result is **faked** (no `/api/arrange`): the modal is removed and `state.commutes` is seeded so the day "snaps together" with transit pills between stops on re-render.
+- **Enabling the Finalize button**: gave `demo-mezquita` a `timing.fixed` so `updateFinalizeBtn` un-disables `#finalizeArrangeBtn` (it requires a fixed-time or verified-checklist activity).
+- **Mock data**: added `DEMO_COMMUTES` (driving pills between consecutive Córdoba/Seville stops, `commutePairKey` shape `from->to` with `{selectedMode,modes:{driving:{durationMinutes,modeIcon}}}`). Arrange seeds `commutes:{}` first (pills hidden) → reveals them post-Finalize; step-4 Finalize beat seeds them too. Arrange beat `dur` 16s→32s.
+
 ## [2026-05-31] Landing reel: fix card cropping, fill add-activity form, smooth motion
 
 - **No more cropped cards** (`landing-reel.js`): added `scrollIntoFrame(el)` (centers cards taller than the frame, else nudges a cropped card fully into view) and refactored scroll into a shared `scrollToTop`. The Review beat now `focusCard()`s each whole card before interacting, and all button/field taps use `{scroll:false}` so they don't re-scroll and crop the top half. The Replace re-frames the swapped card so the change is visible.

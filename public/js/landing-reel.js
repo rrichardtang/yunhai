@@ -252,7 +252,9 @@
       pitfall: 'Late-morning tour groups swarm the prayer hall — go right at opening.',
       booking_advice: 'Buy timed-entry tickets online; the on-site queue eats an hour.',
       insider_tips: 'Free entry weekday mornings 08:30–09:30 if you skip the guided route.',
-      estimated_cost_usd: 13, duration_hours: 2, opening_hours: '08:30–19:00' }),
+      estimated_cost_usd: 13, duration_hours: 2, opening_hours: '08:30–19:00',
+      // Fixed time → enables the Arrange "Finalize" button (updateFinalizeBtn gate).
+      timing: { fixed: { date: '2026-04-25', time: '09:30' } } }),
     act({ id: 'demo-alcazar-cor', name: 'Alcázar de los Reyes Cristianos', city: CORDOBA, type: 'outdoors',
       why_it_fits: 'Terraced gardens, fountains and Moorish towers a six-minute walk from the Mezquita — an easy second stop.',
       pitfall: 'Limited shade at midday; the garden loop is exposed.',
@@ -305,6 +307,15 @@
     'demo-realalcazar': { dayId: `${SEVILLE}-2026-04-27`, time: '09:30' },
     'demo-flamenco': { dayId: `${SEVILLE}-2026-04-28`, time: '21:00' },
     'demo-plaza-espana': { dayId: `${SEVILLE}-2026-04-27`, time: '19:00' }
+  };
+
+  // Transit pills between consecutive placed stops per day. Keyed `fromId->toId`
+  // (commutePairKey). The Finalize step reveals these to show the day "snapping" together.
+  const cm = (mins) => ({ selectedMode: 'driving', modes: { driving: { durationMinutes: mins, modeIcon: '🚗' } } });
+  const DEMO_COMMUTES = {
+    'demo-mezquita->demo-alcazar-cor': cm(8),
+    'demo-alcazar-cor->demo-patios': cm(14),
+    'demo-realalcazar->demo-plaza-espana': cm(11)
   };
 
   // Used for the faked Replace swap. Seeded with place_id/price_level/imageUrl so the
@@ -555,13 +566,14 @@
       step: 3,
       path: '/arrange',
       label: '03 / ARRANGE',
-      dur: 16000,
+      dur: 32000,
       run: async (eng) => {
-        // Seed a pre-arranged calendar so the day columns are full (self-sufficient on dot-jump).
+        // Seed the placed calendar — but NO commutes yet, so the day "snaps together"
+        // (transit pills appear) only after Finalize, below.
         await seed(eng, {
           cities: DEMO_CITIES, days: DEMO_DAYS,
           activities: DEMO_ACTIVITIES, reviewed: { ...DEMO_REVIEWED_ARRANGED },
-          placements: { ...DEMO_PLACEMENTS }, arrangeCity: CORDOBA
+          placements: { ...DEMO_PLACEMENTS }, commutes: {}, arrangeCity: CORDOBA
         });
         eng.gotoAppStep(3);
         await eng.custom(async (doc, win) => { if (win.renderArrange) win.renderArrange(); });
@@ -576,23 +588,71 @@
         );
         await eng.wait(1400);
 
-        // Scheduling preferences modal (pure frontend)
+        // ---- Scheduling preferences modal (cursor-driven, pure frontend) ----
         await eng.narrate(
           'Scheduling preferences',
           'Set the rhythm once.',
-          'Day start and end, when you eat, how much breathing room between stops — YunHai schedules every day to match.',
+          'Day start and end, when you eat, and how much downtime between stops — YunHai schedules every day to match.',
           'br'
         );
-        await eng.click('#schedulingWizardBtn', { travel: 1000, padding: 160, after: 700 });
-        await eng.wait(1700);
-        // Nudge the breaks slider to show it's live, then close.
-        await eng.custom(async (doc) => {
-          const slider = doc.getElementById('schedBreaks');
-          if (slider) { slider.value = '4'; slider.dispatchEvent(new Event('input', { bubbles: true })); }
-        });
-        await eng.wait(1400);
-        await eng.click('#schedulingWizardCancel', { travel: 800, padding: 140, after: 500 });
+        await eng.click('#schedulingWizardBtn', { travel: 1000, padding: 160, after: 800 });
+        await eng.wait(900);
+        // Move through the controls so the viewer sees them being set.
+        await eng.setValue('#schedDayStart', '09:00', { scroll: false, travel: 850, after: 500 });
+        await eng.setValue('#schedDayEnd', '21:30', { scroll: false, travel: 700, after: 500 });
+        const morning = eng.doc.querySelector('#schedTourTiming .sched-radio:first-child');
+        await eng.cursorTo(morning, { scroll: false, travel: 800 });
+        eng.cursor.classList.add('is-clicking'); await eng.wait(160);
+        morning?.querySelector('input')?.click(); eng.cursor.classList.remove('is-clicking');
         await eng.wait(600);
+        // Drag the downtime slider up a notch.
+        await eng.cursorTo('#schedBreaks', { scroll: false, travel: 800 });
+        await eng.custom(async (doc) => {
+          const s = doc.getElementById('schedBreaks');
+          if (s) { s.value = String(Math.min(Number(s.max || 5), Number(s.value || 3) + 1)); s.dispatchEvent(new Event('input', { bubbles: true })); }
+        });
+        await eng.wait(900);
+        await eng.click('#schedulingWizardSave', { travel: 800, padding: 140, after: 600 });
+        await eng.wait(700);
+        await eng.custom(async (doc, win) => { if (win.renderArrange) win.renderArrange(); });
+
+        // ---- Finalize: lock activities, then the day snaps together with transit pills ----
+        await eng.narrate(
+          'Finalize',
+          'Lock what’s set in stone.',
+          'Pin the stops you’ve already booked; YunHai fits everything else around them — then drops in real drive times between stops.',
+          'tr'
+        );
+        await eng.click('#finalizeArrangeBtn', { travel: 1000, padding: 160, after: 800 });
+        await eng.wait(900);
+
+        // Cursor-check a couple of lock checkboxes in the real finalize modal.
+        const checks = Array.from(eng.doc.querySelectorAll('#finalizeModal [data-finalize-check]')).slice(0, 2);
+        for (const cb of checks) {
+          if (eng.cancelled) return;
+          await eng.cursorTo(cb, { scroll: false, travel: 750 });
+          eng.cursor.classList.add('is-clicking'); await eng.wait(160);
+          cb.click(); eng.cursor.classList.remove('is-clicking');
+          await eng.wait(700);
+        }
+        // Press Confirm, then FAKE the arrange result (no /api/arrange): close the modal
+        // and reveal transit pills between stops.
+        await eng.cursorTo('#finalizeConfirmBtn', { scroll: false, travel: 800 });
+        eng.cursor.classList.add('is-clicking'); await eng.wait(180);
+        eng.cursor.classList.remove('is-clicking');
+        await eng.custom(async (doc) => { doc.getElementById('finalizeModal')?.remove(); });
+        await eng.wait(500);
+        await seed(eng, { commutes: { ...DEMO_COMMUTES } });
+        await eng.custom(async (doc, win) => { if (win.renderArrange) win.renderArrange(); });
+        await eng.wait(700);
+        await eng.scrollToTop(0);
+        await eng.narrate(
+          'Done',
+          'A day that actually holds up.',
+          'Every stop in order, real drive times between them, buffers baked in — no backtracking, no impossible jumps.',
+          'br'
+        );
+        await eng.wait(1600);
       },
     },
 
@@ -606,7 +666,7 @@
         await seed(eng, {
           cities: DEMO_CITIES, days: DEMO_DAYS,
           activities: DEMO_ACTIVITIES, reviewed: { ...DEMO_REVIEWED_ARRANGED },
-          placements: { ...DEMO_PLACEMENTS }, arrangeCity: CORDOBA
+          placements: { ...DEMO_PLACEMENTS }, commutes: { ...DEMO_COMMUTES }, arrangeCity: CORDOBA
         });
         eng.gotoAppStep(4);
         await eng.custom(async (doc, win) => { if (win.renderItinerary) win.renderItinerary(); });
