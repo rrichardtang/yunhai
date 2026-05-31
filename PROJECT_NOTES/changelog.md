@@ -13,6 +13,17 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Renamed all `GuideMe` → `YunHai` across ported assets + demo copy; repathed bundle's `Planner.html`/`Landing.html` → `/planner.html` / `#why`.
 - 113/113 unit tests pass; no backend touched. Branch `feature/yunhai-landing-demos`. Pending VPS visual verification.
 
+## [2026-05-31] Landing reel: populate blank Review/Arrange/Finalize steps with seeded demo data
+
+- **Root cause**: the reel drives the real app in an iframe (`/planner.html?embed=1`); `initEmbedMode` (app.js) seeded only ONE city and never ran the live AI, so steps 02 (Review) and 03 (Arrange) rendered blank — no activities/days/placements.
+- **app.js `initEmbedMode`**: exposed demo-only hooks — `window.applyDemoState(partial)` (`Object.assign` into `state`), plus `window.renderActivities/renderArrange/renderItinerary/replaceActivityInState`. Lets the reel seed mock state and force the genuine render functions without any backend.
+- **`public/js/landing-reel.js`**: added a self-contained Andalucía (Córdoba + Seville) mock dataset — `DEMO_CITIES/DEMO_DAYS/DEMO_ACTIVITIES` (real `buildActivityCard` shape), `DEMO_REVIEWED` (Review opener) + `DEMO_REVIEWED_ARRANGED` (all placed stops approved so day columns/itinerary fill, since `renderArrange` only places approved), `DEMO_PLACEMENTS`, and a `REPLACEMENT` activity (seeded `place_id`/`price_level` so `enrichActivity` skips geocode). A `seed(eng, partial)` helper wraps `applyDemoState`.
+- **Rewrote 3 beats** (each self-seeds so dot-jumps work):
+  - **Step 02 Review**: real cards, then cursor-drives Approve (`.approve`), Decline (`.decline`), notes (`#actNotes-…` + `.save-activity-notes`), a faked Replace (type `.decline-reason` → click `.confirm-replace` → `replaceActivityInState(old, REPLACEMENT)` instead of `/api/activity/replace`), and opens the Add-activity modal (`.add-activity-card` → `#addActivityModalClose`).
+  - **Step 03 Arrange**: seeds a pre-arranged calendar (no Draft animation, per request — Draft needs `/api/arrange`), then opens the real Scheduling Preferences modal (`#schedulingWizardBtn`), nudges `#schedBreaks`, closes (`#schedulingWizardCancel`).
+  - **Step 04 Finalize**: renders the itinerary day-by-day from seeded state, scrolls it, then highlights the Sync/Share/PDF tools (`#step4 #syncGoogleCalendarBtn`). Stops before the API-bound finalize-confirm.
+- Beat `dur` budgets retimed for the longer choreographies (scaled by existing `PACE`). 113/113 tests pass; `node --check` clean on both files. Pending VPS visual verification.
+
 ## [2026-05-31] Landing reel: hero CTA target, slower pace, true freeze-on-pause
 
 - **Hero "See how it works" CTA** (`public/index.html`): now anchors to `#reel` (the "see it in motion" reel) instead of `#why`.
