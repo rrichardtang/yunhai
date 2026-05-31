@@ -168,6 +168,123 @@
     }
   }
 
+  // ----- Mock trip data: lets steps 2-4 render the real UI without the live AI. -----
+  // Shapes mirror the app: activities → buildActivityCard fields; days → expandDays
+  // (`${city}-${YYYY-MM-DD}`); placements → { dayId, time }. Seeded activities are never
+  // enriched (renderActivities doesn't call enrichActivity), so imageUrl '' is safe.
+  const CORDOBA = 'Córdoba, Spain';
+  const SEVILLE = 'Seville, Spain';
+
+  const DEMO_CITIES = [
+    {
+      id: 'demo-cordoba', name: CORDOBA, startDate: '2026-04-24', endDate: '2026-04-26',
+      leaveTime: '18:00', notes: '', detailsExpanded: false,
+      latitude: 37.8882, longitude: -4.7794,
+      logistics: { arrival: { date: '2026-04-24', time: '14:00', mode: 'train', location: 'Córdoba Station' },
+        departure: { date: '2026-04-26', time: '18:00', mode: 'train', location: 'Córdoba Station' } }
+    },
+    {
+      id: 'demo-seville', name: SEVILLE, startDate: '2026-04-26', endDate: '2026-04-30',
+      leaveTime: '06:30', notes: 'Flamenco at La Carbonería on Apr 28.', detailsExpanded: false,
+      latitude: 37.3891, longitude: -5.9845,
+      logistics: { arrival: { date: '2026-04-26', time: '11:05', mode: 'train', location: 'Sevilla-Santa Justa' },
+        departure: { date: '2026-04-30', time: '06:30', mode: 'bus', location: 'Plaza de Armas' } }
+    }
+  ];
+
+  const DEMO_DAYS = [
+    { id: `${CORDOBA}-2026-04-24`, city: CORDOBA, date: '2026-04-24' },
+    { id: `${CORDOBA}-2026-04-25`, city: CORDOBA, date: '2026-04-25' },
+    { id: `${CORDOBA}-2026-04-26`, city: CORDOBA, date: '2026-04-26' },
+    { id: `${SEVILLE}-2026-04-26`, city: SEVILLE, date: '2026-04-26' },
+    { id: `${SEVILLE}-2026-04-27`, city: SEVILLE, date: '2026-04-27' },
+    { id: `${SEVILLE}-2026-04-28`, city: SEVILLE, date: '2026-04-28' },
+    { id: `${SEVILLE}-2026-04-29`, city: SEVILLE, date: '2026-04-29' },
+    { id: `${SEVILLE}-2026-04-30`, city: SEVILLE, date: '2026-04-30' }
+  ];
+
+  const act = (o) => ({
+    type: 'landmark', cost_type: 'per_person', duration_hours: 2, imageUrl: '',
+    booking_type: 'none', booking_links: [], userAdded: false, ...o
+  });
+
+  const DEMO_ACTIVITIES = [
+    act({ id: 'demo-mezquita', name: 'Mezquita-Catedral de Córdoba', city: CORDOBA, type: 'landmark',
+      why_it_fits: 'A UNESCO masterpiece — a forest of red-and-white arches you can wander for hours. Exactly the kind of slow, architectural awe you flagged.',
+      pitfall: 'Late-morning tour groups swarm the prayer hall — go right at opening.',
+      booking_advice: 'Buy timed-entry tickets online; the on-site queue eats an hour.',
+      insider_tips: 'Free entry weekday mornings 08:30–09:30 if you skip the guided route.',
+      estimated_cost_usd: 13, duration_hours: 2, opening_hours: '08:30–19:00' }),
+    act({ id: 'demo-alcazar-cor', name: 'Alcázar de los Reyes Cristianos', city: CORDOBA, type: 'outdoors',
+      why_it_fits: 'Terraced gardens, fountains and Moorish towers a six-minute walk from the Mezquita — an easy second stop.',
+      pitfall: 'Limited shade at midday; the garden loop is exposed.',
+      booking_advice: 'No reservation needed — pay at the gate.',
+      estimated_cost_usd: 5, duration_hours: 1.5, opening_hours: '09:15–20:00' }),
+    act({ id: 'demo-patios', name: 'Patios de San Basilio', city: CORDOBA, type: 'outdoors',
+      why_it_fits: 'Hidden flower-filled courtyards locals open to visitors — the offbeat, non-top-10 find you love.',
+      pitfall: 'Best in May during the Patio Festival; some close midday.',
+      booking_advice: 'A few patios take a small donation at the door.',
+      estimated_cost_usd: 0, duration_hours: 1, opening_hours: '11:00–14:00, 18:00–22:00' }),
+    act({ id: 'demo-realalcazar', name: 'Real Alcázar de Sevilla', city: SEVILLE, type: 'landmark',
+      why_it_fits: 'The royal palace from Game of Thrones — tilework, sunken baths and the Ambassadors’ hall. Unmissable in Seville.',
+      pitfall: 'Sells out days ahead in spring.',
+      booking_advice: 'Book the first 09:30 slot online — mornings are calm and cool.',
+      estimated_cost_usd: 15, duration_hours: 2.5, opening_hours: '09:30–17:00' }),
+    act({ id: 'demo-flamenco', name: 'Flamenco at La Carbonería', city: SEVILLE, type: 'nightlife',
+      why_it_fits: 'A raw, no-cover tablao in a candlelit old coal yard — the lively-nights energy from your profile.',
+      pitfall: 'No reservations; arrive 30 min early for a seat.',
+      booking_advice: 'Free entry, buy a drink — cash only.',
+      estimated_cost_usd: 8, cost_type: 'per_person', duration_hours: 1.5, opening_hours: '20:00–02:00' }),
+    act({ id: 'demo-plaza-espana', name: 'Plaza de España', city: SEVILLE, type: 'landmark',
+      why_it_fits: 'A half-kilometre tiled crescent best at golden hour — exactly the view-at-sunset moment you asked for.',
+      pitfall: 'Crowded by afternoon; rowboats have a long queue.',
+      booking_advice: 'Free and open-air — no booking.',
+      estimated_cost_usd: 0, duration_hours: 1, opening_hours: 'Open 24h' })
+  ];
+
+  // Review opens with a couple already approved (not a blank slate).
+  const DEMO_REVIEWED = {
+    'demo-mezquita': { approved: true, notes: '' },
+    'demo-realalcazar': { approved: true, notes: '' }
+  };
+
+  // Arrange/Finalize present an already-built trip: everything placed is approved so the
+  // day columns and itinerary render full. (Review uses DEMO_REVIEWED instead.)
+  const DEMO_REVIEWED_ARRANGED = {
+    'demo-mezquita': { approved: true, notes: 'Book the 08:30 slot — quietest light for photos.' },
+    'demo-alcazar-cor': { approved: true, notes: '' },
+    'demo-patios': { approved: true, notes: '' },
+    'demo-realalcazar': { approved: true, notes: '' },
+    'demo-flamenco': { approved: true, notes: '' },
+    'demo-plaza-espana': { approved: true, notes: '' }
+  };
+
+  // Pre-arranged calendar so step-3 day columns and step-4 finalize have content.
+  const DEMO_PLACEMENTS = {
+    'demo-mezquita': { dayId: `${CORDOBA}-2026-04-25`, time: '09:30' },
+    'demo-alcazar-cor': { dayId: `${CORDOBA}-2026-04-25`, time: '12:00' },
+    'demo-patios': { dayId: `${CORDOBA}-2026-04-25`, time: '18:30' },
+    'demo-realalcazar': { dayId: `${SEVILLE}-2026-04-27`, time: '09:30' },
+    'demo-flamenco': { dayId: `${SEVILLE}-2026-04-28`, time: '21:00' },
+    'demo-plaza-espana': { dayId: `${SEVILLE}-2026-04-27`, time: '19:00' }
+  };
+
+  // Used for the faked Replace swap. Seeded with place_id/price_level/imageUrl so the
+  // app's enrichActivity() (called by replaceActivityInState) makes no network calls.
+  const REPLACEMENT = act({
+    id: 'demo-patios-replacement', name: 'Hammam Al Ándalus (Arab baths)', city: CORDOBA, type: 'wellness',
+    why_it_fits: 'A candlelit thermal bath circuit in a restored Moorish house — a calm, offbeat evening that fits your slow-travel pace better than another courtyard walk.',
+    pitfall: 'Sessions are timed; latecomers lose part of the slot.',
+    booking_advice: 'Reserve a 90-minute slot online; bring a swimsuit.',
+    insider_tips: 'The 21:00 session is quietest — almost private midweek.',
+    estimated_cost_usd: 42, duration_hours: 1.5, opening_hours: '10:00–24:00',
+    place_id: 'demo-place-hammam', price_level: 2, imageUrl: ''
+  });
+
+  const seed = (eng, partial) => eng.custom(async (doc, win) => {
+    if (typeof win.applyDemoState === 'function') win.applyDemoState(partial);
+  });
+
   // Each beat targets one of the real app's 4 setup steps and runs against the same iframe.
   const NEW_CITY = '.city-row:last-child';
   const BEATS = [
@@ -280,32 +397,109 @@
       step: 2,
       path: '/review',
       label: '02 / REVIEW',
-      dur: 8000,
+      dur: 30000,
       run: async (eng) => {
+        // Seed real activity cards, then drive the genuine review UI.
+        await seed(eng, { activities: DEMO_ACTIVITIES, reviewed: { ...DEMO_REVIEWED } });
         eng.gotoAppStep(2);
-        await eng.wait(400);
+        await eng.custom(async (doc, win) => { if (win.renderActivities) win.renderActivities(); });
+        (eng.scroller || {}).scrollTop = 0;
+        await eng.wait(500);
+
+        const card = (id) => eng.doc.querySelector(`.activity-card[data-activity-id="${id}"]`);
+        const inCard = (id, sel) => { const c = card(id); return c ? c.querySelector(sel) : null; };
+
         await eng.narrate(
           'Step 02 · Review',
-          'Approve, skip, or ask for more.',
-          'Every activity is a card — what it costs, why it fits, how long it takes. Tap to approve, skip to dismiss, ask for more like this. No decision fatigue.',
+          'Every suggestion is a card.',
+          'Real venues from Google Places — what it costs, why it fits you, the pitfalls, and booking advice. No fabricated top-10 filler.',
           'tr'
         );
-        (eng.scroller || {}).scrollTop = 0;
-        await eng.wait(600);
-        const cards = eng.doc.querySelectorAll('#activitiesGrid > *');
-        for (let i = 0; i < Math.min(3, cards.length); i++) {
-          if (eng.cancelled) return;
-          await eng.cursorTo(cards[i], { travel: 1100, padding: 180 });
-          eng.cursor.classList.add('is-clicking');
-          await eng.wait(160);
-          eng.cursor.classList.remove('is-clicking');
-          await eng.wait(900);
-        }
-        const sc = eng.scroller;
-        if (sc) {
-          const target = Math.min(sc.scrollHeight - FRAME_H, 500);
-          await eng.scrollTo({ getBoundingClientRect: () => ({ top: target, left: 0, width: 0, height: 0 }) }, 0);
-        }
+        await eng.wait(900);
+
+        // Approve
+        await eng.narrate(
+          'Approve',
+          'Keep the ones you love.',
+          'Approve adds it to your trip and the running budget. Tap again to un-approve — nothing is locked until you say so.',
+          'tr'
+        );
+        await eng.cursorTo(inCard('demo-alcazar-cor', '.approve'), { travel: 1000, padding: 160 });
+        eng.cursor.classList.add('is-clicking');
+        await eng.wait(160);
+        inCard('demo-alcazar-cor', '.approve')?.click();
+        eng.cursor.classList.remove('is-clicking');
+        await eng.wait(1000);
+
+        // Decline
+        await eng.narrate(
+          'Decline',
+          'Drop what doesn’t fit.',
+          'Decline dismisses a suggestion. If it was scheduled, it leaves your days too — so the plan always reflects what you actually want.',
+          'tl'
+        );
+        await eng.cursorTo(inCard('demo-plaza-espana', '.decline'), { travel: 1000, padding: 160 });
+        eng.cursor.classList.add('is-clicking');
+        await eng.wait(160);
+        inCard('demo-plaza-espana', '.decline')?.click();
+        eng.cursor.classList.remove('is-clicking');
+        await eng.wait(1000);
+
+        // Notes
+        await eng.narrate(
+          'Notes',
+          'Pin a reminder to any stop.',
+          'Reservation refs, who’s coming, a must-try dish — saved right on the card and folded into the plan.',
+          'tr'
+        );
+        await eng.type(`#actNotes-demo-mezquita`, 'Book the 08:30 slot — quietest light for photos.', { padding: 200 });
+        await eng.wait(200);
+        await eng.cursorTo(inCard('demo-mezquita', '.save-activity-notes'), { travel: 700, padding: 160 });
+        eng.cursor.classList.add('is-clicking');
+        await eng.wait(160);
+        inCard('demo-mezquita', '.save-activity-notes')?.click();
+        eng.cursor.classList.remove('is-clicking');
+        await eng.wait(1100);
+
+        // Replace / modify (faked swap — no API)
+        await eng.narrate(
+          'Don’t love it? Swap it.',
+          'Ask for something that fits better.',
+          'Say why in a line, and YunHai replaces it with a smarter match tuned to your taste — here, a calm evening over another courtyard walk.',
+          'bl'
+        );
+        await eng.type(`#actDecline-demo-patios`, 'Want something calmer for the evening, not another walk.', { padding: 220, speedMin: 26, speedMax: 52 });
+        await eng.wait(250);
+        const replaceBtn = inCard('demo-patios', '.confirm-replace');
+        await eng.cursorTo(replaceBtn, { travel: 700, padding: 160 });
+        eng.cursor.classList.add('is-clicking');
+        await eng.wait(160);
+        eng.cursor.classList.remove('is-clicking');
+        if (replaceBtn) replaceBtn.innerHTML = '<i class="ph-bold ph-spinner"></i>';
+        await eng.wait(1300);
+        await eng.custom(async (doc, win) => {
+          if (win.replaceActivityInState) win.replaceActivityInState('demo-patios', { ...REPLACEMENT });
+        });
+        await eng.wait(1400);
+
+        // Create a new activity
+        await eng.narrate(
+          'Missing something?',
+          'Add your own activity.',
+          'Got a reservation or a place you already know? Drop it in and it slots into the same flow as everything else.',
+          'br'
+        );
+        const addCard = eng.doc.querySelector('#activitiesGrid .add-activity-card');
+        await eng.cursorTo(addCard, { travel: 1100, padding: 200 });
+        eng.cursor.classList.add('is-clicking');
+        await eng.wait(160);
+        addCard?.click();
+        eng.cursor.classList.remove('is-clicking');
+        await eng.wait(1800);
+        await eng.custom(async (doc) => {
+          doc.getElementById('addActivityModalClose')?.click();
+        });
+        await eng.wait(400);
       },
     },
 
@@ -313,35 +507,44 @@
       step: 3,
       path: '/arrange',
       label: '03 / ARRANGE',
-      dur: 7000,
+      dur: 16000,
       run: async (eng) => {
+        // Seed a pre-arranged calendar so the day columns are full (self-sufficient on dot-jump).
+        await seed(eng, {
+          cities: DEMO_CITIES, days: DEMO_DAYS,
+          activities: DEMO_ACTIVITIES, reviewed: { ...DEMO_REVIEWED_ARRANGED },
+          placements: { ...DEMO_PLACEMENTS }, arrangeCity: CORDOBA
+        });
         eng.gotoAppStep(3);
-        await eng.wait(400);
-        await eng.narrate(
-          'Step 03 · Arrange',
-          'Compose the days.',
-          'Drag activities into days, or let auto-arrange group them geographically. Commute times come from real maps, not vibes — the schedule actually fits.',
-          'br'
-        );
+        await eng.custom(async (doc, win) => { if (win.renderArrange) win.renderArrange(); });
         (eng.scroller || {}).scrollTop = 0;
         await eng.wait(500);
-        const sc = eng.scroller;
-        if (sc) {
-          const target = Math.min(sc.scrollHeight - FRAME_H, 600);
-          const start = sc.scrollTop;
-          const dur = 5000;
-          const t0 = performance.now();
-          await new Promise((resolve) => {
-            const tick = (now) => {
-              if (eng.cancelled) return resolve();
-              const t = Math.min(1, (now - t0) / dur);
-              sc.scrollTop = start + (target - start) * t;
-              if (t < 1) requestAnimationFrame(tick);
-              else resolve();
-            };
-            requestAnimationFrame(tick);
-          });
-        }
+
+        await eng.narrate(
+          'Step 03 · Arrange',
+          'Your days, laid out on a real clock.',
+          'Approved stops sit on a true hourly timeline — drag to move or resize, and overlaps become obvious at a glance.',
+          'br'
+        );
+        await eng.wait(1400);
+
+        // Scheduling preferences modal (pure frontend)
+        await eng.narrate(
+          'Scheduling preferences',
+          'Set the rhythm once.',
+          'Day start and end, when you eat, how much breathing room between stops — YunHai schedules every day to match.',
+          'br'
+        );
+        await eng.click('#schedulingWizardBtn', { travel: 1000, padding: 160, after: 700 });
+        await eng.wait(1700);
+        // Nudge the breaks slider to show it's live, then close.
+        await eng.custom(async (doc) => {
+          const slider = doc.getElementById('schedBreaks');
+          if (slider) { slider.value = '4'; slider.dispatchEvent(new Event('input', { bubbles: true })); }
+        });
+        await eng.wait(1400);
+        await eng.click('#schedulingWizardCancel', { travel: 800, padding: 140, after: 500 });
+        await eng.wait(600);
       },
     },
 
@@ -349,35 +552,55 @@
       step: 4,
       path: '/finalize',
       label: '04 / FINALIZE',
-      dur: 7000,
+      dur: 14000,
       run: async (eng) => {
+        // Self-seed the full trip so jumping straight here (dot click) still renders.
+        await seed(eng, {
+          cities: DEMO_CITIES, days: DEMO_DAYS,
+          activities: DEMO_ACTIVITIES, reviewed: { ...DEMO_REVIEWED_ARRANGED },
+          placements: { ...DEMO_PLACEMENTS }, arrangeCity: CORDOBA
+        });
         eng.gotoAppStep(4);
-        await eng.wait(400);
-        await eng.narrate(
-          'Step 04 · Finalize',
-          'Trip Health, before you book.',
-          'Overlapping reservations, thin mornings, closures — all flagged ahead of time, all fixable in place. Sync to your calendar and share with the party.',
-          'tr'
-        );
+        await eng.custom(async (doc, win) => { if (win.renderItinerary) win.renderItinerary(); });
         (eng.scroller || {}).scrollTop = 0;
         await eng.wait(500);
+
+        await eng.narrate(
+          'Step 04 · Finalize',
+          'The whole trip, day by day.',
+          'Every approved stop, in order, with times and costs — the plan you’ll actually travel with.',
+          'tr'
+        );
+        await eng.wait(1400);
+
         const sc = eng.scroller;
         if (sc) {
-          const target = Math.min(sc.scrollHeight - FRAME_H, 600);
+          const target = Math.min(sc.scrollHeight - FRAME_H, 520);
           const start = sc.scrollTop;
-          const dur = 5000;
+          const dur = 4200;
           const t0 = performance.now();
           await new Promise((resolve) => {
-            const tick = (now) => {
+            const t = (now) => {
               if (eng.cancelled) return resolve();
-              const t = Math.min(1, (now - t0) / dur);
-              sc.scrollTop = start + (target - start) * t;
-              if (t < 1) requestAnimationFrame(tick);
+              if (eng.paused) { return requestAnimationFrame(t); }
+              const k = Math.min(1, (now - t0) / dur);
+              sc.scrollTop = start + (target - start) * k;
+              if (k < 1) requestAnimationFrame(t);
               else resolve();
             };
-            requestAnimationFrame(tick);
+            requestAnimationFrame(t);
           });
         }
+
+        await eng.narrate(
+          'Take it anywhere.',
+          'Sync, share, or export.',
+          'Push every stop to Google Calendar, share a live link with your party, or download a PDF with your tickets tucked inside.',
+          'br'
+        );
+        const tool = eng.doc.querySelector('#step4 #syncGoogleCalendarBtn') ? '#step4 #syncGoogleCalendarBtn' : '#step4 .send-tile';
+        await eng.cursorTo(tool, { travel: 1100, padding: 180 });
+        await eng.wait(1600);
       },
     },
   ];

@@ -9267,6 +9267,13 @@ function initEmbedMode() {
   window.addCityRow = addCityRow;
   window.renderCities = renderCities;
   window.uid = uid;
+
+  // Demo-reel hooks: seed mock state and force renders without the live AI.
+  window.applyDemoState = (partial) => Object.assign(state, partial);
+  window.renderActivities = renderActivities;
+  window.renderArrange = renderArrange;
+  window.renderItinerary = renderItinerary;
+  window.replaceActivityInState = replaceActivityInState;
 }
 
 function clearPlannedResultsKeepSetup() {
