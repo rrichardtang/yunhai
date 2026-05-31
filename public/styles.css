@@ -2535,6 +2535,9 @@ body.overlay-active #chatWidget {
 }
 .opt-lock-btn:hover, .opt-flip-btn:hover { color: var(--accent); border-color: var(--accent); }
 .opt-card--locked .opt-lock-btn { color: #d97706; border-color: #fcd34d; background: #fef3c7; }
+.opt-lock-btn:disabled { cursor: not-allowed; }
+.opt-card--booked .opt-lock-btn { color: #15803d; border-color: #86efac; background: #dcfce7; }
+.opt-card--booked .opt-lock-btn:hover { color: #15803d; border-color: #86efac; }
 
 .opt-card--flip { perspective: 1200px; }
 .opt-card-inner {

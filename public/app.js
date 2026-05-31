@@ -3842,6 +3842,12 @@ function activityImgHtml(src, alt, { extraClass = '', style = '' } = {}) {
   return `<img src="${esc(src)}" alt="${esc(alt)}" loading="lazy" class="${cls}"${style ? ` style="${style}"` : ''} onerror="this.outerHTML='${fallback}'" />`;
 }
 
+function isConfirmedBooking(activityId) {
+  return (state.bookingChecklist || []).some(
+    (item) => item.type === 'activity' && item.activityId === activityId && item.verified === true
+  );
+}
+
 function buildBudgetOptCard(a, mode, approved) {
   const isLocked = budgetOptState.lockedIds.has(a.id);
   const hasRefinement = budgetOptState.refinements.has(a.id);
@@ -3874,24 +3880,28 @@ function buildBudgetOptCard(a, mode, approved) {
   };
 
   if (mode === 'lock') {
-    const lockIcon = isLocked ? 'ph-lock-key' : 'ph-lock-open';
+    const booked = isConfirmedBooking(a.id);
+    if (booked) cardEl.classList.add('opt-card--booked');
+    const lockIcon = booked ? 'ph-seal-check' : isLocked ? 'ph-lock-key' : 'ph-lock-open';
     cardEl.innerHTML = `
-      <button class="opt-lock-btn" type="button" aria-label="${isLocked ? 'Unlock' : 'Lock'} activity">
+      <button class="opt-lock-btn" type="button" ${booked ? 'disabled data-tooltip="Confirmed booking — can\'t be replaced"' : ''} aria-label="${booked ? 'Confirmed booking, locked' : isLocked ? 'Unlock activity' : 'Lock activity'}">
         <i class="ph-bold ${lockIcon}" aria-hidden="true"></i>
       </button>
       ${faceHtml(a, null)}`;
-    cardEl.querySelector('.opt-lock-btn').addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (budgetOptState.lockedIds.has(a.id)) {
-        budgetOptState.lockedIds.delete(a.id);
-        cardEl.classList.remove('opt-card--locked');
-        cardEl.querySelector('.opt-lock-btn').innerHTML = '<i class="ph-bold ph-lock-open" aria-hidden="true"></i>';
-      } else {
-        budgetOptState.lockedIds.add(a.id);
-        cardEl.classList.add('opt-card--locked');
-        cardEl.querySelector('.opt-lock-btn').innerHTML = '<i class="ph-bold ph-lock-key" aria-hidden="true"></i>';
-      }
-    });
+    if (!booked) {
+      cardEl.querySelector('.opt-lock-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (budgetOptState.lockedIds.has(a.id)) {
+          budgetOptState.lockedIds.delete(a.id);
+          cardEl.classList.remove('opt-card--locked');
+          cardEl.querySelector('.opt-lock-btn').innerHTML = '<i class="ph-bold ph-lock-open" aria-hidden="true"></i>';
+        } else {
+          budgetOptState.lockedIds.add(a.id);
+          cardEl.classList.add('opt-card--locked');
+          cardEl.querySelector('.opt-lock-btn').innerHTML = '<i class="ph-bold ph-lock-key" aria-hidden="true"></i>';
+        }
+      });
+    }
     cardEl.addEventListener('click', (e) => {
       if (e.target.closest('button')) return;
       openOptCardExpand(a, null);
@@ -3975,7 +3985,7 @@ function renderBudgetOptCards(activities, mode) {
 async function onConfirmLocks() {
   if (budgetOptState.inFlight) return;
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true && actCostUsd(a) != null && actCostUsd(a) > 0);
-  const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id));
+  const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id) && !isConfirmedBooking(a.id));
   if (!unlocked.length) {
     alert('All activities are locked — nothing to optimize.');
     return;
