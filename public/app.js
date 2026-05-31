@@ -3804,7 +3804,10 @@ function mountBudgetOptOverlay() {
   document.body.appendChild(footer);
 
   document.getElementById('budgetOptCancelBtn').addEventListener('click', exitBudgetOptMode);
-  document.getElementById('budgetOptConfirmLocksBtn').addEventListener('click', onConfirmLocks);
+  document.getElementById('budgetOptConfirmLocksBtn').addEventListener('click', () => {
+    if (budgetOptState.phase === 'flip') onConfirmSelections();
+    else onConfirmLocks();
+  });
 }
 
 function enterBudgetOptMode() {
@@ -3813,11 +3816,22 @@ function enterBudgetOptMode() {
   const approved = allApproved.filter((a) => actCostUsd(a) != null && actCostUsd(a) > 0);
   if (!approved.length) return;
   // Default all to locked — user unlocks what they want changed
-  budgetOptState = { lockedIds: new Set(approved.map((a) => a.id)), refinements: new Map(), choiceIsRefined: new Map(), inFlight: false };
+  budgetOptState = { phase: 'lock', lockedIds: new Set(approved.map((a) => a.id)), refinements: new Map(), choiceIsRefined: new Map(), inFlight: false };
   mountBudgetOptOverlay();
   renderBudgetOptCards(approved, 'lock');
+  document.querySelector('#budgetOptFooter .budget-opt-progress-wrap')?.classList.remove('hidden');
+  document.getElementById('budgetOptProgressLabel')?.classList.remove('hidden');
+  updateBudgetOptProgressBar(approved);
   overlayManager.open('budgetOptOverlay');
   document.body.classList.add('budget-opt-active');
+}
+
+function optActivityCost(act) {
+  const cost = actCostUsd(act);
+  if (cost == null) return null;
+  const adults = state.numTravelers || 1;
+  const children = state.numChildren || 0;
+  return actCostType(act) === 'per_group' ? cost : cost * adults + Math.round(cost * 0.6 * children);
 }
 
 function buildBudgetOptCard(a, mode, approved) {
@@ -3831,9 +3845,11 @@ function buildBudgetOptCard(a, mode, approved) {
   cardEl.dataset.activityId = a.id;
 
   const faceHtml = (act, label) => {
+    const cost = optActivityCost(act);
     return `
     <div class="opt-card-img-wrap">
       <img src="${esc(act.imageUrl || '')}" alt="${esc(act.name)}" loading="lazy" style="width:100%;height:160px;object-fit:cover;border-radius:12px 12px 0 0;" />
+      ${cost != null ? `<span class="opt-cost-chip">$${Math.round(cost).toLocaleString()}</span>` : ''}
     </div>
     <div class="card-content">
       ${label ? `<span class="opt-card--refined-label">${label}</span>` : ''}
@@ -3992,40 +4008,52 @@ async function onConfirmLocks() {
   });
 
   budgetOptState.inFlight = false;
+  btn.disabled = false;
+
+  if (!budgetOptState.refinements.size) {
+    btn.innerHTML = '<i class="ph-bold ph-check" aria-hidden="true"></i> Confirm';
+    showToast('Couldn\'t find cheaper alternatives — try again.', 'error');
+    return;
+  }
+
   await enrichActivities([...budgetOptState.refinements.values()]);
   transitionToFlipPhase(approved);
 }
 
 function transitionToFlipPhase(approved) {
+  budgetOptState.phase = 'flip';
   const confirmBtn = document.getElementById('budgetOptConfirmLocksBtn');
-  if (confirmBtn) {
-    confirmBtn.id = 'budgetOptConfirmSelectionsBtn';
-    confirmBtn.innerHTML = '<i class="ph-bold ph-check-circle" aria-hidden="true"></i> Confirm Selections';
-    confirmBtn.addEventListener('click', onConfirmSelections);
-  }
-  document.querySelector('#budgetOptFooter .budget-opt-progress-wrap')?.classList.remove('hidden');
-  document.getElementById('budgetOptProgressLabel')?.classList.remove('hidden');
+  if (confirmBtn) confirmBtn.innerHTML = '<i class="ph-bold ph-check-circle" aria-hidden="true"></i> Confirm Selections';
   const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id) && budgetOptState.refinements.has(a.id));
   renderBudgetOptCards(unlocked, 'flip');
   updateBudgetOptProgressBar(approved);
 }
 
 function updateBudgetOptProgressBar(approved) {
+  const bar = document.getElementById('budgetOptProgressBar');
+  if (!bar) return;
+
+  if (budgetOptState.phase === 'lock') {
+    const used = computeBudgetLensBreakdown().budgetLensTotal;
+    const budget = state.tripBudget || computeApprovedCost(approved);
+    const ratio = budget > 0 ? used / budget : 0;
+    bar.style.width = `${Math.min(ratio, 1) * 100}%`;
+    bar.className = 'budget-opt-progress-bar' + (ratio >= 0.9 ? ' bar-red' : ratio >= 0.6 ? ' bar-yellow' : '');
+    document.getElementById('budgetOptProgressLabel').textContent =
+      `$${Math.round(used).toLocaleString()} / $${Math.round(budget).toLocaleString()}`;
+    return;
+  }
+
   const totalCost = computeApprovedCost(approved);
   let selectedCost = 0;
   approved.forEach((a) => {
     const refined = budgetOptState.refinements.get(a.id);
     const showingRefined = budgetOptState.choiceIsRefined.get(a.id) ?? !!refined;
-    const act = (showingRefined && refined) ? refined : a;
-    const cost = actCostUsd(act);
-    if (cost == null) return;
-    const adults = state.numTravelers || 1;
-    const children = state.numChildren || 0;
-    selectedCost += actCostType(act) === 'per_group' ? cost : cost * adults + Math.round(cost * 0.6 * children);
+    const cost = optActivityCost((showingRefined && refined) ? refined : a);
+    if (cost != null) selectedCost += cost;
   });
 
   const pct = totalCost > 0 ? Math.min(selectedCost / totalCost, 1.2) * 100 : 0;
-  const bar = document.getElementById('budgetOptProgressBar');
   bar.style.width = `${Math.min(pct, 100)}%`;
   bar.className = 'budget-opt-progress-bar' + (pct > 100 ? ' bar-red' : pct > 80 ? ' bar-yellow' : '');
   document.getElementById('budgetOptProgressLabel').textContent =
