@@ -13,6 +13,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Renamed all `GuideMe` → `YunHai` across ported assets + demo copy; repathed bundle's `Planner.html`/`Landing.html` → `/planner.html` / `#why`.
 - 113/113 unit tests pass; no backend touched. Branch `feature/yunhai-landing-demos`. Pending VPS visual verification.
 
+## [2026-05-31] Landing reel: hero CTA target, slower pace, true freeze-on-pause
+
+- **Hero "See how it works" CTA** (`public/index.html`): now anchors to `#reel` (the "see it in motion" reel) instead of `#why`.
+- **Reel pacing** (`public/js/landing-reel.js`): added a global `PACE = 1.6` multiplier applied uniformly to `engine.wait()`, the per-keystroke typing delay, and each beat's progress-bar `dur` budget; raised typing baseline 35–70 → 55–105 ms/char. Whole walkthrough is ~60% slower, typing reads calmer, progress bar still tracks (`beatDur * PACE`).
+- **Pause/play no longer restarts the beat** (`public/js/landing-reel.js`): introduced an `engine.paused` freeze flag separate from `engine.cancelled` (teardown). `engine.wait()` and the typing loop poll `pumpPause()` and block in place while paused; `tick` slides `beatStart` forward to hold the progress bar. The play button toggles `pause()`/`resume()` (freeze/continue mid-beat) — it no longer calls `goTo`. Split the old `play()`/`pause()` into `start`/`stop` (hard seek/teardown, used by dot-clicks via new `seek(i)` and the IntersectionObserver scroll in/out) vs `pause`/`resume` (in-place freeze, used by the button).
+
 ## [2026-05-30] Budget Optimization: fix confirm button + surface budget in lock stage
 
 - **Fixed permanently-greyed confirm button** (`public/app.js`): `transitionToFlipPhase` previously swapped the button `id` and stacked a second listener while never resetting `disabled`, killing the button in the flip phase. Now a single phase-routed click handler in `mountBudgetOptOverlay` dispatches on `budgetOptState.phase` (`lock`→`onConfirmLocks`, `flip`→`onConfirmSelections`); `onConfirmLocks` always resets `btn.disabled`/label after refine calls and, if all refines fail, re-enables with a `showToast` error instead of transitioning to an empty flip phase.

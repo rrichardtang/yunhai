@@ -9,6 +9,8 @@
   const FRAME_W = 1440;
   const FRAME_H = 880;
   const IFRAME_SRC = '/planner.html?embed=1';
+  // Global pacing multiplier — >1 slows the whole walkthrough (typing, waits, beat budgets).
+  const PACE = 1.6;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   class Engine {
@@ -23,6 +25,11 @@
       this.scale = 1;
       this.iframe = null;
       this.cancelled = false;
+      this.paused = false;
+    }
+
+    async pumpPause() {
+      while (this.paused && !this.cancelled) await wait(80);
     }
     setScale(s) { this.scale = s; }
     setIframe(f) { this.iframe = f; }
@@ -48,10 +55,14 @@
     }
 
     async wait(ms) {
-      const start = performance.now();
-      while (performance.now() - start < ms) {
+      const total = ms * PACE;
+      let remaining = total;
+      while (remaining > 0) {
         if (this.cancelled) return;
-        await wait(Math.min(60, ms - (performance.now() - start)));
+        if (this.paused) { await this.pumpPause(); continue; }
+        const slice = Math.min(60, remaining);
+        await wait(slice);
+        remaining -= slice;
       }
     }
 
@@ -119,13 +130,15 @@
       el.focus();
       el.value = '';
       el.dispatchEvent(new Event('input', { bubbles: true }));
-      const min = opts.speedMin ?? 35;
-      const max = opts.speedMax ?? 70;
+      const min = opts.speedMin ?? 55;
+      const max = opts.speedMax ?? 105;
       for (const ch of text) {
+        if (this.cancelled) return;
+        if (this.paused) await this.pumpPause();
         if (this.cancelled) return;
         el.value += ch;
         el.dispatchEvent(new Event('input', { bubbles: true }));
-        await wait(min + Math.random() * (max - min));
+        await wait((min + Math.random() * (max - min)) * PACE);
       }
       el.dispatchEvent(new Event('change', { bubbles: true }));
     }
@@ -404,11 +417,7 @@
     d.type = 'button';
     d.textContent = beat.label;
     d.setAttribute('aria-label', 'Go to ' + beat.label);
-    d.addEventListener('click', () => {
-      pause();
-      goTo(i, true);
-      play();
-    });
+    d.addEventListener('click', () => seek(i));
     dotsHost.appendChild(d);
     return d;
   });
@@ -437,7 +446,7 @@
   }
 
   let idx = 0;
-  let playing = true;
+  let playing = false;
   let runToken = 0;
   let raf = null;
   let beatStart = 0;
@@ -462,7 +471,7 @@
 
     cursorEl.style.opacity = '1';
     beatStart = performance.now();
-    beatDur = beat.dur;
+    beatDur = beat.dur * PACE;
     if (!raf && playing) raf = requestAnimationFrame(tick);
 
     try {
@@ -477,14 +486,43 @@
   }
 
   function tick(now) {
-    if (!playing) { raf = null; return; }
+    // Freeze the progress clock while paused by sliding beatStart forward.
+    if (engine.paused) { beatStart += now - (tick._last || now); }
+    tick._last = now;
     const elapsed = now - beatStart;
     progressBar.style.width = Math.min(100, (elapsed / beatDur) * 100) + '%';
-    raf = requestAnimationFrame(tick);
+    if (playing) raf = requestAnimationFrame(tick);
+    else raf = null;
   }
 
-  function play() {
-    if (playing) return;
+  // Freeze in place — the in-flight beat keeps its position and resumes.
+  function pause() {
+    if (!playing || engine.paused) return;
+    engine.paused = true;
+    cursorEl.classList.remove('is-clicking');
+    playBtn.setAttribute('aria-label', 'Play demo');
+    playIcon.innerHTML = '<path d="M7 4 L19 12 L7 20 Z"></path>';
+  }
+  function resume() {
+    if (!engine.paused) return;
+    engine.paused = false;
+    playBtn.setAttribute('aria-label', 'Pause demo');
+    playIcon.innerHTML =
+      '<rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect>';
+    if (!raf) raf = requestAnimationFrame(tick);
+  }
+  // Hard stop — used when scrolled out of view; tears down the in-flight beat.
+  function stop() {
+    playing = false;
+    runToken++;
+    engine.cancelled = true;
+    engine.paused = false;
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+  }
+  function start() {
+    if (playing && !engine.paused) return;
+    engine.cancelled = false;
+    engine.paused = false;
     playing = true;
     playBtn.setAttribute('aria-label', 'Pause demo');
     playIcon.innerHTML =
@@ -492,32 +530,27 @@
     if (!raf) raf = requestAnimationFrame(tick);
     goTo(idx);
   }
-  function pause() {
-    playing = false;
-    runToken++;
-    engine.cancelled = true;
-    if (raf) { cancelAnimationFrame(raf); raf = null; }
-    playBtn.setAttribute('aria-label', 'Play demo');
-    playIcon.innerHTML = '<path d="M7 4 L19 12 L7 20 Z"></path>';
-  }
-  playBtn.addEventListener('click', () => (playing ? pause() : play()));
+  playBtn.addEventListener('click', () => (engine.paused ? resume() : pause()));
 
-  let wantsPlay = true;
+  // Jump to a specific beat (dot click) — tears down current beat, restarts at i.
+  async function seek(i) {
+    stop();
+    await wait(80);
+    idx = (i + BEATS.length) % BEATS.length;
+    start();
+  }
+
+  // Off-screen: hard stop to free the iframe work. On-screen: restart current beat.
   const reelObs = new IntersectionObserver(
     (entries) => {
       entries.forEach((e) => {
-        if (!e.isIntersecting && playing) {
-          wantsPlay = true;
-          pause();
-        } else if (e.isIntersecting && wantsPlay && !playing) {
-          play();
-        }
+        if (!e.isIntersecting) stop();
+        else if (e.isIntersecting && !playing) start();
       });
     },
     { threshold: 0.15 }
   );
   reelObs.observe(document.getElementById('reel'));
 
-  playing = true;
-  goTo(0);
+  start();
 })();
