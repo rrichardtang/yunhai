@@ -3834,6 +3834,14 @@ function optActivityCost(act) {
   return actCostType(act) === 'per_group' ? cost : cost * adults + Math.round(cost * 0.6 * children);
 }
 
+function activityImgHtml(src, alt, { extraClass = '', style = '' } = {}) {
+  const cls = `activity-img${extraClass ? ' ' + extraClass : ''}`;
+  const ph = `<div class="${cls} activity-img-placeholder"${style ? ` style="${style}"` : ''}><i class="ph-bold ph-mountains" aria-hidden="true"></i></div>`;
+  if (!src) return ph;
+  const fallback = ph.replace(/"/g, '&quot;');
+  return `<img src="${esc(src)}" alt="${esc(alt)}" loading="lazy" class="${cls}"${style ? ` style="${style}"` : ''} onerror="this.outerHTML='${fallback}'" />`;
+}
+
 function buildBudgetOptCard(a, mode, approved) {
   const isLocked = budgetOptState.lockedIds.has(a.id);
   const hasRefinement = budgetOptState.refinements.has(a.id);
@@ -3848,7 +3856,7 @@ function buildBudgetOptCard(a, mode, approved) {
     const cost = optActivityCost(act);
     return `
     <div class="opt-card-img-wrap">
-      <img src="${esc(act.imageUrl || '')}" alt="${esc(act.name)}" loading="lazy" style="width:100%;height:160px;object-fit:cover;border-radius:12px 12px 0 0;" />
+      ${activityImgHtml(act.imageUrl, act.name, { style: 'width:100%;height:160px;object-fit:cover;border-radius:12px 12px 0 0;' })}
       ${cost != null ? `<span class="opt-cost-chip">$${Math.round(cost).toLocaleString()}</span>` : ''}
     </div>
     <div class="card-content">
@@ -3929,7 +3937,7 @@ function openOptCardExpand(act, label) {
   const body = document.createElement('div');
   body.className = 'card-expand-body';
   body.innerHTML = `
-    <img src="${esc(act.imageUrl || '')}" alt="${esc(act.name)}" style="width:100%;height:220px;object-fit:cover;" />
+    ${activityImgHtml(act.imageUrl, act.name, { style: 'width:100%;height:220px;object-fit:cover;' })}
     <div class="card-content">
       ${label ? `<span class="opt-card--refined-label">${label}</span>` : ''}
       <div class="activity-card-head-actions" style="margin-bottom:8px;">
@@ -4188,7 +4196,7 @@ function renderActivities() {
       <div class="activity-card-inner">
         <div class="activity-card-face activity-card-front">
           <div class="activity-card-img-wrap">
-            <img src="${esc(a.imageUrl || '')}" alt="${esc(a.name)}" loading="lazy" />
+            ${activityImgHtml(a.imageUrl, a.name)}
             <button class="secondary flip-btn activity-flip-btn-overlay" type="button" title="Flip to map" aria-label="Flip card"><i class="ph-bold ph-map-trifold" aria-hidden="true"></i></button>
           </div>
           <div class="card-content">
