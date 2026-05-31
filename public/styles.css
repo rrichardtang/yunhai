@@ -2582,10 +2582,7 @@ body.overlay-active #chatWidget {
   font-size: .8rem; font-weight: 700;
   padding: 3px 8px; border-radius: 999px;
   pointer-events: none;
-  display: none;
-}
-@media (max-width: 600px) {
-  .opt-cost-chip { display: block; }
+  display: block;
 }
 
 /* ── Profile Creation Wizard (GuideMe redesign) ── */
