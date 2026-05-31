@@ -13,6 +13,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Renamed all `GuideMe` → `YunHai` across ported assets + demo copy; repathed bundle's `Planner.html`/`Landing.html` → `/planner.html` / `#why`.
 - 113/113 unit tests pass; no backend touched. Branch `feature/yunhai-landing-demos`. Pending VPS visual verification.
 
+## [2026-05-31] Landing reel: 2× speed toggle + setup-notes/copy tweaks
+
+- **Speed toggle** (`public/index.html`, `public/js/landing-reel.js`, `landing-demo.css`): added a `1×/2×` pill (`#reelSpeed`) in the reel chrome. Replaced the constant `PACE` with `PACE_BASE/speedMult` via a live `pace()` accessor used by every wait, the typing loop, and the progress bar (`beatRawDur * pace()` recomputed in `tick`), so toggling mid-beat speeds everything up cleanly. Button gets `.is-fast` (inverts to navy) at 2×.
+- **Setup-notes demo copy** (`landing-reel.js`): the typed trip notes are now structured bullet points modeling high-quality signals (“- I’ve heard a lot about flamenco shows…”, “- I don’t like paella or other seafood”, “- Prefer slow mornings, lively nights”, reservation). Narrator retitled to “Tell it what you actually like.” to coach users toward specific, structured preferences.
+- **Copy fix**: “Where will you be sleeping?” → “Where will you be staying?”.
+
 ## [2026-05-31] Landing reel: populate blank Review/Arrange/Finalize steps with seeded demo data
 
 - **Root cause**: the reel drives the real app in an iframe (`/planner.html?embed=1`); `initEmbedMode` (app.js) seeded only ONE city and never ran the live AI, so steps 02 (Review) and 03 (Arrange) rendered blank — no activities/days/placements.
