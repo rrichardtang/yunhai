@@ -141,6 +141,27 @@
 .reel__playbtn:active { transform: scale(0.94); }
 .reel__playbtn svg { width: 11px; height: 11px; display: block; }
 
+.reel__speedbtn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hair-strong);
+  background: transparent;
+  color: var(--text-700);
+  font: 600 11px/1 var(--font-mono);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+.reel__speedbtn:hover { background: var(--paper-2); }
+.reel__speedbtn:active { transform: scale(0.94); }
+.reel__speedbtn.is-fast {
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+  color: var(--paper-0);
+}
+
 /* Progress bar under chrome */
 .reel__progress {
   position: absolute;

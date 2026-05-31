@@ -10,7 +10,10 @@
   const FRAME_H = 880;
   const IFRAME_SRC = '/planner.html?embed=1';
   // Global pacing multiplier — >1 slows the whole walkthrough (typing, waits, beat budgets).
-  const PACE = 1.6;
+  // Divided by the live speed multiplier (1× or 2×) so the speed toggle affects everything.
+  const PACE_BASE = 1.6;
+  let speedMult = 1;
+  const pace = () => PACE_BASE / speedMult;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   class Engine {
@@ -55,7 +58,7 @@
     }
 
     async wait(ms) {
-      const total = ms * PACE;
+      const total = ms * pace();
       let remaining = total;
       while (remaining > 0) {
         if (this.cancelled) return;
@@ -138,7 +141,7 @@
         if (this.cancelled) return;
         el.value += ch;
         el.dispatchEvent(new Event('input', { bubbles: true }));
-        await wait((min + Math.random() * (max - min)) * PACE);
+        await wait((min + Math.random() * (max - min)) * pace());
       }
       el.dispatchEvent(new Event('change', { bubbles: true }));
     }
@@ -332,7 +335,7 @@
 
         await eng.narrate(
           'Stay',
-          'Where will you be sleeping?',
+          'Where will you be staying?',
           'Drop in the hotel or apartment address. YunHai uses it as the anchor for nearby activities and realistic commute times.',
           'tr'
         );
@@ -369,16 +372,16 @@
 
         await eng.narrate(
           'Notes',
-          'Anything else we should remember?',
-          'Reservations, must-sees, links, weird constraints — drop them in. YunHai folds them into the suggestion engine so nothing gets dropped.',
+          'Tell it what you actually like.',
+          'The more honest, specific signals you give — tastes, dislikes, must-dos — the better your plan. A few clear bullet points beat a paragraph.',
           'tr'
         );
         await eng.click(NEW_CITY + ' [data-tab="notes"]', { travel: 700, padding: 160 });
         await eng.wait(300);
         await eng.type(
           NEW_CITY + ' [data-field="notes"]',
-          'Flamenco at La Carbonería on Apr 28. Want to see the Alcázar gardens early. Reservation at Eslava — Apr 27, 21:00.',
-          { padding: 240, speedMin: 24, speedMax: 50 }
+          '- I’ve heard a lot about flamenco shows and want to check one out\n- I don’t like paella or other seafood\n- Prefer slow mornings, lively nights\n- Reservation at Eslava — Apr 27, 21:00',
+          { padding: 240, speedMin: 18, speedMax: 40 }
         );
         await eng.wait(700);
 
@@ -618,6 +621,7 @@
   const dotsHost = document.getElementById('reelDots');
   const playBtn = document.getElementById('reelPlayPause');
   const playIcon = document.getElementById('reelPlayIcon');
+  const speedBtn = document.getElementById('reelSpeed');
 
   const engine = new Engine({
     viewport, cursor: cursorEl,
@@ -673,7 +677,7 @@
   let runToken = 0;
   let raf = null;
   let beatStart = 0;
-  let beatDur = 0;
+  let beatRawDur = 0;
 
   async function goTo(i, manual) {
     runToken++;
@@ -694,7 +698,7 @@
 
     cursorEl.style.opacity = '1';
     beatStart = performance.now();
-    beatDur = beat.dur * PACE;
+    beatRawDur = beat.dur;
     if (!raf && playing) raf = requestAnimationFrame(tick);
 
     try {
@@ -713,6 +717,7 @@
     if (engine.paused) { beatStart += now - (tick._last || now); }
     tick._last = now;
     const elapsed = now - beatStart;
+    const beatDur = beatRawDur * pace();
     progressBar.style.width = Math.min(100, (elapsed / beatDur) * 100) + '%';
     if (playing) raf = requestAnimationFrame(tick);
     else raf = null;
@@ -754,6 +759,13 @@
     goTo(idx);
   }
   playBtn.addEventListener('click', () => (engine.paused ? resume() : pause()));
+
+  // Speed toggle (1× ⇄ 2×) — affects all waits, typing, and the progress bar live.
+  speedBtn?.addEventListener('click', () => {
+    speedMult = speedMult === 1 ? 2 : 1;
+    speedBtn.textContent = speedMult + '×';
+    speedBtn.classList.toggle('is-fast', speedMult === 2);
+  });
 
   // Jump to a specific beat (dot click) — tears down current beat, restarts at i.
   async function seek(i) {
