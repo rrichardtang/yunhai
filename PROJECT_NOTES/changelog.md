@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-05-31] Landing page redesign: 3 auto-playing "how it works" demos + new hero, current reel kept
+
+- **Rebuilt `public/index.html`** to 7 content sections in order: new hero ("Built around *you*. Not the crowd.") → marquee → Chapter 01 *Completely yours* → 02 *Sequenced by data* → 03 *All in one place* → **existing `#reel` demo (preserved verbatim, moved to just before pricing)** → pricing (unchanged) → FAQ → footer. Per request, the current reel demo is retained as the second-to-last content page.
+- Swapped the old animated `.stage` SVG-route hero for the handoff's `.heroapp` product-window mock; **removed the `.hero__stats` row** (per user). Updated marquee copy ("Trusted by travelers from"). Removed the now-dead `.stage__card`/`stageAiMsg` inline script. Nav "How it works" anchor `#reel` → `#why`.
+- **Ported from `design_handoff_landing_demos/`** into `public/`: `styles/landing.css` (overwritten — new hero/marquee/chapter/demo shell), new `styles/landing/{landing-demos,landing-demo-profile,landing-demo-sequence,landing-demo-organize}.css`, new `js/landing-demo-{profile,sequence,organize}.js`. Each demo self-inits (DOMContentLoaded) and auto-plays once on scroll-in with a Replay button.
+- **Kept as-is:** `styles/landing/landing-demo.css` (entirely the reel's CSS), `js/landing-reel.js`, `tokens.css` (byte-identical to bundle), `landing-pricing.css` (bundle reuses it).
+- Renamed all `GuideMe` → `YunHai` across ported assets + demo copy; repathed bundle's `Planner.html`/`Landing.html` → `/planner.html` / `#why`.
+- 113/113 unit tests pass; no backend touched. Branch `feature/yunhai-landing-demos`. Pending VPS visual verification.
+
 ## [2026-05-30] Budget Optimization: fix confirm button + surface budget in lock stage
 
 - **Fixed permanently-greyed confirm button** (`public/app.js`): `transitionToFlipPhase` previously swapped the button `id` and stacked a second listener while never resetting `disabled`, killing the button in the flip phase. Now a single phase-routed click handler in `mountBudgetOptOverlay` dispatches on `budgetOptState.phase` (`lock`→`onConfirmLocks`, `flip`→`onConfirmSelections`); `onConfirmLocks` always resets `btn.disabled`/label after refine calls and, if all refines fail, re-enables with a `showToast` error instead of transitioning to an empty flip phase.
