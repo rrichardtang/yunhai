@@ -171,6 +171,9 @@
       if (opts.scroll !== false) await this.scrollTo(el, opts.padding || 160);
       if (this.cancelled) return null;
       const r = el.getBoundingClientRect();
+      // Never chase a hidden/detached element (rect 0,0) — that's what makes the cursor
+      // dart to the top-left corner. Leave it where it is and let the caller proceed.
+      if (r.width === 0 && r.height === 0) { console.warn('[reel] hidden target:', selector); return el; }
       const cx = (r.left + r.width / 2 + (opts.dx || 0)) * this.scale;
       const cy = (r.top + r.height / 2 + (opts.dy || 0)) * this.scale;
       // Glide the cursor over ~85% of the (paced) travel window so it always lands
@@ -298,7 +301,9 @@
       why_it_fits: 'Terraced gardens, fountains and Moorish towers a six-minute walk from the Mezquita — an easy second stop.',
       pitfall: 'Limited shade at midday; the garden loop is exposed.',
       booking_advice: 'No reservation needed — pay at the gate.',
-      estimated_cost_usd: 5, duration_hours: 1.5, opening_hours: '09:15–20:00' }),
+      estimated_cost_usd: 5, duration_hours: 1.5, opening_hours: '09:15–20:00',
+      // Pre-locked in the Finalize checklist (as if already booked/checked off).
+      timing: { fixed: { date: '2026-04-25', time: '13:45' } } }),
     act({ id: 'demo-patios', name: 'Patios de San Basilio', city: CORDOBA, type: 'outdoors',
       why_it_fits: 'Hidden flower-filled courtyards locals open to visitors — the offbeat, non-top-10 find you love.',
       pitfall: 'Best in May during the Patio Festival; some close midday.',
@@ -308,7 +313,9 @@
       why_it_fits: 'Classic Córdoban plates — salmorejo, oxtail, no seafood in sight — a short walk from the old town.',
       pitfall: 'Fills up by 2pm with tour groups.',
       booking_advice: 'Walk-ins fine before 1:30pm, otherwise book ahead.',
-      estimated_cost_usd: 28, duration_hours: 1, opening_hours: '12:00–16:00, 20:00–23:00' }),
+      estimated_cost_usd: 28, duration_hours: 1, opening_hours: '12:00–16:00, 20:00–23:00',
+      // Pre-locked in the Finalize checklist (as if already booked/checked off).
+      timing: { fixed: { date: '2026-04-25', time: '12:00' } } }),
     act({ id: 'demo-puente', name: 'Puente Romano & Calahorra Tower', city: CORDOBA, type: 'landmark',
       why_it_fits: 'The Roman bridge over the Guadalquivir at golden hour — the kind of slow riverside view you asked for.',
       pitfall: 'Very exposed; skip it at midday heat.',
@@ -829,12 +836,20 @@
         await focusRow('Mezquita'); // expanded row is taller — recenter it
         await eng.setValue(inRow(clRow('Mezquita'), '[data-cl="activityTime"]'), '09:30', { scroll: false, after: 350 });
         await eng.setValue(inRow(clRow('Mezquita'), '[data-cl="activityEndTime"]'), '11:30', { scroll: false, after: 350 });
-        // Reveal the reference field (it lives behind "More details").
-        await clickEl(inRow(clRow('Mezquita'), '[data-cl-more]'), { travel: 650 });
-        await eng.wait(500);
+        // Reveal the reference field ONLY if it's hidden behind "More details" — clicking
+        // when it's already open would hide it and send the cursor to a 0,0 (top-left) element.
+        const refHidden = () => {
+          const ref = inRow(clRow('Mezquita'), '[data-cl="referenceNum"]');
+          return !ref || ref.offsetParent === null;
+        };
+        if (refHidden()) {
+          await clickEl(inRow(clRow('Mezquita'), '[data-cl-more]'), { travel: 650 });
+          await eng.wait(500);
+        }
         await focusRow('Mezquita');
         await eng.type(inRow(clRow('Mezquita'), '[data-cl="referenceNum"]'), 'MZQ-4471', { scroll: false, padding: 0 });
         await eng.wait(500);
+        await focusRow('Mezquita');
         await clickEl(inRow(clRow('Mezquita'), '[data-cl-check]'), { travel: 700 });
         await eng.wait(1200);
 
@@ -882,7 +897,30 @@
           'tr'
         );
         await eng.click('#finalizeArrangeBtn', { travel: 1000, padding: 160, after: 800 });
-        await eng.wait(1300); // let the viewer read the checklist (Mezquita is pre-locked)
+        await eng.wait(1100); // a few rows open already locked (Mezquita, Bodegas, Alcázar)
+
+        await eng.narrate(
+          'You’re in control',
+          'Lock the rest with a tap.',
+          'Some stops are already locked from your booking checklist — tick a couple more to pin them, or leave them flexible for YunHai to schedule.',
+          'tr'
+        );
+        // Check off two of the currently-unchecked rows in the real finalize modal.
+        const fzUnchecked = () => Array.from(eng.doc.querySelectorAll('#finalizeModal .finalize-item'))
+          .filter((it) => !it.classList.contains('cl-item--checked'))
+          .map((it) => it.querySelector('[data-finalize-check]'))
+          .filter(Boolean);
+        for (let i = 0; i < 2; i++) {
+          if (eng.cancelled) break;
+          const cb = fzUnchecked()[0];
+          if (!cb) break;
+          await eng.centerInScroller(cb); await eng.wait(220);
+          await eng.cursorTo(cb, { scroll: false, travel: 750 });
+          eng.cursor.classList.add('is-clicking'); await eng.wait(160);
+          cb.click(); eng.cursor.classList.remove('is-clicking');
+          await eng.wait(850);
+        }
+        await eng.wait(500);
 
         // Press Confirm & Arrange, then FAKE the result (no /api/arrange): close the modal
         // and reveal transit pills between the stops.

@@ -13,6 +13,11 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Renamed all `GuideMe` → `YunHai` across ported assets + demo copy; repathed bundle's `Planner.html`/`Landing.html` → `/planner.html` / `#why`.
 - 113/113 unit tests pass; no backend touched. Branch `feature/yunhai-landing-demos`. Pending VPS visual verification.
 
+## [2026-05-31] Landing reel: Finalize check-offs + pre-locked rows; fix cursor top-left dart
+
+- **Finalize shows user control** (`landing-reel.js`): 3 Córdoba stops (Mezquita, Bodegas, Alcázar — via `timing.fixed`) now open **pre-locked** in the Finalize modal "as if checked off in the booking checklist," and the cursor then **checks off two more** unchecked rows (`[data-finalize-check]`, re-querying after each re-render) before Confirm. New narrator beat: "You're in control — lock the rest with a tap."
+- **Fixed the cursor darting to the top-left** (`landing-reel.js`): the booking-checklist Mezquita flow clicked "More details" unconditionally, but seeded activities have a cost so the secondary zone (reference field) is already open — the click *hid* it, sending `cursorTo` to a 0,0 rect (top-left). Now it only reveals the reference field when actually hidden (`offsetParent === null`), and `cursorTo` hard-guards against any 0,0/hidden target (stays put instead of darting). Re-center before the check-off too.
+
 ## [2026-05-31] Landing reel: densely fill every itinerary day (25 activities)
 
 - **Dense calendar** (`landing-reel.js`): the Arrange grid spans 6am–2am, so 3–4 stops/day read as empty. Added 11 calendar-only mock activities (Córdoba: Viana patios, Sinagoga, Hammam, Tablao Cardenal, Salmorejo tasting; Seville: Barrio Santa Cruz, El Arenal tapas, Setas rooftop bar, María Luisa park, Casa de Pilatos, Hospital de los Venerables) and repacked `DEMO_PLACEMENTS` to ~09:30→21:30 back-to-back: days now hold 4/5/4/5/7 stops with a transit pill between each.
