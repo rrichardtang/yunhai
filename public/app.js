@@ -73,7 +73,6 @@ const state = {
   tripHealth: null,
   bookingChecklist: [],
   bookingChecklistNotificationPrefs: { emailSummary: false, reminderBeforeDeparture: false },
-  tripHealthIssueSignatures: [],
   bookingChecklistIssueMeta: {},
   lastFinalizeLocks: {},
   schedulingPrefs: null
@@ -2128,10 +2127,6 @@ function renderTripHealthBadge() {
   if (els.tripHealthPopoverIssues) els.tripHealthPopoverIssues.textContent = `${state.tripHealth.issueCount} issue${state.tripHealth.issueCount === 1 ? '' : 's'}`;
   if (els.tripHealthPopoverTopIssue) els.tripHealthPopoverTopIssue.textContent = state.tripHealth.topIssue;
   if (els.tripHealthPopoverProgress) els.tripHealthPopoverProgress.textContent = `${state.tripHealth.checklistProgress.verified} of ${state.tripHealth.checklistProgress.total} items verified`;
-  const signatures = state.tripHealth.unresolvedIssues.map((x) => x.message);
-  const newlyAdded = signatures.filter((x) => !(state.tripHealthIssueSignatures || []).includes(x));
-  if (newlyAdded.length) showToast(`Trip Health warning: ${newlyAdded[0]}`, 'error');
-  state.tripHealthIssueSignatures = signatures;
 }
 
 function renderTripHealth() {
@@ -2223,11 +2218,6 @@ function renderTripHealth() {
       });
     });
   }
-
-  const signatures = state.tripHealth.unresolvedIssues.map((x) => x.message);
-  const newlyAdded = signatures.filter((x) => !(state.tripHealthIssueSignatures || []).includes(x));
-  if (newlyAdded.length) showToast(`Trip Health warning: ${newlyAdded[0]}`, 'error');
-  state.tripHealthIssueSignatures = signatures;
 }
 
 function setPlanningLoading(isLoading) {
@@ -8714,7 +8704,6 @@ function resetToFresh() {
   state.reviewFilters = { search: '', city: '', type: '', verdict: '' };
   state.bookingChecklist = [];
   state.tripHealth = null;
-  state.tripHealthIssueSignatures = [];
   state.bookingChecklistIssueMeta = {};
   clearSchedulingPrefs();
 
