@@ -13,6 +13,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Renamed all `GuideMe` → `YunHai` across ported assets + demo copy; repathed bundle's `Planner.html`/`Landing.html` → `/planner.html` / `#why`.
 - 113/113 unit tests pass; no backend touched. Branch `feature/yunhai-landing-demos`. Pending VPS visual verification.
 
+## [2026-05-31] Landing reel: booking-checklist walkthrough + compacted, denser trip
+
+- **Booking checklist segment** (`landing-reel.js`, start of Arrange beat; `app.js` exposes `window.openChecklistModal`/`renderChecklistModal` in `initEmbedMode` since `#checklistBtn` is in the embed-hidden topbar): the cursor opens the real checklist modal and (1) taps the ticket icon on a free stop (Judería) → moves it to *Booking Not Required*; (2) on the Mezquita row, expands it, sets start/end time, opens *More details*, types a confirmation # (MZQ-4471), and checks it off to lock. Rows targeted by visible name (`.cl-item-name`) since ids are generated. 100% frontend; check-off also satisfies the Finalize gate.
+- **Compacted, denser trip** (`landing-reel.js`): shrank the date span to non-overlapping Córdoba Apr 24→25 + Seville Apr 26→27 (4 day columns) and filled every visible day — Apr 24 (3 light arrival stops), Apr 25 (5-stop hero day), Apr 26 (3), Apr 27 (3). Added 5 activities (Mercado Victoria, Taberna sunset, Seville Cathedral, Triana, Las Setas); repacked `DEMO_PLACEMENTS`/`DEMO_REVIEWED_ARRANGED`/`DEMO_COMMUTES` (pill between each same-day pair). 14 activities, full id parity. Arrange `dur` 38s→52s.
+- **Photos** (`public/img/demo/README.md`): added 5 new filenames to grab (mercado, vinos, catedral, triana, setas); all previously-added photos still used (none obsolete).
+
 ## [2026-05-31] Landing reel: self-hosted photos for demo activity cards
 
 - **Activity-card photos** (`landing-reel.js`): the `act()` helper now derives `imageUrl` from the activity id → `/img/demo/<slug>.jpg` (slug = id minus the `demo-` prefix). Review cards (and the Arrange/Finalize calendar) show real photos once the files are present; a missing file falls back to the mountains placeholder via the existing `activityImgHtml` `onerror`. REPLACEMENT now derives its photo too (kept `place_id`/`price_level` so `enrichActivity` still makes no network call).
