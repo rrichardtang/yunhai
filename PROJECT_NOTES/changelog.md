@@ -13,6 +13,11 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Renamed all `GuideMe` → `YunHai` across ported assets + demo copy; repathed bundle's `Planner.html`/`Landing.html` → `/planner.html` / `#why`.
 - 113/113 unit tests pass; no backend touched. Branch `feature/yunhai-landing-demos`. Pending VPS visual verification.
 
+## [2026-05-31] Landing reel: self-hosted photos for demo activity cards
+
+- **Activity-card photos** (`landing-reel.js`): the `act()` helper now derives `imageUrl` from the activity id → `/img/demo/<slug>.jpg` (slug = id minus the `demo-` prefix). Review cards (and the Arrange/Finalize calendar) show real photos once the files are present; a missing file falls back to the mountains placeholder via the existing `activityImgHtml` `onerror`. REPLACEMENT now derives its photo too (kept `place_id`/`price_level` so `enrichActivity` still makes no network call).
+- **Drop-in folder**: created `public/img/demo/` with a `README.md` mapping each filename to its activity (mezquita.jpg, alcazar-cor.jpg, bodegas.jpg, juderia.jpg, patios.jpg, puente.jpg, realalcazar.jpg, flamenco.jpg, plaza-espana.jpg, patios-replacement.jpg). User supplies the image files; served statically from `public/`.
+
 ## [2026-05-31] Landing reel: pack the Arrange day + simpler Finalize confirm
 
 - **Packed itinerary day** (`landing-reel.js`): added 3 more Córdoba activities (Bodegas Mezquita lunch, Puente Romano, Judería wander) so the active Córdoba 04-25 day holds 6 back-to-back stops (09:30→20:30) with a transit pill between each — the calendar now looks full like the real app, instead of 3 sparse stops. Repacked `DEMO_PLACEMENTS`/`DEMO_REVIEWED_ARRANGED`/`DEMO_COMMUTES` accordingly (Andalucía kept; no arrival/stay anchor cards — 04-25 is a middle day so the logistics cards don't render).
