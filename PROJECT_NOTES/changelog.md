@@ -13,6 +13,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Renamed all `GuideMe` → `YunHai` across ported assets + demo copy; repathed bundle's `Planner.html`/`Landing.html` → `/planner.html` / `#why`.
 - 113/113 unit tests pass; no backend touched. Branch `feature/yunhai-landing-demos`. Pending VPS visual verification.
 
+## [2026-05-31] Landing reel: densely fill every itinerary day (25 activities)
+
+- **Dense calendar** (`landing-reel.js`): the Arrange grid spans 6am–2am, so 3–4 stops/day read as empty. Added 11 calendar-only mock activities (Córdoba: Viana patios, Sinagoga, Hammam, Tablao Cardenal, Salmorejo tasting; Seville: Barrio Santa Cruz, El Arenal tapas, Setas rooftop bar, María Luisa park, Casa de Pilatos, Hospital de los Venerables) and repacked `DEMO_PLACEMENTS` to ~09:30→21:30 back-to-back: days now hold 4/5/4/5/7 stops with a transit pill between each.
+- **No photos needed for fillers**: Arrange placed-cards and checklist rows render time+icon+name only (no `<img>`), so the new photo-less activities never show a placeholder. The **02/Review** beat now seeds a curated 6-card photo-backed subset (`DEMO_REVIEW_ACTIVITIES` via `REVIEW_IDS`) so Review isn't a wall of placeholder cards.
+- **Finalize checklist** (`landing-reel.js`): `DEMO_REVIEWED_ARRANGED` now derives from `DEMO_ACTIVITIES` (every activity approved), so all 25 stops render in Arrange AND appear in the booking/Finalize checklist (`buildChecklistFromState` includes all approved activities). Full id parity (25 placed = 25 activities); commute pairs all same-day.
+
 ## [2026-05-31] Landing reel: visible checklist nav, modal centering, 3 Córdoba days, no overlap
 
 - **Visible checklist navigation** (`planner.html`, `landing-reel.js`): `#checklistBtn` lives in the embed-hidden topbar, so the reel now relocates it to `<body>` and floats it (embed CSS `#checklistBtn.embed-float`); the cursor visibly travels to it and clicks before the modal opens. Hidden again after close.
