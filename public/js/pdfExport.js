@@ -1,8 +1,10 @@
 /* Itinerary PDF export
  *
  * Builds a single PDF that contains:
- *   1. The styled itinerary view (rasterized via html2canvas, paginated to letter)
- *   2. After each stop, that stop's uploaded attachments:
+ *   1. The styled itinerary view, rasterized block-by-block (hero, city headers,
+ *      day headers, individual stops) so page breaks land on block boundaries
+ *      instead of slicing through a stop.
+ *   2. Each stop's uploaded attachments inserted immediately after that stop:
  *        - PDFs merged page-by-page (pdf-lib copyPages)
  *        - Images embedded as full pages (jpg/png native; webp/heic skipped with warning)
  *
@@ -14,14 +16,8 @@
   const PAGE_W = 612;   // US Letter @ 72dpi
   const PAGE_H = 792;
   const MARGIN = 36;
-
-  function getStopActivityIdsInOrder() {
-    const view = document.getElementById('itineraryModeView');
-    if (!view) return [];
-    return Array.from(view.querySelectorAll('.stop[data-activity-id]'))
-      .map((el) => el.dataset.activityId)
-      .filter(Boolean);
-  }
+  const BLOCK_GAP = 8;  // vertical gap between stacked blocks, in PDF points
+  const SCALE = 2;      // html2canvas oversampling
 
   function getAttachmentsFor(activityId) {
     const byItem = window.state?.attachmentsByItem || {};
@@ -45,52 +41,86 @@
     return () => hidden.forEach(([el, prev]) => { el.style.visibility = prev; });
   }
 
-  async function rasterizeItineraryToPages(pdfDoc) {
+  // Ordered list of the blocks we rasterize one at a time. A stop block carries
+  // its activityId so its attachments can be inserted right after it.
+  function collectBlocks() {
     const view = document.getElementById('itineraryModeView');
-    if (!view) throw new Error('Itinerary view not found');
-    const restore = hideForCapture();
-    let canvas;
-    try {
-      canvas = await window.html2canvas(view, {
-        scale: 2,
-        backgroundColor: '#F4F1EC',
-        useCORS: true,
-        logging: false,
-        windowWidth: view.scrollWidth
-      });
-    } finally {
-      restore();
-    }
+    if (!view) return [];
+    const hero = document.getElementById('itineraryModeHero');
+    const blocks = [];
+    if (hero) blocks.push({ el: hero });
+    view.querySelectorAll('.city-head, .day__when, .stop[data-activity-id]').forEach((el) => {
+      const activityId = el.classList.contains('stop') ? el.dataset.activityId : null;
+      blocks.push({ el, activityId });
+    });
+    return blocks;
+  }
 
-    // Convert the big canvas into letter-size pages by slicing it vertically.
-    const imgW = canvas.width;
-    const imgH = canvas.height;
+  async function rasterizeBlock(el) {
+    return window.html2canvas(el, {
+      scale: SCALE,
+      backgroundColor: '#F4F1EC',
+      useCORS: true,
+      logging: false,
+      windowWidth: el.scrollWidth
+    });
+  }
+
+  // Paginator that stacks block images top-to-bottom, opening a new page when a
+  // block doesn't fit. Blocks taller than a full page are sliced (rare).
+  function createPaginator(pdfDoc) {
     const printableW = PAGE_W - MARGIN * 2;
-    const scale = printableW / imgW;
-    const sliceHpx = Math.floor((PAGE_H - MARGIN * 2) / scale);
+    const printableH = PAGE_H - MARGIN * 2;
+    let page = null;
+    let cursorY = 0; // distance consumed from the top of the printable area
 
-    let yPx = 0;
-    while (yPx < imgH) {
-      const h = Math.min(sliceHpx, imgH - yPx);
-      const sliceCanvas = document.createElement('canvas');
-      sliceCanvas.width = imgW;
-      sliceCanvas.height = h;
-      const ctx = sliceCanvas.getContext('2d');
-      ctx.fillStyle = '#F4F1EC';
-      ctx.fillRect(0, 0, imgW, h);
-      ctx.drawImage(canvas, 0, yPx, imgW, h, 0, 0, imgW, h);
-      const dataUrl = sliceCanvas.toDataURL('image/jpeg', 0.92);
-      const jpgBytes = await fetch(dataUrl).then((r) => r.arrayBuffer());
-      const img = await pdfDoc.embedJpg(new Uint8Array(jpgBytes));
-      const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
-      page.drawImage(img, {
-        x: MARGIN,
-        y: MARGIN,
-        width: printableW,
-        height: h * scale
-      });
-      yPx += h;
+    function newPage() {
+      page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+      cursorY = 0;
     }
+
+    async function embedCanvas(canvas, sx, sh) {
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width;
+      slice.height = sh;
+      const ctx = slice.getContext('2d');
+      ctx.fillStyle = '#F4F1EC';
+      ctx.fillRect(0, 0, slice.width, sh);
+      ctx.drawImage(canvas, 0, sx, canvas.width, sh, 0, 0, canvas.width, sh);
+      const dataUrl = slice.toDataURL('image/jpeg', 0.92);
+      const bytes = await fetch(dataUrl).then((r) => r.arrayBuffer());
+      return pdfDoc.embedJpg(new Uint8Array(bytes));
+    }
+
+    return {
+      async place(canvas) {
+        const pxToPt = printableW / canvas.width; // canvas px → PDF points
+        const slicePx = Math.floor(printableH / pxToPt); // a full page worth of source px
+        let yPx = 0;
+        while (yPx < canvas.height) {
+          if (!page || cursorY >= printableH - 1) newPage();
+          const remainingPt = printableH - cursorY;
+          const remainingPx = Math.floor(remainingPt / pxToPt);
+          const blockPx = canvas.height - yPx;
+          // If the whole remaining block fits, place it; otherwise fill the page.
+          const takePx = blockPx <= remainingPx ? blockPx : Math.min(slicePx, remainingPx);
+          if (takePx <= 0) { newPage(); continue; }
+          const img = await embedCanvas(canvas, yPx, takePx);
+          const drawH = takePx * pxToPt;
+          page.drawImage(img, {
+            x: MARGIN,
+            y: PAGE_H - MARGIN - cursorY - drawH,
+            width: printableW,
+            height: drawH
+          });
+          cursorY += drawH;
+          yPx += takePx;
+        }
+        cursorY += BLOCK_GAP;
+      },
+      // Force the next block onto a fresh page (used after appended attachments).
+      breakPage() { page = null; cursorY = 0; }
+    };
   }
 
   async function appendImageAttachment(pdfDoc, bytes, mimeType) {
@@ -123,27 +153,48 @@
     pages.forEach((p) => pdfDoc.addPage(p));
   }
 
-  async function appendAttachmentsForStops(pdfDoc) {
-    const activityIds = getStopActivityIdsInOrder();
+  // Returns true if any attachment page was added (so the caller can page-break).
+  async function appendStopAttachments(pdfDoc, activityId, warnings) {
+    const attachments = getAttachmentsFor(activityId);
+    let added = false;
+    for (const att of attachments) {
+      try {
+        const bytes = await fetchAttachmentBytes(att.id);
+        const mime = String(att.mimeType || '').toLowerCase();
+        if (mime === 'application/pdf') {
+          await appendPdfAttachment(pdfDoc, bytes);
+          added = true;
+        } else if (mime.startsWith('image/')) {
+          const ok = await appendImageAttachment(pdfDoc, bytes, mime);
+          if (ok) added = true;
+          else warnings.push(`Skipped unsupported image: ${att.filename}`);
+        } else {
+          warnings.push(`Skipped unsupported file: ${att.filename}`);
+        }
+      } catch (err) {
+        warnings.push(`Failed: ${att.filename} (${err.message})`);
+      }
+    }
+    return added;
+  }
+
+  async function buildItinerary(pdfDoc) {
+    const blocks = collectBlocks();
+    if (!blocks.length) throw new Error('Itinerary view not found');
     const warnings = [];
-    for (const activityId of activityIds) {
-      const attachments = getAttachmentsFor(activityId);
-      for (const att of attachments) {
-        try {
-          const bytes = await fetchAttachmentBytes(att.id);
-          const mime = String(att.mimeType || '').toLowerCase();
-          if (mime === 'application/pdf') {
-            await appendPdfAttachment(pdfDoc, bytes);
-          } else if (mime.startsWith('image/')) {
-            const ok = await appendImageAttachment(pdfDoc, bytes, mime);
-            if (!ok) warnings.push(`Skipped unsupported image: ${att.filename}`);
-          } else {
-            warnings.push(`Skipped unsupported file: ${att.filename}`);
-          }
-        } catch (err) {
-          warnings.push(`Failed: ${att.filename} (${err.message})`);
+    const restore = hideForCapture();
+    const paginator = createPaginator(pdfDoc);
+    try {
+      for (const block of blocks) {
+        const canvas = await rasterizeBlock(block.el);
+        await paginator.place(canvas);
+        if (block.activityId) {
+          const added = await appendStopAttachments(pdfDoc, block.activityId, warnings);
+          if (added) paginator.breakPage();
         }
       }
+    } finally {
+      restore();
     }
     return warnings;
   }
@@ -162,8 +213,7 @@
     if (typeof window.showToast === 'function') window.showToast('Building PDF…', 'info');
 
     const pdfDoc = await window.PDFLib.PDFDocument.create();
-    await rasterizeItineraryToPages(pdfDoc);
-    const warnings = await appendAttachmentsForStops(pdfDoc);
+    const warnings = await buildItinerary(pdfDoc);
 
     const bytes = await pdfDoc.save();
     const blob = new Blob([bytes], { type: 'application/pdf' });

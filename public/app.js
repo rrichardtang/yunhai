@@ -7095,7 +7095,7 @@ function renderFinalizeFooter() {
 
 function formatTimeRangeLabel(startMinutes, endMinutes) {
   const fmt = (mins) => {
-    const h = Math.floor(mins / 60);
+    const h = Math.floor(mins / 60) % 24;
     const m = mins % 60;
     const ampm = h >= 12 ? 'PM' : 'AM';
     const h12 = (h % 12) || 12;

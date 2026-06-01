@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-06-01] Checklist modal z-index, post-midnight time labels, block-aware PDF export
+
+- **Attachment viewer behind checklist modal** — `#attachmentViewerModal` and `#checklistModal` both used `.modal` `z-index: 1900`, so equal stacking + DOM order put the viewer behind the checklist when opened from it. Gave the viewer `z-index: 1950` in `public/styles.css`.
+- **Times after 11:59pm rendered as PM** — `formatTimeRangeLabel` in `public/app.js` computed am/pm from raw hours; an activity spilling past midnight has `endMins > 1440` (h=25), so 12:59 AM showed as PM. Wrapped hours with `% 24`.
+- **PDF export: sliced stops + attachments dumped at end** — rewrote `public/js/pdfExport.js`. Old version rasterized the whole itinerary as one canvas sliced at fixed pixel offsets (cutting through stops) and appended all attachments after the entire itinerary. New version rasterizes block-by-block (hero, `.city-head`, `.day__when`, each `.stop`), packs blocks onto pages without splitting a block across a page break, and inserts each stop's attachments immediately after that stop, then page-breaks.
+- 124/124 unit tests pass; frontend-only changes. Branch `feature/checklist-modal-time-fixes`. Pending VPS visual verification of the PDF output.
+
 ## [2026-05-31] Landing page redesign: 3 auto-playing "how it works" demos + new hero, current reel kept
 
 - **Rebuilt `public/index.html`** to 7 content sections in order: new hero ("Built around *you*. Not the crowd.") → marquee → Chapter 01 *Completely yours* → 02 *Sequenced by data* → 03 *All in one place* → **existing `#reel` demo (preserved verbatim, moved to just before pricing)** → pricing (unchanged) → FAQ → footer. Per request, the current reel demo is retained as the second-to-last content page.
