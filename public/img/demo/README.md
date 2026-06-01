@@ -24,6 +24,11 @@ Drop activity photos here to fill the cards shown in the **02 / Review** demo re
 | `flamenco.jpg` | Flamenco at La Carbonería |
 | `plaza-espana.jpg` | Plaza de España |
 | `patios-replacement.jpg` | Hammam Al Ándalus (the Replace swap result) |
+| `mercado.jpg` | Mercado Victoria Food Hall (Córdoba arrival) |
+| `vinos.jpg` | Taberna Sunset on Calleja de las Flores |
+| `catedral.jpg` | Seville Cathedral & Giralda Climb |
+| `triana.jpg` | Triana Market & Riverside Walk |
+| `setas.jpg` | Las Setas de Sevilla |
 
-The first six are the cards seen during the Review demo; the rest appear in the
-Arrange/Finalize calendar and the faked Replace.
+The Review demo shows the Córdoba cards; the rest appear in the Arrange/Finalize
+calendar and the faked Replace. A missing file simply shows the placeholder.

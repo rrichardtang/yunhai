@@ -9274,6 +9274,8 @@ function initEmbedMode() {
   window.renderArrange = renderArrange;
   window.renderItinerary = renderItinerary;
   window.replaceActivityInState = replaceActivityInState;
+  window.openChecklistModal = openChecklistModal;
+  window.renderChecklistModal = renderChecklistModal;
 }
 
 function clearPlannedResultsKeepSetup() {

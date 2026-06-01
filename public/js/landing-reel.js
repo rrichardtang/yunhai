@@ -215,30 +215,26 @@
 
   const DEMO_CITIES = [
     {
-      id: 'demo-cordoba', name: CORDOBA, startDate: '2026-04-24', endDate: '2026-04-26',
+      id: 'demo-cordoba', name: CORDOBA, startDate: '2026-04-24', endDate: '2026-04-25',
       leaveTime: '18:00', notes: '', detailsExpanded: false,
       latitude: 37.8882, longitude: -4.7794,
-      logistics: { arrival: { date: '2026-04-24', time: '14:00', mode: 'train', location: 'Córdoba Station' },
-        departure: { date: '2026-04-26', time: '18:00', mode: 'train', location: 'Córdoba Station' } }
+      logistics: { arrival: { date: '2026-04-24', time: '13:00', mode: 'train', location: 'Córdoba Station' },
+        departure: { date: '2026-04-25', time: '21:30', mode: 'train', location: 'Córdoba Station' } }
     },
     {
-      id: 'demo-seville', name: SEVILLE, startDate: '2026-04-26', endDate: '2026-04-30',
-      leaveTime: '06:30', notes: 'Flamenco at La Carbonería on Apr 28.', detailsExpanded: false,
+      id: 'demo-seville', name: SEVILLE, startDate: '2026-04-26', endDate: '2026-04-27',
+      leaveTime: '20:00', notes: 'Flamenco at La Carbonería on Apr 27.', detailsExpanded: false,
       latitude: 37.3891, longitude: -5.9845,
-      logistics: { arrival: { date: '2026-04-26', time: '11:05', mode: 'train', location: 'Sevilla-Santa Justa' },
-        departure: { date: '2026-04-30', time: '06:30', mode: 'bus', location: 'Plaza de Armas' } }
+      logistics: { arrival: { date: '2026-04-26', time: '10:30', mode: 'train', location: 'Sevilla-Santa Justa' },
+        departure: { date: '2026-04-27', time: '23:30', mode: 'bus', location: 'Plaza de Armas' } }
     }
   ];
 
   const DEMO_DAYS = [
     { id: `${CORDOBA}-2026-04-24`, city: CORDOBA, date: '2026-04-24' },
     { id: `${CORDOBA}-2026-04-25`, city: CORDOBA, date: '2026-04-25' },
-    { id: `${CORDOBA}-2026-04-26`, city: CORDOBA, date: '2026-04-26' },
     { id: `${SEVILLE}-2026-04-26`, city: SEVILLE, date: '2026-04-26' },
-    { id: `${SEVILLE}-2026-04-27`, city: SEVILLE, date: '2026-04-27' },
-    { id: `${SEVILLE}-2026-04-28`, city: SEVILLE, date: '2026-04-28' },
-    { id: `${SEVILLE}-2026-04-29`, city: SEVILLE, date: '2026-04-29' },
-    { id: `${SEVILLE}-2026-04-30`, city: SEVILLE, date: '2026-04-30' }
+    { id: `${SEVILLE}-2026-04-27`, city: SEVILLE, date: '2026-04-27' }
   ];
 
   // Photos are self-hosted at /img/demo/<slug>.jpg (slug = id without the "demo-" prefix).
@@ -286,6 +282,17 @@
       pitfall: 'Easy to get turned around; that’s half the fun.',
       booking_advice: 'No booking — just wander.',
       estimated_cost_usd: 0, duration_hours: 1, opening_hours: 'Open daily' }),
+    // --- Córdoba arrival afternoon (Apr 24) ---
+    act({ id: 'demo-mercado', name: 'Mercado Victoria Food Hall', city: CORDOBA, type: 'food',
+      why_it_fits: 'A buzzing covered market to land in — small plates, local wine, zero seafood pressure. Easy first stop off the train.',
+      pitfall: 'Busiest right at lunch; mid-afternoon is calmer.',
+      booking_advice: 'No booking — grab a stool at any stall.',
+      estimated_cost_usd: 18, duration_hours: 1, opening_hours: '12:00–24:00' }),
+    act({ id: 'demo-vinos', name: 'Taberna Sunset on Calleja de las Flores', city: CORDOBA, type: 'nightlife',
+      why_it_fits: 'A glass of Montilla in the prettiest flowered alley as the light goes gold — a slow, lively first evening.',
+      pitfall: 'The famous alley gets photo-crowded; go for the side tabernas.',
+      booking_advice: 'Walk-in; cash is handy.',
+      estimated_cost_usd: 12, duration_hours: 1, opening_hours: '18:00–24:00' }),
     act({ id: 'demo-realalcazar', name: 'Real Alcázar de Sevilla', city: SEVILLE, type: 'landmark',
       why_it_fits: 'The royal palace from Game of Thrones — tilework, sunken baths and the Ambassadors’ hall. Unmissable in Seville.',
       pitfall: 'Sells out days ahead in spring.',
@@ -300,7 +307,22 @@
       why_it_fits: 'A half-kilometre tiled crescent best at golden hour — exactly the view-at-sunset moment you asked for.',
       pitfall: 'Crowded by afternoon; rowboats have a long queue.',
       booking_advice: 'Free and open-air — no booking.',
-      estimated_cost_usd: 0, duration_hours: 1, opening_hours: 'Open 24h' })
+      estimated_cost_usd: 0, duration_hours: 1, opening_hours: 'Open 24h' }),
+    act({ id: 'demo-catedral', name: 'Seville Cathedral & Giralda Climb', city: SEVILLE, type: 'landmark',
+      why_it_fits: 'The world’s largest Gothic cathedral, then a ramped climb up the Giralda for the whole-city view.',
+      pitfall: 'Long midday queues; the ramp gets warm.',
+      booking_advice: 'Buy a timed combined ticket online.',
+      estimated_cost_usd: 12, duration_hours: 1.5, opening_hours: '11:00–17:00' }),
+    act({ id: 'demo-triana', name: 'Triana Market & Riverside Walk', city: SEVILLE, type: 'outdoors',
+      why_it_fits: 'Cross the river to the ceramic quarter — a working market and a slow walk back along the Guadalquivir.',
+      pitfall: 'Market winds down by mid-afternoon.',
+      booking_advice: 'No booking needed.',
+      estimated_cost_usd: 0, duration_hours: 1, opening_hours: '09:00–15:00' }),
+    act({ id: 'demo-setas', name: 'Las Setas de Sevilla', city: SEVILLE, type: 'landmark',
+      why_it_fits: 'The giant timber “mushrooms” — a rooftop walkway that’s pure sunset territory, just like you flagged.',
+      pitfall: 'Last entry is well before close; check times.',
+      booking_advice: 'Small entry fee; pay at the lift.',
+      estimated_cost_usd: 5, duration_hours: 1, opening_hours: '10:00–23:00' })
   ];
 
   // Review opens with a couple already approved (not a blank slate).
@@ -312,43 +334,67 @@
   // Arrange/Finalize present an already-built trip: everything placed is approved so the
   // day columns and itinerary render full. (Review uses DEMO_REVIEWED instead.)
   const DEMO_REVIEWED_ARRANGED = {
+    // Córdoba Apr 24 (arrival)
+    'demo-mercado': { approved: true, notes: '' },
+    'demo-juderia': { approved: true, notes: '' },
+    'demo-vinos': { approved: true, notes: '' },
+    // Córdoba Apr 25 (hero day)
     'demo-mezquita': { approved: true, notes: 'Book the 08:30 slot — quietest light for photos.' },
     'demo-bodegas': { approved: true, notes: '' },
     'demo-alcazar-cor': { approved: true, notes: '' },
-    'demo-juderia': { approved: true, notes: '' },
     'demo-patios': { approved: true, notes: '' },
     'demo-puente': { approved: true, notes: '' },
+    // Seville Apr 26
     'demo-realalcazar': { approved: true, notes: '' },
-    'demo-flamenco': { approved: true, notes: '' },
-    'demo-plaza-espana': { approved: true, notes: '' }
+    'demo-catedral': { approved: true, notes: '' },
+    'demo-triana': { approved: true, notes: '' },
+    // Seville Apr 27
+    'demo-setas': { approved: true, notes: '' },
+    'demo-plaza-espana': { approved: true, notes: '' },
+    'demo-flamenco': { approved: true, notes: '' }
   };
 
-  // Pre-arranged calendar. The active Córdoba day (04-25) is packed back-to-back so the
-  // timeline looks full; Seville days carry the rest.
+  // Pre-arranged calendar. Every visible day column is filled; Córdoba Apr 25 is the packed
+  // back-to-back "hero" day. Times are 24h.
   const DEMO_PLACEMENTS = {
+    // Córdoba Apr 24 — arrival afternoon (light)
+    'demo-mercado': { dayId: `${CORDOBA}-2026-04-24`, time: '14:00' },
+    'demo-juderia': { dayId: `${CORDOBA}-2026-04-24`, time: '16:00' },
+    'demo-vinos': { dayId: `${CORDOBA}-2026-04-24`, time: '18:30' },
+    // Córdoba Apr 25 — hero day
     'demo-mezquita': { dayId: `${CORDOBA}-2026-04-25`, time: '09:30' },
     'demo-bodegas': { dayId: `${CORDOBA}-2026-04-25`, time: '12:00' },
-    'demo-alcazar-cor': { dayId: `${CORDOBA}-2026-04-25`, time: '13:15' },
-    'demo-juderia': { dayId: `${CORDOBA}-2026-04-25`, time: '15:00' },
-    'demo-patios': { dayId: `${CORDOBA}-2026-04-25`, time: '18:00' },
-    'demo-puente': { dayId: `${CORDOBA}-2026-04-25`, time: '19:30' },
-    'demo-realalcazar': { dayId: `${SEVILLE}-2026-04-27`, time: '09:30' },
-    'demo-flamenco': { dayId: `${SEVILLE}-2026-04-28`, time: '21:00' },
-    'demo-plaza-espana': { dayId: `${SEVILLE}-2026-04-27`, time: '19:00' }
+    'demo-alcazar-cor': { dayId: `${CORDOBA}-2026-04-25`, time: '13:30' },
+    'demo-patios': { dayId: `${CORDOBA}-2026-04-25`, time: '16:00' },
+    'demo-puente': { dayId: `${CORDOBA}-2026-04-25`, time: '18:30' },
+    // Seville Apr 26
+    'demo-realalcazar': { dayId: `${SEVILLE}-2026-04-26`, time: '11:30' },
+    'demo-catedral': { dayId: `${SEVILLE}-2026-04-26`, time: '14:30' },
+    'demo-triana': { dayId: `${SEVILLE}-2026-04-26`, time: '17:00' },
+    // Seville Apr 27
+    'demo-setas': { dayId: `${SEVILLE}-2026-04-27`, time: '11:00' },
+    'demo-plaza-espana': { dayId: `${SEVILLE}-2026-04-27`, time: '19:00' },
+    'demo-flamenco': { dayId: `${SEVILLE}-2026-04-27`, time: '21:00' }
   };
 
   // Transit pills between consecutive placed stops per day. Keyed `fromId->toId`
   // (commutePairKey). The Finalize step reveals these to show the day "snapping" together.
   const cm = (mins) => ({ selectedMode: 'driving', modes: { driving: { durationMinutes: mins, modeIcon: '🚗' } } });
   const DEMO_COMMUTES = {
-    // Córdoba 04-25 (packed day)
+    // Córdoba Apr 24
+    'demo-mercado->demo-juderia': cm(6),
+    'demo-juderia->demo-vinos': cm(5),
+    // Córdoba Apr 25 (hero day)
     'demo-mezquita->demo-bodegas': cm(7),
     'demo-bodegas->demo-alcazar-cor': cm(6),
-    'demo-alcazar-cor->demo-juderia': cm(9),
-    'demo-juderia->demo-patios': cm(12),
+    'demo-alcazar-cor->demo-patios': cm(10),
     'demo-patios->demo-puente': cm(8),
-    // Seville 04-27
-    'demo-realalcazar->demo-plaza-espana': cm(11)
+    // Seville Apr 26
+    'demo-realalcazar->demo-catedral': cm(9),
+    'demo-catedral->demo-triana': cm(13),
+    // Seville Apr 27
+    'demo-setas->demo-plaza-espana': cm(14),
+    'demo-plaza-espana->demo-flamenco': cm(7)
   };
 
   // Used for the faked Replace swap. place_id/price_level set + a derived imageUrl so the
@@ -599,7 +645,7 @@
       step: 3,
       path: '/arrange',
       label: '03 / ARRANGE',
-      dur: 38000,
+      dur: 52000,
       run: async (eng) => {
         // Seed the placed calendar — but NO commutes yet, so the day "snaps together"
         // (transit pills appear) only after Finalize, below.
@@ -620,6 +666,61 @@
           'br'
         );
         await eng.wait(1400);
+
+        // ---- Booking checklist (cursor-driven, pure frontend) ----
+        await eng.narrate(
+          'Booking checklist',
+          'Track every reservation in one place.',
+          'Mark what needs booking, attach confirmation numbers, set times, and check things off as you lock them in.',
+          'tr'
+        );
+        await eng.custom(async (doc, win) => { if (win.openChecklistModal) win.openChecklistModal(); });
+        await eng.wait(1100);
+
+        // Find a checklist row by its visible activity name.
+        const clRow = (name) => Array.from(eng.doc.querySelectorAll('#bookingChecklist [data-cl-item]'))
+          .find((r) => (r.querySelector('.cl-item-name')?.textContent || '').includes(name)) || null;
+        const inRow = (rowEl, sel) => (rowEl ? rowEl.querySelector(sel) : null);
+        const clickEl = async (el, opts = {}) => {
+          if (!el) return;
+          await eng.cursorTo(el, { scroll: false, travel: opts.travel || 750 });
+          eng.cursor.classList.add('is-clicking'); await eng.wait(160);
+          if (!eng.cancelled) el.click(); eng.cursor.classList.remove('is-clicking');
+        };
+
+        // 1) Ticket icon → "Booking Not Required" on a free stop (Judería wander, no ticket).
+        await eng.narrate(
+          'No ticket needed?',
+          'One tap files it away.',
+          'Free or walk-in stops don’t need a booking — tap the ticket to move them to “Booking Not Required.”',
+          'tr'
+        );
+        await clickEl(inRow(clRow('Judería'), '[data-cl-booking-toggle]'));
+        await eng.wait(1200);
+
+        // 2) Full booking flow on the Mezquita row: expand → set time → confirmation # → check off.
+        await eng.narrate(
+          'Lock in a booking',
+          'Time, confirmation, done.',
+          'Open a stop, set its time, drop in the confirmation number, and check it off — now it’s locked to your plan.',
+          'tr'
+        );
+        const mez = clRow('Mezquita');
+        await clickEl(inRow(mez, '[data-cl-collapse-row]'), { travel: 800 });
+        await eng.wait(700);
+        await eng.setValue(inRow(clRow('Mezquita'), '[data-cl="activityTime"]'), '09:30', { scroll: false, after: 350 });
+        await eng.setValue(inRow(clRow('Mezquita'), '[data-cl="activityEndTime"]'), '11:30', { scroll: false, after: 350 });
+        // Reveal the reference field (it lives behind "More details").
+        await clickEl(inRow(clRow('Mezquita'), '[data-cl-more]'), { travel: 650 });
+        await eng.wait(600);
+        await eng.type(inRow(clRow('Mezquita'), '[data-cl="referenceNum"]'), 'MZQ-4471', { scroll: false, padding: 0 });
+        await eng.wait(500);
+        await clickEl(inRow(clRow('Mezquita'), '[data-cl-check]'), { travel: 700 });
+        await eng.wait(1200);
+
+        // Close the checklist.
+        await clickEl(eng.doc.getElementById('checklistModalClose'), { travel: 800 });
+        await eng.wait(700);
 
         // ---- Scheduling preferences modal (cursor-driven, pure frontend) ----
         await eng.narrate(
