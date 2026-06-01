@@ -241,8 +241,14 @@
     { id: `${SEVILLE}-2026-04-30`, city: SEVILLE, date: '2026-04-30' }
   ];
 
+  // Photos are self-hosted at /img/demo/<slug>.jpg (slug = id without the "demo-" prefix).
+  // Drop a file in public/img/demo/ to fill a card; a missing file falls back to the
+  // placeholder automatically (activityImgHtml has an onerror handler). Override per-activity
+  // by passing imageUrl explicitly.
+  const demoPhoto = (id) => `/img/demo/${String(id).replace(/^demo-/, '')}.jpg`;
   const act = (o) => ({
-    type: 'landmark', cost_type: 'per_person', duration_hours: 2, imageUrl: '',
+    type: 'landmark', cost_type: 'per_person', duration_hours: 2,
+    imageUrl: o.id ? demoPhoto(o.id) : '',
     booking_type: 'none', booking_links: [], userAdded: false, ...o
   });
 
@@ -345,7 +351,7 @@
     'demo-realalcazar->demo-plaza-espana': cm(11)
   };
 
-  // Used for the faked Replace swap. Seeded with place_id/price_level/imageUrl so the
+  // Used for the faked Replace swap. place_id/price_level set + a derived imageUrl so the
   // app's enrichActivity() (called by replaceActivityInState) makes no network calls.
   const REPLACEMENT = act({
     id: 'demo-patios-replacement', name: 'Hammam Al Ándalus (Arab baths)', city: CORDOBA, type: 'wellness',
@@ -354,7 +360,7 @@
     booking_advice: 'Reserve a 90-minute slot online; bring a swimsuit.',
     insider_tips: 'The 21:00 session is quietest — almost private midweek.',
     estimated_cost_usd: 42, duration_hours: 1.5, opening_hours: '10:00–24:00',
-    place_id: 'demo-place-hammam', price_level: 2, imageUrl: ''
+    place_id: 'demo-place-hammam', price_level: 2
   });
 
   const seed = (eng, partial) => eng.custom(async (doc, win) => {
