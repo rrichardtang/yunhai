@@ -359,8 +359,63 @@
       why_it_fits: 'The giant timber “mushrooms” — a rooftop walkway that’s pure sunset territory, just like you flagged.',
       pitfall: 'Last entry is well before close; check times.',
       booking_advice: 'Small entry fee; pay at the lift.',
-      estimated_cost_usd: 5, duration_hours: 1, opening_hours: '10:00–23:00' })
+      estimated_cost_usd: 5, duration_hours: 1, opening_hours: '10:00–23:00' }),
+
+    // --- Filler stops: calendar/checklist only (not in Review). No photos needed — the
+    //     Arrange/Finalize cards show time + icon + name, not an image. ---
+    // Córdoba
+    act({ id: 'demo-sinagoga', name: 'Sinagoga & Casa de Sefarad', city: CORDOBA, type: 'culture',
+      why_it_fits: 'A tiny 14th-c. synagogue and Sephardic museum tucked in the Judería — exactly the offbeat history you like.',
+      pitfall: 'Very small; it fills fast with tour groups.', booking_advice: 'Cheap entry, pay at the door.',
+      estimated_cost_usd: 3, duration_hours: 1, opening_hours: '09:00–20:00' }),
+    act({ id: 'demo-viana', name: 'Palacio de Viana Patios', city: CORDOBA, type: 'outdoors',
+      why_it_fits: 'Twelve connected courtyards in a noble house — the patio city at its most peaceful.',
+      pitfall: 'Closed Mondays; last entry early.', booking_advice: 'Ticket at the gate, no need to pre-book.',
+      estimated_cost_usd: 8, duration_hours: 1.5, opening_hours: '10:00–19:00' }),
+    act({ id: 'demo-hammam-cor', name: 'Hammam Al Ándalus Córdoba', city: CORDOBA, type: 'wellness',
+      why_it_fits: 'A candlelit thermal-bath wind-down after a full day on foot — slow travel, literally.',
+      pitfall: 'Timed sessions; arrive 15 min early.', booking_advice: 'Reserve a slot online; bring a swimsuit.',
+      estimated_cost_usd: 38, duration_hours: 1.5, opening_hours: '10:00–24:00' }),
+    act({ id: 'demo-tablao-cor', name: 'Tablao Flamenco Cardenal', city: CORDOBA, type: 'nightlife',
+      why_it_fits: 'An intimate courtyard flamenco show — the lively-nights energy without the tourist arena.',
+      pitfall: 'One show a night; it sells out.', booking_advice: 'Book the evening show ahead.',
+      estimated_cost_usd: 23, cost_type: 'per_person', duration_hours: 1.5, opening_hours: '20:00–23:00' }),
+    act({ id: 'demo-salmorejo', name: 'Salmorejo tasting at La Boca', city: CORDOBA, type: 'food',
+      why_it_fits: 'Creative Córdoban small plates — and no seafood on the tasting menu, just as you asked.',
+      pitfall: 'Tiny dining room; book or go early.', booking_advice: 'Reserve for dinner.',
+      estimated_cost_usd: 34, duration_hours: 1.5, opening_hours: '13:00–16:00, 20:00–23:30' }),
+    // Seville
+    act({ id: 'demo-barrio-santa-cruz', name: 'Barrio Santa Cruz Wander', city: SEVILLE, type: 'outdoors',
+      why_it_fits: 'Orange-tree plazas and twisting lanes in the old Jewish quarter — pure aimless-drift territory.',
+      pitfall: 'Easy to lose the crowd and yourself; bring water.', booking_advice: 'No booking — just wander.',
+      estimated_cost_usd: 0, duration_hours: 1, opening_hours: 'Open daily' }),
+    act({ id: 'demo-tapas-lonja', name: 'Tapas crawl · El Arenal', city: SEVILLE, type: 'food',
+      why_it_fits: 'Three classic tabernas, one street — Iberian ham and Rioja, zero seafood pressure.',
+      pitfall: 'Standing-room only after 9pm.', booking_advice: 'No booking; go stool to stool.',
+      estimated_cost_usd: 26, duration_hours: 1.5, opening_hours: '12:00–16:00, 20:00–24:00' }),
+    act({ id: 'demo-metropol-bar', name: 'Sunset drinks above Las Setas', city: SEVILLE, type: 'nightlife',
+      why_it_fits: 'A rooftop drink as the city turns gold — the sunset view you keep flagging, with a glass in hand.',
+      pitfall: 'Limited seats at golden hour.', booking_advice: 'Walk-in; arrive before sunset.',
+      estimated_cost_usd: 14, duration_hours: 1, opening_hours: '17:00–01:00' }),
+    act({ id: 'demo-maria-luisa', name: 'Parque de María Luisa stroll', city: SEVILLE, type: 'outdoors',
+      why_it_fits: 'Shaded fountains and tiled benches beside Plaza de España — a calm green pause mid-day.',
+      pitfall: 'Big; pick one loop rather than all of it.', booking_advice: 'Free, open all day.',
+      estimated_cost_usd: 0, duration_hours: 1, opening_hours: 'Open daily' }),
+    act({ id: 'demo-casa-pilatos', name: 'Casa de Pilatos', city: SEVILLE, type: 'culture',
+      why_it_fits: 'A half-palace of Mudéjar tilework and a quiet courtyard most top-10 lists skip.',
+      pitfall: 'Upper floor is guided-only and timed.', booking_advice: 'Ground-floor ticket at the door.',
+      estimated_cost_usd: 10, duration_hours: 1, opening_hours: '09:00–18:00' }),
+    act({ id: 'demo-hospital-caridad', name: 'Hospital de los Venerables', city: SEVILLE, type: 'culture',
+      why_it_fits: 'A jewel-box baroque chapel and patio in Santa Cruz — small, calm, and skippable-by-crowds.',
+      pitfall: 'Short visit; pairs well with the barrio walk.', booking_advice: 'Ticket at the door.',
+      estimated_cost_usd: 8, duration_hours: 1, opening_hours: '10:00–18:00' })
   ];
+
+  // The 02/Review beat shows a curated, photo-backed subset (the filler stops below exist
+  // only to fill the Arrange/Finalize calendar — keeping them out of Review avoids a wall of
+  // placeholder cards). Must include every activity the Review choreography touches.
+  const REVIEW_IDS = ['demo-mezquita', 'demo-alcazar-cor', 'demo-patios', 'demo-bodegas', 'demo-realalcazar', 'demo-plaza-espana'];
+  const DEMO_REVIEW_ACTIVITIES = DEMO_ACTIVITIES.filter((a) => REVIEW_IDS.includes(a.id));
 
   // Review opens with a couple already approved (not a blank slate).
   const DEMO_REVIEWED = {
@@ -370,69 +425,80 @@
 
   // Arrange/Finalize present an already-built trip: everything placed is approved so the
   // day columns and itinerary render full. (Review uses DEMO_REVIEWED instead.)
-  const DEMO_REVIEWED_ARRANGED = {
-    // Córdoba Apr 24 (arrival)
-    'demo-mercado': { approved: true, notes: '' },
-    'demo-juderia': { approved: true, notes: '' },
-    'demo-vinos': { approved: true, notes: '' },
-    // Córdoba Apr 25 (hero day)
-    'demo-mezquita': { approved: true, notes: 'Book the 08:30 slot — quietest light for photos.' },
-    'demo-bodegas': { approved: true, notes: '' },
-    'demo-alcazar-cor': { approved: true, notes: '' },
-    'demo-patios': { approved: true, notes: '' },
-    'demo-puente': { approved: true, notes: '' },
-    // Seville Apr 26
-    'demo-realalcazar': { approved: true, notes: '' },
-    'demo-catedral': { approved: true, notes: '' },
-    'demo-triana': { approved: true, notes: '' },
-    // Seville Apr 27
-    'demo-setas': { approved: true, notes: '' },
-    'demo-plaza-espana': { approved: true, notes: '' },
-    'demo-flamenco': { approved: true, notes: '' }
-  };
+  // Every placed activity must be approved here so it renders in Arrange AND appears in the
+  // Finalize/booking checklist (buildChecklistFromState includes all approved activities).
+  const DEMO_REVIEWED_ARRANGED = Object.fromEntries(
+    DEMO_ACTIVITIES.map((a) => [a.id, {
+      approved: true,
+      notes: a.id === 'demo-mezquita' ? 'Book the 08:30 slot — quietest light for photos.' : ''
+    }])
+  );
 
-  // Pre-arranged calendar. Every visible day column is filled; Córdoba Apr 25 is the packed
-  // back-to-back "hero" day. Times are 24h.
+  // Pre-arranged calendar — each day packed ~09:30→21:00 with small gaps so the timeline
+  // reads full (the grid spans 6am–2am, so sparse days look empty). Times are 24h.
+  const D = (city, date, time) => ({ dayId: `${city}-${date}`, time });
   const DEMO_PLACEMENTS = {
-    // Córdoba Apr 23 — arrival day. Single evening stop, well clear of the accommodation
-    // card (~13:45) so there is NO overlap with the logistics cards.
-    'demo-vinos': { dayId: `${CORDOBA}-2026-04-23`, time: '19:00' },
+    // Córdoba Apr 23 — arrival 13:00; first stop after the accommodation card (~13:45).
+    'demo-viana': D(CORDOBA, '2026-04-23', '14:45'),
+    'demo-sinagoga': D(CORDOBA, '2026-04-23', '16:45'),
+    'demo-vinos': D(CORDOBA, '2026-04-23', '18:45'),
+    'demo-tablao-cor': D(CORDOBA, '2026-04-23', '20:30'),
     // Córdoba Apr 24 — full day
-    'demo-mercado': { dayId: `${CORDOBA}-2026-04-24`, time: '11:00' },
-    'demo-juderia': { dayId: `${CORDOBA}-2026-04-24`, time: '13:00' },
-    'demo-puente': { dayId: `${CORDOBA}-2026-04-24`, time: '17:30' },
+    'demo-mercado': D(CORDOBA, '2026-04-24', '09:30'),
+    'demo-juderia': D(CORDOBA, '2026-04-24', '11:00'),
+    'demo-salmorejo': D(CORDOBA, '2026-04-24', '13:00'),
+    'demo-puente': D(CORDOBA, '2026-04-24', '15:30'),
+    'demo-hammam-cor': D(CORDOBA, '2026-04-24', '18:00'),
     // Córdoba Apr 25 — hero day
-    'demo-mezquita': { dayId: `${CORDOBA}-2026-04-25`, time: '09:30' },
-    'demo-bodegas': { dayId: `${CORDOBA}-2026-04-25`, time: '12:00' },
-    'demo-alcazar-cor': { dayId: `${CORDOBA}-2026-04-25`, time: '13:45' },
-    'demo-patios': { dayId: `${CORDOBA}-2026-04-25`, time: '16:00' },
-    // Seville Apr 26
-    'demo-realalcazar': { dayId: `${SEVILLE}-2026-04-26`, time: '11:30' },
-    'demo-catedral': { dayId: `${SEVILLE}-2026-04-26`, time: '14:30' },
-    'demo-triana': { dayId: `${SEVILLE}-2026-04-26`, time: '17:00' },
-    // Seville Apr 27
-    'demo-setas': { dayId: `${SEVILLE}-2026-04-27`, time: '11:00' },
-    'demo-plaza-espana': { dayId: `${SEVILLE}-2026-04-27`, time: '19:00' },
-    'demo-flamenco': { dayId: `${SEVILLE}-2026-04-27`, time: '21:00' }
+    'demo-mezquita': D(CORDOBA, '2026-04-25', '09:30'),
+    'demo-bodegas': D(CORDOBA, '2026-04-25', '12:00'),
+    'demo-alcazar-cor': D(CORDOBA, '2026-04-25', '13:45'),
+    'demo-patios': D(CORDOBA, '2026-04-25', '16:00'),
+    // Seville Apr 26 — arrival 10:30
+    'demo-realalcazar': D(SEVILLE, '2026-04-26', '11:30'),
+    'demo-catedral': D(SEVILLE, '2026-04-26', '14:30'),
+    'demo-barrio-santa-cruz': D(SEVILLE, '2026-04-26', '16:30'),
+    'demo-casa-pilatos': D(SEVILLE, '2026-04-26', '18:15'),
+    'demo-tapas-lonja': D(SEVILLE, '2026-04-26', '20:30'),
+    // Seville Apr 27 — full day
+    'demo-triana': D(SEVILLE, '2026-04-27', '10:00'),
+    'demo-hospital-caridad': D(SEVILLE, '2026-04-27', '12:00'),
+    'demo-maria-luisa': D(SEVILLE, '2026-04-27', '13:30'),
+    'demo-plaza-espana': D(SEVILLE, '2026-04-27', '15:30'),
+    'demo-setas': D(SEVILLE, '2026-04-27', '18:00'),
+    'demo-metropol-bar': D(SEVILLE, '2026-04-27', '20:00'),
+    'demo-flamenco': D(SEVILLE, '2026-04-27', '21:30')
   };
 
   // Transit pills between consecutive placed stops per day. Keyed `fromId->toId`
   // (commutePairKey). The Finalize step reveals these to show the day "snapping" together.
   const cm = (mins) => ({ selectedMode: 'driving', modes: { driving: { durationMinutes: mins, modeIcon: '🚗' } } });
   const DEMO_COMMUTES = {
+    // Córdoba Apr 23
+    'demo-viana->demo-sinagoga': cm(9),
+    'demo-sinagoga->demo-vinos': cm(5),
+    'demo-vinos->demo-tablao-cor': cm(6),
     // Córdoba Apr 24
-    'demo-mercado->demo-juderia': cm(6),
-    'demo-juderia->demo-puente': cm(11),
+    'demo-mercado->demo-juderia': cm(8),
+    'demo-juderia->demo-salmorejo': cm(5),
+    'demo-salmorejo->demo-puente': cm(7),
+    'demo-puente->demo-hammam-cor': cm(9),
     // Córdoba Apr 25 (hero day)
     'demo-mezquita->demo-bodegas': cm(7),
     'demo-bodegas->demo-alcazar-cor': cm(6),
     'demo-alcazar-cor->demo-patios': cm(10),
     // Seville Apr 26
     'demo-realalcazar->demo-catedral': cm(9),
-    'demo-catedral->demo-triana': cm(13),
+    'demo-catedral->demo-barrio-santa-cruz': cm(6),
+    'demo-barrio-santa-cruz->demo-casa-pilatos': cm(8),
+    'demo-casa-pilatos->demo-tapas-lonja': cm(12),
     // Seville Apr 27
-    'demo-setas->demo-plaza-espana': cm(14),
-    'demo-plaza-espana->demo-flamenco': cm(7)
+    'demo-triana->demo-hospital-caridad': cm(13),
+    'demo-hospital-caridad->demo-maria-luisa': cm(10),
+    'demo-maria-luisa->demo-plaza-espana': cm(5),
+    'demo-plaza-espana->demo-setas': cm(15),
+    'demo-setas->demo-metropol-bar': cm(4),
+    'demo-metropol-bar->demo-flamenco': cm(8)
   };
 
   // Used for the faked Replace swap. place_id/price_level set + a derived imageUrl so the
@@ -566,7 +632,7 @@
       dur: 40000,
       run: async (eng) => {
         // Seed real activity cards, then drive the genuine review UI.
-        await seed(eng, { activities: DEMO_ACTIVITIES, reviewed: { ...DEMO_REVIEWED } });
+        await seed(eng, { activities: DEMO_REVIEW_ACTIVITIES, reviewed: { ...DEMO_REVIEWED } });
         eng.gotoAppStep(2);
         await eng.custom(async (doc, win) => { if (win.renderActivities) win.renderActivities(); });
         (eng.scroller || {}).scrollTop = 0;
