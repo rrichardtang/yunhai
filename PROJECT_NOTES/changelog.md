@@ -13,6 +13,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Renamed all `GuideMe` → `YunHai` across ported assets + demo copy; repathed bundle's `Planner.html`/`Landing.html` → `/planner.html` / `#why`.
 - 113/113 unit tests pass; no backend touched. Branch `feature/yunhai-landing-demos`. Pending VPS visual verification.
 
+## [2026-05-31] Landing reel: visible checklist nav, modal centering, 3 Córdoba days, no overlap
+
+- **Visible checklist navigation** (`planner.html`, `landing-reel.js`): `#checklistBtn` lives in the embed-hidden topbar, so the reel now relocates it to `<body>` and floats it (embed CSS `#checklistBtn.embed-float`); the cursor visibly travels to it and clicks before the modal opens. Hidden again after close.
+- **Modal rows centered** (`landing-reel.js`): new `Engine.centerInScroller(el)` scrolls an element's nearest scrollable ancestor (the modal card) to center it — called before each checklist interaction (and again after the Mezquita row expands/grows), fixing rows snapping to the bottom of the screen.
+- **3 Córdoba day columns + no arrival overlap** (`landing-reel.js`): expanded Córdoba to Apr 23→25 so three filled columns show (Apr 23 arrival = 1 evening stop, Apr 24 = 3, Apr 25 hero = 4); Seville Apr 26/27 = 3 each. The arrival day's only stop is at 19:00, well clear of the ~13:45 accommodation card, so the accommodation/first-activity overlap from the screenshot is gone. 14 activities, full id parity. Arrange `dur` already 52s.
+
 ## [2026-05-31] Landing reel: booking-checklist walkthrough + compacted, denser trip
 
 - **Booking checklist segment** (`landing-reel.js`, start of Arrange beat; `app.js` exposes `window.openChecklistModal`/`renderChecklistModal` in `initEmbedMode` since `#checklistBtn` is in the embed-hidden topbar): the cursor opens the real checklist modal and (1) taps the ticket icon on a free stop (Judería) → moves it to *Booking Not Required*; (2) on the Mezquita row, expands it, sets start/end time, opens *More details*, types a confirmation # (MZQ-4471), and checks it off to lock. Rows targeted by visible name (`.cl-item-name`) since ids are generated. 100% frontend; check-off also satisfies the Finalize gate.
