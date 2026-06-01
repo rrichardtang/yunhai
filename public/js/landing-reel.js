@@ -265,6 +265,21 @@
       pitfall: 'Best in May during the Patio Festival; some close midday.',
       booking_advice: 'A few patios take a small donation at the door.',
       estimated_cost_usd: 0, duration_hours: 1, opening_hours: '11:00–14:00, 18:00–22:00' }),
+    act({ id: 'demo-bodegas', name: 'Lunch at Bodegas Mezquita', city: CORDOBA, type: 'food',
+      why_it_fits: 'Classic Córdoban plates — salmorejo, oxtail, no seafood in sight — a short walk from the old town.',
+      pitfall: 'Fills up by 2pm with tour groups.',
+      booking_advice: 'Walk-ins fine before 1:30pm, otherwise book ahead.',
+      estimated_cost_usd: 28, duration_hours: 1, opening_hours: '12:00–16:00, 20:00–23:00' }),
+    act({ id: 'demo-puente', name: 'Puente Romano & Calahorra Tower', city: CORDOBA, type: 'landmark',
+      why_it_fits: 'The Roman bridge over the Guadalquivir at golden hour — the kind of slow riverside view you asked for.',
+      pitfall: 'Very exposed; skip it at midday heat.',
+      booking_advice: 'Bridge is free; tower museum is a few euros.',
+      estimated_cost_usd: 5, duration_hours: 1, opening_hours: '10:00–19:00' }),
+    act({ id: 'demo-juderia', name: 'Judería Old-Town Wander', city: CORDOBA, type: 'outdoors',
+      why_it_fits: 'Whitewashed lanes, hidden plazas and craft shops — exactly the offbeat, on-foot drifting you love.',
+      pitfall: 'Easy to get turned around; that’s half the fun.',
+      booking_advice: 'No booking — just wander.',
+      estimated_cost_usd: 0, duration_hours: 1, opening_hours: 'Open daily' }),
     act({ id: 'demo-realalcazar', name: 'Real Alcázar de Sevilla', city: SEVILLE, type: 'landmark',
       why_it_fits: 'The royal palace from Game of Thrones — tilework, sunken baths and the Ambassadors’ hall. Unmissable in Seville.',
       pitfall: 'Sells out days ahead in spring.',
@@ -292,18 +307,25 @@
   // day columns and itinerary render full. (Review uses DEMO_REVIEWED instead.)
   const DEMO_REVIEWED_ARRANGED = {
     'demo-mezquita': { approved: true, notes: 'Book the 08:30 slot — quietest light for photos.' },
+    'demo-bodegas': { approved: true, notes: '' },
     'demo-alcazar-cor': { approved: true, notes: '' },
+    'demo-juderia': { approved: true, notes: '' },
     'demo-patios': { approved: true, notes: '' },
+    'demo-puente': { approved: true, notes: '' },
     'demo-realalcazar': { approved: true, notes: '' },
     'demo-flamenco': { approved: true, notes: '' },
     'demo-plaza-espana': { approved: true, notes: '' }
   };
 
-  // Pre-arranged calendar so step-3 day columns and step-4 finalize have content.
+  // Pre-arranged calendar. The active Córdoba day (04-25) is packed back-to-back so the
+  // timeline looks full; Seville days carry the rest.
   const DEMO_PLACEMENTS = {
     'demo-mezquita': { dayId: `${CORDOBA}-2026-04-25`, time: '09:30' },
-    'demo-alcazar-cor': { dayId: `${CORDOBA}-2026-04-25`, time: '12:00' },
-    'demo-patios': { dayId: `${CORDOBA}-2026-04-25`, time: '18:30' },
+    'demo-bodegas': { dayId: `${CORDOBA}-2026-04-25`, time: '12:00' },
+    'demo-alcazar-cor': { dayId: `${CORDOBA}-2026-04-25`, time: '13:15' },
+    'demo-juderia': { dayId: `${CORDOBA}-2026-04-25`, time: '15:00' },
+    'demo-patios': { dayId: `${CORDOBA}-2026-04-25`, time: '18:00' },
+    'demo-puente': { dayId: `${CORDOBA}-2026-04-25`, time: '19:30' },
     'demo-realalcazar': { dayId: `${SEVILLE}-2026-04-27`, time: '09:30' },
     'demo-flamenco': { dayId: `${SEVILLE}-2026-04-28`, time: '21:00' },
     'demo-plaza-espana': { dayId: `${SEVILLE}-2026-04-27`, time: '19:00' }
@@ -313,8 +335,13 @@
   // (commutePairKey). The Finalize step reveals these to show the day "snapping" together.
   const cm = (mins) => ({ selectedMode: 'driving', modes: { driving: { durationMinutes: mins, modeIcon: '🚗' } } });
   const DEMO_COMMUTES = {
-    'demo-mezquita->demo-alcazar-cor': cm(8),
-    'demo-alcazar-cor->demo-patios': cm(14),
+    // Córdoba 04-25 (packed day)
+    'demo-mezquita->demo-bodegas': cm(7),
+    'demo-bodegas->demo-alcazar-cor': cm(6),
+    'demo-alcazar-cor->demo-juderia': cm(9),
+    'demo-juderia->demo-patios': cm(12),
+    'demo-patios->demo-puente': cm(8),
+    // Seville 04-27
     'demo-realalcazar->demo-plaza-espana': cm(11)
   };
 
@@ -566,7 +593,7 @@
       step: 3,
       path: '/arrange',
       label: '03 / ARRANGE',
-      dur: 32000,
+      dur: 38000,
       run: async (eng) => {
         // Seed the placed calendar — but NO commutes yet, so the day "snaps together"
         // (transit pills appear) only after Finalize, below.
@@ -616,43 +643,55 @@
         await eng.wait(700);
         await eng.custom(async (doc, win) => { if (win.renderArrange) win.renderArrange(); });
 
-        // ---- Finalize: lock activities, then the day snaps together with transit pills ----
+        // ---- Finalize: confirm the checklist, then the day snaps together with transit pills ----
         await eng.narrate(
           'Finalize',
-          'Lock what’s set in stone.',
-          'Pin the stops you’ve already booked; YunHai fits everything else around them — then drops in real drive times between stops.',
+          'Lock it in.',
+          'Already-booked stops stay pinned to their times; YunHai fits everything else around them — then drops in real drive times between stops.',
           'tr'
         );
         await eng.click('#finalizeArrangeBtn', { travel: 1000, padding: 160, after: 800 });
-        await eng.wait(900);
+        await eng.wait(1300); // let the viewer read the checklist (Mezquita is pre-locked)
 
-        // Cursor-check a couple of lock checkboxes in the real finalize modal.
-        const checks = Array.from(eng.doc.querySelectorAll('#finalizeModal [data-finalize-check]')).slice(0, 2);
-        for (const cb of checks) {
-          if (eng.cancelled) return;
-          await eng.cursorTo(cb, { scroll: false, travel: 750 });
-          eng.cursor.classList.add('is-clicking'); await eng.wait(160);
-          cb.click(); eng.cursor.classList.remove('is-clicking');
-          await eng.wait(700);
-        }
-        // Press Confirm, then FAKE the arrange result (no /api/arrange): close the modal
-        // and reveal transit pills between stops.
-        await eng.cursorTo('#finalizeConfirmBtn', { scroll: false, travel: 800 });
-        eng.cursor.classList.add('is-clicking'); await eng.wait(180);
+        // Press Confirm & Arrange, then FAKE the result (no /api/arrange): close the modal
+        // and reveal transit pills between the stops.
+        await eng.cursorTo('#finalizeConfirmBtn', { scroll: false, travel: 850 });
+        eng.cursor.classList.add('is-clicking'); await eng.wait(200);
         eng.cursor.classList.remove('is-clicking');
         await eng.custom(async (doc) => { doc.getElementById('finalizeModal')?.remove(); });
         await eng.wait(500);
         await seed(eng, { commutes: { ...DEMO_COMMUTES } });
         await eng.custom(async (doc, win) => { if (win.renderArrange) win.renderArrange(); });
         await eng.wait(700);
-        await eng.scrollToTop(0);
+
         await eng.narrate(
           'Done',
           'A day that actually holds up.',
           'Every stop in order, real drive times between them, buffers baked in — no backtracking, no impossible jumps.',
           'br'
         );
-        await eng.wait(1600);
+        // Slowly pan down the packed day so the full timeline + transit pills are seen.
+        await eng.scrollToTop(0);
+        await eng.wait(900);
+        const sc = eng.scroller;
+        if (sc) {
+          const target = Math.min(sc.scrollHeight - FRAME_H, 700);
+          const start = sc.scrollTop;
+          const dur = 5200;
+          const t0 = performance.now();
+          await new Promise((resolve) => {
+            const t = (now) => {
+              if (eng.cancelled) return resolve();
+              if (eng.paused) { return requestAnimationFrame(t); }
+              const k = Math.min(1, (now - t0) / dur);
+              sc.scrollTop = start + (target - start) * (1 - Math.pow(1 - k, 2));
+              if (k < 1) requestAnimationFrame(t);
+              else resolve();
+            };
+            requestAnimationFrame(t);
+          });
+        }
+        await eng.wait(900);
       },
     },
 
