@@ -13,6 +13,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 - Renamed all `GuideMe` → `YunHai` across ported assets + demo copy; repathed bundle's `Planner.html`/`Landing.html` → `/planner.html` / `#why`.
 - 113/113 unit tests pass; no backend touched. Branch `feature/yunhai-landing-demos`. Pending VPS visual verification.
 
+## [2026-05-31] Landing reel: pack the Arrange day + simpler Finalize confirm
+
+- **Packed itinerary day** (`landing-reel.js`): added 3 more Córdoba activities (Bodegas Mezquita lunch, Puente Romano, Judería wander) so the active Córdoba 04-25 day holds 6 back-to-back stops (09:30→20:30) with a transit pill between each — the calendar now looks full like the real app, instead of 3 sparse stops. Repacked `DEMO_PLACEMENTS`/`DEMO_REVIEWED_ARRANGED`/`DEMO_COMMUTES` accordingly (Andalucía kept; no arrival/stay anchor cards — 04-25 is a middle day so the logistics cards don't render).
+- **Finalize confirm simplified** (`landing-reel.js`): no longer ticks lock checkboxes (Mezquita is fixed-time and pre-locked, so ticking would have *unlocked* it). The beat now just opens the checklist modal, pauses so the viewer reads it, then presses **Confirm & Arrange**.
+- **Show the result** (`landing-reel.js`): after the faked confirm + commute seed, the beat now slowly pans down the packed day so the full timeline + transit pills are clearly seen before advancing (previously it "just ended"). Arrange `dur` 32s→38s.
+
 ## [2026-05-31] Landing reel: cursor-drive scheduling modal + working Finalize with transit pills
 
 - **Scheduling Preferences is now actually used** (`landing-reel.js` Arrange beat): the cursor opens the modal and moves through real controls — sets day start/end (`#schedDayStart`/`#schedDayEnd`), picks a tour-timing radio (`#schedTourTiming`), nudges the downtime slider (`#schedBreaks`), then clicks **Save** (`#schedulingWizardSave`) — instead of the old JS-only slider poke + cancel.
