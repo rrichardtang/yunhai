@@ -124,6 +124,42 @@
       await this.scrollToTop(target);
     }
 
+    // Center an element inside its nearest scrollable ancestor (e.g. a modal body),
+    // not the page. Used so modal rows sit mid-screen, never cropped at the bottom.
+    async centerInScroller(el) {
+      if (!el) return;
+      const win = this.win;
+      let sc = el.parentElement;
+      while (sc && sc !== this.doc.body) {
+        const st = win.getComputedStyle(sc);
+        const scrolls = /(auto|scroll)/.test(st.overflowY) && sc.scrollHeight > sc.clientHeight + 4;
+        if (scrolls) break;
+        sc = sc.parentElement;
+      }
+      if (!sc || sc === this.doc.body) return;
+      const er = el.getBoundingClientRect();
+      const cr = sc.getBoundingClientRect();
+      const target = sc.scrollTop + (er.top - cr.top) - (sc.clientHeight - er.height) / 2;
+      const max = Math.max(0, sc.scrollHeight - sc.clientHeight);
+      const clamped = Math.max(0, Math.min(max, target));
+      if (Math.abs(clamped - sc.scrollTop) < 4) return;
+      const from = sc.scrollTop;
+      const dist = clamped - from;
+      const dur = Math.min(700, 220 + Math.abs(dist) * 0.5);
+      const start = performance.now();
+      await new Promise((resolve) => {
+        const step = (now) => {
+          if (this.cancelled) return resolve();
+          if (this.paused) { return requestAnimationFrame(step); }
+          const t = Math.min(1, (now - start) / dur);
+          sc.scrollTop = from + dist * (1 - Math.pow(1 - t, 3));
+          if (t < 1) requestAnimationFrame(step);
+          else resolve();
+        };
+        requestAnimationFrame(step);
+      });
+    }
+
     resolve(selector) {
       return typeof selector === 'string' ? this.doc.querySelector(selector) : selector;
     }
@@ -215,10 +251,10 @@
 
   const DEMO_CITIES = [
     {
-      id: 'demo-cordoba', name: CORDOBA, startDate: '2026-04-24', endDate: '2026-04-25',
+      id: 'demo-cordoba', name: CORDOBA, startDate: '2026-04-23', endDate: '2026-04-25',
       leaveTime: '18:00', notes: '', detailsExpanded: false,
       latitude: 37.8882, longitude: -4.7794,
-      logistics: { arrival: { date: '2026-04-24', time: '13:00', mode: 'train', location: 'Córdoba Station' },
+      logistics: { arrival: { date: '2026-04-23', time: '13:00', mode: 'train', location: 'Córdoba Station' },
         departure: { date: '2026-04-25', time: '21:30', mode: 'train', location: 'Córdoba Station' } }
     },
     {
@@ -231,6 +267,7 @@
   ];
 
   const DEMO_DAYS = [
+    { id: `${CORDOBA}-2026-04-23`, city: CORDOBA, date: '2026-04-23' },
     { id: `${CORDOBA}-2026-04-24`, city: CORDOBA, date: '2026-04-24' },
     { id: `${CORDOBA}-2026-04-25`, city: CORDOBA, date: '2026-04-25' },
     { id: `${SEVILLE}-2026-04-26`, city: SEVILLE, date: '2026-04-26' },
@@ -357,16 +394,18 @@
   // Pre-arranged calendar. Every visible day column is filled; Córdoba Apr 25 is the packed
   // back-to-back "hero" day. Times are 24h.
   const DEMO_PLACEMENTS = {
-    // Córdoba Apr 24 — arrival afternoon (light)
-    'demo-mercado': { dayId: `${CORDOBA}-2026-04-24`, time: '14:00' },
-    'demo-juderia': { dayId: `${CORDOBA}-2026-04-24`, time: '16:00' },
-    'demo-vinos': { dayId: `${CORDOBA}-2026-04-24`, time: '18:30' },
+    // Córdoba Apr 23 — arrival day. Single evening stop, well clear of the accommodation
+    // card (~13:45) so there is NO overlap with the logistics cards.
+    'demo-vinos': { dayId: `${CORDOBA}-2026-04-23`, time: '19:00' },
+    // Córdoba Apr 24 — full day
+    'demo-mercado': { dayId: `${CORDOBA}-2026-04-24`, time: '11:00' },
+    'demo-juderia': { dayId: `${CORDOBA}-2026-04-24`, time: '13:00' },
+    'demo-puente': { dayId: `${CORDOBA}-2026-04-24`, time: '17:30' },
     // Córdoba Apr 25 — hero day
     'demo-mezquita': { dayId: `${CORDOBA}-2026-04-25`, time: '09:30' },
     'demo-bodegas': { dayId: `${CORDOBA}-2026-04-25`, time: '12:00' },
-    'demo-alcazar-cor': { dayId: `${CORDOBA}-2026-04-25`, time: '13:30' },
+    'demo-alcazar-cor': { dayId: `${CORDOBA}-2026-04-25`, time: '13:45' },
     'demo-patios': { dayId: `${CORDOBA}-2026-04-25`, time: '16:00' },
-    'demo-puente': { dayId: `${CORDOBA}-2026-04-25`, time: '18:30' },
     // Seville Apr 26
     'demo-realalcazar': { dayId: `${SEVILLE}-2026-04-26`, time: '11:30' },
     'demo-catedral': { dayId: `${SEVILLE}-2026-04-26`, time: '14:30' },
@@ -383,12 +422,11 @@
   const DEMO_COMMUTES = {
     // Córdoba Apr 24
     'demo-mercado->demo-juderia': cm(6),
-    'demo-juderia->demo-vinos': cm(5),
+    'demo-juderia->demo-puente': cm(11),
     // Córdoba Apr 25 (hero day)
     'demo-mezquita->demo-bodegas': cm(7),
     'demo-bodegas->demo-alcazar-cor': cm(6),
     'demo-alcazar-cor->demo-patios': cm(10),
-    'demo-patios->demo-puente': cm(8),
     // Seville Apr 26
     'demo-realalcazar->demo-catedral': cm(9),
     'demo-catedral->demo-triana': cm(13),
@@ -672,15 +710,28 @@
           'Booking checklist',
           'Track every reservation in one place.',
           'Mark what needs booking, attach confirmation numbers, set times, and check things off as you lock them in.',
-          'tr'
+          'br'
         );
+        // Surface the Checklist button (it lives in the embed-hidden topbar): relocate it to
+        // <body> and float it, so the cursor can visibly navigate to it.
+        await eng.custom(async (doc) => {
+          const btn = doc.getElementById('checklistBtn');
+          if (btn) { doc.body.appendChild(btn); btn.classList.add('embed-float'); }
+        });
+        await eng.wait(400);
+        const clBtn = eng.doc.getElementById('checklistBtn');
+        await eng.cursorTo(clBtn, { scroll: false, travel: 1100 });
+        eng.cursor.classList.add('is-clicking'); await eng.wait(180);
+        eng.cursor.classList.remove('is-clicking');
         await eng.custom(async (doc, win) => { if (win.openChecklistModal) win.openChecklistModal(); });
         await eng.wait(1100);
 
-        // Find a checklist row by its visible activity name.
+        // Find a checklist row by its visible activity name; center it in the modal's own
+        // scroll area before interacting so it sits mid-screen (never cropped at the bottom).
         const clRow = (name) => Array.from(eng.doc.querySelectorAll('#bookingChecklist [data-cl-item]'))
           .find((r) => (r.querySelector('.cl-item-name')?.textContent || '').includes(name)) || null;
         const inRow = (rowEl, sel) => (rowEl ? rowEl.querySelector(sel) : null);
+        const focusRow = async (name) => { await eng.centerInScroller(clRow(name)); await eng.wait(280); };
         const clickEl = async (el, opts = {}) => {
           if (!el) return;
           await eng.cursorTo(el, { scroll: false, travel: opts.travel || 750 });
@@ -695,6 +746,7 @@
           'Free or walk-in stops don’t need a booking — tap the ticket to move them to “Booking Not Required.”',
           'tr'
         );
+        await focusRow('Judería');
         await clickEl(inRow(clRow('Judería'), '[data-cl-booking-toggle]'));
         await eng.wait(1200);
 
@@ -705,21 +757,27 @@
           'Open a stop, set its time, drop in the confirmation number, and check it off — now it’s locked to your plan.',
           'tr'
         );
-        const mez = clRow('Mezquita');
-        await clickEl(inRow(mez, '[data-cl-collapse-row]'), { travel: 800 });
-        await eng.wait(700);
+        await focusRow('Mezquita');
+        await clickEl(inRow(clRow('Mezquita'), '[data-cl-collapse-row]'), { travel: 800 });
+        await eng.wait(600);
+        await focusRow('Mezquita'); // expanded row is taller — recenter it
         await eng.setValue(inRow(clRow('Mezquita'), '[data-cl="activityTime"]'), '09:30', { scroll: false, after: 350 });
         await eng.setValue(inRow(clRow('Mezquita'), '[data-cl="activityEndTime"]'), '11:30', { scroll: false, after: 350 });
         // Reveal the reference field (it lives behind "More details").
         await clickEl(inRow(clRow('Mezquita'), '[data-cl-more]'), { travel: 650 });
-        await eng.wait(600);
+        await eng.wait(500);
+        await focusRow('Mezquita');
         await eng.type(inRow(clRow('Mezquita'), '[data-cl="referenceNum"]'), 'MZQ-4471', { scroll: false, padding: 0 });
         await eng.wait(500);
         await clickEl(inRow(clRow('Mezquita'), '[data-cl-check]'), { travel: 700 });
         await eng.wait(1200);
 
-        // Close the checklist.
+        // Close the checklist, then hide the relocated floating button.
         await clickEl(eng.doc.getElementById('checklistModalClose'), { travel: 800 });
+        await eng.custom(async (doc) => {
+          const btn = doc.getElementById('checklistBtn');
+          if (btn) { btn.classList.remove('embed-float'); btn.style.display = 'none'; }
+        });
         await eng.wait(700);
 
         // ---- Scheduling preferences modal (cursor-driven, pure frontend) ----

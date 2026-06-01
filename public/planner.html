@@ -35,6 +35,15 @@
       body.is-embed .save-progress-btn,
       body.is-embed .step-nav .nav-hint { display: none !important; }
       body.is-embed main.container { padding-top: 24px; }
+      /* Embed: the demo reel relocates #checklistBtn out of the hidden topbar into <body>
+         (class .embed-float) and surfaces it as a floating control to navigate to. */
+      body.is-embed #checklistBtn.embed-float {
+        display: inline-flex !important; align-items: center; gap: 6px;
+        position: fixed; top: 16px; right: 20px; z-index: 50;
+        padding: 8px 14px; border-radius: 999px;
+        background: var(--ink-900, #0A1628); color: var(--paper-0, #F4F1EC);
+        border: none; box-shadow: 0 4px 14px rgba(10,22,40,.18); font-weight: 600; cursor: pointer;
+      }
     </style>
   </head>
   <body>
