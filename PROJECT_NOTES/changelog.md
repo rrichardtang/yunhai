@@ -4,11 +4,11 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
-## [2026-06-01] Pace progress bar in budget tracker
+## [2026-06-01] Approved-activity count in budget tracker
 
-- **Added a "Pace" bar** so users can see how many activities they've approved vs. a comfortable plan. Added `computePace()` and `renderPaceSection()` and rewrote `renderBudgetTracker()` in `public/app.js`. Target = `(nonMealPerDay[pace] + 2 meals) × total trip days`, mirroring the planning target in `src/claude.js` (`nonMealPerDayByPace`). Day count computed inline (not via `daysBetween`, which is duplicate-declared at lines 2436 & 7385 — the later *nights* version wins globally).
-- Status pill: `Ready to plan` (idle) / `Comfortable pace` (≤ target) / `Full pace` (≤ 1.25×) / `Packed pace` (over), styled like the reference mock. Segmented bar when target ≤ 16 slots, continuous fill otherwise.
-- Renamed the budget card label `Budget Tracker` → `Budget`; tracker now renders when budget OR a pace target exists (was budget-only), with a new `.budget-neutral` card variant for the no-budget case. Pace CSS added in `public/styles.css`. Branch `feature/pace-progress-bar`.
+- **Surfaced approved activity count** so users can see how many they've approved (the original gap). `renderApprovedCountSection()` in `public/app.js` adds an "Activities — N approved" row to the budget tracker.
+- Deliberately **dropped a "Pace" target/bar** that was prototyped first: the comfortable-target denominator (planner generation count) overstated precision — it counts meals as activities, ignores per-day density (already shown by the `Light/Balanced/Packed day` pills), and penalizes intentional curation. A plain count answers the actual need without a false verdict.
+- Renamed the budget card label `Budget Tracker` → `Budget`; tracker now renders whenever `step >= 2` (was budget-only) with a `.budget-neutral` card variant for the no-budget case. CSS in `public/styles.css`. Branch `feature/pace-progress-bar`.
 
 ## [2026-06-01] Checklist modal z-index, post-midnight time labels, block-aware PDF export
 
