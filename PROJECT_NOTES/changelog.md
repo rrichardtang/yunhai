@@ -8,6 +8,7 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 - **Surfaced approved activity count** so users can see how many they've approved (the original gap). `renderApprovedCountSection()` in `public/app.js` adds an "Activities — N approved" row to the budget tracker.
 - Deliberately **dropped a "Pace" target/bar** that was prototyped first: the comfortable-target denominator (planner generation count) overstated precision — it counts meals as activities, ignores per-day density (already shown by the `Light/Balanced/Packed day` pills), and penalizes intentional curation. A plain count answers the actual need without a false verdict.
+- Shows per-day average alongside the count (`N approved · ~X/day`) via `tripDayCount()` — gives a density signal without a denominator/quota, avoiding the "23/28, am I 5 short?" anxiety the planner's intentional over-generation (`maxTotal = minTotal*1.15`) would otherwise trigger. Day-level fullness still judged by the `Light/Balanced/Packed day` pills.
 - Renamed the budget card label `Budget Tracker` → `Budget`; tracker now renders whenever `step >= 2` (was budget-only) with a `.budget-neutral` card variant for the no-budget case. CSS in `public/styles.css`. Branch `feature/pace-progress-bar`.
 
 ## [2026-06-01] Checklist modal z-index, post-midnight time labels, block-aware PDF export
