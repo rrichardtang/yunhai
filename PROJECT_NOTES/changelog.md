@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-06-01] Planning loading modal redesign (animated globe)
+
+- **Replaced the plain-text planning overlay** with the hifi design from `design_handoff_loading_modal/`: inline wireframe-globe SVG (atmosphere glow, ocean gradient, clipped meridians/latitudes, sheen) with a dotted flight route and an orbiting paper plane riding it via CSS Motion Path, plus a refined type hierarchy (uppercase trip kicker, bold hero city line, progress pill, accent-blue rotating message).
+- **Markup**: injected the globe SVG above the four text nodes in `mountPlanningOverlay()` (`public/app.js`). No logic changes — existing `data-trip-name`/`data-city-status`/`data-progress`/`data-loading-message` hooks, the `loading-visible` toggle, and 2400ms message cycling in `setPlanningLoading()` were already a match for the design contract.
+- **CSS** (`public/styles.css`): rewrote `.planning-overlay-card` + all `.planning-*` rules to the hifi spec (440px card, layered radial+linear gradient, 28px radius, border/shadow), added `.planning-globe`/`.globe-svg`/`.orbit-route`/`.plane` rules and five keyframes (`globeFloat`, `routeFlow`, `planeOrbit`, `planeFade`, `planningCardIn`). Added `.planning-progress:empty { display:none }` so the pill hides during "Starting planning…", and extended the existing `prefers-reduced-motion` block to disable the new animations.
+- Reused the `--text-on-dark` token (spec's #F5F0EB ≈ existing #F4F1EC) and kept the existing 7 `LOADING_MESSAGES`. Verified by rendering the real markup + CSS in headless Chrome. Branch `feature/loading-modal-globe-redesign`, pushed. Pending VPS visual verification.
+
 ## [2026-06-01] Approved-activity count in budget tracker
 
 - **Surfaced approved activity count** so users can see how many they've approved (the original gap). `renderApprovedCountSection()` in `public/app.js` adds an "Activities — N approved" row to the budget tracker.
