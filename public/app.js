@@ -8481,6 +8481,34 @@ function mountPlanningOverlay() {
   overlay.className = 'planning-overlay hidden';
   overlay.innerHTML = `
     <div class="planning-overlay-card">
+      <div class="planning-globe" aria-hidden="true">
+        <svg viewBox="0 0 220 150" class="globe-svg" role="presentation" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="pgOcean" cx="38%" cy="30%" r="82%">
+              <stop offset="0%" stop-color="#5aa2f2"/><stop offset="52%" stop-color="#1c5fae"/><stop offset="100%" stop-color="#0b2c58"/>
+            </radialGradient>
+            <radialGradient id="pgGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="rgba(42,125,225,.55)"/><stop offset="100%" stop-color="rgba(42,125,225,0)"/>
+            </radialGradient>
+            <clipPath id="pgClip"><circle cx="110" cy="78" r="52"/></clipPath>
+          </defs>
+          <circle cx="110" cy="78" r="72" fill="url(#pgGlow)"/>
+          <circle cx="110" cy="78" r="52" fill="url(#pgOcean)"/>
+          <g clip-path="url(#pgClip)" fill="none" stroke="rgba(245,240,235,.22)" stroke-width="1">
+            <ellipse cx="110" cy="78" rx="18" ry="52"/><ellipse cx="110" cy="78" rx="38" ry="52"/>
+            <line x1="110" y1="26" x2="110" y2="130"/>
+            <ellipse cx="110" cy="78" rx="52" ry="20"/><ellipse cx="110" cy="78" rx="52" ry="40"/>
+            <line x1="58" y1="78" x2="162" y2="78"/>
+          </g>
+          <ellipse cx="92" cy="56" rx="19" ry="11" fill="rgba(245,240,235,.16)" transform="rotate(-30 92 56)"/>
+          <g transform="rotate(-13 110 78)">
+            <path d="M196,78 A86,24 0 1,1 24,78 A86,24 0 1,1 196,78" fill="none" stroke="rgba(109,176,255,.6)" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="1 7" class="orbit-route"/>
+            <g class="plane">
+              <path d="M12,0 L-7,-7 L-2,-2 L-12,-2 L-9,0 L-12,2 L-2,2 L-7,7 Z" fill="#F7F3EE" stroke="#0b2c58" stroke-width=".6" stroke-linejoin="round"/>
+            </g>
+          </g>
+        </svg>
+      </div>
       <div class="planning-trip" data-trip-name></div>
       <div class="planning-status" data-city-status></div>
       <div class="planning-progress" data-progress></div>
