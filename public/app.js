@@ -3727,11 +3727,23 @@ function computeBudgetLensBreakdown() {
   };
 }
 
+function tripDayCount() {
+  return state.cities.reduce((sum, c) => {
+    if (!c.startDate || !c.endDate) return sum;
+    const start = parseYmdAsLocal(c.startDate);
+    const end = parseYmdAsLocal(c.endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return sum;
+    return sum + Math.floor((end - start) / 86400000) + 1;
+  }, 0);
+}
+
 function renderApprovedCountSection(count, withDivider) {
+  const days = tripDayCount();
+  const perDay = count > 0 && days > 0 ? ` · ~${Math.round((count / days) * 10) / 10}/day` : '';
   return `${withDivider ? '<div class="budget-row-divider"></div>' : ''}
     <div class="approved-count-row">
       <span class="budget-label">Activities</span>
-      <span class="approved-count-amt">${count} approved</span>
+      <span class="approved-count-amt">${count} approved${perDay}</span>
     </div>`;
 }
 
