@@ -1188,32 +1188,54 @@ body.is-dragging-activity .day-schedule.is-no-legal-slot { box-shadow: inset 0 0
   z-index: 1800;
 }
 .planning-overlay-card {
-  width: min(600px, 100%);
-  padding: 36px 32px;
+  position: relative;
+  width: min(440px, 100%);
+  padding: 6px 36px 40px;
   text-align: center;
   color: var(--text-on-dark);
-  background: linear-gradient(145deg, rgba(19, 60, 115, .97), rgba(11, 37, 69, .95));
-  border: none;
-  border-radius: 24px;
-  box-shadow: var(--shadow-lg);
+  background:
+    radial-gradient(120% 80% at 50% -12%, rgba(42, 125, 225, .30), transparent 60%),
+    linear-gradient(160deg, #103a72 0%, #0b2545 56%, #081b34 100%);
+  border: 1px solid rgba(245, 240, 235, .08);
+  border-radius: 28px;
+  box-shadow: 0 30px 80px rgba(8, 20, 40, .55), inset 0 1px 0 rgba(245, 240, 235, .06);
+  overflow: hidden;
+  animation: planningCardIn .5s cubic-bezier(.2, .8, .2, 1) both;
 }
-.planning-trip { font-size: 1.1rem; font-weight: 700; margin-bottom: 10px; }
-.planning-status { font-size: 1.25rem; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
-.planning-progress { font-size: .95rem; opacity: .75; margin-bottom: 10px; }
+.planning-globe { width: 220px; max-width: 100%; margin: 4px auto -4px; }
+.globe-svg { width: 100%; height: auto; display: block; animation: globeFloat 5s ease-in-out infinite; }
+.orbit-route { animation: routeFlow 1.1s linear infinite; }
+.planning-globe .plane {
+  offset-path: path('M196,78 A86,24 0 1,1 24,78 A86,24 0 1,1 196,78');
+  offset-rotate: auto;
+  animation: planeOrbit 6s linear infinite, planeFade 6s linear infinite;
+}
+.planning-trip {
+  font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: rgba(245, 240, 235, .6); margin-bottom: 14px;
+}
+.planning-status {
+  font-size: 1.5rem; font-weight: 800; letter-spacing: -.01em; line-height: 1.15;
+  color: var(--text-on-dark); margin-bottom: 14px;
+}
+.planning-progress {
+  display: inline-block; font-size: .8rem; font-weight: 600; letter-spacing: .02em;
+  color: rgba(245, 240, 235, .78); background: rgba(245, 240, 235, .08);
+  border: 1px solid rgba(245, 240, 235, .1); padding: 5px 14px;
+  border-radius: 999px; margin-bottom: 18px;
+}
+.planning-progress:empty { display: none; }
 .planning-message {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--accent);
-  opacity: .35;
-  transform: translateY(4px);
-  transition: opacity .4s ease, transform .4s ease;
-  animation: planningPulse 1.6s ease-in-out infinite;
+  font-size: 1.05rem; font-weight: 600; color: #6db0ff; min-height: 1.4em;
+  opacity: 0; transform: translateY(6px);
+  transition: opacity .45s ease, transform .45s ease;
 }
 .planning-message.loading-visible { opacity: 1; transform: translateY(0); }
-@keyframes planningPulse {
-  0%, 100% { opacity: .92; }
-  50% { opacity: .65; }
-}
+@keyframes globeFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes routeFlow { to { stroke-dashoffset: -8; } }
+@keyframes planeOrbit { to { offset-distance: 100%; } }
+@keyframes planeFade { 0%, 46% { opacity: 1; } 56%, 82% { opacity: .18; } 92%, 100% { opacity: 1; } }
+@keyframes planningCardIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
 
 /* ── Modal ── */
 .modal {
@@ -1942,6 +1964,7 @@ body.overlay-active #chatWidget {
   .chat-suggestion-chip, .chat-suggestions-label { animation: none; }
   #chatClose:hover { transform: none; }
   #chatBubble:hover .chat-fab-icon { transform: none; }
+  .globe-svg, .orbit-route, .planning-overlay-card, .planning-globe .plane { animation: none !important; }
 }
 
 /* ── Nav hint ── */
