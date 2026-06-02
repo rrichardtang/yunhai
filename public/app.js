@@ -3737,14 +3737,22 @@ function tripDayCount() {
   }, 0);
 }
 
-function renderApprovedCountSection(count, withDivider) {
+function trackerRow({ label, tooltip, value, fillPct, trailing = '' }) {
+  return `
+    <div class="tk-label"><span class="budget-label">${label}</span><button class="budget-info-btn" type="button" aria-label="${label} info" data-tooltip="${tooltip}"><i class="ph-bold ph-info" aria-hidden="true"></i></button></div>
+    <div class="tk-value">${value}</div>
+    <div class="tk-bar"><div class="tk-fill" style="width:${fillPct}%"></div></div>
+    <div class="tk-trailing">${trailing}</div>`;
+}
+
+// Avg activities/day against a comfortable full day (derived from the trip's pace pref).
+// Capped at 100% — fullness signal, never a "you need more" quota.
+function activityDensityFill(count) {
   const days = tripDayCount();
-  const perDay = count > 0 && days > 0 ? ` · ~${Math.round((count / days) * 10) / 10}/day` : '';
-  return `${withDivider ? '<div class="budget-row-divider"></div>' : ''}
-    <div class="approved-count-row">
-      <span class="budget-label">Activities</span>
-      <span class="approved-count-amt">${count} approved${perDay}</span>
-    </div>`;
+  if (!days || !count) return 0;
+  const paceVal = Math.max(1, Math.min(5, Math.round(Number(state.profile?.answers?.pace) || 3)));
+  const fullPerDay = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6 }[paceVal] + 2;
+  return Math.min((count / days) / fullPerDay, 1) * 100;
 }
 
 function renderBudgetTracker() {
@@ -3754,6 +3762,15 @@ function renderBudgetTracker() {
 
   if (state.step < 2) { if (existing) existing.remove(); return; }
 
+  const days = tripDayCount();
+  const perDayLabel = approved.length && days ? ` · ~${Math.round((approved.length / days) * 10) / 10}/day` : '';
+  const activitiesRow = trackerRow({
+    label: 'Activities',
+    tooltip: 'Approved activities and how full your days are on average',
+    value: `${approved.length} approved${perDayLabel}`,
+    fillPct: activityDensityFill(approved.length)
+  });
+
   let colorClass = 'budget-neutral';
   let budgetSection = '';
   if (hasBudget) {
@@ -3761,24 +3778,16 @@ function renderBudgetTracker() {
     const pct = Math.min(used / state.tripBudget, 1);
     const nullCount = approved.filter((a) => actCostUsd(a) === null || actCostUsd(a) === undefined).length;
     colorClass = pct < 0.6 ? 'budget-green' : pct < 0.9 ? 'budget-yellow' : 'budget-red';
-    budgetSection = `
-    <div class="budget-tracker-top">
-      <div class="budget-tracker-left">
-        <span class="budget-label">Budget</span>
-        <button class="budget-info-btn" type="button" aria-label="Budget info" data-tooltip="Tracks total cost of planned activities"><i class="ph-bold ph-info" aria-hidden="true"></i></button>
-      </div>
-      <div class="budget-tracker-right">
-        ${nullCount > 0 ? `<span class="budget-caveat">${nullCount} activit${nullCount === 1 ? 'y' : 'ies'} unpriced</span>` : ''}
-        <span class="budget-remaining-amt">$${Math.round(used).toLocaleString()} / $${state.tripBudget.toLocaleString()}</span>
-        ${approved.length > 0 ? `<button class="secondary budget-optimize-btn" type="button" id="budgetOptimizeBtn"><i class="ph-bold ph-lightning" aria-hidden="true"></i> Optimize</button>` : ''}
-      </div>
-    </div>
-    <div class="budget-bar-track">
-      <div class="budget-bar-fill" style="width:${pct * 100}%"></div>
-    </div>`;
+    budgetSection = trackerRow({
+      label: 'Budget',
+      tooltip: 'Tracks total cost of planned activities',
+      value: `${nullCount > 0 ? `<span class="budget-caveat">${nullCount} unpriced</span> ` : ''}$${Math.round(used).toLocaleString()} / $${state.tripBudget.toLocaleString()}`,
+      fillPct: pct * 100,
+      trailing: approved.length > 0 ? `<button class="secondary budget-optimize-btn" type="button" id="budgetOptimizeBtn"><i class="ph-bold ph-lightning" aria-hidden="true"></i> Optimize</button>` : ''
+    }) + `<div class="tk-divider"></div>`;
   }
 
-  const html = `<div id="budgetTracker" class="budget-tracker ${colorClass}">${budgetSection}${renderApprovedCountSection(approved.length, hasBudget)}</div>`;
+  const html = `<div id="budgetTracker" class="budget-tracker budget-grid ${colorClass}">${budgetSection}${activitiesRow}</div>`;
 
   if (existing) { existing.outerHTML = html; } else {
     const grid = els.activitiesGrid;
