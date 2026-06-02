@@ -3727,21 +3727,69 @@ function computeBudgetLensBreakdown() {
   };
 }
 
+// Comfortable activity target = (non-meal/day for the trip's pace + 2 meals) × total trip days.
+// Mirrors the planning target in src/claude.js so the bar matches what the planner generates.
+function computePace(approvedCount) {
+  const totalDays = state.cities.reduce((sum, c) => {
+    if (!c.startDate || !c.endDate) return sum;
+    const start = parseYmdAsLocal(c.startDate);
+    const end = parseYmdAsLocal(c.endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return sum;
+    return sum + Math.floor((end - start) / 86400000) + 1;
+  }, 0);
+  if (totalDays <= 0) return null;
+
+  const paceVal = Math.max(1, Math.min(5, Math.round(Number(state.profile?.answers?.pace) || 3)));
+  const perDay = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6 }[paceVal] + 2;
+  const target = perDay * totalDays;
+  const ratio = approvedCount / target;
+  const status =
+    approvedCount === 0 ? { label: 'Ready to plan', className: 'pace-idle' }
+    : ratio <= 1 ? { label: 'Comfortable pace', className: 'pace-comfortable' }
+    : ratio <= 1.25 ? { label: 'Full pace', className: 'pace-full' }
+    : { label: 'Packed pace', className: 'pace-packed' };
+
+  return { target, count: approvedCount, ratio, status, segmented: target <= 16 };
+}
+
+function renderPaceSection(pace, withDivider) {
+  const filled = Math.min(pace.count, pace.target);
+  const bar = pace.segmented
+    ? `<div class="pace-bar-segments">${Array.from({ length: pace.target }, (_, i) =>
+        `<span class="pace-seg${i < filled ? ' is-filled' : ''}"></span>`).join('')}</div>`
+    : `<div class="pace-bar-track"><div class="pace-bar-fill" style="width:${Math.min(pace.ratio, 1) * 100}%"></div></div>`;
+
+  return `${withDivider ? '<div class="budget-row-divider"></div>' : ''}
+    <div class="pace-row">
+      <div class="budget-tracker-left">
+        <span class="budget-label">Pace</span>
+        <button class="budget-info-btn" type="button" aria-label="Pace info" data-tooltip="Approved activities vs. a comfortable plan for your trip length and pace"><i class="ph-bold ph-info" aria-hidden="true"></i></button>
+      </div>
+      <span class="pace-count">${pace.count} / ${pace.target} activities</span>
+      ${bar}
+      <span class="pace-status-pill ${pace.status.className}">${pace.status.label}</span>
+    </div>`;
+}
+
 function renderBudgetTracker() {
   const existing = document.getElementById('budgetTracker');
-  if (!state.tripBudget || state.step < 2) { if (existing) existing.remove(); return; }
-
+  const hasBudget = state.tripBudget > 0;
   const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true);
-  const used = computeBudgetLensBreakdown().budgetLensTotal;
-  const remaining = state.tripBudget - used;
-  const pct = Math.min(used / state.tripBudget, 1);
-  const nullCount = approved.filter((a) => actCostUsd(a) === null || actCostUsd(a) === undefined).length;
-  const colorClass = pct < 0.6 ? 'budget-green' : pct < 0.9 ? 'budget-yellow' : 'budget-red';
+  const pace = computePace(approved.length);
 
-  const html = `<div id="budgetTracker" class="budget-tracker ${colorClass}">
+  if (state.step < 2 || (!hasBudget && !pace)) { if (existing) existing.remove(); return; }
+
+  let colorClass = 'budget-neutral';
+  let budgetSection = '';
+  if (hasBudget) {
+    const used = computeBudgetLensBreakdown().budgetLensTotal;
+    const pct = Math.min(used / state.tripBudget, 1);
+    const nullCount = approved.filter((a) => actCostUsd(a) === null || actCostUsd(a) === undefined).length;
+    colorClass = pct < 0.6 ? 'budget-green' : pct < 0.9 ? 'budget-yellow' : 'budget-red';
+    budgetSection = `
     <div class="budget-tracker-top">
       <div class="budget-tracker-left">
-        <span class="budget-label">Budget Tracker</span>
+        <span class="budget-label">Budget</span>
         <button class="budget-info-btn" type="button" aria-label="Budget info" data-tooltip="Tracks total cost of planned activities"><i class="ph-bold ph-info" aria-hidden="true"></i></button>
       </div>
       <div class="budget-tracker-right">
@@ -3751,9 +3799,11 @@ function renderBudgetTracker() {
       </div>
     </div>
     <div class="budget-bar-track">
-      <div class="budget-bar-fill" style="width:${Math.min(pct,1)*100}%"></div>
-    </div>
-  </div>`;
+      <div class="budget-bar-fill" style="width:${pct * 100}%"></div>
+    </div>`;
+  }
+
+  const html = `<div id="budgetTracker" class="budget-tracker ${colorClass}">${budgetSection}${pace ? renderPaceSection(pace, hasBudget) : ''}</div>`;
 
   if (existing) { existing.outerHTML = html; } else {
     const grid = els.activitiesGrid;

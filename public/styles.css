@@ -2276,6 +2276,35 @@ body.overlay-active #chatWidget {
   transition: width 0.3s ease;
 }
 
+/* ── Pace bar ── */
+.budget-tracker.budget-neutral { background: #f4f5f7; color: #1f2937; border: 1.5px solid rgba(0,0,0,0.08); }
+.budget-row-divider { height: 1px; background: currentColor; opacity: 0.12; margin: 10px 0; }
+.pace-row { display: flex; align-items: center; gap: 12px; }
+.pace-count { font-size: 0.82rem; opacity: 0.85; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pace-bar-segments { display: flex; gap: 4px; flex: 1; min-width: 60px; }
+.pace-seg { flex: 1; height: 8px; border-radius: 3px; background: rgba(0,0,0,0.1); transition: background 0.2s ease; }
+.pace-seg.is-filled { background: #2563eb; }
+.pace-bar-track { flex: 1; min-width: 60px; height: 8px; border-radius: 99px; background: rgba(0,0,0,0.1); overflow: hidden; }
+.pace-bar-fill { height: 100%; border-radius: 99px; background: #2563eb; transition: width 0.3s ease; }
+.pace-status-pill {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 99px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.pace-status-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pace-status-pill.pace-idle { background: rgba(100,116,139,0.15); color: #475569; }
+.pace-status-pill.pace-comfortable { background: rgba(22,163,74,0.15); color: #15803d; }
+.pace-status-pill.pace-full { background: rgba(217,119,6,0.15); color: #b45309; }
+.pace-status-pill.pace-packed { background: rgba(220,38,38,0.15); color: #b91c1c; }
+
 /* ── Activity cost + booking links ── */
 .activity-cost { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: 4px 0; }
 .cost-per-person-input { width: 5ch; border: none; border-bottom: 1px dashed var(--muted); background: transparent; font: inherit; color: inherit; text-align: right; padding: 0 2px; -moz-appearance: textfield; }
