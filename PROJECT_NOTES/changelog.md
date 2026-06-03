@@ -4,6 +4,12 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-06-03] Resume-trips popup on app load
+
+- **Added a "Welcome back" popup** that auto-shows on app load so returning users can resume a trip immediately instead of scrolling to the My Trips panel. Triggered in `init()` (`public/app.js`) after auth/entitlement/trip-fetch, only when ≥1 saved trip or in-progress draft exists and the user did not arrive via a `?itinerary=` share link.
+- **Refactored My Trips into shared helpers** to avoid duplicating row logic: extracted `collectMyTrips()` (draft + saved gathering), `tripRowMarkup()` and `bindTripRows(listEl, trips, { onPick, onChange })` (render + wire Open/Resume/Delete) out of `renderMyTrips()`, which is now a thin caller. The popup (`showResumeTripsPopup()`) reuses the same rows; `onPick`/`onChange` callbacks close it on trip selection or deletion.
+- Popup reuses existing styles (`.modal`, `.saved-itineraries-list`, `.saved-itinerary-item`, `.icon-btn`, `.draft-badge`) — no CSS changes. Registered with the overlay manager alongside `confirmDialog`. Dismiss via "Start a new trip" (→ `resetToFresh()`), X, or backdrop. 124/124 tests pass; verified rendering in headless Chrome. Branch `feature/loading-modal-globe-redesign`.
+
 ## [2026-06-01] Planning loading modal redesign (animated globe)
 
 - **Replaced the plain-text planning overlay** with the hifi design from `design_handoff_loading_modal/`: inline wireframe-globe SVG (atmosphere glow, ocean gradient, clipped meridians/latitudes, sheen) with a dotted flight route and an orbiting paper plane riding it via CSS Motion Path, plus a refined type hierarchy (uppercase trip kicker, bold hero city line, progress pill, accent-blue rotating message).

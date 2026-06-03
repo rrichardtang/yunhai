@@ -18,7 +18,7 @@ sendDebug('boot', `build=${APP_BUILD_ID} loaded=${new Date().toISOString()} sw=$
 
 ['prefsModal', 'checklistModal', 'budgetOptOverlay', 'addActivityModal',
  'attachmentViewerModal',
- 'planningOverlay', 'textareaExpandModal', 'confirmDialog']
+ 'planningOverlay', 'textareaExpandModal', 'confirmDialog', 'resumeTripsModal']
   .forEach((id) => overlayManager.register(id, () => document.getElementById(id)));
 
 const state = {
@@ -8826,9 +8826,7 @@ function hydrateFromSnapshot(snapshot) {
   setStep(targetStep);
 }
 
-function renderMyTrips() {
-  if (!els.myTripsPanel || !els.myTripsList) return;
-
+function collectMyTrips() {
   const snapshot = getSnapshot();
   const trips = [];
 
@@ -8857,49 +8855,51 @@ function renderMyTrips() {
     });
   });
 
-  if (!trips.length) {
-    els.myTripsPanel.classList.add('hidden');
-    resetToFresh();
-    return;
-  }
+  return trips;
+}
 
-  els.myTripsPanel.classList.remove('hidden');
-
-  els.myTripsList.innerHTML = trips.map((trip) => {
-    if (trip.type === 'draft') {
-      return `
-        <article class="saved-itinerary-item draft-item">
-          <div>
-            <h4>${esc(trip.tripName)} <span class="draft-badge">Draft</span></h4>
-            <p>${esc(trip.detail)}</p>
-          </div>
-          <div class="saved-itinerary-actions">
-            <button type="button" class="primary" data-resume-draft>Resume</button>
-            <button type="button" class="secondary" data-delete-draft>Delete</button>
-          </div>
-        </article>`;
-    }
+function tripRowMarkup(trip) {
+  if (trip.type === 'draft') {
     return `
-      <article class="saved-itinerary-item">
+      <article class="saved-itinerary-item draft-item">
         <div>
-          <h4>${esc(trip.tripName)}</h4>
-          <p>${trip.detail}</p>
+          <h4>${esc(trip.tripName)} <span class="draft-badge">Draft</span></h4>
+          <p>${esc(trip.detail)}</p>
         </div>
         <div class="saved-itinerary-actions">
-          <button type="button" class="secondary" data-load-trip="${esc(trip.id)}">Open</button>
-          <button type="button" class="secondary" data-delete-trip="${esc(trip.id)}">Delete</button>
+          <button type="button" class="primary" data-resume-draft>Resume</button>
+          <button type="button" class="secondary" data-delete-draft>Delete</button>
         </div>
       </article>`;
-  }).join('');
+  }
+  return `
+    <article class="saved-itinerary-item">
+      <div>
+        <h4>${esc(trip.tripName)}</h4>
+        <p>${trip.detail}</p>
+      </div>
+      <div class="saved-itinerary-actions">
+        <button type="button" class="secondary" data-load-trip="${esc(trip.id)}">Open</button>
+        <button type="button" class="secondary" data-delete-trip="${esc(trip.id)}">Delete</button>
+      </div>
+    </article>`;
+}
 
-  const resumeBtn = els.myTripsList.querySelector('[data-resume-draft]');
-  if (resumeBtn) {
+// Renders trip rows into listEl and wires actions. onPick fires after a trip is
+// opened/resumed; onChange fires after a deletion (so callers can re-render/close).
+function bindTripRows(listEl, trips, { onPick, onChange } = {}) {
+  const snapshot = trips.find((t) => t.type === 'draft')?.snapshot || null;
+  listEl.innerHTML = trips.map(tripRowMarkup).join('');
+
+  const resumeBtn = listEl.querySelector('[data-resume-draft]');
+  if (resumeBtn && snapshot) {
     resumeBtn.addEventListener('click', () => {
       hydrateFromSnapshot(snapshot);
+      onPick?.();
     });
   }
 
-  const deleteDraftBtn = els.myTripsList.querySelector('[data-delete-draft]');
+  const deleteDraftBtn = listEl.querySelector('[data-delete-draft]');
   if (deleteDraftBtn) {
     deleteDraftBtn.addEventListener('click', async () => {
       const confirmed = await showConfirmDialog('Delete draft?', 'Your in-progress draft will be permanently deleted.', 'Delete');
@@ -8908,16 +8908,18 @@ function renderMyTrips() {
       resetChatSession();
       renderMyTrips();
       resetToFresh();
+      onChange?.();
     });
   }
 
-  els.myTripsList.querySelectorAll('[data-load-trip]').forEach((btn) => {
+  listEl.querySelectorAll('[data-load-trip]').forEach((btn) => {
     btn.addEventListener('click', () => {
       loadItineraryById(btn.dataset.loadTrip);
+      onPick?.();
     });
   });
 
-  els.myTripsList.querySelectorAll('[data-delete-trip]').forEach((btn) => {
+  listEl.querySelectorAll('[data-delete-trip]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.deleteTrip;
       if (!id) return;
@@ -8934,13 +8936,65 @@ function renderMyTrips() {
         renderMyTrips();
         renderSavedItineraries();
         showToast('Trip deleted.', 'success');
+        onChange?.();
       } catch {
         showToast('Could not delete trip.', 'error');
       }
     });
   });
+}
 
+function renderMyTrips() {
+  if (!els.myTripsPanel || !els.myTripsList) return;
+
+  const trips = collectMyTrips();
+  if (!trips.length) {
+    els.myTripsPanel.classList.add('hidden');
+    resetToFresh();
+    return;
+  }
+
+  els.myTripsPanel.classList.remove('hidden');
+  bindTripRows(els.myTripsList, trips);
   resetToFresh();
+}
+
+function showResumeTripsPopup() {
+  const trips = collectMyTrips();
+  if (!trips.length) return;
+  if (document.getElementById('resumeTripsModal')) return;
+
+  const modal = document.createElement('div');
+  modal.id = 'resumeTripsModal';
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-card" style="max-width:560px;gap:16px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="text-align:left">
+          <h3 style="margin:0">Welcome back</h3>
+          <p class="muted-text" style="margin:4px 0 0">Pick up where you left off, or start something new.</p>
+        </div>
+        <button id="resumeTripsClose" class="icon-btn" type="button" aria-label="Close"><i class="ph-bold ph-x" aria-hidden="true"></i></button>
+      </div>
+      <div id="resumeTripsList" class="saved-itineraries-list"></div>
+      <button id="resumeTripsNew" class="secondary" type="button" style="align-self:stretch">Start a new trip</button>
+    </div>`;
+  document.body.appendChild(modal);
+  refreshOverlayInterlocks();
+
+  const close = () => {
+    modal.remove();
+    refreshOverlayInterlocks();
+  };
+
+  bindTripRows(modal.querySelector('#resumeTripsList'), trips, { onPick: close, onChange: close });
+
+  modal.querySelector('#resumeTripsClose').addEventListener('click', close);
+  modal.querySelector('#resumeTripsNew').addEventListener('click', () => {
+    close();
+    resetToFresh();
+  });
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
 }
 
 async function maybeLoadSharedItineraryFromUrl() {
@@ -9868,5 +9922,8 @@ history.replaceState({ spa: true, step: 1 }, '');
   const savedViewMode = localStorage.getItem(VIEW_MODE_KEY);
   setViewMode(savedViewMode === 'itinerary' || savedViewMode === 'execution' ? 'itinerary' : 'planning');
   const loadedFromShare = await maybeLoadSharedItineraryFromUrl();
-  if (!loadedFromShare) renderMyTrips();
+  if (!loadedFromShare) {
+    renderMyTrips();
+    showResumeTripsPopup();
+  }
 })();
