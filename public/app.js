@@ -960,16 +960,65 @@ function showToast(message, type = 'info') {
   return toastId;
 }
 
-function updatePlanningStatus(status = '', progress = '', percent = null) {
+function updatePlanningStatus(status = '', progress = '') {
   const overlay = document.getElementById('planningOverlay');
   if (!overlay) return;
   overlay.querySelector('[data-city-status]').textContent = status;
   overlay.querySelector('[data-progress]').textContent = progress;
-  if (percent !== null) {
-    const clamped = Math.max(0, Math.min(100, Math.round(percent)));
-    overlay.querySelector('[data-progress-fill]').style.width = `${clamped}%`;
-    overlay.querySelector('.planning-bar')?.setAttribute('aria-valuenow', String(clamped));
+}
+
+// Progress-bar trickle: cities are the only real signal (one LLM call each), so we
+// ease the bar forward continuously toward the next real milestone — capped just
+// below it until that city actually completes, then snapped exactly to the milestone.
+let planProgress = null;
+
+function applyPlanProgress(percent) {
+  const overlay = document.getElementById('planningOverlay');
+  if (!overlay) return;
+  const clamped = Math.max(0, Math.min(100, percent));
+  overlay.querySelector('[data-progress-fill]').style.width = `${clamped.toFixed(1)}%`;
+  overlay.querySelector('.planning-bar')?.setAttribute('aria-valuenow', String(Math.round(clamped)));
+}
+
+function beginPlanProgress(totalCities) {
+  endPlanProgress();
+  planProgress = { total: Math.max(1, totalCities), done: 0, display: 0, ceiling: 0, timer: null };
+  recomputePlanCeiling();
+  applyPlanProgress(0);
+  planProgress.timer = setInterval(() => {
+    planProgress.display += (planProgress.ceiling - planProgress.display) * 0.035;
+    applyPlanProgress(planProgress.display);
+  }, 120);
+}
+
+function recomputePlanCeiling() {
+  if (planProgress.done >= planProgress.total) {
+    planProgress.ceiling = 100;
+    return;
   }
+  const share = 100 / planProgress.total;
+  planProgress.ceiling = Math.min(planProgress.done * share + share * 0.9, 96);
+}
+
+function setPlanCitiesDone(done) {
+  if (!planProgress) return;
+  planProgress.done = done;
+  recomputePlanCeiling();
+  planProgress.display = Math.max(planProgress.display, done * (100 / planProgress.total));
+  applyPlanProgress(planProgress.display);
+}
+
+function finishPlanProgress() {
+  if (!planProgress) return;
+  clearInterval(planProgress.timer);
+  planProgress.timer = null;
+  applyPlanProgress(100);
+}
+
+function endPlanProgress() {
+  if (planProgress?.timer) clearInterval(planProgress.timer);
+  planProgress = null;
+  applyPlanProgress(0);
 }
 
 let _stepTransitionLock = false;
@@ -2239,13 +2288,14 @@ function setPlanningLoading(isLoading) {
     if (loadingInterval) clearInterval(loadingInterval);
     loadingInterval = null;
     loadingMessageIndex = 0;
+    endPlanProgress();
     return;
   }
 
   const tripName = (els.tripName.value || state.tripName || 'your trip').trim();
   overlay.querySelector('[data-trip-name]').textContent = `Planning your trip to ${tripName}`;
   overlay.querySelector('[data-loading-message]').textContent = LOADING_MESSAGES[0];
-  updatePlanningStatus('Starting planning...', '', 0);
+  updatePlanningStatus('Starting planning...', '');
   overlay.classList.remove('hidden');
   refreshOverlayInterlocks();
 
@@ -8048,7 +8098,8 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
   let buffer = '';
   let completedCities = 0;
 
-  updatePlanningStatus(`Planning ${cities[0]?.name || 'trip'}...`, `City 0 of ${cities.length} done`, 0);
+  updatePlanningStatus(`Planning ${cities[0]?.name || 'trip'}...`, `City 0 of ${cities.length} done`);
+  beginPlanProgress(cities.length);
 
   const handleEvent = async (payloadText) => {
     const evt = JSON.parse(payloadText);
@@ -8079,23 +8130,23 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
       renderActivities();
 
       completedCities += 1;
+      setPlanCitiesDone(completedCities);
       const nextCity = cities[completedCities]?.name;
       const progress = `City ${completedCities} of ${cities.length} done`;
-      const percent = (completedCities / cities.length) * 100;
       if (nextCity) {
         updatePlanningStatus(
           `Got ${cityActivities.length} activities for ${evt.city}! Moving to ${nextCity}...`,
-          progress,
-          percent
+          progress
         );
-        setTimeout(() => updatePlanningStatus(`Planning ${nextCity}...`, progress, percent), 700);
+        setTimeout(() => updatePlanningStatus(`Planning ${nextCity}...`, progress), 700);
       } else {
-        updatePlanningStatus(`Got ${cityActivities.length} activities for ${evt.city}!`, progress, percent);
+        updatePlanningStatus(`Got ${cityActivities.length} activities for ${evt.city}!`, progress);
       }
     }
 
     if (evt.type === 'done') {
-      updatePlanningStatus('Finalizing...', `City ${completedCities} of ${cities.length} done`, 100);
+      updatePlanningStatus('Finalizing...', `City ${completedCities} of ${cities.length} done`);
+      finishPlanProgress();
     }
   };
 

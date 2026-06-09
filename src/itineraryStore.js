@@ -37,7 +37,10 @@ function createId() {
 
 function summarizeItinerary(itinerary = {}) {
   const days = Array.isArray(itinerary.days) ? itinerary.days : [];
-  const activityCount = days.reduce((sum, day) => sum + (Array.isArray(day.activities) ? day.activities.length : 0), 0);
+  const nestedCount = days.reduce((sum, day) => sum + (Array.isArray(day.activities) ? day.activities.length : 0), 0);
+  const activityCount = nestedCount > 0
+    ? nestedCount
+    : (Array.isArray(itinerary.activities) ? itinerary.activities.length : 0);
   const bookingCount = Array.isArray(itinerary.bookings) ? itinerary.bookings.length : 0;
   return {
     id: itinerary.id,
@@ -228,5 +231,6 @@ module.exports = {
   listItineraries,
   deleteItinerary,
   addParsedBookings,
-  updateBookingChecklist
+  updateBookingChecklist,
+  summarizeItinerary
 };
