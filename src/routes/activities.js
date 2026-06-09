@@ -460,20 +460,47 @@ Return ONLY valid JSON (no markdown fences):
 
     debugLog('arrange', `START model=${ARRANGE_MODEL} flexible=${flexible.length} locked=${resolvedLocked.length} days=${days.length} city="${cityName}" matrix_pairs=${matrixPairCount}`);
 
-    async function callLlmForJson(prompt) {
-      debugLog('arrange', `LLM_CALL model=${ARRANGE_MODEL} prompt_chars=${prompt.length}`);
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const ARRANGE_SYSTEM = [{ type: 'text', text: STATIC_ARRANGE_SYSTEM, cache_control: { type: 'ephemeral' } }];
+
+    // Call 1: reason about the schedule as text. tool_choice:none means there is
+    // no tool to defer, so thinking terminates normally instead of running away.
+    async function reasonAboutSchedule(prompt) {
       const stream = anthropic.messages.stream({
         model: ARRANGE_MODEL,
-        max_tokens: 32000,
+        max_tokens: 24000,
         thinking: { type: 'adaptive' },
         output_config: { effort: 'medium' },
-        system: [{ type: 'text', text: STATIC_ARRANGE_SYSTEM, cache_control: { type: 'ephemeral' } }],
-        tools: [SCHEDULE_TOOL],
-        tool_choice: { type: 'auto' },
-        messages: [{ role: 'user', content: prompt }]
+        system: ARRANGE_SYSTEM,
+        tool_choice: { type: 'none' },
+        messages: [{ role: 'user', content: [{ type: 'text', text: prompt, cache_control: { type: 'ephemeral' } }] }]
       });
       const response = await stream.finalMessage();
+      const u = response.usage || {};
+      const text = extractText(response.content);
+      debugLog('arrange', `REASON_PASS finish=${response.stop_reason} chars=${text.length} cache_write=${u.cache_creation_input_tokens || 0} cache_read=${u.cache_read_input_tokens || 0}`);
+      return text;
+    }
+
+    // Call 2: force the schema. No thinking — fast and always emits the tool call.
+    // `reasoning` (from Call 1) is optional context; repair calls pass none.
+    async function submitSchedule(prompt, reasoning = '') {
+      // Cache the shared prompt prefix (identical across Call 1, Call 2, and repairs);
+      // the per-call reasoning goes in a separate block AFTER the breakpoint so the
+      // cached prefix stays byte-stable.
+      const userBlocks = [{ type: 'text', text: prompt, cache_control: { type: 'ephemeral' } }];
+      if (reasoning) {
+        userBlocks.push({ type: 'text', text: `\n\nYour prior reasoning about this schedule:\n${reasoning}\n\nNow emit the final schedule via submit_schedule.` });
+      }
+      debugLog('arrange', `SUBMIT_CALL model=${ARRANGE_MODEL} prompt_chars=${prompt.length} reasoning_chars=${reasoning.length}`);
+      const response = await anthropic.messages.create({
+        model: ARRANGE_MODEL,
+        max_tokens: 16384,
+        system: ARRANGE_SYSTEM,
+        tools: [SCHEDULE_TOOL],
+        tool_choice: { type: 'tool', name: 'submit_schedule' },
+        messages: [{ role: 'user', content: userBlocks }]
+      });
       const toolUse = (response.content || []).find((c) => c.type === 'tool_use' && c.name === 'submit_schedule');
       const u = response.usage || {};
       debugLog('arrange', `LLM_RESPONSE finish=${response.stop_reason} tool_use=${!!toolUse} cache_write=${u.cache_creation_input_tokens || 0} cache_read=${u.cache_read_input_tokens || 0}`);
@@ -482,11 +509,7 @@ Return ONLY valid JSON (no markdown fences):
         const rawText = extractText(response.content).slice(0, 800);
         console.error('arrange response text (first 800 chars):', rawText);
         const err = new Error('Failed to parse arrangement JSON');
-        err.diagnostic = {
-          stop_reason: response.stop_reason,
-          tool_use: false,
-          head: rawText
-        };
+        err.diagnostic = { stop_reason: response.stop_reason, tool_use: false, head: rawText };
         throw err;
       }
       return toolUse.input;
@@ -542,7 +565,8 @@ Return ONLY valid JSON (no markdown fences):
         return Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
       }).length;
       debugLog('arrange', `PROMPT_INFO cluster_block=${hasClusterBlock} commute_block=${hasCommuteBlock} acts_with_coords=${activitiesWithCoords}/${flexible.length}`);
-      const parsed = await callLlmForJson(prompt);
+      const reasoning = await reasonAboutSchedule(prompt);
+      const parsed = await submitSchedule(prompt, reasoning);
       let { placements, unplaced } = sanitizePlacements(parsed);
       debugLog('arrange', `FIRST_PASS placed=${Object.keys(placements).length} unplaced=${unplaced.length} unplaced_ids=${unplaced.map((u) => u.id).join(',') || 'none'}`);
 
@@ -561,7 +585,7 @@ Return ONLY valid JSON (no markdown fences):
         repairUsed = true;
         try {
           const repairPrompt = buildRepairPrompt({ placements, issues: v.issues, activitiesById });
-          const repaired = await callLlmForJson(repairPrompt);
+          const repaired = await submitSchedule(repairPrompt);
           const repairedSan = sanitizePlacements(repaired);
           placements = repairedSan.placements;
           unplaced = [...unplaced, ...repairedSan.unplaced];
