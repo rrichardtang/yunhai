@@ -960,11 +960,16 @@ function showToast(message, type = 'info') {
   return toastId;
 }
 
-function updatePlanningStatus(status = '', progress = '') {
+function updatePlanningStatus(status = '', progress = '', percent = null) {
   const overlay = document.getElementById('planningOverlay');
   if (!overlay) return;
   overlay.querySelector('[data-city-status]').textContent = status;
   overlay.querySelector('[data-progress]').textContent = progress;
+  if (percent !== null) {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+    overlay.querySelector('[data-progress-fill]').style.width = `${clamped}%`;
+    overlay.querySelector('.planning-bar')?.setAttribute('aria-valuenow', String(clamped));
+  }
 }
 
 let _stepTransitionLock = false;
@@ -2240,7 +2245,7 @@ function setPlanningLoading(isLoading) {
   const tripName = (els.tripName.value || state.tripName || 'your trip').trim();
   overlay.querySelector('[data-trip-name]').textContent = `Planning your trip to ${tripName}`;
   overlay.querySelector('[data-loading-message]').textContent = LOADING_MESSAGES[0];
-  updatePlanningStatus('Starting planning...', '');
+  updatePlanningStatus('Starting planning...', '', 0);
   overlay.classList.remove('hidden');
   refreshOverlayInterlocks();
 
@@ -8043,7 +8048,7 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
   let buffer = '';
   let completedCities = 0;
 
-  updatePlanningStatus(`Planning ${cities[0]?.name || 'trip'}...`, `City 0 of ${cities.length} done`);
+  updatePlanningStatus(`Planning ${cities[0]?.name || 'trip'}...`, `City 0 of ${cities.length} done`, 0);
 
   const handleEvent = async (payloadText) => {
     const evt = JSON.parse(payloadText);
@@ -8076,19 +8081,21 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
       completedCities += 1;
       const nextCity = cities[completedCities]?.name;
       const progress = `City ${completedCities} of ${cities.length} done`;
+      const percent = (completedCities / cities.length) * 100;
       if (nextCity) {
         updatePlanningStatus(
           `Got ${cityActivities.length} activities for ${evt.city}! Moving to ${nextCity}...`,
-          progress
+          progress,
+          percent
         );
-        setTimeout(() => updatePlanningStatus(`Planning ${nextCity}...`, progress), 700);
+        setTimeout(() => updatePlanningStatus(`Planning ${nextCity}...`, progress, percent), 700);
       } else {
-        updatePlanningStatus(`Got ${cityActivities.length} activities for ${evt.city}!`, progress);
+        updatePlanningStatus(`Got ${cityActivities.length} activities for ${evt.city}!`, progress, percent);
       }
     }
 
     if (evt.type === 'done') {
-      updatePlanningStatus('Finalizing...', `City ${completedCities} of ${cities.length} done`);
+      updatePlanningStatus('Finalizing...', `City ${completedCities} of ${cities.length} done`, 100);
     }
   };
 
@@ -8512,6 +8519,15 @@ function mountPlanningOverlay() {
       <div class="planning-trip" data-trip-name></div>
       <div class="planning-status" data-city-status></div>
       <div class="planning-progress" data-progress></div>
+      <div class="planning-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="planning-bar-fill" data-progress-fill>
+          <span class="planning-bar-plane" aria-hidden="true">
+            <svg viewBox="-13 -8 27 16" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12,0 L-7,-7 L-2,-2 L-12,-2 L-9,0 L-12,2 L-2,2 L-7,7 Z" fill="#F7F3EE" stroke="#0b2c58" stroke-width=".6" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+      </div>
       <div class="planning-message loading-visible" data-loading-message></div>
     </div>
   `;
