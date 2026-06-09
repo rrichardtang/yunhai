@@ -4,6 +4,13 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-06-09] Loading-modal progress bar with airplane pointer + saved-trip activity count fix
+
+- **Added a planning progress bar** to the loading modal (`public/app.js`, `public/styles.css`) between the progress pill and rotating message. Driven by the real SSE signal (cities completed / total) which is per-city atomic (one LLM call each).
+- **Airplane pointer**: the bar's leading edge is a paper-plane SVG (same glyph as the globe) pointing in the direction of travel, with a drop-shadow and gentle idle bob (`planningPlaneBob`, disabled under `prefers-reduced-motion`).
+- **Eased trickle**: because per-city is the only real granularity (a 1-city trip would otherwise jump 0→100 at the end), the bar width is owned by a 120ms trickle loop (`beginPlanProgress`/`setPlanCitiesDone`/`finishPlanProgress`/`endPlanProgress`) that eases toward a ceiling just below the next city milestone (`done·share + 0.9·share`, capped 96%), snaps to each real city-done point, pins ceiling to 100% once all cities are done (prevents a backward sag before the `done` event), and jumps to 100% on done. CSS `width` transition softened to `.2s linear` so trickle ticks flow.
+- **Fixed saved trips showing "0 activities"** in the resume popup and My Trips panel. `summarizeItinerary` (`src/itineraryStore.js`) only counted activities nested in `days[].activities`, so trips whose activities weren't arranged into days reported 0 despite a populated top-level `activities` array. Now falls back to the top-level `activities` length when no day-nested activities exist (matching the count the save/update paths already use). Read-path fix — no migration needed. Exported `summarizeItinerary` and added `src/itineraryStore.test.js` (3 tests: nested, fallback, empty). 127/127 tests pass.
+
 ## [2026-06-03] Resume-trips popup on app load
 
 - **Added a "Welcome back" popup** that auto-shows on app load so returning users can resume a trip immediately instead of scrolling to the My Trips panel. Triggered in `init()` (`public/app.js`) after auth/entitlement/trip-fetch, only when ≥1 saved trip or in-progress draft exists and the user did not arrive via a `?itinerary=` share link.
