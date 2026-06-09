@@ -463,16 +463,17 @@ Return ONLY valid JSON (no markdown fences):
     async function callLlmForJson(prompt) {
       debugLog('arrange', `LLM_CALL model=${ARRANGE_MODEL} prompt_chars=${prompt.length}`);
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const response = await anthropic.messages.create({
+      const stream = anthropic.messages.stream({
         model: ARRANGE_MODEL,
-        max_tokens: 16384,
+        max_tokens: 32000,
         thinking: { type: 'adaptive' },
-        output_config: { effort: 'high' },
+        output_config: { effort: 'medium' },
         system: [{ type: 'text', text: STATIC_ARRANGE_SYSTEM, cache_control: { type: 'ephemeral' } }],
         tools: [SCHEDULE_TOOL],
         tool_choice: { type: 'auto' },
         messages: [{ role: 'user', content: prompt }]
       });
+      const response = await stream.finalMessage();
       const toolUse = (response.content || []).find((c) => c.type === 'tool_use' && c.name === 'submit_schedule');
       const u = response.usage || {};
       debugLog('arrange', `LLM_RESPONSE finish=${response.stop_reason} tool_use=${!!toolUse} cache_write=${u.cache_creation_input_tokens || 0} cache_read=${u.cache_read_input_tokens || 0}`);
