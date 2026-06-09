@@ -12,7 +12,7 @@ const { recall, observe } = require('../memory');
 const { search, isConfigured: isBraveConfigured, shouldUseBrave } = require('../braveSearch');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('../arrangeConfig');
 const { buildBookingLinks } = require('../services/bookingLinks');
-const { buildDirectArrangePrompt, buildRepairPrompt } = require('../services/arrangePromptDirect');
+const { buildDirectArrangePrompt, buildRepairPrompt, STATIC_ARRANGE_SYSTEM } = require('../services/arrangePromptDirect');
 const { validate: validateArrangement } = require('../arrangeValidator');
 const { adjust: adjustArrangementTimes } = require('../services/arrangeTimeAdjuster');
 const { minutesFromTime } = require('../../shared/timeHelpers');
@@ -23,6 +23,41 @@ const { debugLog } = require('../services/debugLog');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
 const ARRANGE_MODEL = 'claude-sonnet-4-6';
+
+const SCHEDULE_TOOL = {
+  name: 'submit_schedule',
+  description: 'Submit the final activity schedule with concrete date+time for placements and reasons for unplaced activities.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      placements: {
+        type: 'object',
+        description: 'Map of activity id to scheduled date and time.',
+        additionalProperties: {
+          type: 'object',
+          properties: {
+            date: { type: 'string', description: 'YYYY-MM-DD' },
+            time: { type: 'string', description: '24-hour HH:MM' }
+          },
+          required: ['date', 'time']
+        }
+      },
+      unplaced: {
+        type: 'array',
+        description: 'Activities that could not be placed and why.',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            reason: { type: 'string' }
+          },
+          required: ['id', 'reason']
+        }
+      }
+    },
+    required: ['placements', 'unplaced']
+  }
+};
 
 const BREAKS_LABELS = ['back-to-back days', 'short breaks between activities', 'moderate breaks between activities', 'generous breaks between activities', 'lots of downtime between activities'];
 
@@ -425,53 +460,22 @@ Return ONLY valid JSON (no markdown fences):
 
     debugLog('arrange', `START model=${ARRANGE_MODEL} flexible=${flexible.length} locked=${resolvedLocked.length} days=${days.length} city="${cityName}" matrix_pairs=${matrixPairCount}`);
 
-    const SCHEDULE_TOOL = {
-      name: 'submit_schedule',
-      description: 'Submit the final activity schedule with concrete date+time for placements and reasons for unplaced activities.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          placements: {
-            type: 'object',
-            description: 'Map of activity id to scheduled date and time.',
-            additionalProperties: {
-              type: 'object',
-              properties: {
-                date: { type: 'string', description: 'YYYY-MM-DD' },
-                time: { type: 'string', description: '24-hour HH:MM' }
-              },
-              required: ['date', 'time']
-            }
-          },
-          unplaced: {
-            type: 'array',
-            description: 'Activities that could not be placed and why.',
-            items: {
-              type: 'object',
-              properties: {
-                id: { type: 'string' },
-                reason: { type: 'string' }
-              },
-              required: ['id', 'reason']
-            }
-          }
-        },
-        required: ['placements', 'unplaced']
-      }
-    };
-
     async function callLlmForJson(prompt) {
       debugLog('arrange', `LLM_CALL model=${ARRANGE_MODEL} prompt_chars=${prompt.length}`);
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const response = await anthropic.messages.create({
         model: ARRANGE_MODEL,
         max_tokens: 16384,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: 'high' },
+        system: [{ type: 'text', text: STATIC_ARRANGE_SYSTEM, cache_control: { type: 'ephemeral' } }],
         tools: [SCHEDULE_TOOL],
-        tool_choice: { type: 'tool', name: 'submit_schedule' },
+        tool_choice: { type: 'auto' },
         messages: [{ role: 'user', content: prompt }]
       });
       const toolUse = (response.content || []).find((c) => c.type === 'tool_use' && c.name === 'submit_schedule');
-      debugLog('arrange', `LLM_RESPONSE finish=${response.stop_reason} tool_use=${!!toolUse}`);
+      const u = response.usage || {};
+      debugLog('arrange', `LLM_RESPONSE finish=${response.stop_reason} tool_use=${!!toolUse} cache_write=${u.cache_creation_input_tokens || 0} cache_read=${u.cache_read_input_tokens || 0}`);
       if (!toolUse || !toolUse.input || typeof toolUse.input !== 'object') {
         console.error(`arrange tool_use missing (stop_reason=${response.stop_reason})`);
         const rawText = extractText(response.content).slice(0, 800);
@@ -511,6 +515,7 @@ Return ONLY valid JSON (no markdown fences):
     let firstPassIssues = [];
     let repairUsed = false;
     let secondPassValid = false;
+    let forceDroppedCount = 0;
 
     try {
       const prompt = buildDirectArrangePrompt({
@@ -550,7 +555,8 @@ Return ONLY valid JSON (no markdown fences):
         debugLog('arrange', 'VALIDATE_OK first_pass');
       }
 
-      if (!v.ok) {
+      const MAX_REPAIR_ITERATIONS = 2;
+      for (let iter = 1; !v.ok && iter <= MAX_REPAIR_ITERATIONS; iter += 1) {
         repairUsed = true;
         try {
           const repairPrompt = buildRepairPrompt({ placements, issues: v.issues, activitiesById });
@@ -568,10 +574,11 @@ Return ONLY valid JSON (no markdown fences):
           });
           v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById, commuteMatrix: matrix, unplacedIds: unplaced.map((u) => u.id) });
           secondPassValid = v.ok;
-          debugLog('arrange', `REPAIR_PASS ok=${v.ok} remaining_issues=${(v.issues || []).map((i) => i.type).join(',') || 'none'}`);
+          debugLog('arrange', `REPAIR_PASS iter=${iter} ok=${v.ok} remaining_issues=${(v.issues || []).map((i) => i.type).join(',') || 'none'}`);
         } catch (repairErr) {
           console.warn('[arrange] repair pass failed:', repairErr.message);
-          debugLog('arrange', `REPAIR_PASS_THREW err="${repairErr?.message || repairErr}"`);
+          debugLog('arrange', `REPAIR_PASS_THREW iter=${iter} err="${repairErr?.message || repairErr}"`);
+          break;
         }
       }
 
@@ -610,6 +617,7 @@ Return ONLY valid JSON (no markdown fences):
           if (placements[id]) {
             unplaced.push({ id, reason: 'physics_unresolved' });
             delete placements[id];
+            forceDroppedCount += 1;
           }
         }
         debugLog('arrange', `FORCE_DROP ids=${[...toDrop].join(',') || 'none'}`);
@@ -625,6 +633,8 @@ Return ONLY valid JSON (no markdown fences):
         issues: firstPassIssues,
         repairUsed,
         secondPassValid,
+        forceDropped: forceDroppedCount > 0,
+        forceDroppedCount,
         flexibleCount: flexible.length,
         lockedCount: resolvedLocked.length
       });

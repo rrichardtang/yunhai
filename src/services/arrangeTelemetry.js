@@ -32,11 +32,13 @@ function summarize(runs) {
   let firstPassValid = 0;
   let repairUsed = 0;
   let secondPassValid = 0;
+  let forceDropped = 0;
   const issueTypes = {};
   for (const r of runs) {
     if (r.firstPassValid) firstPassValid += 1;
     if (r.repairUsed) repairUsed += 1;
     if (r.secondPassValid) secondPassValid += 1;
+    if (r.forceDropped) forceDropped += 1;
     for (const issue of r.issues || []) {
       const t = issue.type || 'unknown';
       issueTypes[t] = (issueTypes[t] || 0) + 1;
@@ -47,6 +49,7 @@ function summarize(runs) {
     firstPassValidPct: Math.round((firstPassValid / total) * 100),
     repairUsedPct: Math.round((repairUsed / total) * 100),
     secondPassValidPct: repairUsed ? Math.round((secondPassValid / repairUsed) * 100) : null,
+    forceDropPct: Math.round((forceDropped / total) * 100),
     topIssueTypes: Object.entries(issueTypes).sort((a, b) => b[1] - a[1]).slice(0, 10)
   };
 }
