@@ -463,43 +463,19 @@ Return ONLY valid JSON (no markdown fences):
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const ARRANGE_SYSTEM = [{ type: 'text', text: STATIC_ARRANGE_SYSTEM, cache_control: { type: 'ephemeral' } }];
 
-    // Call 1: reason about the schedule as text. tool_choice:none means there is
-    // no tool to defer, so thinking terminates normally instead of running away.
-    async function reasonAboutSchedule(prompt) {
-      const stream = anthropic.messages.stream({
-        model: ARRANGE_MODEL,
-        max_tokens: 24000,
-        thinking: { type: 'adaptive' },
-        output_config: { effort: 'medium' },
-        system: ARRANGE_SYSTEM,
-        tool_choice: { type: 'none' },
-        messages: [{ role: 'user', content: [{ type: 'text', text: prompt, cache_control: { type: 'ephemeral' } }] }]
-      });
-      const response = await stream.finalMessage();
-      const u = response.usage || {};
-      const text = extractText(response.content);
-      debugLog('arrange', `REASON_PASS finish=${response.stop_reason} chars=${text.length} cache_write=${u.cache_creation_input_tokens || 0} cache_read=${u.cache_read_input_tokens || 0}`);
-      return text;
-    }
-
-    // Call 2: force the schema. No thinking — fast and always emits the tool call.
-    // `reasoning` (from Call 1) is optional context; repair calls pass none.
-    async function submitSchedule(prompt, reasoning = '') {
-      // Cache the shared prompt prefix (identical across Call 1, Call 2, and repairs);
-      // the per-call reasoning goes in a separate block AFTER the breakpoint so the
-      // cached prefix stays byte-stable.
-      const userBlocks = [{ type: 'text', text: prompt, cache_control: { type: 'ephemeral' } }];
-      if (reasoning) {
-        userBlocks.push({ type: 'text', text: `\n\nYour prior reasoning about this schedule:\n${reasoning}\n\nNow emit the final schedule via submit_schedule.` });
-      }
-      debugLog('arrange', `SUBMIT_CALL model=${ARRANGE_MODEL} prompt_chars=${prompt.length} reasoning_chars=${reasoning.length}`);
+    // Forced-tool call, no thinking — fast (~10-15s) and always emits the schema.
+    // Adaptive thinking was tried here but consistently ran for minutes on dense
+    // trips (it auto-enables interleaved thinking, which Sonnet 4.6 can't hard-cap),
+    // so quality is driven by the few-shot + surgical repair instead.
+    async function submitSchedule(prompt) {
+      debugLog('arrange', `SUBMIT_CALL model=${ARRANGE_MODEL} prompt_chars=${prompt.length}`);
       const response = await anthropic.messages.create({
         model: ARRANGE_MODEL,
         max_tokens: 16384,
         system: ARRANGE_SYSTEM,
         tools: [SCHEDULE_TOOL],
         tool_choice: { type: 'tool', name: 'submit_schedule' },
-        messages: [{ role: 'user', content: userBlocks }]
+        messages: [{ role: 'user', content: [{ type: 'text', text: prompt, cache_control: { type: 'ephemeral' } }] }]
       });
       const toolUse = (response.content || []).find((c) => c.type === 'tool_use' && c.name === 'submit_schedule');
       const u = response.usage || {};
@@ -565,8 +541,7 @@ Return ONLY valid JSON (no markdown fences):
         return Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
       }).length;
       debugLog('arrange', `PROMPT_INFO cluster_block=${hasClusterBlock} commute_block=${hasCommuteBlock} acts_with_coords=${activitiesWithCoords}/${flexible.length}`);
-      const reasoning = await reasonAboutSchedule(prompt);
-      const parsed = await submitSchedule(prompt, reasoning);
+      const parsed = await submitSchedule(prompt);
       let { placements, unplaced } = sanitizePlacements(parsed);
       debugLog('arrange', `FIRST_PASS placed=${Object.keys(placements).length} unplaced=${unplaced.length} unplaced_ids=${unplaced.map((u) => u.id).join(',') || 'none'}`);
 
@@ -587,6 +562,13 @@ Return ONLY valid JSON (no markdown fences):
           const repairPrompt = buildRepairPrompt({ placements, issues: v.issues, activitiesById });
           const repaired = await submitSchedule(repairPrompt);
           const repairedSan = sanitizePlacements(repaired);
+          // A repair that returns an empty schedule validates as "ok" (no
+          // placements → no conflicts), silently wiping a good first pass.
+          // Reject it and keep the prior placements for the deterministic adjuster.
+          if (Object.keys(repairedSan.placements).length === 0 && Object.keys(placements).length > 0) {
+            debugLog('arrange', `REPAIR_REJECT iter=${iter} reason=empty_result kept_prior=${Object.keys(placements).length}`);
+            break;
+          }
           placements = repairedSan.placements;
           unplaced = [...unplaced, ...repairedSan.unplaced];
           const placedIds = new Set(Object.keys(placements));
