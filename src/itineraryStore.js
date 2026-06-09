@@ -35,18 +35,30 @@ function createId() {
   return `it_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function cityDateSpanDays(cities = []) {
+  return cities.reduce((sum, city) => {
+    const start = Date.parse(`${city?.startDate}T00:00:00Z`);
+    const end = Date.parse(`${city?.endDate}T00:00:00Z`);
+    if (Number.isNaN(start) || Number.isNaN(end) || end < start) return sum;
+    return sum + Math.floor((end - start) / 86400000) + 1;
+  }, 0);
+}
+
 function summarizeItinerary(itinerary = {}) {
   const days = Array.isArray(itinerary.days) ? itinerary.days : [];
   const nestedCount = days.reduce((sum, day) => sum + (Array.isArray(day.activities) ? day.activities.length : 0), 0);
   const activityCount = nestedCount > 0
     ? nestedCount
     : (Array.isArray(itinerary.activities) ? itinerary.activities.length : 0);
+  const dayCount = days.length > 0
+    ? days.length
+    : cityDateSpanDays(Array.isArray(itinerary.cities) ? itinerary.cities : []);
   const bookingCount = Array.isArray(itinerary.bookings) ? itinerary.bookings.length : 0;
   return {
     id: itinerary.id,
     tripName: itinerary.tripName || 'Untitled Trip',
     generatedAt: itinerary.generatedAt,
-    days: days.length,
+    days: dayCount,
     activityCount,
     bookingCount
   };
