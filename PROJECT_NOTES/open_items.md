@@ -18,3 +18,15 @@
 
 ---
 
+
+## [2026-06-09] Verify Arrange reliability levers on the VPS
+**Status:** Pending input
+**Description:** `feature/arrange-reliability-thinking` is pushed but unverified — local server/tests are not run for this project. On the VPS: (1) record BEFORE baseline from `GET /api/admin/arrange-stats?limit=200` (`firstPassValidPct`, `repairUsedPct`, `secondPassValidPct`, `forceDropPct`, `topIssueTypes`); (2) run a dense case (re-use the Kyoto 18+4 / 5-meal trip) and confirm in arrange debug logs: `tool_use=true` stays true (watch for prose / `ERROR msg=` from the `auto` switch or a rejected untyped param), `cache_write>0` then `cache_read>0` on a 2nd call within 5 min, a smaller first-pass `VALIDATE_FAIL count`, a 2nd `REPAIR_PASS iter=2` on hard cases, and all 5 meals surviving; (3) compare arrange-stats after — expect `firstPassValidPct` up and `forceDropPct` down.
+**Context:** See decisions [2026-06-09] and changelog [2026-06-09]. If `tool_use=false` (prose) shows up in practice, add a one-shot forced-tool fallback in `callLlmForJson`. If meal/ordering drops persist, revisit the deferred deterministic reorder / meal-enforcement options.
+**Next action:** Owner deploys the branch to the VPS and runs the before/after comparison.
+
+## [2026-06-09] Missing commute pairs from Google distance-matrix (transit ZERO_RESULTS)
+**Status:** Deferred
+**Description:** Arrange logs show `live_fail=25` and repeated `[dm] element-status=ZERO_RESULTS mode=transit` — some venue pairs return no transit duration, so the adjuster falls back to a 10-min walking assumption and the LLM schedules without real commute data for those pairs. Orthogonal to the LLM scaffolding work; affects scheduling accuracy.
+**Context:** Surfaced in the same Kyoto run analyzed for the reliability levers. Likely needs a mode fallback (transit→driving/walking) or caching of a coarse fallback estimate in `distanceMatrix`/commute-matrix services.
+**Next action:** Investigate distance-matrix mode fallback when transit returns ZERO_RESULTS.

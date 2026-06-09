@@ -1253,3 +1253,10 @@ Generation prompt was telling Claude to produce a hard floor of ~72 activities f
 - Applied client-side migration at state hydration path (snapshot load and SSE city event)
 - Added `src/activityMigration.test.js` with 11 tests (all passing); `npm test` 22/22 green
 - Pushed branch `feature/arrange-schema-migration`
+
+## [2026-06-09] Arrange reliability: thinking + caching + few-shot + stronger repair
+- Branch `feature/arrange-reliability-thinking` (pushed). A real Kyoto run (18 flexible + 4 locked, 5 meals) produced a 16-violation first pass and dropped 7 activities incl. 3 of 5 meals; root cause was forced `tool_choice` blocking extended thinking, so the model never reasoned through meal opening_hours or commute ordering.
+- `src/routes/activities.js`: `callLlmForJson` now uses `tool_choice:auto` + `thinking:{type:'adaptive'}` + `output_config:{effort:'high'}` (forced tool use is incompatible with thinking). Hoisted `SCHEDULE_TOOL` to module scope; passes a cached `system` block (`cache_control:ephemeral`) carrying the static rules + few-shot. Repair loop now runs up to 2 iterations. Added `forceDroppedCount` tracking → `forceDropped` in success-path `logRun`; `LLM_RESPONSE` log now includes cache_write/cache_read tokens.
+- `src/services/arrangePromptDirect.js`: extracted `STATIC_ARRANGE_SYSTEM` constant (static rules + commute-aware-ordering rule + worked few-shot example centered on opening-hours-aware meal slotting); `buildDirectArrangePrompt` now returns only the volatile per-request body; `buildRepairPrompt` rewritten to group issues by type and emit a surgical directive per type.
+- `src/services/arrangeTelemetry.js`: `summarize()` now reports `forceDropPct`.
+- SDK stays at `@anthropic-ai/sdk` 0.39.0; verified `messages.create` forwards the body verbatim (no field whitelist), so untyped `thinking`/`output_config` reach the wire.
