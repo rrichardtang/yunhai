@@ -13,6 +13,15 @@ function act(id, name, durationMin, openingHours = '') {
   };
 }
 
+function meal(id, name, durationMin, openingHours = '') {
+  return {
+    id,
+    name,
+    type: 'meal',
+    timing: { duration_minutes: durationMin, opening_hours: openingHours }
+  };
+}
+
 test('adjuster nudges overlapping placements apart using commute matrix', () => {
   const activitiesById = {
     A: act('A', 'Shibuya Sky', 90, '10:00-22:30'),
@@ -112,6 +121,38 @@ test('adjuster skips commute padding when matrix value is below walking threshol
   assert.strictEqual(result.placements.A.time, '09:00');
   assert.strictEqual(result.placements.B.time, '09:50');
   assert.strictEqual(result.drops.length, 0);
+});
+
+test('adjuster anchors a lunch meal in its window instead of cascading it out', () => {
+  // Mirrors the Asuka case: a long morning activity + big commute would push the
+  // lunch meal past its closing time. Meal-first anchoring must protect it.
+  const activitiesById = {
+    A: act('A', 'Long Morning Tour', 180, '09:00-17:00'),
+    M: meal('M', 'Lunch-only Restaurant', 60, '11:00-15:00')
+  };
+  const placements = {
+    A: { date: '2026-05-20', time: '09:00' },
+    M: { date: '2026-05-20', time: '12:00' }
+  };
+  const commuteMatrix = { A: { M: 90 } };
+  const result = adjust({ placements, days, activitiesById, commuteMatrix });
+  // Meal stays inside the lunch window (11:00-14:30) and its opening hours, not dropped.
+  assert.ok(result.placements.M, 'meal should be placed');
+  const mealStart = Number(result.placements.M.time.slice(0, 2)) * 60 + Number(result.placements.M.time.slice(3));
+  assert.ok(mealStart >= 11 * 60 && mealStart < 14 * 60 + 30, `meal start ${result.placements.M.time} in lunch window`);
+  assert.ok(!result.drops.find((d) => d.id === 'M'), 'meal not dropped');
+});
+
+test('adjuster drops a meal with no feasible slot on the day', () => {
+  // Dinner-only venue on a day that closes before it can fit (the Wagyu case).
+  const tightDay = { date: '2026-05-20', windowStart: '09:00', windowEnd: '18:00' };
+  const activitiesById = {
+    M: meal('M', 'Dinner-only Teppanyaki', 90, '17:00-23:00')
+  };
+  const placements = { M: { date: '2026-05-20', time: '17:00' } };
+  const result = adjust({ placements, days: [tightDay], activitiesById, commuteMatrix: {} });
+  assert.ok(!result.placements.M, 'meal cannot fit, should be dropped');
+  assert.strictEqual(result.drops[0].id, 'M');
 });
 
 test('adjuster respects a locked-only day (no flexible placements, no crash)', () => {
