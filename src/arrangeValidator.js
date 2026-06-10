@@ -232,4 +232,4 @@ function validate({ placements, lockedActivities = [], days, activitiesById, com
   return { ok: issues.length === 0, issues };
 }
 
-module.exports = { validate, overlaps, parseOpeningHours, getDuration, effectiveDayStart, effectiveDayEnd };
+module.exports = { validate, overlaps, parseOpeningHours, parseOpeningHoursContains, getDuration, effectiveDayStart, effectiveDayEnd };

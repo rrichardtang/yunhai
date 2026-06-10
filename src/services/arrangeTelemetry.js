@@ -29,28 +29,33 @@ async function readRecent(limit = 100) {
 function summarize(runs) {
   const total = runs.length;
   if (!total) return { total: 0 };
-  let firstPassValid = 0;
-  let repairUsed = 0;
-  let secondPassValid = 0;
-  let forceDropped = 0;
-  const issueTypes = {};
+  let errors = 0;
+  let totalFlexible = 0;
+  let totalPlaced = 0;
+  let totalUnplaced = 0;
+  let redistributed = 0;
+  let diagnosticsFired = 0;
+  const droppedByReason = {};
   for (const r of runs) {
-    if (r.firstPassValid) firstPassValid += 1;
-    if (r.repairUsed) repairUsed += 1;
-    if (r.secondPassValid) secondPassValid += 1;
-    if (r.forceDropped) forceDropped += 1;
-    for (const issue of r.issues || []) {
-      const t = issue.type || 'unknown';
-      issueTypes[t] = (issueTypes[t] || 0) + 1;
+    if (r.error) { errors += 1; continue; }
+    totalFlexible += r.flexibleCount || 0;
+    totalPlaced += r.placedCount || 0;
+    totalUnplaced += r.unplacedCount || 0;
+    redistributed += r.mealRedistributed || 0;
+    if (r.diagnosticsCount) diagnosticsFired += 1;
+    for (const [reason, n] of Object.entries(r.droppedByReason || {})) {
+      droppedByReason[reason] = (droppedByReason[reason] || 0) + n;
     }
   }
+  const scheduled = total - errors;
   return {
     total,
-    firstPassValidPct: Math.round((firstPassValid / total) * 100),
-    repairUsedPct: Math.round((repairUsed / total) * 100),
-    secondPassValidPct: repairUsed ? Math.round((secondPassValid / repairUsed) * 100) : null,
-    forceDropPct: Math.round((forceDropped / total) * 100),
-    topIssueTypes: Object.entries(issueTypes).sort((a, b) => b[1] - a[1]).slice(0, 10)
+    errors,
+    placedPct: totalFlexible ? Math.round((totalPlaced / totalFlexible) * 100) : null,
+    avgUnplacedPerRun: scheduled ? Number((totalUnplaced / scheduled).toFixed(2)) : 0,
+    mealRedistributedTotal: redistributed,
+    diagnosticsFiredRuns: diagnosticsFired,
+    droppedByReason
   };
 }
 

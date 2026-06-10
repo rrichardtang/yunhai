@@ -1267,3 +1267,13 @@ Generation prompt was telling Claude to produce a hard floor of ~72 activities f
 - Added deterministic meal protection (commit 29f3b4b) in `src/services/arrangeTimeAdjuster.js`: `anchorMeals` + `findSlotStart` pin each meal into a lunch (11:00–14:30) or dinner (17:00–22:00) slot by opening_hours, ≤1 each per day, before non-meals are timed; non-meal placement generalized to push past all obstacles (locks + meal anchors). Meals with no feasible slot drop with `no_meal_slot_on_day`. Added 2 meal tests to `src/arrangeTimeAdjuster.test.js` (9/9 pass).
 - Kept from the earlier 54bacff work: prompt caching, few-shot example + commute-aware ordering rule in `STATIC_ARRANGE_SYSTEM`, per-issue-type `buildRepairPrompt`, `forceDropPct` telemetry.
 - Investigated meal generation (`claude.js` planCity): meals are generated as neutral named restaurants + opening_hours with slot assignment deliberately deferred to arrange. Decided not to add a breakfast slot or generator meal-slot tags (no demand — trips assume breakfast-at-hotel).
+
+## [2026-06-10] Arrange redesign: LLM day-assignment + deterministic scheduler
+- NEW `src/services/arrangeScheduler.js` `schedule({assignment,days,activitiesById,lockedActivities,commuteMatrix})` → `{placements,unplaced,diagnostics,mealRedistributed}`. Cross-day meal redistribution, brute-force/NN per-day ordering, meal anchoring, time assignment. 14 unit tests in `src/arrangeScheduler.test.js` (all pass).
+- NEW `src/services/geo.js` — shared `activityCoords`/`haversineKm`; deduped from distanceMatrix.js, placesEnrich.js, arrangePromptDirect.js.
+- `src/services/arrangePromptDirect.js` — gutted to `buildAssignPrompt` + minimal `STATIC_ARRANGE_SYSTEM` (day-assignment only). Deleted few-shot, commute block, repair prompt, time-math rules.
+- `src/routes/activities.js` — `ASSIGN_TOOL` (assign_days), `sanitizeAssignment` (backfills LLM-omitted ids to least-loaded day), calls `schedule()`. Deleted repair loop, force-drop, sanitizePlacements.
+- `src/arrangeValidator.js` — demoted `validate()` to a self-check assertion; exported `parseOpeningHoursContains`.
+- `src/services/arrangeTelemetry.js` — new field set (placedPct, avgUnplacedPerRun, mealRedistributedTotal, droppedByReason); dropped zombie fields.
+- DELETED `src/services/arrangeTimeAdjuster.js` + `src/arrangeTimeAdjuster.test.js`.
+- Full local suite: 126/126 pass.
