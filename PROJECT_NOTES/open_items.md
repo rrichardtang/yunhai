@@ -19,10 +19,10 @@
 ---
 
 
-## [2026-06-09] Verify Arrange reliability levers on the VPS
+## [2026-06-09] Verify final Arrange behavior on the VPS
 **Status:** Pending input
-**Description:** `feature/arrange-reliability-thinking` is pushed but unverified — local server/tests are not run for this project. On the VPS: (1) record BEFORE baseline from `GET /api/admin/arrange-stats?limit=200` (`firstPassValidPct`, `repairUsedPct`, `secondPassValidPct`, `forceDropPct`, `topIssueTypes`); (2) run a dense case (re-use the Kyoto 18+4 / 5-meal trip) and confirm in arrange debug logs: `tool_use=true` stays true (watch for prose / `ERROR msg=` from the `auto` switch or a rejected untyped param), `cache_write>0` then `cache_read>0` on a 2nd call within 5 min, a smaller first-pass `VALIDATE_FAIL count`, a 2nd `REPAIR_PASS iter=2` on hard cases, and all 5 meals surviving; (3) compare arrange-stats after — expect `firstPassValidPct` up and `forceDropPct` down.
-**Context:** See decisions [2026-06-09] and changelog [2026-06-09]. If `tool_use=false` (prose) shows up in practice, add a one-shot forced-tool fallback in `callLlmForJson`. If meal/ordering drops persist, revisit the deferred deterministic reorder / meal-enforcement options.
+**Description:** `feature/arrange-reliability-thinking` is pushed but unverified — local server/tests are not run for this project. The branch is the FAST forced-tool design (thinking was reverted) + deterministic meal anchoring. On the VPS: (1) record BEFORE baseline from `GET /api/admin/arrange-stats?limit=200` (`firstPassValidPct`, `forceDropPct`, `topIssueTypes`); (2) run a dense case (the Kyoto 18+4 / multi-meal trip) and confirm in arrange debug logs: `SUBMIT_CALL` → `LLM_RESPONSE finish=tool_use tool_use=true` in ~10–15s (NO `REASON_PASS`, NO `finish=max_tokens`), `cache_read>0` on repair calls, `ADJUSTER_MEAL_ANCHOR` lines pinning meals to lunch/dinner, and previously-cascaded meals surviving; a meal only drops with `no_meal_slot_on_day` when genuinely over-subscribed; (3) compare arrange-stats after — expect `forceDropPct` and meal-drop count down.
+**Context:** See decisions [2026-06-09] (the SUPERSEDES entry) and changelog [2026-06-09]. Thinking is intentionally gone from the interactive path; do not reintroduce it.
 **Next action:** Owner deploys the branch to the VPS and runs the before/after comparison.
 
 ## [2026-06-09] Missing commute pairs from Google distance-matrix (transit ZERO_RESULTS)
