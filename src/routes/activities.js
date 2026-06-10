@@ -12,10 +12,8 @@ const { recall, observe } = require('../memory');
 const { search, isConfigured: isBraveConfigured, shouldUseBrave } = require('../braveSearch');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('../arrangeConfig');
 const { buildBookingLinks } = require('../services/bookingLinks');
-const { buildDirectArrangePrompt, buildRepairPrompt, STATIC_ARRANGE_SYSTEM } = require('../services/arrangePromptDirect');
-const { validate: validateArrangement } = require('../arrangeValidator');
-const { adjust: adjustArrangementTimes } = require('../services/arrangeTimeAdjuster');
-const { minutesFromTime } = require('../../shared/timeHelpers');
+const { buildAssignPrompt, STATIC_ARRANGE_SYSTEM } = require('../services/arrangePromptDirect');
+const { schedule } = require('../services/arrangeScheduler');
 const { buildCityTravelTiming } = require('../services/distanceMatrix');
 const arrangeTelemetry = require('../services/arrangeTelemetry');
 const { enrichWithPlaceDetails } = require('../services/placesEnrich');
@@ -24,38 +22,22 @@ const { debugLog } = require('../services/debugLog');
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
 const ARRANGE_MODEL = 'claude-sonnet-4-6';
 
-const SCHEDULE_TOOL = {
-  name: 'submit_schedule',
-  description: 'Submit the final activity schedule with concrete date+time for placements and reasons for unplaced activities.',
+const ASSIGN_TOOL = {
+  name: 'assign_days',
+  description: 'Assign each activity to a day. Output a map of date to the activity ids on that day. Do NOT output times or within-day order — code computes those.',
   input_schema: {
     type: 'object',
     properties: {
-      placements: {
+      assignment: {
         type: 'object',
-        description: 'Map of activity id to scheduled date and time.',
+        description: 'Map of YYYY-MM-DD date to an array of activity ids assigned to that day. Every activity id appears under exactly one day.',
         additionalProperties: {
-          type: 'object',
-          properties: {
-            date: { type: 'string', description: 'YYYY-MM-DD' },
-            time: { type: 'string', description: '24-hour HH:MM' }
-          },
-          required: ['date', 'time']
-        }
-      },
-      unplaced: {
-        type: 'array',
-        description: 'Activities that could not be placed and why.',
-        items: {
-          type: 'object',
-          properties: {
-            id: { type: 'string' },
-            reason: { type: 'string' }
-          },
-          required: ['id', 'reason']
+          type: 'array',
+          items: { type: 'string' }
         }
       }
     },
-    required: ['placements', 'unplaced']
+    required: ['assignment']
   }
 };
 
@@ -463,62 +445,62 @@ Return ONLY valid JSON (no markdown fences):
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const ARRANGE_SYSTEM = [{ type: 'text', text: STATIC_ARRANGE_SYSTEM, cache_control: { type: 'ephemeral' } }];
 
-    // Forced-tool call, no thinking — fast (~10-15s) and always emits the schema.
-    // Adaptive thinking was tried here but consistently ran for minutes on dense
-    // trips (it auto-enables interleaved thinking, which Sonnet 4.6 can't hard-cap),
-    // so quality is driven by the few-shot + surgical repair instead.
-    async function submitSchedule(prompt) {
-      debugLog('arrange', `SUBMIT_CALL model=${ARRANGE_MODEL} prompt_chars=${prompt.length}`);
+    // The LLM only assigns activities to days (no times, no order). Code schedules.
+    async function assignDays(prompt) {
+      debugLog('arrange', `ASSIGN_CALL model=${ARRANGE_MODEL} prompt_chars=${prompt.length}`);
       const response = await anthropic.messages.create({
         model: ARRANGE_MODEL,
-        max_tokens: 16384,
+        max_tokens: 8192,
         system: ARRANGE_SYSTEM,
-        tools: [SCHEDULE_TOOL],
-        tool_choice: { type: 'tool', name: 'submit_schedule' },
+        tools: [ASSIGN_TOOL],
+        tool_choice: { type: 'tool', name: 'assign_days' },
         messages: [{ role: 'user', content: [{ type: 'text', text: prompt, cache_control: { type: 'ephemeral' } }] }]
       });
-      const toolUse = (response.content || []).find((c) => c.type === 'tool_use' && c.name === 'submit_schedule');
+      const toolUse = (response.content || []).find((c) => c.type === 'tool_use' && c.name === 'assign_days');
       const u = response.usage || {};
       debugLog('arrange', `LLM_RESPONSE finish=${response.stop_reason} tool_use=${!!toolUse} cache_write=${u.cache_creation_input_tokens || 0} cache_read=${u.cache_read_input_tokens || 0}`);
       if (!toolUse || !toolUse.input || typeof toolUse.input !== 'object') {
-        console.error(`arrange tool_use missing (stop_reason=${response.stop_reason})`);
         const rawText = extractText(response.content).slice(0, 800);
-        console.error('arrange response text (first 800 chars):', rawText);
-        const err = new Error('Failed to parse arrangement JSON');
+        const err = new Error('Failed to parse day assignment');
         err.diagnostic = { stop_reason: response.stop_reason, tool_use: false, head: rawText };
         throw err;
       }
       return toolUse.input;
     }
 
-    function sanitizePlacements(parsed) {
-      const rawPlacements = parsed?.placements && typeof parsed.placements === 'object' ? parsed.placements : {};
-      const placements = {};
-      for (const [rawId, val] of Object.entries(rawPlacements)) {
-        const id = String(rawId);
-        if (lockedIdSet.has(id)) continue;
-        if (!activitiesById[id]) continue;
-        if (!val || typeof val !== 'object') continue;
-        const date = String(val.date || '');
-        const time = String(val.time || '');
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-        if (!/^\d{1,2}:\d{2}$/.test(time)) continue;
-        placements[id] = { date, time };
+    // Build a clean { date: [ids] } map: keep known, non-locked ids on valid dates, then
+    // ensure every flexible activity is assigned somewhere (append any the LLM omitted to
+    // the least-loaded day) so the deterministic scheduler — not the LLM — owns feasibility.
+    function sanitizeAssignment(parsed) {
+      const validDates = new Set(days.map((d) => d.date));
+      const assignment = {};
+      for (const d of days) assignment[d.date] = [];
+      const seen = new Set();
+      const rawAssignment = parsed?.assignment && typeof parsed.assignment === 'object' ? parsed.assignment : {};
+      for (const [date, ids] of Object.entries(rawAssignment)) {
+        if (!validDates.has(date) || !Array.isArray(ids)) continue;
+        for (const rawId of ids) {
+          const id = String(rawId);
+          if (lockedIdSet.has(id) || !activitiesById[id] || seen.has(id)) continue;
+          seen.add(id);
+          assignment[date].push(id);
+        }
       }
-      const unplaced = Array.isArray(parsed?.unplaced)
-        ? parsed.unplaced.filter((u) => activitiesById[String(u?.id)]).map((u) => ({ id: String(u.id), reason: String(u.reason || '') }))
-        : [];
-      return { placements, unplaced };
+      const leastLoadedDate = () => Object.keys(assignment).sort((a, b) => assignment[a].length - assignment[b].length)[0];
+      for (const a of flexible) {
+        const id = String(a.id);
+        if (!seen.has(id)) {
+          const target = leastLoadedDate() || days[0].date;
+          assignment[target].push(id);
+          seen.add(id);
+          debugLog('arrange', `ASSIGN_BACKFILL id=${id} -> ${target} (LLM omitted)`);
+        }
+      }
+      return assignment;
     }
 
-    let firstPassValid = false;
-    let firstPassIssues = [];
-    let repairUsed = false;
-    let secondPassValid = false;
-    let forceDroppedCount = 0;
-
     try {
-      const prompt = buildDirectArrangePrompt({
+      const prompt = buildAssignPrompt({
         days,
         flexible,
         locked: resolvedLocked,
@@ -527,123 +509,26 @@ Return ONLY valid JSON (no markdown fences):
         numTravelers,
         numChildren,
         cityName,
-        commuteMatrix: matrix,
         schedulingPrefs
       });
-      const hasClusterBlock = prompt.includes('WALKING NEIGHBORS');
-      const hasCommuteBlock = prompt.includes('COMMUTE TIMES');
-      const activitiesWithCoords = flexible.filter((a) => {
-        const rawLat = a?.location?.lat ?? a?.start_latitude;
-        const rawLng = a?.location?.lng ?? a?.start_longitude;
-        if (rawLat == null || rawLng == null) return false;
-        const lat = Number(rawLat);
-        const lng = Number(rawLng);
-        return Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
-      }).length;
-      debugLog('arrange', `PROMPT_INFO cluster_block=${hasClusterBlock} commute_block=${hasCommuteBlock} acts_with_coords=${activitiesWithCoords}/${flexible.length}`);
-      const parsed = await submitSchedule(prompt);
-      let { placements, unplaced } = sanitizePlacements(parsed);
-      debugLog('arrange', `FIRST_PASS placed=${Object.keys(placements).length} unplaced=${unplaced.length} unplaced_ids=${unplaced.map((u) => u.id).join(',') || 'none'}`);
+      const parsed = await assignDays(prompt);
+      const assignment = sanitizeAssignment(parsed);
 
-      let v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById, commuteMatrix: matrix, unplacedIds: unplaced.map((u) => u.id) });
-      firstPassValid = v.ok;
-      firstPassIssues = v.issues || [];
-      if (!v.ok) {
-        const issueSummary = v.issues.map((i) => i.type).join(',');
-        debugLog('arrange', `VALIDATE_FAIL count=${v.issues.length} types=${issueSummary}`);
-      } else {
-        debugLog('arrange', 'VALIDATE_OK first_pass');
-      }
-
-      const MAX_REPAIR_ITERATIONS = 2;
-      for (let iter = 1; !v.ok && iter <= MAX_REPAIR_ITERATIONS; iter += 1) {
-        repairUsed = true;
-        try {
-          const repairPrompt = buildRepairPrompt({ placements, issues: v.issues, activitiesById });
-          const repaired = await submitSchedule(repairPrompt);
-          const repairedSan = sanitizePlacements(repaired);
-          // A repair that returns an empty schedule validates as "ok" (no
-          // placements → no conflicts), silently wiping a good first pass.
-          // Reject it and keep the prior placements for the deterministic adjuster.
-          if (Object.keys(repairedSan.placements).length === 0 && Object.keys(placements).length > 0) {
-            debugLog('arrange', `REPAIR_REJECT iter=${iter} reason=empty_result kept_prior=${Object.keys(placements).length}`);
-            break;
-          }
-          placements = repairedSan.placements;
-          unplaced = [...unplaced, ...repairedSan.unplaced];
-          const placedIds = new Set(Object.keys(placements));
-          const seen = new Set();
-          unplaced = unplaced.filter((u) => {
-            if (placedIds.has(u.id)) return false;
-            if (seen.has(u.id)) return false;
-            seen.add(u.id);
-            return true;
-          });
-          v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById, commuteMatrix: matrix, unplacedIds: unplaced.map((u) => u.id) });
-          secondPassValid = v.ok;
-          debugLog('arrange', `REPAIR_PASS iter=${iter} ok=${v.ok} remaining_issues=${(v.issues || []).map((i) => i.type).join(',') || 'none'}`);
-        } catch (repairErr) {
-          console.warn('[arrange] repair pass failed:', repairErr.message);
-          debugLog('arrange', `REPAIR_PASS_THREW iter=${iter} err="${repairErr?.message || repairErr}"`);
-          break;
-        }
-      }
-
-      const adjusterResult = adjustArrangementTimes({
-        placements,
-        days,
-        activitiesById,
-        lockedActivities: resolvedLocked,
-        commuteMatrix: matrix
-      });
-      placements = adjusterResult.placements;
-      if (adjusterResult.drops.length) {
-        const placedIds = new Set(Object.keys(placements));
-        unplaced = unplaced.filter((u) => !placedIds.has(u.id));
-        for (const d of adjusterResult.drops) {
-          if (!unplaced.find((u) => u.id === d.id)) unplaced.push(d);
-        }
-      }
-      debugLog('arrange', `ADJUSTER_RUN day_count=${days.length} moved=${adjusterResult.moved} dropped=${adjusterResult.drops.length}`);
-      v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById, commuteMatrix: matrix, unplacedIds: unplaced.map((u) => u.id) });
-
-      if (!v.ok) {
-        const toDrop = new Set();
-        for (const issue of v.issues) {
-          if (issue.type === 'empty_dinner_with_available_meal') continue;
-          if ((issue.type === 'overlap' || issue.type === 'commute_gap_violation') && Array.isArray(issue.ids) && issue.ids.length === 2) {
-            const [idA, idB] = issue.ids;
-            const aStart = minutesFromTime(placements[idA]?.time || '00:00');
-            const bStart = minutesFromTime(placements[idB]?.time || '00:00');
-            toDrop.add(aStart <= bStart ? idB : idA);
-          } else if (issue.id) {
-            toDrop.add(issue.id);
-          }
-        }
-        for (const id of toDrop) {
-          if (placements[id]) {
-            unplaced.push({ id, reason: 'physics_unresolved' });
-            delete placements[id];
-            forceDroppedCount += 1;
-          }
-        }
-        debugLog('arrange', `FORCE_DROP ids=${[...toDrop].join(',') || 'none'}`);
-        v = validateArrangement({ placements, lockedActivities: resolvedLocked, days, activitiesById });
-      }
-
-      debugLog('arrange', `RETURN placed=${Object.keys(placements).length} unplaced=${unplaced.length} repair_used=${repairUsed} second_pass_ok=${secondPassValid}`);
+      const result = schedule({ assignment, days, activitiesById, lockedActivities: resolvedLocked, commuteMatrix: matrix });
+      const droppedByReason = {};
+      for (const u of result.unplaced) droppedByReason[u.reason] = (droppedByReason[u.reason] || 0) + 1;
+      debugLog('arrange', `RETURN placed=${Object.keys(result.placements).length} unplaced=${result.unplaced.length} redistributed=${result.mealRedistributed} diagnostics=${result.diagnostics.length}`);
 
       arrangeTelemetry.logRun({
         userId,
         cityName,
-        firstPassValid,
-        issues: firstPassIssues,
-        repairUsed,
-        secondPassValid,
-        forceDropped: forceDroppedCount > 0,
-        forceDroppedCount,
         flexibleCount: flexible.length,
-        lockedCount: resolvedLocked.length
+        lockedCount: resolvedLocked.length,
+        placedCount: Object.keys(result.placements).length,
+        unplacedCount: result.unplaced.length,
+        mealRedistributed: result.mealRedistributed,
+        droppedByReason,
+        diagnosticsCount: result.diagnostics.length
       });
 
       // Arrange feedback → memory. Gated on a deliberate free-text note so we
@@ -654,20 +539,12 @@ Return ONLY valid JSON (no markdown fences):
         observe({ userId, tripId, source: 'arrange', candidates: buildArrangeFeedback(schedulingPrefs) });
       }
 
-      return res.json({
-        placements,
-        unplaced,
-        diagnostics: v.ok ? [] : v.issues.map((i) => i.message)
-      });
+      return res.json(result);
     } catch (error) {
       debugLog('arrange', `ERROR msg="${error?.message || error}" diag=${JSON.stringify(error?.diagnostic || null)}`);
       arrangeTelemetry.logRun({
         userId,
         cityName,
-        firstPassValid,
-        issues: firstPassIssues,
-        repairUsed,
-        secondPassValid,
         flexibleCount: flexible.length,
         lockedCount: resolvedLocked.length,
         error: error.message

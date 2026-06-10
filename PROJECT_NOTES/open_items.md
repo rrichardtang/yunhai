@@ -19,11 +19,11 @@
 ---
 
 
-## [2026-06-09] Verify final Arrange behavior on the VPS
+## [2026-06-10] Verify the Arrange REDESIGN on the VPS
 **Status:** Pending input
-**Description:** `feature/arrange-reliability-thinking` is pushed but unverified — local server/tests are not run for this project. The branch is the FAST forced-tool design (thinking was reverted) + deterministic meal anchoring. On the VPS: (1) record BEFORE baseline from `GET /api/admin/arrange-stats?limit=200` (`firstPassValidPct`, `forceDropPct`, `topIssueTypes`); (2) run a dense case (the Kyoto 18+4 / multi-meal trip) and confirm in arrange debug logs: `SUBMIT_CALL` → `LLM_RESPONSE finish=tool_use tool_use=true` in ~10–15s (NO `REASON_PASS`, NO `finish=max_tokens`), `cache_read>0` on repair calls, `ADJUSTER_MEAL_ANCHOR` lines pinning meals to lunch/dinner, and previously-cascaded meals surviving; a meal only drops with `no_meal_slot_on_day` when genuinely over-subscribed; (3) compare arrange-stats after — expect `forceDropPct` and meal-drop count down.
-**Context:** See decisions [2026-06-09] (the SUPERSEDES entry) and changelog [2026-06-09]. Thinking is intentionally gone from the interactive path; do not reintroduce it.
-**Next action:** Owner deploys the branch to the VPS and runs the before/after comparison.
+**Description:** `feature/arrange-reliability-thinking` now carries the full redesign (LLM `assign_days` → deterministic `arrangeScheduler.js`). Deterministic core is proven locally (126/126 tests). Unverified end-to-end because local server isn't run. On the VPS: (1) run the dense Kyoto 18+4 / multi-meal trip; in arrange debug logs confirm `ASSIGN_CALL` → `LLM_RESPONSE finish=tool_use tool_use=true` (fast, ~one call), `SCHED_DAY` lines per day, and NO `SCHED_ASSERT_FAIL` (validator self-check passes); (2) `GET /api/admin/arrange-stats?limit=200` → `placedPct` near 100 (vs old ~67%), low `avgUnplacedPerRun`, `mealRedistributedTotal` firing; (3) eyeball the Arrange UI — no overlaps, meals in lunch/dinner windows, geographically coherent days. A drop should only occur for genuine over-subscription (more meals/activities than a day can hold).
+**Context:** decisions [2026-06-10]; changelog [2026-06-10]. The LLM now only assigns days — if days look geographically incoherent, that's an LLM-assignment-quality issue (tune the prompt), NOT a time/violation issue (those are structurally impossible now).
+**Next action:** Owner deploys the branch and runs the dense case + arrange-stats.
 
 ## [2026-06-09] Missing commute pairs from Google distance-matrix (transit ZERO_RESULTS)
 **Status:** Deferred
