@@ -865,8 +865,6 @@ button.btn-decline:not(.inactive):hover:not(:disabled) { background: #be123c; co
 }
 .unplaced-item:hover { background: #FFF4E0; border-color: #F0C879; }
 .unplaced-item-name { display: block; font-weight: 600; color: var(--heading); font-size: 0.9rem; }
-.unplaced-item-reason { display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 2px; }
-.arrange-diag-list { margin: 8px 0 0; padding-left: 20px; font-size: 0.85rem; color: var(--text-muted); }
 
 .staging-card--flash {
   animation: staging-flash 1.6s ease-out;
