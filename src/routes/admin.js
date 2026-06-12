@@ -1,5 +1,6 @@
 const { generateCodes, listCodes, revokeCode } = require('../entitlements');
 const { requireConfiguredAuth } = require('../middleware/auth');
+const commuteCache = require('../services/commuteCache');
 
 function requireOwner(req, res, next) {
   const ownerId = String(process.env.OWNER_USER_ID || '').trim();
@@ -24,6 +25,14 @@ function register(app) {
   app.delete('/api/admin/invites/:code', requireConfiguredAuth, requireOwner, (req, res) => {
     const result = revokeCode(req.params.code);
     res.json(result);
+  });
+
+  // Flush the commute cache so the next Arrange re-fetches live. Pass
+  // ?negativesOnly=1 to drop only "no route" entries and keep good positives.
+  app.post('/api/admin/commute-cache/clear', requireConfiguredAuth, requireOwner, (req, res) => {
+    const negativesOnly = req.query.negativesOnly === '1' || req.body?.negativesOnly === true;
+    const result = negativesOnly ? commuteCache.clearNegatives() : commuteCache.clear();
+    res.json({ ok: true, ...result });
   });
 }
 
