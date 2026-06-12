@@ -5161,8 +5161,8 @@ function makeCommuteIndicator(currentItem, nextItem, currentTopOverride = null) 
   return renderCommuteSelector(currentItem.id, nextItem.id, topY + h + 6);
 }
 
-function makeLogisticsCard(label, icon, time, subtitle = '') {
-  const y = yFromTime(time);
+function makeLogisticsCard(label, icon, time, subtitle = '', topOverride = null) {
+  const y = Number.isFinite(topOverride) ? topOverride : yFromTime(time);
   const subtitleHtml = subtitle ? `<span class="logistics-card-sub">${esc(subtitle)}</span>` : '';
   return `
     <div class="logistics-card" style="top:${y}px;" aria-label="${esc(label)}">
@@ -5550,6 +5550,8 @@ function renderArrange() {
     const cardH = getLogisticsCardHeight();
 
     let html = '';
+    const PILL_RESERVE = 44;
+    let prevBottom = -Infinity;
 
     if (dayLogistics?.isArrival) {
       const arrivalLabel = dayLogistics.arrivalLocation || 'Arrival';
@@ -5564,19 +5566,20 @@ function renderArrange() {
       const accArrivalMins = minutesFromTime(dayLogistics.arrivalTime) + procBuf + arrToAccMins;
       const accArrivalTime = timeFromMinutes(accArrivalMins);
       html += makeLogisticsCard(accLabel, '<i class="ph-bold ph-bed" aria-hidden="true"></i>', accArrivalTime);
-      // 4. Commute: accommodation → first activity
+      // Seed the flow cursor at the accommodation card's bottom so the first
+      // activity (and the commute pill below) can't overlap the arrival block.
+      prevBottom = yFromTime(accArrivalTime) + cardH;
+      // 4. Commute: accommodation → first activity (positioned from the flow cursor)
       if (items.length > 0) {
-        html += makeLogisticsCommuteIndicator(arrAccId, items[0].id, accArrivalTime, cardH);
+        html += renderCommuteSelector(arrAccId, items[0].id, prevBottom + 6);
       }
     }
 
-    let prevBottom = -Infinity;
     items.forEach((item, index) => {
       const placement = state.placements[item.id] || {};
       const itemTime = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
       const itemH = Math.max(56, actDurationHours(item) * PX_PER_HOUR);
       const rawY = yFromTime(itemTime);
-      const PILL_RESERVE = 44;
       const topFloor = prevBottom + PILL_RESERVE;
       const effectiveTop = Math.max(rawY, topFloor);
       html += makePlacedCard(item, effectiveTop);
@@ -5588,25 +5591,26 @@ function renderArrange() {
 
     if (dayLogistics?.isDeparture) {
       const departureLabel = dayLogistics.departureLocation || 'Departure';
+      // 1. Commute: last activity → accommodation (positioned from the flow cursor
+      // so it sits below the actual last card, not its raw time).
       if (items.length > 0) {
-        const lastItem = items[items.length - 1];
-        const lastPlacement = state.placements[lastItem.id] || {};
-        const lastTime = parseTimeTo24(lastPlacement.time || actPreferredTime(lastItem) || typeToTime(lastItem.type));
-        const lastEndMins = minutesFromTime(lastTime) + Math.max(30, actDurationHours(lastItem) * 60);
-        // 1. Commute: last activity → accommodation
-        html += makeLogisticsCommuteIndicator(lastItem.id, depAccId, timeFromMinutes(lastEndMins), 0);
+        html += renderCommuteSelector(items[items.length - 1].id, depAccId, prevBottom + 6);
+        prevBottom += 6 + PILL_RESERVE;
       }
-      // 2. Accommodation card (positioned before departure - procedural buffer - commute)
+      // 2. Accommodation card (before departure - procedural buffer - commute, floored below the cursor)
       const accToDepCommute = state.commutes[commutePairKey(depAccId, depId)] || null;
       const accToDepMins = resolveSelectedCommuteDetails(accToDepCommute)?.durationMinutes || 0;
       const depProcBuf = departureBufferMins(dayLogistics.departureMode, dayLogistics.departureInternational);
       const accDepartureMins = minutesFromTime(dayLogistics.departureTime) - depProcBuf - accToDepMins;
       const accDepartureTime = timeFromMinutes(Math.max(0, accDepartureMins));
-      html += makeLogisticsCard(accLabel, '<i class="ph-bold ph-bed" aria-hidden="true"></i>', accDepartureTime);
+      const accDepTop = Math.max(yFromTime(accDepartureTime), prevBottom);
+      html += makeLogisticsCard(accLabel, '<i class="ph-bold ph-bed" aria-hidden="true"></i>', accDepartureTime, '', accDepTop);
+      const accDepBottom = accDepTop + cardH;
       // 3. Commute: accommodation → departure
-      html += makeLogisticsCommuteIndicator(depAccId, depId, accDepartureTime, cardH);
-      // 4. Departure location card
-      html += makeLogisticsCard(`Depart: ${departureLabel}`, '<i class="ph-bold ph-airplane-takeoff" aria-hidden="true"></i>', dayLogistics.departureTime);
+      html += renderCommuteSelector(depAccId, depId, accDepBottom + 6);
+      // 4. Departure location card (floored below the commute pill)
+      const depTop = Math.max(yFromTime(dayLogistics.departureTime), accDepBottom + PILL_RESERVE);
+      html += makeLogisticsCard(`Depart: ${departureLabel}`, '<i class="ph-bold ph-airplane-takeoff" aria-hidden="true"></i>', dayLogistics.departureTime, '', depTop);
     }
 
     schedule.innerHTML = html;
