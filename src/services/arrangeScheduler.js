@@ -42,6 +42,25 @@ function buildLockedObstacles(lockedActivities, date) {
     });
 }
 
+// Classify a locked meal into the slot it occupies by its locked start time, so
+// flexible meals don't double up (e.g. a locked 7pm dinner blocks the dinner slot).
+function lockedMealSlot(timeMin) {
+  if (timeMin >= DINNER_WINDOW[0]) return 'dinner';
+  if (timeMin >= LUNCH_WINDOW[0]) return 'lunch';
+  return null;
+}
+
+function lockedMealSlotsByDate(lockedActivities) {
+  const byDate = {};
+  for (const l of lockedActivities) {
+    if (!isMealActivity(l)) continue;
+    const slot = lockedMealSlot(minutesFromTime(l.time || '00:00'));
+    if (!slot) continue;
+    (byDate[l.date] = byDate[l.date] || new Set()).add(slot);
+  }
+  return byDate;
+}
+
 function pickActiveOpeningWindow(rawHours, earliest, hardEnd) {
   const ranges = parseOpeningHours(rawHours);
   for (const [s, e] of ranges) {
@@ -90,10 +109,16 @@ function isSingleSlot(cap) {
 
 // Move surplus meals off over-subscribed days (a day holds at most one lunch + one
 // dinner) onto days with a free compatible slot, nearest by geography. Deterministic.
-function redistributeMeals(byDate, days, activitiesById) {
+function redistributeMeals(byDate, days, activitiesById, lockedSlots = {}) {
   const dateList = days.map((d) => d.date);
   const slots = {};
-  for (const date of dateList) slots[date] = { lunch: null, dinner: null };
+  for (const date of dateList) {
+    const locked = lockedSlots[date];
+    slots[date] = {
+      lunch: locked?.has('lunch') ? '__locked__' : null,
+      dinner: locked?.has('dinner') ? '__locked__' : null
+    };
+  }
   const floaters = [];
 
   for (const date of dateList) {
@@ -148,11 +173,11 @@ function nearestDay(mealId, candidateDates, byDate, activitiesById) {
 }
 
 // Anchor at most one lunch + one dinner meal by opening hours, before non-meals.
-function anchorMeals(mealIds, { activitiesById, dayStart, dayEnd, locks }) {
+function anchorMeals(mealIds, { activitiesById, dayStart, dayEnd, locks, lockedSlots }) {
   const placed = {};
   const anchors = [];
   const dropped = [];
-  const usedSlots = new Set();
+  const usedSlots = new Set(lockedSlots || []);
   const sorted = mealIds.slice().sort((a, b) => {
     const sa = isSingleSlot(mealSlotCapability(activitiesById[a])) ? 0 : 1;
     const sb = isSingleSlot(mealSlotCapability(activitiesById[b])) ? 0 : 1;
@@ -286,7 +311,8 @@ function schedule({ assignment, days, activitiesById, lockedActivities = [], com
     byDate[date] = (byDate[date] || []).concat(known);
   }
 
-  const mealRedistributed = redistributeMeals(byDate, days, activitiesById);
+  const lockedSlots = lockedMealSlotsByDate(lockedActivities);
+  const mealRedistributed = redistributeMeals(byDate, days, activitiesById, lockedSlots);
 
   for (const day of (days || [])) {
     const date = day.date;
@@ -297,7 +323,7 @@ function schedule({ assignment, days, activitiesById, lockedActivities = [], com
     const mealIds = ids.filter((id) => isMealActivity(activitiesById[id]));
     const nonMealIds = ids.filter((id) => !isMealActivity(activitiesById[id]));
 
-    const meal = anchorMeals(mealIds, { activitiesById, dayStart, dayEnd, locks });
+    const meal = anchorMeals(mealIds, { activitiesById, dayStart, dayEnd, locks, lockedSlots: lockedSlots[date] });
     for (const id of meal.dropped) unplaced.push({ id, reason: 'no_meal_slot_on_day' });
 
     const obstacles = [...locks, ...meal.anchors].sort((a, b) => a.startMin - b.startMin);
