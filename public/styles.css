@@ -4573,6 +4573,12 @@ select.gm-inp {
   box-shadow: 0 2px 8px rgba(47,125,251,.18);
   color: var(--text-900);
 }
+#step3 .commute-selector--static .commute-selector-trigger { cursor: default; }
+#step3 .commute-selector--static:hover .commute-selector-trigger {
+  border-color: var(--hair-strong);
+  box-shadow: 0 1px 4px rgba(10,22,40,.08);
+  color: var(--text-700);
+}
 #step3 .commute-selector-arrow { font-size: 9px; opacity: .55; }
 #step3 .commute-selected-label { display: inline-flex; align-items: center; gap: 6px; }
 #step3 .commute-selected-label i { font-size: 13px; line-height: 1; }
