@@ -26,6 +26,17 @@ function load() {
   return cache;
 }
 
+function flushNow() {
+  if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+  dirty = false;
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(CACHE_PATH, JSON.stringify(cache));
+  } catch {
+    // best-effort cache; swallow
+  }
+}
+
 function scheduleFlush() {
   dirty = true;
   if (flushTimer) return;
@@ -75,4 +86,24 @@ function setNegative(origin, destination, mode) {
   scheduleFlush();
 }
 
-module.exports = { get, set, setNegative };
+// Admin: drop cached entries so the next lookups re-fetch live. Clears the
+// in-memory store (the source of truth for the running process) and the file.
+function clear() {
+  const store = load();
+  const total = Object.keys(store).length;
+  cache = {};
+  flushNow();
+  return { removed: total, kind: 'all' };
+}
+
+function clearNegatives() {
+  const store = load();
+  let removed = 0;
+  for (const k of Object.keys(store)) {
+    if (store[k]?.minutes === NEGATIVE_SENTINEL) { delete store[k]; removed += 1; }
+  }
+  flushNow();
+  return { removed, kind: 'negatives' };
+}
+
+module.exports = { get, set, setNegative, clear, clearNegatives };
