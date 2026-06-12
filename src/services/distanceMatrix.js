@@ -365,15 +365,24 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
   }
 
   if (isWalkingDistancePair(fromActivity, toActivity)) {
+    // Close pairs only need the real walking time; transit/driving return
+    // ZERO_RESULTS on short hops, so we skip them and query walking alone.
+    const walk = await fetchDistanceMatrixDuration({ origin, destination, mode: 'walking' });
+    let minutes = walk.minutes;
+    if (!Number.isFinite(minutes)) {
+      const a = getActivityCoords(fromActivity);
+      const b = getActivityCoords(toActivity);
+      minutes = a && b ? Math.max(1, Math.round(haversineKm(a.lat, a.lng, b.lat, b.lng) * 12)) : null;
+    }
     return {
-      modes: {
-        walking: { durationMinutes: null, modeIcon: COMMUTE_MODE_ICON.walking, isWalkingDistance: true }
-      },
+      modes: Number.isFinite(minutes)
+        ? { walking: { durationMinutes: minutes, modeIcon: COMMUTE_MODE_ICON.walking, isWalkingDistance: true } }
+        : {},
       selectedMode: 'walking',
-      durationMinutes: null,
+      durationMinutes: Number.isFinite(minutes) ? minutes : null,
       modeIcon: COMMUTE_MODE_ICON.walking,
       isWalkingDistance: true,
-      sources: ['walking-skip']
+      sources: [walk.source]
     };
   }
 

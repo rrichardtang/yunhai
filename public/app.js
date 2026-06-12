@@ -5099,12 +5099,14 @@ function renderCommuteSelector(fromId, toId, y) {
   if (!commute) return '';
 
   if (commute.isWalkingDistance) {
+    const mins = resolveSelectedCommuteDetails(commute)?.durationMinutes;
+    const label = Number.isFinite(mins) ? `${mins} min` : 'walk';
     return `
       <div class="commute-indicator" style="top:${y}px;">
-        <div class="commute-selector" data-from-id="${esc(fromId)}" data-to-id="${esc(toId)}">
-          <button type="button" class="commute-selector-trigger" aria-expanded="false" disabled>
-            <span class="commute-selected-label">${COMMUTE_MODE_PHOSPHOR.walking} <span>walk</span></span>
-          </button>
+        <div class="commute-selector commute-selector--static">
+          <span class="commute-selector-trigger">
+            <span class="commute-selected-label">${COMMUTE_MODE_PHOSPHOR.walking} <span>${label}</span></span>
+          </span>
         </div>
       </div>
     `;
