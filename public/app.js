@@ -5096,6 +5096,20 @@ const COMMUTE_MODE_PHOSPHOR = {
 
 function renderCommuteSelector(fromId, toId, y) {
   const commute = state.commutes[commutePairKey(fromId, toId)] || null;
+  if (!commute) return '';
+
+  if (commute.isWalkingDistance) {
+    return `
+      <div class="commute-indicator" style="top:${y}px;">
+        <div class="commute-selector" data-from-id="${esc(fromId)}" data-to-id="${esc(toId)}">
+          <button type="button" class="commute-selector-trigger" aria-expanded="false" disabled>
+            <span class="commute-selected-label">${COMMUTE_MODE_PHOSPHOR.walking} <span>walk</span></span>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
   const selected = resolveSelectedCommuteDetails(commute);
   if (!selected || !Number.isFinite(selected.durationMinutes)) return '';
 

@@ -72,6 +72,30 @@ test('routes a flexible activity past a locked anchor obstacle', () => {
   assert.ok(validate({ placements: r.placements, lockedActivities, days, activitiesById }).ok);
 });
 
+test('locked meal claims its slot so a flexible dinner does not double up', () => {
+  const activitiesById = {
+    M: meal('M', 'Dinner Spot', 60, '17:00-22:00') // dinner-only flexible meal
+  };
+  const lockedActivities = [
+    { id: 'LM', date: '2026-05-20', time: '19:00', duration_minutes: 90, type: 'meal', name: 'Locked Dinner' }
+  ];
+  const r = schedule({ assignment: { '2026-05-20': ['M'] }, days, activitiesById, lockedActivities, commuteMatrix: {} });
+  assert.ok(!r.placements.M, 'flexible dinner not anchored — locked dinner already owns the slot');
+  assert.ok(r.unplaced.some((u) => u.id === 'M'), 'reported unplaced');
+});
+
+test('flexible meal falls back to lunch when a locked meal owns dinner', () => {
+  const activitiesById = {
+    M: meal('M', 'Flexible Meal', 60, '11:00-22:00') // lunch + dinner capable
+  };
+  const lockedActivities = [
+    { id: 'LM', date: '2026-05-20', time: '19:00', duration_minutes: 90, type: 'meal', name: 'Locked Dinner' }
+  ];
+  const r = schedule({ assignment: { '2026-05-20': ['M'] }, days, activitiesById, lockedActivities, commuteMatrix: {} });
+  assert.ok(r.placements.M, 'placed');
+  assert.ok(toMin(r.placements.M.time) < 17 * 60, 'placed at lunch, not the locked dinner slot');
+});
+
 test('drops overflow when a tight day cannot fit both', () => {
   const tightDay = { date: '2026-05-20', windowStart: '09:00', windowEnd: '11:00' };
   const activitiesById = { A: act('A', 'First', 60), B: act('B', 'Second', 60) };
