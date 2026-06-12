@@ -59,7 +59,6 @@ const state = {
   reviewCardFlips: {},
   viewMode: 'planning',
   arrangeConfig: null,
-  arrangeDiagnostics: {},
   arrangeUnplaced: {},
   arrangeUnplacedPanelOpen: false,
   lastPlannedFingerprint: null,
@@ -6060,23 +6059,9 @@ async function updateCommutesForCityDays(dayIds = []) {
   }
 }
 
-const UNPLACED_REASON_LABELS = {
-  physics_unresolved: "Couldn't fit into the day without conflicts",
-  no_time_remaining: 'No time remaining in the day window',
-  outside_opening_hours: 'Outside the venue opening hours',
-  outside_window: 'Outside the day window'
-};
-
-function friendlyUnplacedReason(raw) {
-  const key = String(raw || '').trim().toLowerCase().replace(/\s+/g, '_');
-  if (UNPLACED_REASON_LABELS[key]) return UNPLACED_REASON_LABELS[key];
-  return raw || 'no reason given';
-}
-
 function renderArrangeDiagnostics() {
   if (!els.arrangeDiagnostics) return;
   const activeCity = state.arrangeCity;
-  const diagnostics = state.arrangeDiagnostics[activeCity] || [];
   const unplaced = state.arrangeUnplaced[activeCity] || [];
 
   let html = '';
@@ -6087,19 +6072,15 @@ function renderArrangeDiagnostics() {
     </button>`;
     if (state.arrangeUnplacedPanelOpen) {
       html += `<div class="unplaced-panel">
-        <p class="unplaced-panel-hint">These activities couldn't be auto-placed. Click one to find it in the staging strip, then drag it into a day.</p>
+        <p class="unplaced-panel-hint">The planner couldn't fit these into your schedule. Click one to find it in the staging strip, then drag it into a day.</p>
         <ul>${unplaced.map((u) => `
           <li>
             <button type="button" class="unplaced-item" data-unplaced-id="${esc(u.id)}">
               <span class="unplaced-item-name">${esc(u.name)}</span>
-              <span class="unplaced-item-reason">${esc(friendlyUnplacedReason(u.reason))}</span>
             </button>
           </li>`).join('')}</ul>
       </div>`;
     }
-  }
-  if (diagnostics.length) {
-    html += `<ul class="arrange-diag-list">${diagnostics.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>`;
   }
   if (!html) {
     html = '<p>Auto-arrange uses durations, category defaults, and opening hours to place activities.</p>';
@@ -6513,7 +6494,6 @@ async function autoArrangeActiveCity(opts = {}) {
       const day = dateToDay[entry.date];
       if (day) state.placements[entry.activity.id] = { dayId: day.id, time: entry.time };
     }
-    state.arrangeDiagnostics[activeCity] = [];
     state.arrangeUnplaced[activeCity] = [];
     const activeDayIds = activeDays.map((d) => d.id);
     await updateCommutesForCityDays(activeDayIds);
@@ -6598,7 +6578,7 @@ async function autoArrangeActiveCity(opts = {}) {
     });
 
     if (!res.ok) throw new Error('Arrange request failed');
-    const { placements, unplaced = [], diagnostics = [] } = await res.json();
+    const { placements, unplaced = [] } = await res.json();
 
     const dateToDay = Object.fromEntries(activeDays.map((d) => [d.date, d]));
     for (const [id, placement] of Object.entries(placements || {})) {
@@ -6631,11 +6611,10 @@ async function autoArrangeActiveCity(opts = {}) {
         const a = flexible.find((x) => x.id === u.id);
         if (!a) return null;
         if (state.placements[a.id]?.dayId) return null;
-        return { id: a.id, name: a.name, reason: u.reason };
+        return { id: a.id, name: a.name };
       })
       .filter(Boolean);
     state.arrangeUnplaced[activeCity] = unplacedItems;
-    state.arrangeDiagnostics[activeCity] = [...diagnostics];
 
     // Validate flexible placements: drop any that overlap a lock or fall outside the day window
     const lockedIds = new Set(lockedSet.map((e) => String(e.activity.id)));
@@ -6645,11 +6624,7 @@ async function autoArrangeActiveCity(opts = {}) {
       if (!placement?.dayId) return;
       if (hasOverlapInDay(a.id, placement.dayId, placement)) {
         state.placements[a.id] = { dayId: null, time: null };
-        state.arrangeUnplaced[activeCity].push({
-          id: a.id,
-          name: a.name,
-          reason: 'overlapped a locked activity or fell outside the day window'
-        });
+        state.arrangeUnplaced[activeCity].push({ id: a.id, name: a.name });
       }
     });
   } catch (e) {
