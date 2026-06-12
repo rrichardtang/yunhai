@@ -327,12 +327,32 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
   return { minutes, source: 'live-ok' };
 }
 
-async function getFastestCommuteWithSource(fromActivity, toActivity) {
-  if (isWalkingDistancePair(fromActivity, toActivity)) {
-    return { minutes: null, sources: ['walking-skip'] };
+// Real walking time for a close pair: query the walking mode alone (transit/
+// driving ZERO_RESULTS on short hops), falling back to a haversine estimate
+// only if Google returns nothing. Used by both the matrix and per-pair paths.
+async function walkingCommute(fromActivity, toActivity, origin, destination) {
+  let source = 'walking-skip';
+  let minutes = null;
+  if (origin && destination) {
+    const walk = await fetchDistanceMatrixDuration({ origin, destination, mode: 'walking' });
+    source = walk.source;
+    minutes = walk.minutes;
   }
+  if (!Number.isFinite(minutes)) {
+    const a = getActivityCoords(fromActivity);
+    const b = getActivityCoords(toActivity);
+    minutes = a && b ? Math.max(1, Math.round(haversineKm(a.lat, a.lng, b.lat, b.lng) * 12)) : null;
+  }
+  return { minutes: Number.isFinite(minutes) ? minutes : null, source };
+}
+
+async function getFastestCommuteWithSource(fromActivity, toActivity) {
   const origin = resolveCommuteQuery(fromActivity, 'end_location');
   const destination = resolveCommuteQuery(toActivity, 'start_location');
+  if (isWalkingDistancePair(fromActivity, toActivity)) {
+    const { minutes, source } = await walkingCommute(fromActivity, toActivity, origin, destination);
+    return { minutes, sources: [source] };
+  }
   if (!origin || !destination) return { minutes: null, sources: ['no-query'] };
 
   const sources = [];
@@ -365,15 +385,7 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
   }
 
   if (isWalkingDistancePair(fromActivity, toActivity)) {
-    // Close pairs only need the real walking time; transit/driving return
-    // ZERO_RESULTS on short hops, so we skip them and query walking alone.
-    const walk = await fetchDistanceMatrixDuration({ origin, destination, mode: 'walking' });
-    let minutes = walk.minutes;
-    if (!Number.isFinite(minutes)) {
-      const a = getActivityCoords(fromActivity);
-      const b = getActivityCoords(toActivity);
-      minutes = a && b ? Math.max(1, Math.round(haversineKm(a.lat, a.lng, b.lat, b.lng) * 12)) : null;
-    }
+    const { minutes, source } = await walkingCommute(fromActivity, toActivity, origin, destination);
     return {
       modes: Number.isFinite(minutes)
         ? { walking: { durationMinutes: minutes, modeIcon: COMMUTE_MODE_ICON.walking, isWalkingDistance: true } }
@@ -382,7 +394,7 @@ async function getCommuteBetweenActivities(fromActivity, toActivity) {
       durationMinutes: Number.isFinite(minutes) ? minutes : null,
       modeIcon: COMMUTE_MODE_ICON.walking,
       isWalkingDistance: true,
-      sources: [walk.source]
+      sources: [source]
     };
   }
 
