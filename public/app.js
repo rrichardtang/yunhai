@@ -6023,7 +6023,9 @@ async function updateCommutesForCityDays(dayIds = []) {
     const { arrival, arrivalAccommodation, departure, departureAccommodation } = buildLogisticsPseudoActivities(cityObj, day.date, day.city);
     const payloadActivities = orderedActivities.map((a) => ({
       id: a.id, name: a.name, city: a.city,
+      location: a.location,
       start_location: actAddress(a),
+      end_location: actAddress(a),
       accommodation_location: accommodationLocation,
       hotel_location: accommodationLocation,
       hotel_latitude: normalizeCoordinate(accommodation?.latitude),
@@ -6381,32 +6383,6 @@ async function autoArrangeActiveCity(opts = {}) {
 
   const cityLogistics = cityPlan?.logistics || {};
   const departureLocation = String(cityLogistics.departure?.location || '').trim() || 'departure point';
-  const primaryAccommodation = cityPlan?.accommodation;
-
-  const arrLogistics = buildLogisticsPseudoActivities(cityPlan, cityPlan?.startDate, activeCity);
-  const depLogistics = buildLogisticsPseudoActivities(cityPlan, cityPlan?.endDate, activeCity);
-  const [arrivalCommutes, departureCommutes] = await Promise.all([
-    arrLogistics.arrival && arrLogistics.arrivalAccommodation
-      ? fetchCommutesForActivities([arrLogistics.arrival, arrLogistics.arrivalAccommodation])
-      : [],
-    depLogistics.departureAccommodation && depLogistics.departure
-      ? fetchCommutesForActivities([depLogistics.departureAccommodation, depLogistics.departure])
-      : []
-  ]);
-
-  const diagnostics = [];
-
-  const arrCommute = resolveSelectedCommuteDetails(arrivalCommutes[0]);
-  if (!arrCommute || !Number.isFinite(arrCommute.durationMinutes)) {
-    diagnostics.push(`Distance Matrix unavailable for arrival — using ${TRANSIT_FALLBACK_MINS[cityLogistics.arrival?.mode] ?? 30}min fallback`);
-  }
-  const arrivalTransitMins = arrCommute?.durationMinutes ?? (TRANSIT_FALLBACK_MINS[cityLogistics.arrival?.mode] ?? 30);
-
-  const depCommute = resolveSelectedCommuteDetails(departureCommutes[0]);
-  if (!depCommute || !Number.isFinite(depCommute.durationMinutes)) {
-    diagnostics.push(`Distance Matrix unavailable for departure — using ${TRANSIT_FALLBACK_MINS[cityLogistics.departure?.mode] ?? 30}min fallback`);
-  }
-  const departureTransitMins = depCommute?.durationMinutes ?? (TRANSIT_FALLBACK_MINS[cityLogistics.departure?.mode] ?? 30);
 
   const prefs = state.schedulingPrefs || defaultSchedulingPrefs();
   const prefStartMins = minutesFromTime(prefs.dayStartTime);
@@ -6454,13 +6430,8 @@ async function autoArrangeActiveCity(opts = {}) {
   if (sameDayEntry) {
     const fsMin = minutesFromTime(sameDayEntry.fixedStart.time);
     const feMin = minutesFromTime(sameDayEntry.fixedEnd.time);
-    if (feMin <= fsMin) {
-      showToast('No schedulable window for this city — consider extending the stay', 'warning');
-      return;
-    }
+    if (feMin <= fsMin) return;
   }
-
-  if (diagnostics.length) showToast(diagnostics.join(' | '), 'info');
 
   allApprovedInCity.forEach((a) => {
     state.activities = state.activities.map((current) => (current.id === a.id ? a : current));
