@@ -16,7 +16,7 @@ const { buildAssignPrompt, STATIC_ARRANGE_SYSTEM } = require('../services/arrang
 const { schedule } = require('../services/arrangeScheduler');
 const { buildCityTravelTiming } = require('../services/distanceMatrix');
 const arrangeTelemetry = require('../services/arrangeTelemetry');
-const { enrichWithPlaceDetails } = require('../services/placesEnrich');
+const { enrichWithPlaceDetails, formatOpeningHoursFromPlaces, PRICE_LEVEL_MAP } = require('../services/placesEnrich');
 const { debugLog } = require('../services/debugLog');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
@@ -75,6 +75,77 @@ function placesCacheSet(key, value) {
     const oldestKey = placesCache.keys().next().value;
     placesCache.delete(oldestKey);
   }
+}
+
+const PLACES_FIELD_MASK = 'places.id,places.displayName,places.formattedAddress,places.location,places.priceLevel,places.rating,places.userRatingCount,places.regularOpeningHours';
+
+async function searchPlaceText(input) {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return { error: 'maps_disabled' };
+  try {
+    const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': PLACES_FIELD_MASK
+      },
+      body: JSON.stringify({ textQuery: input })
+    });
+    if (!r.ok) {
+      const errText = await r.text();
+      debugLog('places-resolve', `searchText http=${r.status} input="${input}" body=${errText.slice(0, 300)}`);
+      return { error: 'lookup_failed' };
+    }
+    const data = await r.json();
+    const place = Array.isArray(data.places) ? data.places[0] : null;
+    debugLog('places-resolve', `searchText places=${(data.places || []).length} input="${input}"`);
+    if (!place) return { placeId: null };
+    return {
+      placeId: place.id || null,
+      lat: typeof place.location?.latitude === 'number' ? place.location.latitude : null,
+      lng: typeof place.location?.longitude === 'number' ? place.location.longitude : null,
+      name: place.displayName?.text || null,
+      formattedAddress: place.formattedAddress || null,
+      priceLevel: place.priceLevel in PRICE_LEVEL_MAP ? PRICE_LEVEL_MAP[place.priceLevel] : null,
+      rating: typeof place.rating === 'number' ? place.rating : null,
+      userRatingsTotal: typeof place.userRatingCount === 'number' ? place.userRatingCount : null,
+      openingHours: formatOpeningHoursFromPlaces(place.regularOpeningHours)
+    };
+  } catch (err) {
+    debugLog('places-resolve', `exception input="${input}" error=${err.message}`);
+    return { error: 'lookup_failed' };
+  }
+}
+
+function groundActivityToPlace(activity, place, { cost = null, costType = 'per_person' } = {}) {
+  const resolvedCostType = costType === 'per_group' ? 'per_group' : 'per_person';
+  if (place) {
+    activity.name = place.name || activity.name;
+    activity.venue_name = place.name || activity.venue_name || activity.name;
+    activity.place_id = place.placeId || null;
+    activity.location = {
+      name: activity.venue_name,
+      address: place.formattedAddress || activity.location?.address || '',
+      lat: Number.isFinite(place.lat) ? place.lat : null,
+      lng: Number.isFinite(place.lng) ? place.lng : null
+    };
+    if (place.openingHours) {
+      activity.opening_hours = place.openingHours;
+      if (activity.timing) activity.timing.opening_hours = place.openingHours;
+    }
+    if (place.priceLevel != null) activity.price_level = place.priceLevel;
+  }
+  if (cost != null) {
+    if (activity.cost && typeof activity.cost === 'object') {
+      activity.cost.estimated_usd = cost;
+      activity.cost.type = resolvedCostType;
+    } else {
+      activity.estimated_cost_usd = cost;
+      activity.cost_type = resolvedCostType;
+    }
+  }
+  return activity;
 }
 
 function extractText(content = []) {
@@ -170,61 +241,89 @@ function register(app) {
     const city = String(req.query.city || '').trim();
     if (!q) return res.status(400).json({ error: 'Missing q parameter' });
 
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    if (!apiKey) return res.json({ error: 'maps_disabled' });
-
     const cacheKey = `${q.toLowerCase()}|${city.toLowerCase()}`;
     const cached = placesCacheGet(cacheKey);
     if (cached) return res.json(cached);
 
-    const input = city ? `${q}, ${city}` : q;
-    const priceLevelMap = {
-      PRICE_LEVEL_FREE: 0,
-      PRICE_LEVEL_INEXPENSIVE: 1,
-      PRICE_LEVEL_MODERATE: 2,
-      PRICE_LEVEL_EXPENSIVE: 3,
-      PRICE_LEVEL_VERY_EXPENSIVE: 4
-    };
+    const response = await searchPlaceText(city ? `${q}, ${city}` : q);
+    if (!response.error) placesCacheSet(cacheKey, response);
+    return res.json(response);
+  });
 
-    try {
-      const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.priceLevel,places.rating,places.userRatingCount'
-        },
-        body: JSON.stringify({ textQuery: input })
-      });
-      if (!r.ok) {
-        const errText = await r.text();
-        debugLog('places-resolve', `searchText http=${r.status} input="${input}" body=${errText.slice(0, 300)}`);
-        return res.json({ error: 'lookup_failed' });
-      }
-      const data = await r.json();
-      const place = Array.isArray(data.places) ? data.places[0] : null;
-      debugLog('places-resolve', `searchText places=${(data.places || []).length} input="${input}"`);
-      if (!place) {
-        const response = { placeId: null };
-        placesCacheSet(cacheKey, response);
-        return res.json(response);
-      }
-      const response = {
-        placeId: place.id || null,
-        lat: typeof place.location?.latitude === 'number' ? place.location.latitude : null,
-        lng: typeof place.location?.longitude === 'number' ? place.location.longitude : null,
-        name: place.displayName?.text || null,
-        formattedAddress: place.formattedAddress || null,
-        priceLevel: place.priceLevel in priceLevelMap ? priceLevelMap[place.priceLevel] : null,
-        rating: typeof place.rating === 'number' ? place.rating : null,
-        userRatingsTotal: typeof place.userRatingCount === 'number' ? place.userRatingCount : null
-      };
-      placesCacheSet(cacheKey, response);
-      return res.json(response);
-    } catch (err) {
-      debugLog('places-resolve', `exception input="${input}" error=${err.message}`);
-      return res.json({ error: 'lookup_failed' });
+  app.post('/api/activity/add', async (req, res) => {
+    const addStartTs = Date.now();
+    const { name, city, why = '', cost = null, costType = 'per_person', userId, tripId = null } = req.body || {};
+    debugLog('activity-add', `INBOUND name="${name || ''}" city="${city || ''}" why_chars=${(why || '').length}`);
+    if (!name || !city) return res.status(400).json({ error: 'name and city are required' });
+
+    const cacheKey = `${String(name).toLowerCase()}|${String(city).toLowerCase()}`;
+    let place = placesCacheGet(cacheKey);
+    if (!place) {
+      place = await searchPlaceText(`${name}, ${city}`);
+      if (!place.error) placesCacheSet(cacheKey, place);
     }
+    const grounded = !place.error && !!place.placeId;
+    if (!place.error && !place.placeId) {
+      debugLog('activity-add', `REJECT name="${name}" city="${city}" reason=place_not_found`);
+      return res.status(404).json({ error: 'place_not_found' });
+    }
+
+    const canonicalName = grounded ? (place.name || name) : String(name).trim();
+    let activity = null;
+
+    if (process.env.ANTHROPIC_API_KEY) {
+      try {
+        const resolvedUserId = parseUserId(userId);
+        const prefSummary = recall({ userId: resolvedUserId, tripId, query: `${canonicalName} ${why || ''}` }).text;
+        const systemPrompt = prefSummary ? `${ACTIVITY_SYSTEM_PROMPT}\n\n${prefSummary}` : ACTIVITY_SYSTEM_PROMPT;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const addressClause = grounded && place.formattedAddress ? ` (${place.formattedAddress})` : '';
+        const verifiedClause = grounded ? ' This is a verified real venue — do NOT rename or substitute it.' : '';
+        const noteClause = why ? `\nTraveler's note: "${why}"` : '';
+        const userContent = `The traveler manually added "${canonicalName}"${addressClause} in ${city} to their itinerary.${verifiedClause} The "name" field must be exactly "${canonicalName}".${noteClause}
+Fill in the descriptive fields for this venue: type, why_it_fits, pitfall, booking_advice, insider_tips, duration_hours, suggested_time, opening_hours, booking_type, estimated_cost_usd.
+
+Return ONLY valid JSON (no markdown fences): a single activity object matching the standard activity schema.`;
+
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userContent }]
+        });
+        const parsed = tryParseJsonObject(extractText(response.content));
+        const rawActivity = parsed?.activity && typeof parsed.activity === 'object' ? parsed.activity : parsed;
+        if (rawActivity && typeof rawActivity === 'object') {
+          rawActivity.name = canonicalName;
+          activity = normalizeActivity(rawActivity, city);
+        }
+      } catch (error) {
+        debugLog('activity-add', `LLM_FAIL name="${canonicalName}" msg="${error?.message || error}"`);
+      }
+    }
+
+    if (!activity) {
+      activity = normalizeActivity({
+        name: canonicalName,
+        city,
+        type: 'tour',
+        why_it_fits: why,
+        estimated_cost_usd: cost,
+        cost_type: costType
+      }, city);
+    }
+    groundActivityToPlace(activity, grounded ? place : null, { cost, costType });
+    if (!grounded) await enrichWithPlaceDetails([activity], city);
+
+    const bookingType = activity.booking?.type ?? activity.booking_type;
+    const links = buildBookingLinks({ bookingType, name: activity.venue_name || activity.name, city });
+    if (links.length) {
+      if (activity.booking) activity.booking.links = links;
+      else activity.booking_links = links;
+    }
+
+    debugLog('activity-add', `DONE name="${activity.name}" grounded=${grounded} elapsed_ms=${Date.now() - addStartTs}`);
+    return res.json({ activity });
   });
 
   app.post('/api/activity/refine', async (req, res) => {
@@ -273,6 +372,19 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
 
       const updatedName = updates.name || activity.name;
       const updatedCity = updates.city || activity.city;
+
+      if (updates.name && updates.name !== activity.name && process.env.GOOGLE_MAPS_API_KEY) {
+        const merged = { ...activity, ...updates, city: updatedCity };
+        merged.location = { ...(activity.location || {}), lat: null, lng: null };
+        if (activity.timing) merged.timing = { ...activity.timing, ...(updates.timing || {}) };
+        await enrichWithPlaceDetails([merged], updatedCity);
+        if (Number.isFinite(Number(merged.location?.lat)) && Number.isFinite(Number(merged.location?.lng))) {
+          updates.location = merged.location;
+          if (merged.opening_hours) updates.opening_hours = merged.opening_hours;
+          if (merged.timing) updates.timing = merged.timing;
+        }
+      }
+
       const isNewShape = activity.booking !== undefined;
       const existingBookingType = isNewShape ? activity.booking?.type : activity.booking_type;
       const updatedBookingType = updates.booking_type || existingBookingType || 'none';
@@ -381,8 +493,33 @@ Return ONLY valid JSON (no markdown fences):
         return res.status(500).json({ error: 'LLM returned unexpected shape' });
       }
 
-      const normalized = normalizeActivity(parsed.activity, activity.city);
+      let normalized = normalizeActivity(parsed.activity, activity.city);
       await enrichWithPlaceDetails([normalized], activity.city);
+
+      const coordsOk = (a) => Number.isFinite(Number(a?.location?.lat)) && Number.isFinite(Number(a?.location?.lng));
+      let unverified = false;
+      if (!coordsOk(normalized) && process.env.GOOGLE_MAPS_API_KEY) {
+        debugLog('activity-replace', `RETRY name="${normalized?.name || ''}" reason=venue_not_found_on_maps`);
+        const retryResponse = await anthropic.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [
+            { role: 'user', content: userContent },
+            { role: 'assistant', content: raw },
+            { role: 'user', content: `Your suggestion "${normalized.name}" could not be found on Google Maps — it likely does not exist under that name. Suggest a different, verifiable venue in ${activity.city} that satisfies the same request. Prefer venues from the web research list above. Same JSON format.` }
+          ]
+        });
+        const retryParsed = tryParseJsonObject(extractText(retryResponse.content));
+        if (retryParsed?.activity && typeof retryParsed.activity === 'object') {
+          const retryNormalized = normalizeActivity(retryParsed.activity, activity.city);
+          await enrichWithPlaceDetails([retryNormalized], activity.city);
+          if (coordsOk(retryNormalized)) normalized = retryNormalized;
+          else unverified = true;
+        } else {
+          unverified = true;
+        }
+      }
 
       const declineSignals = [
         ...(Array.isArray(parsed.preferences) ? parsed.preferences : []),
@@ -391,9 +528,8 @@ Return ONLY valid JSON (no markdown fences):
       // Detached: reconciliation must not delay the replacement response.
       observe({ userId: resolvedUserId, tripId, source: 'decline', candidates: declineSignals });
 
-      const hasCoords = Number.isFinite(Number(normalized?.location?.lat)) && Number.isFinite(Number(normalized?.location?.lng));
-      debugLog('activity-replace', `DONE name="${normalized?.name || ''}" has_coords=${hasCoords} elapsed_ms=${Date.now() - replaceStartTs}`);
-      return res.json({ activity: normalized });
+      debugLog('activity-replace', `DONE name="${normalized?.name || ''}" has_coords=${coordsOk(normalized)} unverified=${unverified} elapsed_ms=${Date.now() - replaceStartTs}`);
+      return res.json(unverified ? { activity: normalized, unverified: true } : { activity: normalized });
     } catch (error) {
       debugLog('activity-replace', `ERROR msg="${error?.message || error}" elapsed_ms=${Date.now() - replaceStartTs}`);
       return res.status(500).json({ error: error.message || 'Failed to replace activity' });
@@ -662,4 +798,4 @@ Return ONLY valid JSON (no markdown fences):
   });
 }
 
-module.exports = { register };
+module.exports = { register, groundActivityToPlace };

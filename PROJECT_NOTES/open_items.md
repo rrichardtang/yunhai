@@ -30,3 +30,9 @@
 **Description:** Arrange logs show `live_fail=25` and repeated `[dm] element-status=ZERO_RESULTS mode=transit` — some venue pairs return no transit duration, so the adjuster falls back to a 10-min walking assumption and the LLM schedules without real commute data for those pairs. Orthogonal to the LLM scaffolding work; affects scheduling accuracy.
 **Context:** Surfaced in the same Kyoto run analyzed for the reliability levers. Likely needs a mode fallback (transit→driving/walking) or caching of a coarse fallback estimate in `distanceMatrix`/commute-matrix services.
 **Next action:** Investigate distance-matrix mode fallback when transit returns ZERO_RESULTS.
+
+## [2026-07-01] Verify grounded activity-add / replace-retry / refine-enrichment in a keyed environment
+**Status:** Pending input (needs API keys)
+**Description:** The mobile-UI feedback branch reworked activity grounding: new `POST /api/activity/add` (Places resolve gate → LLM fill with verbatim name → `groundActivityToPlace`), one retry on the replace path when the suggested venue doesn't resolve, and refine re-enrichment on rename. Deterministic parts are unit-tested (`src/activityAdd.test.js`) and the UI flows Playwright-verified, but the live Places + Anthropic paths are unproven in this keyless container.
+**Context:** Fixes the reported Sisterita substitution / hallucinated-address / Muir Woods→Sausalito bugs. decisions [2026-07-01]; changelog [2026-07-01]. Branch `claude/mobile-ui-feedback-eqx6he`.
+**Next action:** In a keyed env: (1) add "Sisterita" (San Francisco) → canonical name kept, real address, map pin resolves; (2) add a gibberish name → inline modal error, no LLM call (check debug log `activity-add REJECT reason=place_not_found`); (3) decline→replace toward an unresolvable venue → `activity-replace RETRY` then coords or `unverified:true`; (4) refine that renames a venue → coords/opening hours refreshed.

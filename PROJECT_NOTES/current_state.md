@@ -1,72 +1,49 @@
 # Current State
 
-_Last updated: 2026-05-29_
+_Last updated: 2026-07-01_
 
 ## Objective
-Ship the modular agent-memory layer (A-MEM / Mem0-inspired) that all four LLM touchpoints
-(activity generation, activity refine/replace, TianHe chat, arrange) share, with both
-long-term (user) and per-trip working memory, while staying on flat-JSON (no DB). Roll it out
-to prod (`yunhai.io`) via staging → promote, on top of the now-landed server-side Clerk auth fix.
+Land the mobile-UI feedback pass (branch `claude/mobile-ui-feedback-eqx6he`) — activity-card
+prev/next navigation on all viewports, toast system removed in favor of a persistent error
+banner, grounded activity adds via the new `/api/activity/add`, scrollable preference wizards,
+and mobile overflow fixes — then verify the LLM-dependent paths in a keyed environment and
+deploy. The memory-layer and arrange-redesign verifications remain queued behind their own
+staging deploys.
 
 ## Active Workstream
-Branch `claude/website-memory-architecture-3BI4W`, merged up to current `main` (which already
-carries the `feature/clerk-server-auth` fixes). `src/memory/` module shipped:
-`recall()` (sync, no-LLM, relevance-ranked retrieval merging user + trip scope) and
-`observe()` (detached LLM-driven ADD/UPDATE/DELETE reconciliation via Haiku, gated by the
-global semaphore), backed by a swappable `MemoryStore` (`store.js`, flat-JSON at
-`/data/memory/{userId}.json`). `preferences.js` is now a thin facade preserving its old API +
-diff-based sync + legacy migration. Wired into all five read sites and three write sites.
-`tripId` is plumbed through every touchpoint (frontend POST bodies + chat/plan routes),
-standardized on the itinerary id as the canonical per-trip key. 113/113 tests pass; server boots clean.
-
-Already on `main` (landed via `feature/clerk-server-auth`): fixed server-side Clerk auth
-(`req.auth()` is a function, was read as a property → `userId=null`), added `trust proxy` +
-`authorizedParties` for verification behind Traefik, and hardened admin routes with real Clerk
-verification (`req.auth().userId` vs `OWNER_USER_ID`). Production is `yunhai.io`; access is
-distributed via magic invite links managed from `/admin.html` (owner-only).
+Branch `claude/mobile-ui-feedback-eqx6he`, complete and pushed. All five feedback items
+implemented; 144/144 tests pass; UI verified locally via Playwright against `?embed` mode at
+desktop (1280px) and mobile (375px) widths. What could NOT be verified without API keys: the
+`/api/activity/add` LLM fill + Places resolve gate live path, the replace-path retry, and the
+refine re-enrichment (all need `GOOGLE_MAPS_API_KEY` / `ANTHROPIC_API_KEY`).
 
 ## Constraints
-- Stay flat-JSON / no-DB. The `MemoryStore` interface is the single swap point for a future
-  Postgres + pgvector backend.
-- `recall()` is on the hot path of every LLM call → must stay synchronous and make zero LLM
-  calls. `observe()` is detached so reconciliation latency never blocks user responses.
-- Retrieval is heuristic (salience + recency + lexical overlap); embeddings are deferred
-  behind the pluggable `score()` signature.
-- Approve/decline is intentionally NOT a write pathway (honors the 2026-04-16 decision).
-- `tripId` is optional everywhere (null ⇒ user-scoped only); canonical key is the itinerary id
-  (`state.currentItineraryId`). The frontend sends it on all relevant POST bodies.
-- Staging and prod are separate deployments with split env files: staging reads
-  `/docker/travelplanner/.env` (test Clerk instance, `pk_test_`); prod reads
-  `/docker/travelplanner/.env.prod` (live instance, `pk_live_`). Same email → different Clerk
-  userId per instance, so `OWNER_USER_ID` differs between them.
-- `CLERK_AUTHORIZED_PARTIES` must be set per env (staging URL vs `https://yunhai.io`).
-- Deploys must go through `deployment/promotion.sh` (`deploy-staging` / `promote`) — file-by-file
-  `git checkout` does NOT restart the Node process.
-- Node isn't on the VPS PATH — admin is browser-driven, not CLI.
+- Frontend stays a monolith (`public/app.js`) — only boundary concerns are extracted.
+- `showToast` no longer exists; failures go through `showErrorBanner()` (persistent, dismissible,
+  top-center). Do not reintroduce transient notifications.
+- Add path: Places resolve gate runs before any LLM call; degrade gracefully when
+  `GOOGLE_MAPS_API_KEY` is absent (gate skipped) or `ANTHROPIC_API_KEY` is absent (grounded
+  minimal activity, never an error for a verified venue).
+- Map links prefer `place_id` → lat,lng → name+city text search, in that order.
+- Staging/prod deploy discipline unchanged: `deployment/promotion.sh` only; split env files
+  (`.env` staging / `.env.prod` prod); `CLERK_AUTHORIZED_PARTIES` per env.
 
 ## Risks
-- Arrange feedback ingestion is gated on a free-text scheduling note to avoid a Haiku call on
-  every draft click; structured prefs only ride along when a note is present. If users rarely
-  type notes, arrange-derived learning will be thin.
-- Live end-to-end (chat → memory write → reflected in a later plan; contradiction reconcile)
-  is UNVERIFIED in this container — no API keys present. Needs a keyed environment.
-- `data/invite-codes.json` and `/data/memory/*.json` live on the VPS, not in git. If the data
-  dir is wiped, invites and learned memory are lost. Worth backing up.
-- `/debug` and `/debug/codes` expose internal logs / the code list. Now Clerk-gated (resolves a
-  userId), but worth restricting to owner-only later.
-- (Carried over) Google OAuth client secret was briefly exposed; should be rotated.
-  `client_secret_*.json` should be `.gitignore`d.
+- Keyed-environment verification of the grounding fixes is outstanding — the Sisterita-class
+  bugs are fixed by construction but unproven against live Places/Anthropic.
+- Removing success toasts means saves/deletes/copies have no positive confirmation; watch for
+  user confusion reports.
+- Checklist item delete lost its undo (was toast-based).
+- (Carried over) Google OAuth client secret should be rotated; `client_secret_*.json` should be
+  `.gitignore`d.
 
 ## Next Actions
-- (Concierge, 2026-05-30) Deploy branch `feature/concierge-shopping-search-fix` to staging and verify the agentic `web_search` end-to-end: "dinner near my hotel" issues an address-scoped query (check `/debug` Brave telemetry), former regex-gate misses (nightlife/day-trip/weather/safety/souvenirs) all search, "what does Finalize do?" does NOT search, and rationale/booking questions answer from context. Then promote.
-- `bash deployment/promotion.sh deploy-staging claude/website-memory-architecture-3BI4W`, then
-  verify the memory layer end-to-end on staging in a keyed environment: state a preference in
-  chat → confirm a record is written and appears in a later plan/arrange prompt; state a
-  contradicting preference → confirm reconciler UPDATEs/DELETEs instead of appending a duplicate;
-  decline with a note → replacement reflects memory; refine reflects memory. Confirm a trip-only
-  statement is tagged trip-scoped to the itinerary id and surfaces in arrange for that trip but
-  not another.
-- `bash deployment/promotion.sh promote --yes` (ensure both checkouts clean first) → merges to
-  `main`, redeploys prod.
-- Confirm `CLERK_AUTHORIZED_PARTIES=https://yunhai.io` is set in `.env.prod` (and staging URL in `.env`).
-- Rotate Google OAuth secret + `.gitignore` the `client_secret` file (deferred from prior sessions).
+- Verify on a keyed environment (VPS/staging): add "Sisterita" in San Francisco → gate passes,
+  name verbatim, real address/pin; gibberish name → inline "Couldn't find…" with no LLM call;
+  replace with an unresolvable venue → one retry then `unverified: true`; refine rename →
+  coords/hours refreshed.
+- Merge/deploy `claude/mobile-ui-feedback-eqx6he` via staging → promote.
+- (Queued, from prior sessions) Staging verification of the memory layer
+  (`claude/website-memory-architecture-3BI4W`) and the arrange redesign
+  (`feature/arrange-reliability-thinking`) per open_items.
+- Rotate Google OAuth secret + `.gitignore` the `client_secret` file (deferred).

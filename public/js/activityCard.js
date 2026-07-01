@@ -79,10 +79,13 @@
   function googleMapsLinkHtml(activity = {}) {
     const venue = activity.venue_name || activity.name;
     if (!venue) return '';
-    const q = encodeURIComponent(venue);
+    const lat = Number(activity.location?.lat);
+    const lng = Number(activity.location?.lng);
     const url = activity.place_id
       ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(activity.place_id)}`
-      : `https://www.google.com/maps/search/?api=1&query=${q}`;
+      : (Number.isFinite(lat) && Number.isFinite(lng))
+        ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.city ? `${venue}, ${activity.city}` : venue)}`;
     return `<a href="${url}" target="_blank" rel="noopener" class="badge badge-maps" title="Open in Google Maps" aria-label="Google Maps"><i class="ph-bold ph-map-pin" aria-hidden="true"></i></a>`;
   }
 
