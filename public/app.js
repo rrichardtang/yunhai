@@ -78,7 +78,6 @@ const state = {
 };
 window.state = state;
 window.addEventListener('DOMContentLoaded', () => {
-  if (typeof showToast === 'function') window.showToast = showToast;
   if (typeof setViewMode === 'function') window.setViewMode = setViewMode;
 });
 
@@ -892,7 +891,6 @@ const LOADING_MESSAGES = [
 
 let loadingInterval = null;
 let loadingMessageIndex = 0;
-let activeSavingToastId = null;
 let profileSnapshot = null;
 
 function refreshOverlayInterlocks() {
@@ -919,44 +917,19 @@ function refreshCityTimelineUI(row, city) {
   }
 }
 
-function showToast(message, type = 'info') {
-  const safeType = ['success', 'error', 'info'].includes(type) ? type : 'info';
-  const host = document.getElementById('toastHost');
-  if (!host || !message) return null;
-
-  const iconMap = {
-    success: '✓',
-    error: '×',
-    info: 'ℹ'
-  };
-  const duration = safeType === 'error' ? 4000 : 2500;
-  const toast = document.createElement('div');
-  const toastId = `toast-${uid()}`;
-  toast.dataset.toastId = toastId;
-  toast.className = `toast toast-${safeType}`;
-  toast.setAttribute('role', 'status');
-  toast.setAttribute('aria-live', safeType === 'error' ? 'assertive' : 'polite');
-  toast.innerHTML = `
-    <span class="toast-icon" aria-hidden="true">${iconMap[safeType]}</span>
-    <span class="toast-message">${esc(String(message))}</span>
-  `;
-
-  host.appendChild(toast);
-  requestAnimationFrame(() => toast.classList.add('show'));
-
-  const dismiss = () => {
-    toast.classList.remove('show');
-    toast.classList.add('hide');
-    setTimeout(() => toast.remove(), 280);
-  };
-
-  const timer = setTimeout(dismiss, duration);
-  toast.addEventListener('click', () => {
-    clearTimeout(timer);
-    dismiss();
-  });
-
-  return toastId;
+function showErrorBanner(message) {
+  if (!message) return;
+  let banner = document.getElementById('errorBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'errorBanner';
+    banner.className = 'error-banner';
+    banner.setAttribute('role', 'alert');
+    banner.innerHTML = '<span class="error-banner-message"></span><button class="error-banner-dismiss" type="button" aria-label="Dismiss">&times;</button>';
+    banner.querySelector('.error-banner-dismiss').addEventListener('click', () => banner.remove());
+    document.body.appendChild(banner);
+  }
+  banner.querySelector('.error-banner-message').textContent = String(message);
 }
 
 function updatePlanningStatus(status = '', progress = '') {
@@ -1918,7 +1891,6 @@ function bindChecklistEvents(el) {
     });
   });
 
-  // Delete with undo toast
   el.querySelectorAll('[data-cl-delete]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const itemEl = btn.closest('[data-cl-item]');
@@ -1929,30 +1901,6 @@ function bindChecklistEvents(el) {
       state.bookingChecklist = state.bookingChecklist.filter((x) => x.id !== id);
       renderChecklistModal();
       renderTripHealthBadge();
-
-      // Undo toast
-      const host = document.getElementById('toastHost');
-      if (host) {
-        const toast = document.createElement('div');
-        toast.className = 'toast toast-info';
-        toast.setAttribute('role', 'status');
-        toast.innerHTML = `<span class="toast-message">Item deleted</span><button class="cl-undo-btn" type="button">Undo</button>`;
-        host.appendChild(toast);
-        requestAnimationFrame(() => toast.classList.add('show'));
-        const dismiss = () => {
-          toast.classList.remove('show');
-          toast.classList.add('hide');
-          setTimeout(() => toast.remove(), 280);
-        };
-        const timer = setTimeout(dismiss, 4000);
-        toast.querySelector('.cl-undo-btn').addEventListener('click', () => {
-          clearTimeout(timer);
-          dismiss();
-          state.bookingChecklist = [...state.bookingChecklist, deleted];
-          renderChecklistModal();
-          renderTripHealthBadge();
-        });
-      }
     });
   });
 
@@ -2160,7 +2108,7 @@ function scheduleChecklistAutosave() {
   if (checklistAutosaveTimer) clearTimeout(checklistAutosaveTimer);
   checklistAutosaveTimer = setTimeout(() => {
     checklistAutosaveTimer = null;
-    saveSnapshot({ silent: true });
+    saveSnapshot();
   }, 600);
 }
 
@@ -2349,14 +2297,14 @@ async function goToNextStep(fromStep = state.step) {
     }
 
     if (!validateLocationsBeforePlanning()) {
-      showToast('Please validate all locations before planning your trip.', 'error');
+      showErrorBanner('Please validate all locations before planning your trip.');
       return;
     }
     clearSnapshot();
     if (!citiesToRegenerate) clearPlannedResultsKeepSetup();
     setPlanningLoading(true);
     try { await planTrip(citiesToRegenerate, lockedByCity); }
-    catch (e) { showToast(e?.message || 'Failed to plan trip.', 'error'); }
+    catch (e) { showErrorBanner(e?.message || 'Failed to plan trip.'); }
     finally { setPlanningLoading(false); }
     return;
   }
@@ -2377,7 +2325,7 @@ async function goToNextStep(fromStep = state.step) {
     try {
       await generateItinerary();
     } catch (e) {
-      showToast(e?.message || 'Failed to generate itinerary.', 'error');
+      showErrorBanner(e?.message || 'Failed to generate itinerary.');
     }
     return;
   }
@@ -2540,7 +2488,6 @@ function sortCitiesByDate() {
   if (state.cities[0] && existingTravel) state.cities[0].travelEntry = normalizeTravelEntry(existingTravel);
   syncTravelDateTimes();
   renderCities();
-  showToast('Cities sorted by start date.', 'success');
 }
 
 function splitCityName(full) {
@@ -3499,7 +3446,6 @@ function openProfileWizard(store, { forced = false } = {}) {
     state.profilesStore = saveProfiles(nextStore);
     state.profile = normalizeProfile(profile);
     openPreferencesModal();
-    showToast('Profile created — generating summary…', 'info');
     apiFetch('/api/profile/enrich', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3509,7 +3455,6 @@ function openProfileWizard(store, { forced = false } = {}) {
       if (instruction) {
         state.learnedPrefs = { ...(state.learnedPrefs || {}), profileInstruction: instruction };
         renderPreferencesModal();
-        showToast('AI summary ready!', 'success');
       }
     }).catch(() => {});
   }
@@ -3527,7 +3472,6 @@ async function deleteActiveProfile() {
   state.learnedPrefs = null;
   apiFetch('/api/preferences/reset', { method: 'POST' }).catch(() => {});
   closePreferencesModal();
-  showToast('Profile deleted.', 'success');
   openProfileWizard(nextStore, { forced: true });
 }
 
@@ -3574,7 +3518,7 @@ function closeChecklistModal() {
   if (checklistAutosaveTimer) {
     clearTimeout(checklistAutosaveTimer);
     checklistAutosaveTimer = null;
-    saveSnapshot({ silent: true });
+    saveSnapshot();
   }
   overlayManager.close('checklistModal');
 }
@@ -3599,7 +3543,7 @@ async function fetchStatus() {
       await loadGoogleMapsPlacesSDK(googleMapsApiKey);
       initializePlacesWidgets();
     } catch (err) {
-      showToast(err?.message || 'Google Places failed to load.', 'error');
+      showErrorBanner(err?.message || 'Google Places failed to load.');
     }
   }
 }
@@ -3696,7 +3640,7 @@ function getFilteredReviewActivities() {
 function applyVerdictToVisibleActivities(verdict = null) {
   const visible = getFilteredReviewActivities();
   if (!visible.length) {
-    showToast('No visible activities to update.', 'info');
+    showErrorBanner('No visible activities to update.');
     return;
   }
 
@@ -3709,7 +3653,6 @@ function applyVerdictToVisibleActivities(verdict = null) {
     };
   });
 
-  showToast(`Updated ${visible.length} visible activities.`, 'success');
   renderActivities();
 }
 
@@ -4108,7 +4051,7 @@ async function onConfirmLocks() {
 
   if (!budgetOptState.refinements.size) {
     btn.innerHTML = '<i class="ph-bold ph-check" aria-hidden="true"></i> Confirm';
-    showToast('Couldn\'t find cheaper alternatives — try again.', 'error');
+    showErrorBanner('Couldn\'t find cheaper alternatives — try again.');
     return;
   }
 
@@ -4418,120 +4361,158 @@ function renderActivities() {
       openActivityMapOverlay(a.id);
     });
 
-    // Mobile: tap card to expand fullscreen
-    if (window.matchMedia('(max-width: 767px)').matches) {
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('button, a, textarea, input, .decline-feedback')) return;
-        openCardExpand(a, card);
-      });
-    }
+    // Tap/click card to expand into the detail overlay
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('button, a, textarea, input, .decline-feedback')) return;
+      openCardExpand(filteredActivities.indexOf(a));
+    });
 
     return card;
   }
 
-  function openCardExpand(a, sourceCard) {
+  function openCardExpand(startIndex) {
+    if (startIndex < 0 || !filteredActivities[startIndex]) return;
     const existing = document.querySelector('.card-expand-overlay');
     if (existing) existing.remove();
 
     const overlay = document.createElement('div');
     overlay.className = 'card-expand-overlay';
 
-    // Clone the front face content for the expanded view
-    const front = sourceCard.querySelector('.activity-card-front');
-    if (!front) return;
-
     const body = document.createElement('div');
     body.className = 'card-expand-body';
-    body.innerHTML = front.innerHTML;
-    // Ensure all content visible in expanded view
-    body.querySelectorAll('.card-content > *').forEach((el) => { el.style.display = ''; });
 
     const closeBtn = document.createElement('button');
-    closeBtn.className = 'card-expand-close';
+    closeBtn.className = 'card-expand-close icon-btn red';
     closeBtn.innerHTML = '<i class="ph-bold ph-x" aria-hidden="true"></i>';
-    closeBtn.classList.add('icon-btn', 'red');
     closeBtn.setAttribute('aria-label', 'Close');
     closeBtn.setAttribute('title', 'Close');
 
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'card-expand-nav prev';
+    prevBtn.innerHTML = '<i class="ph-bold ph-caret-left" aria-hidden="true"></i>';
+    prevBtn.setAttribute('aria-label', 'Previous activity');
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'card-expand-nav next';
+    nextBtn.innerHTML = '<i class="ph-bold ph-caret-right" aria-hidden="true"></i>';
+    nextBtn.setAttribute('aria-label', 'Next activity');
+
     overlay.appendChild(closeBtn);
+    overlay.appendChild(prevBtn);
+    overlay.appendChild(nextBtn);
     overlay.appendChild(body);
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
 
+    let index = startIndex;
+
     function close() {
       overlay.classList.add('closing');
       document.body.style.overflow = '';
+      document.removeEventListener('keydown', onKeydown);
       overlay.addEventListener('animationend', () => overlay.remove(), { once: true });
     }
-    closeBtn.addEventListener('click', close);
 
-    function syncExpand(approved) {
-      syncVerdictClasses(body, approved);
-      syncVerdictClasses(sourceCard, approved);
+    function onKeydown(e) {
+      if (e.target instanceof Element && e.target.closest('textarea, input, select')) return;
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowLeft' && index > 0) show(index - 1);
+      else if (e.key === 'ArrowRight' && index < filteredActivities.length - 1) show(index + 1);
     }
 
-    // Wire up actions directly against state (source card may be re-rendered)
-    body.querySelector('.approve')?.addEventListener('click', () => {
-      const current = state.reviewed[a.id]?.approved;
-      const next = current === true ? null : true;
-      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: next };
-      syncExpand(next);
-    });
+    function gridCardFor(id) {
+      return els.activitiesGrid.querySelector(`[data-activity-id="${CSS.escape(String(id))}"]`);
+    }
 
-    const expandDeclineBtn = body.querySelector('.decline');
-    const expandDeclineReason = body.querySelector('.decline-reason');
-    const expandConfirmReplace = body.querySelector('.confirm-replace');
-    const expandSaveActivityNotes = body.querySelector('.save-activity-notes');
-    const expandActivityNotesText = body.querySelector('.activity-notes-text');
+    function show(i) {
+      index = i;
+      const a = filteredActivities[i];
+      const sourceCard = gridCardFor(a.id) || buildActivityCard(a);
+      const front = sourceCard.querySelector('.activity-card-front');
+      body.innerHTML = front ? front.innerHTML : sourceCard.innerHTML;
+      body.scrollTop = 0;
+      // Ensure all content visible in expanded view
+      body.querySelectorAll('.card-content > *').forEach((el) => { el.style.display = ''; });
+      prevBtn.disabled = i === 0;
+      nextBtn.disabled = i === filteredActivities.length - 1;
 
-    expandDeclineBtn?.addEventListener('click', () => {
-      const current = state.reviewed[a.id]?.approved;
-      const next = current === false ? null : false;
-      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: next };
-      syncExpand(next);
-    });
-
-    expandSaveActivityNotes?.addEventListener('click', () => {
-      const notes = expandActivityNotesText.value.trim();
-      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), notes };
-      syncActivityNotesToChecklist(a.id, notes);
-      saveSnapshot();
-      expandSaveActivityNotes.innerHTML = '<i class="ph-bold ph-check"></i>';
-      setTimeout(() => { expandSaveActivityNotes.innerHTML = '<i class="ph-bold ph-floppy-disk"></i>'; }, 1500);
-    });
-
-    expandDeclineReason?.addEventListener('input', () => {
-      if (expandConfirmReplace) expandConfirmReplace.disabled = !expandDeclineReason.value.trim();
-    });
-
-    expandConfirmReplace?.addEventListener('click', async () => {
-      const reason = expandDeclineReason.value.trim();
-      if (!reason) return;
-      expandConfirmReplace.disabled = true;
-      expandConfirmReplace.innerHTML = '<i class="ph-bold ph-spinner"></i>';
-      try {
-        const notes = state.reviewed[a.id]?.notes || '';
-        const resp = await apiFetch('/api/activity/replace', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity: a, reason, notes, userId: ensureUserId(), tripId: state.currentItineraryId || null })
-        });
-        if (!resp.ok) throw new Error('Replace failed');
-        const { activity: rawReplacement } = await resp.json();
-        if (!rawReplacement) throw new Error('No activity in response');
-        const replacement = { id: `${rawReplacement.city || a.city}-replacement-${uid()}`, ...normalizeActivityMetadata(rawReplacement), city: canonicalizeActivityCity(rawReplacement.city, a.city) };
-        close();
-        replaceActivityInState(a.id, replacement);
-      } catch {
-        expandConfirmReplace.innerHTML = '<i class="ph-bold ph-arrows-clockwise"></i>';
-        expandConfirmReplace.disabled = false;
+      function syncExpand(approved) {
+        syncVerdictClasses(body, approved);
+        const gridCard = gridCardFor(a.id);
+        if (gridCard) syncVerdictClasses(gridCard, approved);
       }
-    });
 
-    body.querySelector('.flip-btn')?.addEventListener('click', () => {
-      close();
-      openActivityMapOverlay(a.id);
-    });
+      // Wire up actions directly against state (grid card may be re-rendered)
+      body.querySelector('.approve')?.addEventListener('click', () => {
+        const current = state.reviewed[a.id]?.approved;
+        const next = current === true ? null : true;
+        state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: next };
+        syncExpand(next);
+      });
+
+      const expandDeclineBtn = body.querySelector('.decline');
+      const expandDeclineReason = body.querySelector('.decline-reason');
+      const expandConfirmReplace = body.querySelector('.confirm-replace');
+      const expandSaveActivityNotes = body.querySelector('.save-activity-notes');
+      const expandActivityNotesText = body.querySelector('.activity-notes-text');
+
+      expandDeclineBtn?.addEventListener('click', () => {
+        const current = state.reviewed[a.id]?.approved;
+        const next = current === false ? null : false;
+        state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: next };
+        syncExpand(next);
+      });
+
+      expandSaveActivityNotes?.addEventListener('click', () => {
+        const notes = expandActivityNotesText.value.trim();
+        state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), notes };
+        syncActivityNotesToChecklist(a.id, notes);
+        saveSnapshot();
+        expandSaveActivityNotes.innerHTML = '<i class="ph-bold ph-check"></i>';
+        setTimeout(() => { expandSaveActivityNotes.innerHTML = '<i class="ph-bold ph-floppy-disk"></i>'; }, 1500);
+      });
+
+      expandDeclineReason?.addEventListener('input', () => {
+        if (expandConfirmReplace) expandConfirmReplace.disabled = !expandDeclineReason.value.trim();
+      });
+
+      expandConfirmReplace?.addEventListener('click', async () => {
+        const reason = expandDeclineReason.value.trim();
+        if (!reason) return;
+        expandConfirmReplace.disabled = true;
+        expandConfirmReplace.innerHTML = '<i class="ph-bold ph-spinner"></i>';
+        try {
+          const notes = state.reviewed[a.id]?.notes || '';
+          const resp = await apiFetch('/api/activity/replace', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activity: a, reason, notes, userId: ensureUserId(), tripId: state.currentItineraryId || null })
+          });
+          if (!resp.ok) throw new Error('Replace failed');
+          const { activity: rawReplacement } = await resp.json();
+          if (!rawReplacement) throw new Error('No activity in response');
+          const replacement = { id: `${rawReplacement.city || a.city}-replacement-${uid()}`, ...normalizeActivityMetadata(rawReplacement), city: canonicalizeActivityCity(rawReplacement.city, a.city) };
+          close();
+          replaceActivityInState(a.id, replacement);
+        } catch {
+          expandConfirmReplace.innerHTML = '<i class="ph-bold ph-arrows-clockwise"></i>';
+          expandConfirmReplace.disabled = false;
+        }
+      });
+
+      body.querySelector('.flip-btn')?.addEventListener('click', () => {
+        close();
+        openActivityMapOverlay(a.id);
+      });
+    }
+
+    closeBtn.addEventListener('click', close);
+    prevBtn.addEventListener('click', () => { if (index > 0) show(index - 1); });
+    nextBtn.addEventListener('click', () => { if (index < filteredActivities.length - 1) show(index + 1); });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    document.addEventListener('keydown', onKeydown);
+
+    show(startIndex);
   }
 }
 
@@ -4656,6 +4637,7 @@ function openAddActivityModal() {
   document.getElementById('addActivityCost').value = '';
   document.getElementById('addActivityCostType').value = 'per_person';
   document.getElementById('addActivityWhy').value = '';
+  setAddActivityError('');
 
   overlayManager.open('addActivityModal');
   setTimeout(() => document.getElementById('addActivityName').focus(), 50);
@@ -4665,11 +4647,18 @@ function closeAddActivityModal() {
   overlayManager.close('addActivityModal');
 }
 
-function submitAddActivity() {
-  const name = document.getElementById('addActivityName').value.trim();
+function setAddActivityError(message) {
+  const errorEl = document.getElementById('addActivityError');
+  errorEl.textContent = message || '';
+  errorEl.classList.toggle('hidden', !message);
+}
+
+async function submitAddActivity() {
+  const nameInput = document.getElementById('addActivityName');
+  const name = nameInput.value.trim();
   if (!name) {
-    document.getElementById('addActivityName').focus();
-    showToast('Please enter an activity name.', 'info');
+    setAddActivityError('Please enter an activity name.');
+    nameInput.focus();
     return;
   }
 
@@ -4679,30 +4668,31 @@ function submitAddActivity() {
   const why = document.getElementById('addActivityWhy').value.trim();
   const cost = costRaw !== '' && Number.isFinite(Number(costRaw)) && Number(costRaw) >= 0 ? Number(costRaw) : null;
 
+  const submitBtn = document.getElementById('addActivitySubmit');
+  submitBtn.disabled = true;
+  setAddActivityError('');
+
+  let resolved = null;
+  try {
+    const res = await apiFetch(`/api/places/resolve?q=${encodeURIComponent(name)}&city=${encodeURIComponent(city)}`);
+    resolved = res.ok ? await res.json() : null;
+  } catch {
+    resolved = null;
+  }
+  submitBtn.disabled = false;
+
+  if (resolved && !resolved.error && !resolved.placeId) {
+    setAddActivityError(`Couldn't find "${name}" in ${city} — check the spelling.`);
+    nameInput.focus();
+    return;
+  }
+
   const stubId = crypto.randomUUID();
   const stub = {
     id: stubId,
-    name,
+    name: resolved?.name || name,
     city,
     type: 'tour',
-    category: 'tour',
-    why_it_fits: why,
-    estimated_cost_usd: cost,
-    cost_type: costType,
-    verdict: 'Recommend',
-    pitfall: '',
-    booking_advice: '',
-    smarter_alternative: null,
-    dedicated_time_block: false,
-    suggested_time: '10:00am',
-    duration_hours: 2,
-    duration: '2 hours',
-    opening_hours: '',
-    booking_type: 'none',
-    booking_links: [],
-    imageUrl: '',
-    start_location: '',
-    end_location: '',
     userAdded: true,
     enriching: true,
   };
@@ -4710,12 +4700,11 @@ function submitAddActivity() {
   state.activities.push(stub);
   closeAddActivityModal();
   renderActivities();
-  showToast(`Finding the best match for "${name}"…`, 'info');
 
-  apiFetch('/api/activity/replace', {
+  apiFetch('/api/activity/add', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ activity: stub, reason: why || null, userId: ensureUserId(), tripId: state.currentItineraryId || null }),
+    body: JSON.stringify({ name, city, why, cost, costType, userId: ensureUserId(), tripId: state.currentItineraryId || null }),
   })
     .then((res) => {
       if (!res.ok) throw new Error(`server ${res.status}`);
@@ -4723,14 +4712,14 @@ function submitAddActivity() {
     })
     .then((data) => {
       if (!data?.activity) throw new Error('no activity returned');
-      const enriched = { ...data.activity, id: stubId, city: stub.city, userAdded: true };
-      replaceActivityInState(stubId, enriched);
-      showToast(`"${enriched.name}" added to your itinerary.`, 'success');
+      const added = { ...data.activity, id: stubId, city: stub.city, userAdded: true };
+      replaceActivityInState(stubId, added);
     })
     .catch((err) => {
-      console.error('[addActivity] enrichment failed:', err);
-      updateActivityInState(stubId, { enriching: false });
-      showToast(`"${name}" added. Details couldn't be enriched — you can edit it later.`, 'info');
+      console.error('[addActivity] failed:', err);
+      state.activities = state.activities.filter((a) => a.id !== stubId);
+      renderActivities();
+      showErrorBanner(`Couldn't add "${name}" — try again.`);
     });
 }
 
@@ -5009,7 +4998,7 @@ function openTimeEditPopup(activityId, anchorEl) {
     const sMin = minutesFromTime(newStart);
     const eMin = minutesFromTime(newEnd);
     if (!Number.isFinite(sMin) || !Number.isFinite(eMin) || eMin <= sMin) {
-      showToast('End time must be after start time');
+      showErrorBanner('End time must be after start time');
       return;
     }
     const newDurHours = (eMin - sMin) / 60;
@@ -6619,7 +6608,7 @@ async function autoArrangeActiveCity(opts = {}) {
       }
     });
   } catch (e) {
-    showToast(e?.message || 'Failed to arrange activities.', 'error');
+    showErrorBanner(e?.message || 'Failed to arrange activities.');
   } finally {
     els.autoArrangeBtn.disabled = false;
     els.autoArrangeBtn.textContent = 'Auto Arrange';
@@ -6757,7 +6746,7 @@ function bindPlacedCardInteractions() {
       if (isLocked) {
         e.stopPropagation();
         e.preventDefault();
-        showToast('This activity is locked. Re-open Finalize to unlock.');
+        showErrorBanner('This activity is locked. Re-open Finalize to unlock.');
         return;
       }
 
@@ -7198,9 +7187,15 @@ function getItineraryRows() {
       const timeLabel = formatTimeRangeLabel(range.startMinutes, range.endMinutes);
       const location = actAddress(activity) || activity.city || '';
       const locationQuery = location || `${activity.name} ${activity.city || ''}`;
-      const navigateHref = location || activity.name
-        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`
-        : '';
+      const lat = Number(activity.location?.lat);
+      const lng = Number(activity.location?.lng);
+      const navigateHref = activity.place_id
+        ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(activity.place_id)}`
+        : (Number.isFinite(lat) && Number.isFinite(lng))
+          ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+          : (location || activity.name)
+            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`
+            : '';
       const notes = String(state.reviewed[activity.id]?.notes || '').trim();
       const referenceNum = getActivityReferenceNum(activity.id);
 
@@ -7367,14 +7362,13 @@ function getMinimalOfflineStore() {
 function saveMinimalOfflinePayload(payload) {
   const id = String(payload?.itineraryId || '').trim();
   if (!id) {
-    showToast('Generate and save an itinerary first.', 'info');
+    showErrorBanner('Generate and save an itinerary first.');
     return;
   }
 
   const store = getMinimalOfflineStore();
   store[id] = payload;
   persist.saveJson(MINIMAL_OFFLINE_KEY, store);
-  showToast('Minimal itinerary saved for offline use.', 'success');
 }
 
 function loadMinimalOfflinePayload(id = '') {
@@ -7398,13 +7392,12 @@ function copyMinimalItineraryText() {
   ].filter(Boolean);
 
   navigator.clipboard.writeText(lines.join('\n'))
-    .then(() => showToast('Copied minimal itinerary.', 'success'))
-    .catch(() => showToast('Could not copy itinerary text.', 'error'));
+    .catch(() => showErrorBanner('Could not copy itinerary text.'));
 }
 
 async function shareMinimalItinerary() {
   if (!state.currentItineraryId) {
-    showToast('Save itinerary first to create a share link.', 'info');
+    showErrorBanner('Save itinerary first to create a share link.');
     return;
   }
 
@@ -7424,8 +7417,7 @@ async function shareMinimalItinerary() {
   }
 
   navigator.clipboard.writeText(shareUrl)
-    .then(() => showToast('Share link copied.', 'success'))
-    .catch(() => showToast('Could not copy share link.', 'error'));
+    .catch(() => showErrorBanner(`Could not copy — share link: ${shareUrl}`));
 }
 
 function renderItineraryModeSummary() { /* legacy no-op; hero replaces this */ }
@@ -7714,7 +7706,7 @@ async function uploadActivityAttachments(activityId, fileList, buttonEl = null) 
 
   if (!activityId) {
     setUploadBtnState(buttonEl, 'idle');
-    showToast('Could not identify activity. Please refresh and try again.', 'error');
+    showErrorBanner('Could not identify activity. Please refresh and try again.');
     return;
   }
 
@@ -7723,12 +7715,12 @@ async function uploadActivityAttachments(activityId, fileList, buttonEl = null) 
       await generateItinerary();
     } catch {
       setUploadBtnState(buttonEl, 'idle');
-      showToast('Save your trip first, then upload files.', 'error');
+      showErrorBanner('Save your trip first, then upload files.');
       return;
     }
     if (!state.currentItineraryId) {
       setUploadBtnState(buttonEl, 'idle');
-      showToast('Save your trip first, then upload files.', 'error');
+      showErrorBanner('Save your trip first, then upload files.');
       return;
     }
   }
@@ -7740,15 +7732,15 @@ async function uploadActivityAttachments(activityId, fileList, buttonEl = null) 
       `/api/itinerary/${encodeURIComponent(state.currentItineraryId)}/activity/${encodeURIComponent(activityId)}/attachments`,
       { method: 'POST', body: formData }
     );
-    if (res.status === 401) { setUploadBtnState(buttonEl, 'idle'); showToast('Sign in to upload files.', 'error'); return; }
-    if (res.status === 404) { setUploadBtnState(buttonEl, 'idle'); showToast('Activity not found on the server. Try saving the trip again.', 'error'); return; }
-    if (res.status === 413) { setUploadBtnState(buttonEl, 'idle'); showToast('File exceeds 10 MB limit.', 'error'); return; }
-    if (res.status === 415) { setUploadBtnState(buttonEl, 'idle'); showToast('Unsupported file type.', 'error'); return; }
+    if (res.status === 401) { setUploadBtnState(buttonEl, 'idle'); showErrorBanner('Sign in to upload files.'); return; }
+    if (res.status === 404) { setUploadBtnState(buttonEl, 'idle'); showErrorBanner('Activity not found on the server. Try saving the trip again.'); return; }
+    if (res.status === 413) { setUploadBtnState(buttonEl, 'idle'); showErrorBanner('File exceeds 10 MB limit.'); return; }
+    if (res.status === 415) { setUploadBtnState(buttonEl, 'idle'); showErrorBanner('Unsupported file type.'); return; }
     if (!res.ok) {
       setUploadBtnState(buttonEl, 'idle');
       let msg = 'Upload failed.';
       try { const j = await res.json(); if (j?.error) msg = `Upload failed: ${j.error}`; } catch {}
-      showToast(msg, 'error');
+      showErrorBanner(msg);
       return;
     }
     const data = await res.json();
@@ -7761,7 +7753,7 @@ async function uploadActivityAttachments(activityId, fileList, buttonEl = null) 
     }, 1000);
   } catch (err) {
     setUploadBtnState(buttonEl, 'idle');
-    showToast(`Upload failed: ${err?.message || 'network error'}`, 'error');
+    showErrorBanner(`Upload failed: ${err?.message || 'network error'}`);
   }
 }
 
@@ -7803,14 +7795,13 @@ function renderAttachmentViewerList(activityId, attachments) {
 async function deleteAttachment(activityId, attachmentId) {
   try {
     const res = await apiFetch(`/api/attachments/${encodeURIComponent(attachmentId)}`, { method: 'DELETE' });
-    if (!res.ok) { showToast('Could not delete file.', 'error'); return; }
+    if (!res.ok) { showErrorBanner('Could not delete file.'); return; }
     const remaining = getItemAttachments(activityId).filter((a) => a.id !== attachmentId);
     setItemAttachments(activityId, remaining);
     renderAttachmentViewerList(activityId, remaining);
     renderItineraryMode();
-    showToast('File deleted.', 'success');
   } catch {
-    showToast('Could not delete file.', 'error');
+    showErrorBanner('Could not delete file.');
   }
 }
 
@@ -7897,9 +7888,8 @@ function renderSavedItineraries() {
         }
         await fetchSavedItineraries();
         renderSavedItineraries();
-        showToast('Itinerary deleted.', 'success');
       } catch {
-        showToast('Could not delete itinerary.', 'error');
+        showErrorBanner('Could not delete itinerary.');
       }
     });
   });
@@ -7957,7 +7947,7 @@ async function loadItineraryById(id) {
     await hydrateAttachmentsForItinerary(state.currentItineraryId);
     setStep(4);
   } catch {
-    showToast('Could not load itinerary.', 'error');
+    showErrorBanner('Could not load itinerary.');
   }
 }
 
@@ -8551,13 +8541,6 @@ function mountPlanningOverlay() {
   document.body.appendChild(overlay);
 }
 
-function mountToastHost() {
-  const host = document.createElement('div');
-  host.id = 'toastHost';
-  host.className = 'toast-host';
-  document.body.appendChild(host);
-}
-
 function getSnapshot() {
   return persist.loadJson(SNAPSHOT_KEY, null);
 }
@@ -8726,7 +8709,7 @@ function clearSnapshot() {
   syncToServer('snapshot', null);
 }
 
-function saveSnapshot({ silent = false } = {}) {
+function saveSnapshot() {
   syncTripMetaFromInputs();
 
   const payload = {
@@ -8777,7 +8760,6 @@ function saveSnapshot({ silent = false } = {}) {
     }).catch(() => {});
   }
 
-  if (!silent) showToast('Saved!', 'success');
 }
 
 function resetToFresh() {
@@ -8968,10 +8950,9 @@ function bindTripRows(listEl, trips, { onPick, onChange } = {}) {
         await fetchSavedItineraries();
         renderMyTrips();
         renderSavedItineraries();
-        showToast('Trip deleted.', 'success');
         onChange?.();
       } catch {
-        showToast('Could not delete trip.', 'error');
+        showErrorBanner('Could not delete trip.');
       }
     });
   });
@@ -9387,7 +9368,6 @@ function initEmbedMode() {
   state.profilesStore = loadProfiles();
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   state.schedulingPrefs = loadSchedulingPrefs();
-  mountToastHost();
 
   state.tripName = 'Andalucía Spring';
   els.tripName.value = state.tripName;
@@ -9524,7 +9504,7 @@ document.getElementById('savePdfBtn')?.addEventListener('click', () => {
   if (window.exportItineraryPdf) {
     window.exportItineraryPdf().catch((err) => {
       console.error('PDF export failed', err);
-      showToast(err?.message || 'PDF export failed', 'error');
+      showErrorBanner(err?.message || 'PDF export failed');
     });
   } else {
     window.print();
@@ -9532,12 +9512,12 @@ document.getElementById('savePdfBtn')?.addEventListener('click', () => {
 });
 document.getElementById('shareTripLinkBtn')?.addEventListener('click', () => {
   const id = state.currentItineraryId;
-  if (!id) { showToast('Save your trip first', 'info'); return; }
+  if (!id) { showErrorBanner('Save your trip first'); return; }
   const url = `${window.location.origin}/trip/${encodeURIComponent(id)}`;
   if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(url).then(() => showToast('Link copied'));
+    navigator.clipboard.writeText(url).catch(() => showErrorBanner(`Could not copy — share link: ${url}`));
   } else {
-    showToast(`Share link: ${url}`);
+    showErrorBanner(`Could not copy — share link: ${url}`);
   }
 });
 document.getElementById('lockTripBtn')?.addEventListener('click', () => {
@@ -9594,7 +9574,7 @@ document.getElementById('savePdfBtnItin')?.addEventListener('click', () => {
   if (window.exportItineraryPdf) {
     window.exportItineraryPdf().catch((err) => {
       console.error('PDF export failed', err);
-      showToast(err?.message || 'PDF export failed', 'error');
+      showErrorBanner(err?.message || 'PDF export failed');
     });
   } else {
     window.print();
@@ -9791,11 +9771,6 @@ expandModal.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEx
 bindTextareaExpandButtons(document);
 els.profileEditBtn.addEventListener('click', async () => {
   const next = getProfilePayload();
-  if (activeSavingToastId) {
-    const stale = document.querySelector(`[data-toast-id="${activeSavingToastId}"]`);
-    stale?.click();
-  }
-  activeSavingToastId = showToast('Saving...', 'info');
 
   const prev = profileSnapshot ? JSON.parse(profileSnapshot) : null;
   const profileChanged = !prev ||
@@ -9806,8 +9781,6 @@ els.profileEditBtn.addEventListener('click', async () => {
   profileSnapshot = JSON.stringify(next);
 
   if (!profileChanged) {
-    showToast('Profile saved!', 'success');
-    activeSavingToastId = null;
     renderPreferencesModal();
     return;
   }
@@ -9831,14 +9804,11 @@ els.profileEditBtn.addEventListener('click', async () => {
         els.profileAiSummary.value = instruction;
         els.aiSummarySection.classList.remove('hidden');
       }
-      showToast('Profile saved!', 'success');
     } else {
-      showToast('Profile saved (enrichment failed)', 'info');
+      showErrorBanner('Profile saved, but AI summary update failed.');
     }
   } catch {
-    showToast('Profile saved (enrichment failed)', 'info');
-  } finally {
-    activeSavingToastId = null;
+    showErrorBanner('Profile saved, but AI summary update failed.');
   }
 
   renderPreferencesModal();
@@ -9938,7 +9908,6 @@ history.replaceState({ spa: true, step: 1 }, '');
   state.schedulingPrefs = loadSchedulingPrefs();
   mountPlanningOverlay();
   mountActivityMapOverlay();
-  mountToastHost();
   bindChatEvents();
   ensureUserId();
   ensureChatSessionId();

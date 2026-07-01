@@ -210,8 +210,6 @@
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
 
-    if (typeof window.showToast === 'function') window.showToast('Building PDF…', 'info');
-
     const pdfDoc = await window.PDFLib.PDFDocument.create();
     const warnings = await buildItinerary(pdfDoc);
 
@@ -228,14 +226,7 @@
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
 
-    if (typeof window.showToast === 'function') {
-      if (warnings.length) {
-        window.showToast(`PDF saved (${warnings.length} attachment warning${warnings.length > 1 ? 's' : ''})`, 'info');
-        console.warn('PDF export warnings:', warnings);
-      } else {
-        window.showToast('PDF saved', 'success');
-      }
-    }
+    if (warnings.length) console.warn('PDF export warnings:', warnings);
   }
 
   window.exportItineraryPdf = exportItineraryPdf;
