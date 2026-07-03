@@ -22,6 +22,9 @@ function isMealActivity(activity = {}) {
 const LUNCH_WINDOW = [11 * 60, 14 * 60 + 30];
 const DINNER_WINDOW = [17 * 60, 22 * 60];
 
+const COMMUTE_BUFFER_MIN = 10;
+const WALKING_FALLBACK_MIN = 10;
+
 const PACE_LABELS = {
   1: 'very relaxed',
   2: 'easy-going',
@@ -44,6 +47,8 @@ module.exports = {
   DEFAULT_ACTIVITY_CATEGORY_CONFIG,
   LUNCH_WINDOW,
   DINNER_WINDOW,
+  COMMUTE_BUFFER_MIN,
+  WALKING_FALLBACK_MIN,
   isMealActivity,
   getCategoryDefaults,
   PACE_LABELS,

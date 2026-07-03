@@ -1,6 +1,6 @@
 # Current State
 
-_Last updated: 2026-07-01_
+_Last updated: 2026-07-02_
 
 ## Objective
 Land the mobile-UI feedback pass (branch `claude/mobile-ui-feedback-eqx6he`) — activity-card
@@ -11,7 +11,12 @@ deploy. The memory-layer and arrange-redesign verifications remain queued behind
 staging deploys.
 
 ## Active Workstream
-Branch `claude/mobile-ui-feedback-eqx6he`, complete and pushed. All five feedback items
+Branch `claude/mobile-ui-feedback-eqx6he`. Two completed passes: (1) the mobile-UI feedback fixes
+(pushed 2026-07-01), and (2) the auto-arrange overhaul (2026-07-02) — server-authoritative
+`endTime` placements, deletion of the client's post-response re-check, meal rescue pass fixing the
+live `empty_dinner_with_available_meal` assert, unfloored/honest commute values with a walking
+last-resort, and observable telemetry. 160/160 tests; Playwright-verified against canned arrange
+responses. Mobile-UI details below still apply. All five feedback items
 implemented; 144/144 tests pass; UI verified locally via Playwright against `?embed` mode at
 desktop (1280px) and mobile (375px) widths. What could NOT be verified without API keys: the
 `/api/activity/add` LLM fill + Places resolve gate live path, the replace-path retry, and the

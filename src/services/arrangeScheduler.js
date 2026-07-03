@@ -2,35 +2,37 @@ const { minutesFromTime, timeFromMinutes } = require('../../shared/timeHelpers')
 const { showUpEarlyMins } = require('../../shared/arrangeArrivalBuffers');
 const {
   parseOpeningHours,
-  parseOpeningHoursContains,
+  mealSlotCapability,
+  getOpeningHoursRaw,
   getDuration,
   effectiveDayStart,
   effectiveDayEnd,
   validate
 } = require('../arrangeValidator');
-const { isMealActivity, LUNCH_WINDOW, DINNER_WINDOW } = require('../arrangeConfig');
+const {
+  isMealActivity,
+  LUNCH_WINDOW,
+  DINNER_WINDOW,
+  COMMUTE_BUFFER_MIN,
+  WALKING_FALLBACK_MIN
+} = require('../arrangeConfig');
 const { activityCoords, haversineKm } = require('./geo');
 const { debugLog } = require('./debugLog');
 
-const COMMUTE_BUFFER_MIN = 10;
-const WALKING_FALLBACK_MIN = 10;
-const MIN_COMMUTE_THRESHOLD_MIN = 15;
 const BRUTE_FORCE_MAX = 7;
-
-function getOpeningHoursRaw(activity) {
-  return activity?.timing?.opening_hours || activity?.opening_hours || '';
-}
 
 function getBookingType(activity) {
   return activity?.booking?.type || activity?.booking_type || 'none';
 }
 
+// Returns the matrix value in either direction, or null when the pair is missing —
+// callers decide the fallback so a miss stays distinguishable from a real short hop.
 function getCommuteMin(commuteMatrix, fromId, toId) {
   const direct = Number(commuteMatrix?.[fromId]?.[toId]);
   if (Number.isFinite(direct)) return direct;
   const reverse = Number(commuteMatrix?.[toId]?.[fromId]);
   if (Number.isFinite(reverse)) return reverse;
-  return WALKING_FALLBACK_MIN;
+  return null;
 }
 
 function buildLockedObstacles(lockedActivities, date) {
@@ -94,15 +96,6 @@ function findSlotStart(rawHours, duration, slotWindow, dayStart, dayEnd, obstacl
   return null;
 }
 
-function mealSlotCapability(activity) {
-  const raw = getOpeningHoursRaw(activity);
-  if (!raw) return { lunch: true, dinner: true };
-  return {
-    lunch: parseOpeningHoursContains(raw, LUNCH_WINDOW[0], LUNCH_WINDOW[1]),
-    dinner: parseOpeningHoursContains(raw, DINNER_WINDOW[0], DINNER_WINDOW[1])
-  };
-}
-
 function isSingleSlot(cap) {
   return cap.lunch !== cap.dinner;
 }
@@ -158,18 +151,22 @@ function redistributeMeals(byDate, days, activitiesById, lockedSlots = {}) {
   return moved;
 }
 
-function nearestDay(mealId, candidateDates, byDate, activitiesById) {
-  const mc = activityCoords(activitiesById[mealId]);
+function nearestDayOrder(mealId, candidateDates, byDate, activitiesById) {
   const sorted = candidateDates.slice().sort();
-  if (!mc) return sorted[0];
-  let best = null;
-  let bestD = Infinity;
-  for (const date of sorted) {
+  const mc = activityCoords(activitiesById[mealId]);
+  if (!mc) return sorted;
+  const dist = (date) => {
     const others = (byDate[date] || []).map((id) => activityCoords(activitiesById[id])).filter(Boolean);
-    const d = others.length ? Math.min(...others.map((o) => haversineKm(mc.lat, mc.lng, o.lat, o.lng))) : Infinity;
-    if (d < bestD) { bestD = d; best = date; }
-  }
-  return best || sorted[0];
+    return others.length ? Math.min(...others.map((o) => haversineKm(mc.lat, mc.lng, o.lat, o.lng))) : Infinity;
+  };
+  return sorted
+    .map((date) => ({ date, d: dist(date) }))
+    .sort((a, b) => a.d - b.d || (a.date < b.date ? -1 : 1))
+    .map((x) => x.date);
+}
+
+function nearestDay(mealId, candidateDates, byDate, activitiesById) {
+  return nearestDayOrder(mealId, candidateDates, byDate, activitiesById)[0];
 }
 
 // Anchor at most one lunch + one dinner meal by opening hours, before non-meals.
@@ -204,7 +201,7 @@ function anchorMeals(mealIds, { activitiesById, dayStart, dayEnd, locks, lockedS
     anchors.push({ id, startMin: chosen.start, endMin: chosen.start + duration });
     placed[id] = chosen.start;
   }
-  return { placed, anchors, dropped };
+  return { placed, anchors, dropped, usedSlots };
 }
 
 // Place non-meals in the given order, routing around obstacles (locks + meal anchors),
@@ -225,8 +222,7 @@ function placeNonMeals(orderedIds, { activitiesById, dayStart, dayEnd, obstacles
     let commuteApplied = 0;
     if (prevId) {
       const commute = getCommuteMin(commuteMatrix, prevId, id);
-      const commutePart = commute >= MIN_COMMUTE_THRESHOLD_MIN ? commute : WALKING_FALLBACK_MIN;
-      commuteApplied = commutePart + COMMUTE_BUFFER_MIN;
+      commuteApplied = (commute ?? WALKING_FALLBACK_MIN) + COMMUTE_BUFFER_MIN;
       earliest = Math.max(earliest, prevEndMin + commuteApplied);
     }
 
@@ -239,7 +235,10 @@ function placeNonMeals(orderedIds, { activitiesById, dayStart, dayEnd, obstacles
       if (end > window[1] || end > dayEnd) break;
       const hit = obstacles.find((o) => candidate < o.endMin && end > o.startMin);
       if (!hit) { start = candidate; break; }
-      earliest = hit.endMin;
+      // Resume after the obstacle; budget commute from it when the pair is in the matrix
+      // (meal anchors are flexible activities, so their pairs are — locks are not).
+      const resumeCommute = getCommuteMin(commuteMatrix, hit.id, id);
+      earliest = hit.endMin + (resumeCommute != null ? resumeCommute + COMMUTE_BUFFER_MIN : 0);
     }
 
     if (start == null) { dropped.push(id); continue; }
@@ -268,7 +267,8 @@ function nearestNeighborOrder(ids, ctx) {
   const order = [remaining.shift()];
   while (remaining.length) {
     const last = order[order.length - 1];
-    remaining.sort((a, b) => getCommuteMin(ctx.commuteMatrix, last, a) - getCommuteMin(ctx.commuteMatrix, last, b) || (a < b ? -1 : 1));
+    remaining.sort((a, b) => (getCommuteMin(ctx.commuteMatrix, last, a) ?? WALKING_FALLBACK_MIN)
+      - (getCommuteMin(ctx.commuteMatrix, last, b) ?? WALKING_FALLBACK_MIN) || (a < b ? -1 : 1));
     order.push(remaining.shift());
   }
   return order;
@@ -314,6 +314,10 @@ function schedule({ assignment, days, activitiesById, lockedActivities = [], com
   const lockedSlots = lockedMealSlotsByDate(lockedActivities);
   const mealRedistributed = redistributeMeals(byDate, days, activitiesById, lockedSlots);
 
+  const dayIntervals = {};
+  const usedMealSlots = {};
+  const dayWindows = {};
+
   for (const day of (days || [])) {
     const date = day.date;
     const ids = byDate[date] || [];
@@ -332,11 +336,52 @@ function schedule({ assignment, days, activitiesById, lockedActivities = [], com
     const nonMeal = placeNonMeals(order, ctx);
     for (const id of nonMeal.dropped) unplaced.push({ id, reason: 'no_time_slot_remaining' });
 
-    for (const [id, startMin] of Object.entries(meal.placed)) placements[id] = { date, time: timeFromMinutes(startMin) };
-    for (const [id, startMin] of Object.entries(nonMeal.placed)) placements[id] = { date, time: timeFromMinutes(startMin) };
+    const intervals = [...locks, ...meal.anchors];
+    for (const a of meal.anchors) {
+      placements[a.id] = { date, time: timeFromMinutes(a.startMin), endTime: timeFromMinutes(a.endMin) };
+    }
+    for (const [id, startMin] of Object.entries(nonMeal.placed)) {
+      const endMin = startMin + getDuration(activitiesById[id]);
+      placements[id] = { date, time: timeFromMinutes(startMin), endTime: timeFromMinutes(endMin) };
+      intervals.push({ id, startMin, endMin });
+    }
+    dayIntervals[date] = intervals;
+    usedMealSlots[date] = meal.usedSlots;
+    dayWindows[date] = { dayStart, dayEnd };
 
     debugLog('arrange', `SCHED_DAY date=${date} window=${timeFromMinutes(dayStart)}-${timeFromMinutes(dayEnd)} meals=${mealIds.length} placed_meals=${Object.keys(meal.placed).length} nonmeals=${nonMealIds.length} placed_nonmeals=${Object.keys(nonMeal.placed).length}`);
   }
+
+  // Rescue pass: a meal whose own day couldn't fit it (locked block over its slot,
+  // hours vs day window) gets a second chance on the nearest day with a free slot.
+  const SLOT_WINDOWS = { dinner: DINNER_WINDOW, lunch: LUNCH_WINDOW };
+  const droppedMealIds = [...new Set(unplaced
+    .filter((u) => u.reason === 'no_meal_slot_on_day' && !placements[u.id])
+    .map((u) => u.id))].sort();
+  let mealsRescued = 0;
+  for (const id of droppedMealIds) {
+    const activity = activitiesById[id];
+    const cap = mealSlotCapability(activity);
+    const duration = getDuration(activity);
+    const rawHours = getOpeningHoursRaw(activity);
+    let placedRescue = false;
+    for (const slot of ['dinner', 'lunch']) {
+      if (placedRescue || !cap[slot]) continue;
+      const candidates = Object.keys(dayWindows).filter((date) => !usedMealSlots[date].has(slot));
+      for (const date of nearestDayOrder(id, candidates, byDate, activitiesById)) {
+        const { dayStart, dayEnd } = dayWindows[date];
+        const start = findSlotStart(rawHours, duration, SLOT_WINDOWS[slot], dayStart, dayEnd, dayIntervals[date]);
+        if (start == null) continue;
+        placements[id] = { date, time: timeFromMinutes(start), endTime: timeFromMinutes(start + duration) };
+        usedMealSlots[date].add(slot);
+        dayIntervals[date].push({ id, startMin: start, endMin: start + duration });
+        mealsRescued += 1;
+        placedRescue = true;
+        break;
+      }
+    }
+  }
+  if (mealsRescued) debugLog('arrange', `SCHED_MEAL_RESCUE rescued=${mealsRescued}/${droppedMealIds.length}`);
 
   const placedIds = new Set(Object.keys(placements));
   const seen = new Set();

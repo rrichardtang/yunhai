@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const { debugLog } = require('./debugLog');
 
 const LOG_DIR = path.join(__dirname, '..', '..', 'logs');
 const LOG_PATH = path.join(LOG_DIR, 'arrange.jsonl');
@@ -9,8 +10,8 @@ function logRun(entry) {
   try {
     if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
     fs.appendFileSync(LOG_PATH, JSON.stringify({ ts: new Date().toISOString(), ...entry }) + '\n');
-  } catch {
-    // best-effort
+  } catch (err) {
+    debugLog('arrange-telemetry', `WRITE_FAIL msg="${err?.message || err}"`);
   }
 }
 

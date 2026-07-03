@@ -555,7 +555,7 @@ Return ONLY valid JSON (no markdown fences):
     const flexible = activities.filter((a) => !lockedIdSet.has(String(a.id)));
 
     if (flexible.length === 0) {
-      return res.json({ placements: {}, unplaced: [], diagnostics: [] });
+      return res.json({ placements: {}, unplaced: [], diagnostics: [], mealRedistributed: 0 });
     }
 
     const userId = parseUserId(getAuthedUserId(req));
