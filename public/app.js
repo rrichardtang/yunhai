@@ -528,8 +528,11 @@ function attachPlaceAutocompleteElement(element, { onResolved, onInvalid, onInpu
       sr.prepend(s);
     }
     const inner = sr.querySelector('input');
-    if (!inner || !isMobile) return;
-    inner.style.cssText = 'font-size:0.8rem;padding:4px 8px;height:32px;min-height:0;box-sizing:border-box';
+    if (!inner) return;
+    inner.style.width = '100%';
+    inner.style.minWidth = '0';
+    if (!isMobile) return;
+    inner.style.cssText += ';font-size:0.8rem;padding:4px 8px;height:32px;min-height:0;box-sizing:border-box';
   };
   styleShadowInput();
   requestAnimationFrame(styleShadowInput);

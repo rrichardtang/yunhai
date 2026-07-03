@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-07-03] Setup-step mobile fixes: dark autocomplete pills, gm-grid overflow, bottom clearance
+
+Branch `claude/mobile-ui-feedback-eqx6he`. From a staging iPhone screenshot (OS Dark Mode, ~390px):
+
+- **`color-scheme: light` declared on `:root`** (`public/styles.css`) — the `gmp-place-autocomplete` shadow input (and native time/select chrome) was self-theming near-black on Dark-Mode phones while our own inputs stayed light. The app is single-theme light; now everything renders light regardless of OS setting.
+- **Horizontal overflow fixed at the grid**: `.gm-grid > *` and `.gm-f` get `min-width: 0` (grid-item `min-width:auto` let the autocomplete shadow input's intrinsic width inflate `.gm-pane` past the card, dragging the Time field with it); `.tp-place-autocomplete` gets `min-width: 0`; the shadow-input override in `attachPlaceAutocompleteElement` (`public/app.js`) now also pins `width:100%; min-width:0` on the internal input.
+- **Bottom clearance**: mobile `.container` bottom padding 96px so `#setupInsights` scrolls clear of the fixed save/next pill and chat FAB. Placed AFTER the redesign's `.container` rule — the old 767px-block padding/margin was silently dead (later equal-specificity rule won); the dead mobile container rule and the legacy drawer rules (`.city-dropdown-section`, `.accommodation-row`, `.arrival-row`, `.departure-row` — classes no longer rendered) were removed.
+- Verified via Playwright at 390×844 with `colorScheme:'dark'`: root computes `light`, time input renders paper-light, injected wide intrinsic input causes zero horizontal overflow, summary strip bottom (707px) clears pill top (770px). 160/160 tests pass.
+- **Note:** staging still runs pre-branch code — none of this branch is deployed until `deployment/promotion.sh deploy-staging claude/mobile-ui-feedback-eqx6he` runs on the VPS.
+
 ## [2026-07-02] Auto-arrange overhaul: server-authoritative endTime, meal rescue pass, honest commutes
 
 Branch `claude/mobile-ui-feedback-eqx6he`. Follows a full review (backend pipeline, frontend duplication, git bug archaeology). decisions [2026-07-02] ×2.
