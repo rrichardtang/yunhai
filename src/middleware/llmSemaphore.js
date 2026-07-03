@@ -15,7 +15,7 @@ const acquire = () => new Promise((resolve) => {
 });
 
 const release = () => {
-  activeLlmCalls--;
+  if (activeLlmCalls > 0) activeLlmCalls--;
   if (llmQueue.length > 0) llmQueue.shift()();
 };
 

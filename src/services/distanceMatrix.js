@@ -1,5 +1,6 @@
 const commuteCache = require('./commuteCache');
 const { debugLog } = require('./debugLog');
+const { fetchWithTimeout } = require('./fetchWithTimeout');
 const { arrivalBufferMins, departureBufferMins } = require('../../shared/arrangeBuffers');
 const { haversineKm, activityCoords } = require('./geo');
 
@@ -91,7 +92,7 @@ async function fetchDistanceMatrixLeg({
     }
   }
 
-  const response = await fetch(`${DISTANCE_MATRIX_BASE_URL}?${params.toString()}`);
+  const response = await fetchWithTimeout(`${DISTANCE_MATRIX_BASE_URL}?${params.toString()}`);
   if (!response.ok) return null;
 
   const data = await response.json();
@@ -284,7 +285,7 @@ async function fetchDistanceMatrixDuration({ origin, destination, mode }) {
     params.set('departure_time', 'now');
   }
 
-  const response = await fetch(`${DISTANCE_MATRIX_BASE_URL}?${params.toString()}`);
+  const response = await fetchWithTimeout(`${DISTANCE_MATRIX_BASE_URL}?${params.toString()}`);
   if (!response.ok) {
     debugLog('dm', `HTTP ${response.status} mode=${mode} ${origin} -> ${destination}`);
     commuteCache.setNegative(origin, destination, mode);

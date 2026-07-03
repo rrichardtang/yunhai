@@ -1,5 +1,14 @@
+const { fetchWithTimeout } = require('./services/fetchWithTimeout');
+
+const CACHE_MAX_ENTRIES = 500;
 const cache = new Map();
 const usedUrls = new Set();
+
+function capSize(collection) {
+  while (collection.size > CACHE_MAX_ENTRIES) {
+    collection.delete(collection.keys().next().value);
+  }
+}
 
 const FALLBACK_STOPWORDS = new Set([
   'the', 'a', 'an', 'and', 'or', 'at', 'in', 'for', 'on', 'with', 'from', 'to',
@@ -54,14 +63,17 @@ async function searchUnsplash(query) {
     const urls = cache.get(key);
     if (!Array.isArray(urls)) return urls;
     const picked = urls.find((u) => !usedUrls.has(u)) || urls[0] || null;
-    if (picked) usedUrls.add(picked);
+    if (picked) {
+      usedUrls.add(picked);
+      capSize(usedUrls);
+    }
     return picked;
   }
 
   const q = encodeURIComponent(normalizedQuery);
   const url = `https://api.unsplash.com/search/photos?query=${q}&per_page=5&orientation=landscape`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     headers: {
       Authorization: `Client-ID ${process.env.UNSPLASH_ACCESS_KEY}`
     }
@@ -70,6 +82,7 @@ async function searchUnsplash(query) {
   if (res.status === 403 || res.status === 429) {
     console.warn('[unsplash] Rate limit hit — returning null');
     cache.set(key, null);
+    capSize(cache);
     return null;
   }
 
@@ -81,8 +94,12 @@ async function searchUnsplash(query) {
   const data = await res.json();
   const urls = (data?.results || []).map((r) => r?.urls?.regular).filter(Boolean);
   cache.set(key, urls);
+  capSize(cache);
   const picked = urls.find((u) => !usedUrls.has(u)) || urls[0] || null;
-  if (picked) usedUrls.add(picked);
+  if (picked) {
+    usedUrls.add(picked);
+    capSize(usedUrls);
+  }
   return picked;
 }
 

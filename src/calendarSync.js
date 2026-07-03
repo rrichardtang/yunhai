@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { fetchWithTimeout } = require('./services/fetchWithTimeout');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const TOKENS_PATH = path.join(DATA_DIR, 'google-calendar-tokens.json');
@@ -150,7 +151,7 @@ function setSyncRecord(userId, itineraryId, itemFingerprint, eventId) {
 }
 
 async function callGoogleCalendarApi({ accessToken, method = 'GET', path, body }) {
-  const response = await fetch(`https://www.googleapis.com/calendar/v3${path}`, {
+  const response = await fetchWithTimeout(`https://www.googleapis.com/calendar/v3${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -191,7 +192,10 @@ async function detectConflicts({ accessToken, calendarId = 'primary', items = []
     const itemEnd = item.end.getTime();
     for (const event of existingEvents) {
       const existingStart = new Date(event?.start?.dateTime || `${event?.start?.date}T00:00:00`).getTime();
-      const existingEnd = new Date(event?.end?.dateTime || `${event?.end?.date}T23:59:59`).getTime();
+      // All-day end.date is exclusive per the Calendar API, so the event ends at midnight of that date
+      const existingEnd = event?.end?.dateTime
+        ? new Date(event.end.dateTime).getTime()
+        : new Date(`${event?.end?.date}T00:00:00`).getTime();
       if (!Number.isFinite(existingStart) || !Number.isFinite(existingEnd)) continue;
       if (itemStart < existingEnd && existingStart < itemEnd) {
         conflicts.push({

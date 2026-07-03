@@ -28,7 +28,9 @@ function readStore() {
 
 function writeStore(store) {
   ensureStoreFile();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+  const tmp = `${STORE_PATH}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(store, null, 2));
+  fs.renameSync(tmp, STORE_PATH);
 }
 
 function createId() {
