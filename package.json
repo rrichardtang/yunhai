@@ -5,8 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test \"src/**/*.test.js\"",
-    "review:learn": "node scripts/sherlock-learning-review.js"
+    "test": "node --test \"src/**/*.test.js\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

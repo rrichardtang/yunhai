@@ -4,7 +4,7 @@ const overlayManager = window.TravelPlannerOverlayManager.createOverlayManager()
 function sendDebug(scope, payload) {
   try {
     const message = typeof payload === 'string' ? payload : JSON.stringify(payload);
-    fetch('/debug/client', {
+    apiFetch('/debug/client', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scope, message }),
@@ -13,8 +13,6 @@ function sendDebug(scope, payload) {
   } catch {}
 }
 
-const APP_BUILD_ID = 'no-store-cache';
-sendDebug('boot', `build=${APP_BUILD_ID} loaded=${new Date().toISOString()} sw=${navigator.serviceWorker?.controller ? 'controlled' : 'uncontrolled'}`);
 
 ['prefsModal', 'checklistModal', 'budgetOptOverlay', 'addActivityModal',
  'attachmentViewerModal',
@@ -193,7 +191,7 @@ const GEO_CACHE_KEY = 'travelplanner_geo_cache_v2';
 const PLACES_CACHE_KEY = 'travelplanner_places_cache_v1';
 const PLACES_CACHE_MAX = 500;
 const uid = () => Math.random().toString(36).slice(2, 10);
-const esc = (s='') => s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc = (s='') => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // normalizeCity provided by /js/cityPlanner.js
 
 // activity accessors (actDurationHours, actPreferredTime, actAddress, actCostUsd,
@@ -2438,7 +2436,7 @@ function cityIsReadyForDetails(city) {
   return Boolean(String(city?.name || '').trim());
 }
 
-function daysBetween(startDate, endDate) {
+function tripDaysInclusive(startDate, endDate) {
   const start = parseYmdAsLocal(startDate);
   const end = parseYmdAsLocal(endDate);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
@@ -2454,7 +2452,7 @@ function renderSetupInsights() {
   }
 
   const sorted = [...complete].sort((a, b) => parseYmdAsLocal(a.startDate) - parseYmdAsLocal(b.startDate));
-  const totalDays = sorted.reduce((sum, c) => sum + daysBetween(c.startDate, c.endDate), 0);
+  const totalDays = sorted.reduce((sum, c) => sum + tripDaysInclusive(c.startDate, c.endDate), 0);
   let overlapCount = 0;
   let reverseDateCount = 0;
 
@@ -2987,9 +2985,6 @@ async function getAuthToken() {
 
 async function apiFetch(url, options = {}) {
   const token = await getAuthToken();
-  if (url.includes('/api/auth/redeem-code') || url.includes('/api/auth/entitlement')) {
-    sendDebug('apiFetch', `url=${url} tokenLen=${token ? token.length : 0} tokenHead=${token ? token.slice(0, 16) : ''}`);
-  }
   const headers = new Headers(options.headers || {});
   if (token) headers.set('Authorization', `Bearer ${token}`);
   const next = { ...options, headers };
@@ -6643,12 +6638,14 @@ function positionPlacedTooltip(anchorEl) {
 function showPlacedTooltip(anchorEl) {
   if (!anchorEl) return;
   const layer = ensurePlacedTooltipLayer();
+  // dataset getters return the decoded attribute value, so escape at read time
+  const d = anchorEl.dataset;
   layer.innerHTML = `
-    <div class="placed-tooltip-title">${anchorEl.dataset.tooltipName || ''}</div>
-    <div class="placed-tooltip-row"><strong>Type:</strong> ${anchorEl.dataset.tooltipTypeIcon || ''} ${anchorEl.dataset.tooltipType || ''}</div>
-    <div class="placed-tooltip-row"><strong>Duration:</strong> ${anchorEl.dataset.tooltipDuration || ''}</div>
-    <div class="placed-tooltip-row"><strong>Location:</strong> ${anchorEl.dataset.tooltipStartLocation || '—'}</div>
-    <div class="placed-tooltip-row"><strong>Why it fits:</strong> ${anchorEl.dataset.tooltipWhy || ''}</div>
+    <div class="placed-tooltip-title">${esc(d.tooltipName)}</div>
+    <div class="placed-tooltip-row"><strong>Type:</strong> ${esc(d.tooltipTypeIcon)} ${esc(d.tooltipType)}</div>
+    <div class="placed-tooltip-row"><strong>Duration:</strong> ${esc(d.tooltipDuration)}</div>
+    <div class="placed-tooltip-row"><strong>Location:</strong> ${esc(d.tooltipStartLocation) || '—'}</div>
+    <div class="placed-tooltip-row"><strong>Why it fits:</strong> ${esc(d.tooltipWhy)}</div>
   `;
   layer.classList.add('visible');
   positionPlacedTooltip(anchorEl);
@@ -7414,7 +7411,7 @@ function formatItinHeroDate(dateStr) {
   return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function daysBetween(a, b) {
+function nightsBetween(a, b) {
   if (!a || !b) return 0;
   const d1 = new Date(`${a}T12:00:00`);
   const d2 = new Date(`${b}T12:00:00`);
@@ -7434,7 +7431,7 @@ function renderItineraryHero(payload) {
   const dates = payload.firstDate && payload.lastDate
     ? `${formatItinHeroDate(payload.firstDate)} → ${formatItinHeroDate(payload.lastDate)}`
     : '—';
-  const nights = daysBetween(payload.firstDate, payload.lastDate);
+  const nights = nightsBetween(payload.firstDate, payload.lastDate);
   const travelers = (Number(state.numTravelers || 0) + Number(state.numChildren || 0)) || 1;
   const routeCities = payload.cities || [];
   const routeHtml = routeCities.length
@@ -9198,20 +9195,14 @@ function clearInviteCodeFromUrl() {
 }
 
 async function enforceEntitlementGate() {
-  const userId = state.authUserId || '';
   let entitled = false;
   try {
     const res = await apiFetch('/api/auth/entitlement', { headers: { 'Accept': 'application/json' } });
-    sendDebug('entitlement-client', `check userId=${userId} status=${res.status}`);
     if (res.ok) {
       const body = await res.json();
-      sendDebug('entitlement-client', `body=${JSON.stringify(body)}`);
       entitled = Boolean(body?.entitled);
     }
-  } catch (err) {
-    sendDebug('entitlement-client', `check-threw msg=${err?.message || err}`);
-  }
-  sendDebug('entitlement-client', `decision entitled=${entitled}`);
+  } catch {}
   if (entitled) {
     clearInviteCodeFromUrl();
     return true;
@@ -9249,8 +9240,6 @@ async function enforceEntitlementGate() {
       errorEl.classList.add('hidden');
       const code = input.value.trim();
       if (!code) return;
-      const userId = state.authUserId || '';
-      sendDebug('redeem-client', `submit userId=${userId} codeLen=${code.length}`);
       let res;
       try {
         res = await apiFetch('/api/auth/redeem-code', {
@@ -9259,20 +9248,16 @@ async function enforceEntitlementGate() {
           body: JSON.stringify({ code })
         });
       } catch (err) {
-        sendDebug('redeem-client', `fetch-threw msg=${err?.message || err} name=${err?.name || ''}`);
         showError(`Network error: ${err?.message || err}`);
         return;
       }
-      sendDebug('redeem-client', `response status=${res.status} ok=${res.ok}`);
       let data;
       try {
         data = await res.json();
       } catch (err) {
-        sendDebug('redeem-client', `json-parse-threw status=${res.status} msg=${err?.message || err}`);
         showError(`Could not parse response (status ${res.status})`);
         return;
       }
-      sendDebug('redeem-client', `body=${JSON.stringify(data)}`);
       if (data?.ok) {
         clearInviteCodeFromUrl();
         overlay.remove();
@@ -9295,7 +9280,6 @@ async function enforceEntitlementGate() {
     const presetCode = readInviteCodeFromUrl();
     if (presetCode) {
       input.value = presetCode;
-      sendDebug('redeem-client', `auto-submit from url codeLen=${presetCode.length}`);
       form.requestSubmit();
     } else {
       input.focus();

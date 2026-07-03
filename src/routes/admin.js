@@ -1,6 +1,7 @@
 const { generateCodes, listCodes, revokeCode } = require('../entitlements');
 const { requireConfiguredAuth, requireOwner } = require('../middleware/auth');
 const commuteCache = require('../services/commuteCache');
+const arrangeTelemetry = require('../services/arrangeTelemetry');
 
 function register(app) {
   app.get('/api/admin/invites', requireConfiguredAuth, requireOwner, (_req, res) => {
@@ -16,6 +17,12 @@ function register(app) {
   app.delete('/api/admin/invites/:code', requireConfiguredAuth, requireOwner, (req, res) => {
     const result = revokeCode(req.params.code);
     res.json(result);
+  });
+
+  app.get('/api/admin/arrange-stats', requireConfiguredAuth, requireOwner, async (req, res) => {
+    const limit = Math.max(1, Math.min(1000, Number(req.query.limit) || 100));
+    const runs = await arrangeTelemetry.readRecent(limit);
+    return res.json({ summary: arrangeTelemetry.summarize(runs), runs });
   });
 
   // Flush the commute cache so the next Arrange re-fetches live. Pass
