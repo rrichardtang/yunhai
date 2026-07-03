@@ -19,6 +19,13 @@ function parseUserId(rawUserId) {
   return resolveUserId(rawUserId);
 }
 
+function requireOwner(req, res, next) {
+  const ownerId = String(process.env.OWNER_USER_ID || '').trim();
+  if (!ownerId) return res.status(503).json({ error: 'OWNER_USER_ID not configured' });
+  if (getAuthedUserId(req) !== ownerId) return res.status(403).json({ error: 'not_owner' });
+  return next();
+}
+
 const ENTITLEMENT_BYPASS_PATHS = new Set([
   '/auth/session',
   '/auth/entitlement',
@@ -35,4 +42,4 @@ function requireEntitlement(req, res, next) {
   return next();
 }
 
-module.exports = { requireConfiguredAuth, requireEntitlement, getAuthedUserId, parseUserId };
+module.exports = { requireConfiguredAuth, requireEntitlement, requireOwner, getAuthedUserId, parseUserId };

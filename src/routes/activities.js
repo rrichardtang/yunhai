@@ -252,7 +252,7 @@ function register(app) {
 
   app.post('/api/activity/add', async (req, res) => {
     const addStartTs = Date.now();
-    const { name, city, why = '', cost = null, costType = 'per_person', userId, tripId = null } = req.body || {};
+    const { name, city, why = '', cost = null, costType = 'per_person', tripId = null } = req.body || {};
     debugLog('activity-add', `INBOUND name="${name || ''}" city="${city || ''}" why_chars=${(why || '').length}`);
     if (!name || !city) return res.status(400).json({ error: 'name and city are required' });
 
@@ -273,7 +273,7 @@ function register(app) {
 
     if (process.env.ANTHROPIC_API_KEY) {
       try {
-        const resolvedUserId = parseUserId(userId);
+        const resolvedUserId = parseUserId(getAuthedUserId(req));
         const prefSummary = recall({ userId: resolvedUserId, tripId, query: `${canonicalName} ${why || ''}` }).text;
         const systemPrompt = prefSummary ? `${ACTIVITY_SYSTEM_PROMPT}\n\n${prefSummary}` : ACTIVITY_SYSTEM_PROMPT;
         const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -428,14 +428,14 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
       return res.status(503).json({ error: 'Anthropic API key not configured' });
     }
 
-    const { activity, reason, notes, userId, tripId = null } = req.body || {};
+    const { activity, reason, notes, tripId = null } = req.body || {};
     debugLog('activity-replace', `INBOUND name="${activity?.name || ''}" city="${activity?.city || ''}" type="${activity?.type || ''}" reason_chars=${(reason || '').length}`);
     if (!activity?.name || !activity?.city) {
       debugLog('activity-replace', `REJECT reason=missing_name_or_city`);
       return res.status(400).json({ error: 'activity.name and activity.city are required' });
     }
 
-    const resolvedUserId = parseUserId(userId);
+    const resolvedUserId = parseUserId(getAuthedUserId(req));
     const prefSummary = recall({ userId: resolvedUserId, tripId, query: `${activity.name} ${reason || ''}` }).text;
     const systemPrompt = prefSummary ? `${ACTIVITY_SYSTEM_PROMPT}\n\n${prefSummary}` : ACTIVITY_SYSTEM_PROMPT;
 

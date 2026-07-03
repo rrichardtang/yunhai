@@ -8,8 +8,11 @@ const { addParsedBookings } = require('../itineraryStore');
 function register(app) {
   app.post('/api/email/inbound', async (req, res) => {
     const expectedSecret = String(process.env.EMAIL_WEBHOOK_SECRET || '').trim();
+    if (!expectedSecret) {
+      return res.status(503).json({ error: 'Email ingest is not configured' });
+    }
     const providedSecret = String(req.headers['x-travelplanner-email-secret'] || '').trim();
-    if (expectedSecret && providedSecret !== expectedSecret) {
+    if (providedSecret !== expectedSecret) {
       return res.status(401).json({ error: 'Invalid webhook secret' });
     }
 

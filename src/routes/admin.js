@@ -1,15 +1,6 @@
 const { generateCodes, listCodes, revokeCode } = require('../entitlements');
-const { requireConfiguredAuth } = require('../middleware/auth');
+const { requireConfiguredAuth, requireOwner } = require('../middleware/auth');
 const commuteCache = require('../services/commuteCache');
-
-function requireOwner(req, res, next) {
-  const ownerId = String(process.env.OWNER_USER_ID || '').trim();
-  if (!ownerId) return res.status(503).json({ error: 'OWNER_USER_ID not configured' });
-  const auth = typeof req.auth === 'function' ? req.auth() : null;
-  const userId = String(auth?.userId || '').trim();
-  if (userId !== ownerId) return res.status(403).json({ error: 'not_owner' });
-  return next();
-}
 
 function register(app) {
   app.get('/api/admin/invites', requireConfiguredAuth, requireOwner, (_req, res) => {

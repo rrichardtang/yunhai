@@ -3,6 +3,7 @@ const { getAuthedUserId, parseUserId } = require('../middleware/auth');
 const { recall } = require('../memory');
 const {
   getSession,
+  peekSession,
   setTripContext,
   addMessage,
   getHistory,
@@ -67,9 +68,12 @@ function register(app) {
 
     try {
       const userId = parseUserId(getAuthedUserId(req));
+      const session = getSession(sessionId, userId);
+      if (session.userId !== userId) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
       const prefSummary = recall({ userId, tripId: tripId || null, query: message }).text;
 
-      getSession(sessionId);
       setTripContext(sessionId, tripContext || {});
       addMessage(sessionId, 'user', message);
 
@@ -102,13 +106,20 @@ function register(app) {
   app.get('/api/chat/session/:sessionId', (req, res) => {
     const { sessionId } = req.params;
     if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
-    const session = getSession(sessionId);
+    const session = peekSession(sessionId);
+    if (session && session.userId !== parseUserId(getAuthedUserId(req))) {
+      return res.status(403).json({ error: 'forbidden' });
+    }
     return res.json({ sessionId, history: session?.history || [] });
   });
 
   app.delete('/api/chat/session/:sessionId', (req, res) => {
     const { sessionId } = req.params;
     if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
+    const session = peekSession(sessionId);
+    if (session && session.userId !== parseUserId(getAuthedUserId(req))) {
+      return res.status(403).json({ error: 'forbidden' });
+    }
     clearSession(sessionId);
     return res.json({ ok: true });
   });
