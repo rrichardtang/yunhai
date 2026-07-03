@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const { clerkMiddleware } = require('@clerk/express');
-const { requireConfiguredAuth, requireEntitlement } = require('./middleware/auth');
+const { requireConfiguredAuth, requireEntitlement, requireOwner } = require('./middleware/auth');
 const { readDebugLog, clearDebugLog, debugLog } = require('./services/debugLog');
 
 const app = express();
@@ -12,20 +12,12 @@ const PORT = Number(process.env.PORT || 3457);
 app.set('trust proxy', true);
 app.use(express.json({ limit: '1mb' }));
 
-const CLERK_BYPASS_PATHS = new Set([
-  '/api/auth/entitlement',
-  '/api/auth/redeem-code'
-]);
-const clerkBypassed = (p) => CLERK_BYPASS_PATHS.has(p);
 const AUTHORIZED_PARTIES = (process.env.CLERK_AUTHORIZED_PARTIES || '')
   .split(',').map(s => s.trim()).filter(Boolean);
 const _clerk = clerkMiddleware(
   AUTHORIZED_PARTIES.length ? { authorizedParties: AUTHORIZED_PARTIES } : {}
 );
 app.use((req, res, next) => {
-  if (clerkBypassed(req.path)) {
-    return next();
-  }
   _clerk(req, res, (err) => {
     if (err) {
       debugLog('clerk-middleware', `err on ${req.method} ${req.path}: ${err?.message || err}`);
@@ -48,7 +40,7 @@ function serveWithClerkKey(filename) {
 app.get('/planner.html', serveWithClerkKey('planner.html'));
 app.get('/admin.html', serveWithClerkKey('admin.html'));
 
-app.post('/debug/client', (req, res) => {
+app.post('/debug/client', requireConfiguredAuth, (req, res) => {
   const scope = String(req.body?.scope || 'client').slice(0, 40);
   const message = typeof req.body?.message === 'string'
     ? req.body.message
@@ -57,7 +49,7 @@ app.post('/debug/client', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/debug', (req, res) => {
+app.get('/debug', requireConfiguredAuth, requireOwner, (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
@@ -72,7 +64,7 @@ app.get('/debug', (req, res) => {
   res.type('text/plain').send(lines.join('\n'));
 });
 
-app.get('/debug/clear', (_req, res) => {
+app.get('/debug/clear', requireConfiguredAuth, requireOwner, (_req, res) => {
   res.type('text/plain').send(clearDebugLog() ? 'cleared' : 'failed');
 });
 

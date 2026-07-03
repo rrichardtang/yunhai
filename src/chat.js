@@ -5,8 +5,9 @@ const MODEL_CONTEXT_WINDOW_TOKENS = 200000;
 const COMPACT_THRESHOLD_TOKENS = 8000;
 const CHARS_PER_TOKEN = 4;
 
-function createEmptySession() {
+function createEmptySession(userId) {
   return {
+    userId: userId || null,
     history: [],
     tripContext: {},
     cachedSystemPrompt: null,
@@ -14,12 +15,16 @@ function createEmptySession() {
   };
 }
 
-function getSession(sessionId) {
+function getSession(sessionId, userId) {
   if (!sessionId) return null;
   if (!SESSION_STORE.has(sessionId)) {
-    SESSION_STORE.set(sessionId, createEmptySession());
+    SESSION_STORE.set(sessionId, createEmptySession(userId));
   }
   return SESSION_STORE.get(sessionId);
+}
+
+function peekSession(sessionId) {
+  return (sessionId && SESSION_STORE.get(sessionId)) || null;
 }
 
 function hashContext(context) {
@@ -121,6 +126,7 @@ function clearSession(sessionId) {
 
 module.exports = {
   getSession,
+  peekSession,
   setTripContext,
   addMessage,
   getHistory,

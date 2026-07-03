@@ -86,7 +86,6 @@ let budgetOptState = null;
 const PROFILES_KEY = 'travelplanner_profiles_v1';
 const SCHEDULING_PREFS_KEY = 'travelplanner_scheduling_prefs_v1';
 const LEGACY_PROFILE_KEY = 'travelplanner_profile_v1';
-const USER_ID_KEY = 'travelplanner_user_id';
 // PROFILE_QUESTIONS, PROFILE_MIN, PROFILE_MAX, PROFILE_DEFAULT, profileLabel,
 // pacePrefLabel provided by /js/profileWizard.js
 
@@ -2975,14 +2974,6 @@ function typeToTime(type) {
   return map[type] || 'TBD';
 }
 
-function ensureUserId() {
-  if (state.authUserId) return state.authUserId;
-  const existing = localStorage.getItem(USER_ID_KEY);
-  if (existing) return existing;
-  const next = crypto.randomUUID();
-  localStorage.setItem(USER_ID_KEY, next);
-  return next;
-}
 
 async function getAuthToken() {
   const clerk = window.Clerk;
@@ -3531,7 +3522,14 @@ async function fetchStatus() {
   const res = await apiFetch('/api/status');
   const data = await res.json();
   state.keys = data.keys || state.keys;
-  const googleMapsApiKey = String(data?.googleMapsApiKey || '').trim();
+  let googleMapsApiKey = '';
+  if (data?.keys?.googleMapsConfigured) {
+    try {
+      const keyRes = await apiFetch('/api/config/maps-key');
+      const keyData = await keyRes.json();
+      googleMapsApiKey = String(keyData?.googleMapsApiKey || '').trim();
+    } catch {}
+  }
   const msgs = [];
   if (!state.keys.anthropicConfigured) msgs.push('Anthropic API key not configured: planning disabled.');
   if (!googleMapsApiKey) msgs.push('Google Maps API key not configured: location autocomplete unavailable.');
@@ -4034,7 +4032,6 @@ async function onConfirmLocks() {
           activity: a,
           note: 'find a cheaper alternative within the same activity type and city',
           budget_target: perActivityTarget,
-          userId: ensureUserId(),
           tripId: state.currentItineraryId || null
         })
       })
@@ -4349,7 +4346,7 @@ function renderActivities() {
         const resp = await apiFetch('/api/activity/replace', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity: a, reason, notes, userId: ensureUserId(), tripId: state.currentItineraryId || null })
+          body: JSON.stringify({ activity: a, reason, notes, tripId: state.currentItineraryId || null })
         });
         if (!resp.ok) throw new Error('Replace failed');
         const { activity: rawReplacement } = await resp.json();
@@ -4490,7 +4487,7 @@ function renderActivities() {
           const resp = await apiFetch('/api/activity/replace', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ activity: a, reason, notes, userId: ensureUserId(), tripId: state.currentItineraryId || null })
+            body: JSON.stringify({ activity: a, reason, notes, tripId: state.currentItineraryId || null })
           });
           if (!resp.ok) throw new Error('Replace failed');
           const { activity: rawReplacement } = await resp.json();
@@ -4708,7 +4705,7 @@ async function submitAddActivity() {
   apiFetch('/api/activity/add', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, city, why, cost, costType, userId: ensureUserId(), tripId: state.currentItineraryId || null }),
+    body: JSON.stringify({ name, city, why, cost, costType, tripId: state.currentItineraryId || null }),
   })
     .then((res) => {
       if (!res.ok) throw new Error(`server ${res.status}`);
@@ -6547,7 +6544,6 @@ async function autoArrangeActiveCity(opts = {}) {
         }),
         lockedActivities,
         commuteMatrix,
-        userId: ensureUserId(),
         profile: getProfilePayload(),
         numTravelers: state.numTravelers,
         numChildren: state.numChildren,
@@ -8013,7 +8009,6 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
   const payload = {
     cities, travels,
     profile: state.profile || loadProfile(),
-    userId: ensureUserId(),
     budget: state.tripBudget,
     numTravelers: state.numTravelers,
     numChildren: state.numChildren,
@@ -8423,7 +8418,6 @@ async function sendChatMessage() {
         sessionId: ensureChatSessionId(),
         message,
         tripContext: getTripContext(),
-        userId: ensureUserId(),
         tripId: state.currentItineraryId || null
       })
     });
@@ -9170,7 +9164,6 @@ async function loadAuthSessionData() {
     const data = await res.json();
     state.authUserId = String(data?.userId || state.authUserId || '');
     state.forwardingAddress = String(data?.forwardingAddress || '');
-    localStorage.setItem(USER_ID_KEY, state.authUserId);
   } catch {}
 
   try {
@@ -9208,7 +9201,7 @@ async function enforceEntitlementGate() {
   const userId = state.authUserId || '';
   let entitled = false;
   try {
-    const res = await fetch(`/api/auth/entitlement?userId=${encodeURIComponent(userId)}`, { headers: { 'Accept': 'application/json' } });
+    const res = await apiFetch('/api/auth/entitlement', { headers: { 'Accept': 'application/json' } });
     sendDebug('entitlement-client', `check userId=${userId} status=${res.status}`);
     if (res.ok) {
       const body = await res.json();
@@ -9260,10 +9253,10 @@ async function enforceEntitlementGate() {
       sendDebug('redeem-client', `submit userId=${userId} codeLen=${code.length}`);
       let res;
       try {
-        res = await fetch('/api/auth/redeem-code', {
+        res = await apiFetch('/api/auth/redeem-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ code, userId })
+          body: JSON.stringify({ code })
         });
       } catch (err) {
         sendDebug('redeem-client', `fetch-threw msg=${err?.message || err} name=${err?.name || ''}`);
@@ -9898,7 +9891,6 @@ history.replaceState({ spa: true, step: 1 }, '');
   mountPlanningOverlay();
   mountActivityMapOverlay();
   bindChatEvents();
-  ensureUserId();
   ensureChatSessionId();
   await restoreChatHistory();
   await fetchStatus();

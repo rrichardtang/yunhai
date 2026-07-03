@@ -1,6 +1,6 @@
 const { requireConfiguredAuth, getAuthedUserId, parseUserId } = require('../middleware/auth');
 const { getOrCreateForwardingAddress } = require('../emailForwarding');
-const { isEntitled, redeemCode, listCodes } = require('../entitlements');
+const { isEntitled, redeemCode } = require('../entitlements');
 const { debugLog } = require('../services/debugLog');
 
 function register(app) {
@@ -14,9 +14,12 @@ function register(app) {
         googleMapsConfigured: Boolean(process.env.GOOGLE_MAPS_API_KEY),
         clerkConfigured: Boolean(process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY),
         resendConfigured: Boolean(process.env.RESEND_API_KEY)
-      },
-      googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
+      }
     });
+  });
+
+  app.get('/api/config/maps-key', requireConfiguredAuth, (_req, res) => {
+    res.json({ googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '' });
   });
 
   app.get('/api/auth/session', requireConfiguredAuth, (req, res) => {
@@ -32,38 +35,23 @@ function register(app) {
     });
   });
 
-  app.get('/api/auth/entitlement', (req, res) => {
-    const rawUserId = String(req.query.userId || '').trim();
-    const userId = rawUserId ? parseUserId(rawUserId) : null;
+  app.get('/api/auth/entitlement', requireConfiguredAuth, (req, res) => {
+    const userId = parseUserId(getAuthedUserId(req));
     const entitled = userId ? isEntitled(userId) : false;
     debugLog('entitlement-check', `userId=${userId} entitled=${entitled}`);
     res.json({ entitled, userId });
   });
 
-  app.post('/api/auth/redeem-code', (req, res) => {
+  app.post('/api/auth/redeem-code', requireConfiguredAuth, (req, res) => {
     const rawCode = req.body?.code;
-    const rawUserId = String(req.body?.userId || '').trim();
-    if (!rawUserId) {
+    const userId = parseUserId(getAuthedUserId(req));
+    if (!userId) {
       debugLog('redeem-code', `denied no-userId codeLen=${String(rawCode || '').length}`);
       return res.json({ ok: false, reason: 'invalid' });
     }
-    const userId = parseUserId(rawUserId);
     const result = redeemCode(rawCode, userId);
     debugLog('redeem-code', `userId=${userId} codeLen=${String(rawCode || '').length} result=${JSON.stringify(result)}`);
     res.json(result);
-  });
-
-  app.get('/debug/codes', (_req, res) => {
-    const codes = listCodes();
-    res.json({
-      count: codes.length,
-      codes: codes.map((c) => ({
-        code: c.code,
-        createdAt: c.createdAt,
-        redeemedBy: c.redeemedBy,
-        redeemedAt: c.redeemedAt
-      }))
-    });
   });
 }
 

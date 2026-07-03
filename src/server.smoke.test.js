@@ -58,3 +58,40 @@ for (const [method, path] of routes) {
     assert.notEqual(res.status, 404, `route ${method} ${path} returned 404 — not mounted`);
   });
 }
+
+test('GET /debug/codes is removed (falls through to the SPA catch-all)', async () => {
+  const res = await request(app).get('/debug/codes');
+  assert.match(res.headers['content-type'] || '', /html/);
+  assert.equal(res.body.codes, undefined);
+});
+
+test('GET /api/status does not expose the Google Maps API key', async () => {
+  const res = await request(app).get('/api/status');
+  assert.equal(res.status, 200);
+  assert.equal('googleMapsApiKey' in res.body, false);
+});
+
+for (const path of ['/debug', '/debug/clear', '/api/config/maps-key']) {
+  test(`GET ${path} is not publicly accessible`, async () => {
+    const res = await request(app).get(path);
+    assert.ok([401, 403, 503].includes(res.status), `expected auth rejection, got ${res.status}`);
+  });
+}
+
+test('POST /debug/client rejects unauthenticated writes', async () => {
+  const res = await request(app).post('/debug/client').send({ scope: 'x', message: 'y' });
+  assert.ok([401, 403, 503].includes(res.status), `expected auth rejection, got ${res.status}`);
+});
+
+test('POST /api/auth/redeem-code rejects unauthenticated calls', async () => {
+  const res = await request(app).post('/api/auth/redeem-code').send({ code: 'nope' });
+  assert.ok([401, 403, 503].includes(res.status), `expected auth rejection, got ${res.status}`);
+});
+
+test('POST /api/email/inbound fails closed when no webhook secret is configured', async () => {
+  const prev = process.env.EMAIL_WEBHOOK_SECRET;
+  delete process.env.EMAIL_WEBHOOK_SECRET;
+  const res = await request(app).post('/api/email/inbound').send({ to: 'x@y.z' });
+  if (prev !== undefined) process.env.EMAIL_WEBHOOK_SECRET = prev;
+  assert.equal(res.status, 503);
+});
