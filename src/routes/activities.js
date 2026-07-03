@@ -692,17 +692,6 @@ Return ONLY valid JSON (no markdown fences):
     }
   });
 
-  app.get('/api/admin/arrange-stats', async (req, res) => {
-    const adminToken = process.env.ADMIN_TOKEN;
-    if (!adminToken) return res.status(404).json({ error: 'not_found' });
-    const provided = req.get('x-admin-token') || req.query.token;
-    if (provided !== adminToken) return res.status(403).json({ error: 'forbidden' });
-
-    const limit = Math.max(1, Math.min(1000, Number(req.query.limit) || 100));
-    const runs = await arrangeTelemetry.readRecent(limit);
-    return res.json({ summary: arrangeTelemetry.summarize(runs), runs });
-  });
-
   app.post('/api/plan', async (req, res) => {
     const planStartTs = Date.now();
     const { cities, travels, profile, budget, numTravelers, numChildren, lockedActivities, tripId = null } = req.body || {};

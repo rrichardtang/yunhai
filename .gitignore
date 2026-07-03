@@ -20,4 +20,5 @@ logs/
 .trae
 .windsurf
 .DS_Store
-env/*
+env/*.env.local
+japan.pdf

@@ -78,8 +78,10 @@ async function api(path, opts = {}) {
 }
 
 function inviteUrl(code) {
-  return `${window.location.origin}/?invite=${code}`;
+  return `${window.location.origin}/?invite=${encodeURIComponent(code)}`;
 }
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function render(codes) {
   const tbody = document.querySelector('#codes tbody');
@@ -99,11 +101,11 @@ function render(codes) {
       : `<span class="status-open">open</span>`;
     const link = inviteUrl(c.code);
     tr.innerHTML = `
-      <td class="code">${c.code}</td>
-      <td><a class="link" href="${link}">${link}</a></td>
+      <td class="code">${esc(c.code)}</td>
+      <td><a class="link" href="${esc(link)}">${esc(link)}</a></td>
       <td>${status}</td>
       <td class="muted">${c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ''}</td>
-      <td><button class="danger" data-revoke="${c.code}">Revoke</button></td>
+      <td><button class="danger" data-revoke="${esc(c.code)}">Revoke</button></td>
     `;
     tbody.appendChild(tr);
   }
