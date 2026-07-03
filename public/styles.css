@@ -1,5 +1,9 @@
 /* ── Design tokens (GuideMe redesign — handoff §3) ── */
 :root {
+  /* Single-theme light app: keeps native controls and gmp-place-autocomplete
+     from self-theming dark on OS Dark Mode devices. */
+  color-scheme: light;
+
   /* Surfaces — dark */
   --ink-abyss: #070B12;
   --ink-900: #0A1628;
@@ -578,7 +582,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .travel-row input, .travel-row select { margin-top: 0; }
 
 .place-autocomplete-fallback { display: none; }
-.tp-place-autocomplete { display: block; width: 100%; position: relative; z-index: 30; }
+.tp-place-autocomplete { display: block; width: 100%; min-width: 0; position: relative; z-index: 30; }
 .city-autocomplete { position: relative; }
 .city-suggestions {
   position: absolute;
@@ -2142,7 +2146,6 @@ body.overlay-active #chatWidget {
   /* Scale the entire UI down — everything using rem/inherit cascades from this */
   html { font-size: 13px; }
 
-  .container { padding: 0 10px 24px; margin-top: 10px; }
   .panel { padding: 14px 10px; }
 
   /* Forms: tighten padding globally */
@@ -2174,20 +2177,7 @@ body.overlay-active #chatWidget {
   .city-row-main > :nth-child(4) { grid-column: 3 / 5; grid-row: 2; }
   .city-row-main input[type="date"] { width: 100%; min-width: 0; padding: 4px 2px; font-size: 0.75rem; -webkit-appearance: none; }
 
-  /* Drawer sections: tighter */
-  .city-dropdown-section { padding: 6px; border-radius: 10px; overflow: hidden; max-width: 100%; box-sizing: border-box; }
-  .city-dropdown-grid { gap: 4px; overflow: hidden; }
-  .city-dropdown-label { font-size: 0.75rem; margin-bottom: 3px; }
-  .city-drawer { overflow: hidden; }
   .hotel-row, .travel-row { grid-template-columns: 1fr; }
-  .accommodation-row { grid-template-columns: 1fr 1fr; }
-  .accommodation-row > :first-child { grid-column: 1 / -1; }
-  .accommodation-row input[type="date"] { padding: 4px 2px; font-size: 0.75rem; min-width: 0; width: 100%; }
-  .arrival-row, .departure-row { grid-template-columns: 1fr auto; }
-  .arrival-row input[type="date"],
-  .arrival-row input[type="time"],
-  .departure-row input[type="date"],
-  .departure-row input[type="time"] { padding: 4px 2px; font-size: 0.75rem; min-width: 0; }
 
   /* Topbar */
   .topbar { padding: 8px 10px; }
@@ -3068,6 +3058,10 @@ body.overlay-active #chatWidget {
 
 /* Container width — mock uses 1120px, the app uses 960px. Bump to match. */
 .container { max-width: 1120px; padding: 0 clamp(20px, 4vw, 40px) 80px; margin: 32px auto 0; }
+/* 96px bottom clearance on mobile so content scrolls clear of the fixed nav pill + chat FAB */
+@media (max-width: 767px) {
+  .container { padding: 0 10px 96px; margin-top: 10px; }
+}
 
 /* Stepper — pill-shaped chips become numbered nodes on a hairline track */
 .steps {
@@ -3584,6 +3578,7 @@ button.secondary:hover:not(:disabled) {
 
 /* Field grid + inputs inside panes */
 .gm-grid { display: grid; gap: 14px 16px; }
+.gm-grid > * { min-width: 0; }
 .gm-grid.c2 { grid-template-columns: 1fr 1fr; }
 .gm-grid.c3 { grid-template-columns: 1.6fr 1fr 1fr; }
 .gm-grid.c-loc-time { grid-template-columns: 1fr 160px; }
@@ -3591,7 +3586,7 @@ button.secondary:hover:not(:disabled) {
 @media (max-width: 720px) {
   .gm-grid.c2, .gm-grid.c3, .gm-grid.c-loc-time, .gm-grid.c-mode-intl { grid-template-columns: 1fr; }
 }
-.gm-f { display: flex; flex-direction: column; gap: 6px; margin-bottom: 0; }
+.gm-f { display: flex; flex-direction: column; gap: 6px; margin-bottom: 0; min-width: 0; }
 .gm-f > label {
   font-family: var(--font-sans);
   text-transform: none;
