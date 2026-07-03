@@ -1,5 +1,6 @@
 const placesCache = require('./placesCache');
 const { debugLog } = require('./debugLog');
+const { fetchWithTimeout } = require('./fetchWithTimeout');
 const { haversineKm } = require('./geo');
 
 const FOOD_TYPES = new Set(['meal', 'nightlife']);
@@ -74,7 +75,7 @@ async function fetchPlaceDetails(name, city, cityCenter = null) {
     };
   }
   try {
-    const res = await fetch(ENDPOINT, {
+    const res = await fetchWithTimeout(ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

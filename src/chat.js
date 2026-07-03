@@ -1,6 +1,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 
 const SESSION_STORE = new Map();
+const MAX_SESSIONS = 500;
 const MODEL_CONTEXT_WINDOW_TOKENS = 200000;
 const COMPACT_THRESHOLD_TOKENS = 8000;
 const CHARS_PER_TOKEN = 4;
@@ -8,6 +9,7 @@ const CHARS_PER_TOKEN = 4;
 function createEmptySession(userId) {
   return {
     userId: userId || null,
+    touchedAt: Date.now(),
     history: [],
     tripContext: {},
     cachedSystemPrompt: null,
@@ -15,12 +17,23 @@ function createEmptySession(userId) {
   };
 }
 
+function evictIdlestSession() {
+  let idlest = null;
+  for (const [key, session] of SESSION_STORE) {
+    if (!idlest || session.touchedAt < SESSION_STORE.get(idlest).touchedAt) idlest = key;
+  }
+  if (idlest) SESSION_STORE.delete(idlest);
+}
+
 function getSession(sessionId, userId) {
   if (!sessionId) return null;
   if (!SESSION_STORE.has(sessionId)) {
+    if (SESSION_STORE.size >= MAX_SESSIONS) evictIdlestSession();
     SESSION_STORE.set(sessionId, createEmptySession(userId));
   }
-  return SESSION_STORE.get(sessionId);
+  const session = SESSION_STORE.get(sessionId);
+  session.touchedAt = Date.now();
+  return session;
 }
 
 function peekSession(sessionId) {
