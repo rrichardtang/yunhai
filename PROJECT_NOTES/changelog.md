@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-07-03] Codebase clean-sweep: security hardening, correctness fixes, dedup pass
+
+Branch `claude/codebase-review-sweep-2z6t4h` (5 commits). Full-repo review (backend core, services, frontend) then targeted fixes; 168/168 tests green (8 new smoke regressions).
+
+- Security: removed unauthenticated `GET /debug/codes` (leaked all invite codes; with pre-auth `redeem-code` accepting body userId this was a full entitlement bypass); `redeem-code`/`entitlement` now require Clerk auth and derive userId from the session; public `/api/status` no longer returns the raw `GOOGLE_MAPS_API_KEY` (new authed `GET /api/config/maps-key`); `/debug` + `/debug/clear` owner-gated, `/debug/client` auth-gated; email webhook fails closed (503) when `EMAIL_WEBHOOK_SECRET` unset; `/api/activity/add|replace` memory recall/observe now scoped by the authed user (was client-supplied `userId`); chat sessions record an owner and message/read/delete verify it; `/api/admin/arrange-stats` moved under `requireOwner` (ADMIN_TOKEN scheme deleted).
+- Frontend security: fixed placed-card tooltip XSS (dataset round-trip decoded the write-time escaping; now escaped at read), hardened `esc()` to coerce non-strings, escaped invite codes in admin.html, removed the Clerk-JWT-prefix `sendDebug` logging and leftover boot/entitlement/redeem debug chatter, `sendDebug` now authenticates via `apiFetch`.
+- Correctness: `itineraryStore`/`userDataStore` writes are tmp+rename atomic; all-day Google Calendar `end.date` treated as exclusive (was stretching events a day, causing false conflicts); fixed duplicate `daysBetween` in app.js (exclusive version shadowed the inclusive one — setup insights under-counted planned days by 1/city); shared `fetchWithTimeout` (10s) on Distance Matrix/Places/Unsplash/Calendar fetches; capped chat `SESSION_STORE` (500, idle eviction) and unsplash caches; guarded `llmSemaphore.release()` underflow.
+- Dedup/dead code: new `src/services/llmJson.js` (shared LLM-JSON parse/repair toolkit, replaced 5 copies); `parseClockTime` in `shared/timeHelpers` + `services/calendarShared.js` (calendar parser/location-label dedup); merged keyword extractors into `imageQuery.extractKeywords`; `services/jsonFileCache.js` factory behind commute/places caches; deleted `arrangeConstants.js`, `normalizeLegacyActivity`, `enrichWithPriceLevel`, the first/last accommodation pseudo-split, `renderItineraryModeSummary` no-op, dead client `userId` plumbing (`ensureUserId`); extracted `clearItineraryColumns()`; `renderTripHealth` reuses `renderTripHealthBadge`.
+- Repo hygiene: untracked `.env.local` (unused InsForge artifact), `japan.pdf`, `.DS_Store`; removed dead `review:learn` npm script; Brave stdout telemetry no longer logs query text; `.env.example` documents `OWNER_USER_ID` and the fail-closed webhook; CLAUDE.md updated (routes/ split, llmJson, esc()/dataset rule).
+
 ## [2026-07-03] Setup-step mobile fixes: dark autocomplete pills, gm-grid overflow, bottom clearance
 
 Branch `claude/mobile-ui-feedback-eqx6he`. From a staging iPhone screenshot (OS Dark Mode, ~390px):
