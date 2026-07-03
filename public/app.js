@@ -2115,10 +2115,17 @@ function scheduleChecklistAutosave() {
 
 // ── renderTripHealth (badge + trip health panels) ─────────────────────────
 
+function clearItineraryColumns() {
+  els.dayColumns.innerHTML = '';
+  els.stagingArea.innerHTML = '';
+  if (els.itineraryGrid) els.itineraryGrid.innerHTML = '';
+  if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
+}
+
 function renderTripHealthBadge() {
   const tripLoaded = Boolean(state.currentItineraryId || (state.activities && state.activities.length));
   if (els.tripHealthBadge) els.tripHealthBadge.classList.toggle('hidden', !tripLoaded);
-  if (!tripLoaded) return;
+  if (!tripLoaded) return false;
   state.tripHealth = computeTripHealthLocal();
   const statusClass = String(state.tripHealth.status || '').toLowerCase().replace(/\s+/g, '-');
   if (els.tripHealthBadge) {
@@ -2129,26 +2136,15 @@ function renderTripHealthBadge() {
   if (els.tripHealthPopoverIssues) els.tripHealthPopoverIssues.textContent = `${state.tripHealth.issueCount} issue${state.tripHealth.issueCount === 1 ? '' : 's'}`;
   if (els.tripHealthPopoverTopIssue) els.tripHealthPopoverTopIssue.textContent = state.tripHealth.topIssue;
   if (els.tripHealthPopoverProgress) els.tripHealthPopoverProgress.textContent = `${state.tripHealth.checklistProgress.verified} of ${state.tripHealth.checklistProgress.total} items verified`;
+  return true;
 }
 
 function renderTripHealth() {
-  const tripLoaded = Boolean(state.currentItineraryId || (state.activities && state.activities.length));
-  if (els.tripHealthBadge) els.tripHealthBadge.classList.toggle('hidden', !tripLoaded);
-  if (!tripLoaded) {
+  if (!renderTripHealthBadge()) {
     if (els.tripHealthSummary) els.tripHealthSummary.innerHTML = '<p class="muted-text">Load or create a trip to open Trip Health.</p>';
     if (els.tripHealthIssues) els.tripHealthIssues.innerHTML = '';
     return;
   }
-  state.tripHealth = computeTripHealthLocal();
-  const statusClass = String(state.tripHealth.status || '').toLowerCase().replace(/\s+/g, '-');
-  if (els.tripHealthBadge) {
-    els.tripHealthBadge.className = `trip-health-badge ${statusClass}`;
-    els.tripHealthBadge.innerHTML = `<i class="ph-bold ph-heartbeat" aria-hidden="true"></i><span class="sr-only">Trip Health: ${esc(state.tripHealth.status)} · ${state.tripHealth.issueCount} issues</span>`;
-  }
-  if (els.tripHealthPopoverStatus) els.tripHealthPopoverStatus.innerHTML = `<strong>${esc(state.tripHealth.status)}</strong>`;
-  if (els.tripHealthPopoverIssues) els.tripHealthPopoverIssues.textContent = `${state.tripHealth.issueCount} issue${state.tripHealth.issueCount === 1 ? '' : 's'}`;
-  if (els.tripHealthPopoverTopIssue) els.tripHealthPopoverTopIssue.textContent = state.tripHealth.topIssue;
-  if (els.tripHealthPopoverProgress) els.tripHealthPopoverProgress.textContent = `${state.tripHealth.checklistProgress.verified} of ${state.tripHealth.checklistProgress.total} items verified`;
 
   if (els.tripHealthSummary) {
     const checklist = state.bookingChecklist || [];
@@ -7402,8 +7398,6 @@ async function shareMinimalItinerary() {
     .catch(() => showErrorBanner(`Could not copy — share link: ${shareUrl}`));
 }
 
-function renderItineraryModeSummary() { /* legacy no-op; hero replaces this */ }
-
 function formatItinHeroDate(dateStr) {
   if (!dateStr) return '';
   const d = new Date(`${dateStr}T12:00:00`);
@@ -8772,10 +8766,7 @@ function resetToFresh() {
   renderCities();
   addCityRow();
   renderActivities();
-  els.dayColumns.innerHTML = '';
-  els.stagingArea.innerHTML = '';
-  if (els.itineraryGrid) els.itineraryGrid.innerHTML = '';
-  if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
+  clearItineraryColumns();
   updateCalendarControls();
   renderChatMessages();
   setStep(1);
@@ -9009,9 +9000,6 @@ async function maybeLoadSharedItineraryFromUrl() {
       ? offline.itineraryRows
       : (Array.isArray(offline.executionRows) ? offline.executionRows : []);
 
-    if (els.itineraryModeSummary) {
-      renderItineraryModeSummary(offline);
-    }
     if (els.itineraryModeList) {
       els.itineraryModeList.innerHTML = offlineRows.map((row) => {
         const title = row.title || '';
@@ -9372,10 +9360,7 @@ function clearPlannedResultsKeepSetup() {
   state.commutes = {};
   state.arrangeCity = null;
   renderActivities();
-  els.dayColumns.innerHTML = '';
-  els.stagingArea.innerHTML = '';
-  if (els.itineraryGrid) els.itineraryGrid.innerHTML = '';
-  if (els.itineraryInsights) els.itineraryInsights.innerHTML = '';
+  clearItineraryColumns();
   updateCalendarControls();
 }
 

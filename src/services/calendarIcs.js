@@ -1,20 +1,5 @@
-function parseTimeForCalendar(raw = '') {
-  const normalized = String(raw || '').trim().toLowerCase();
-  const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
-  if (!match) return { hours: 9, minutes: 0 };
-
-  let hours = Number(match[1] || 9);
-  const minutes = Number(match[2] || 0);
-  const meridiem = match[3];
-
-  if (meridiem === 'pm' && hours < 12) hours += 12;
-  if (meridiem === 'am' && hours === 12) hours = 0;
-
-  return {
-    hours: Math.max(0, Math.min(23, hours)),
-    minutes: Math.max(0, Math.min(59, minutes))
-  };
-}
+const { parseClockTime } = require('../../shared/timeHelpers');
+const { activityLocationLabel } = require('./calendarShared');
 
 function toIcsDate(date) {
   const pad = (n) => String(n).padStart(2, '0');
@@ -44,7 +29,7 @@ function buildItineraryIcs(itinerary = {}, { metadataMode = 'compact' } = {}) {
       const [year, month, date] = baseDate.split('-').map((n) => Number(n));
       if (!year || !month || !date) continue;
 
-      const start = parseTimeForCalendar(activity?.time || activity?.suggested_time || '09:00');
+      const start = parseClockTime(activity?.time || activity?.suggested_time || '09:00');
       const durationHours = Math.max(0.5, Number(activity?.duration_hours || 1.5));
       const durationMinutes = Math.round(durationHours * 60);
 
@@ -52,7 +37,7 @@ function buildItineraryIcs(itinerary = {}, { metadataMode = 'compact' } = {}) {
       const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
 
       const summary = activity?.name || 'Travel activity';
-      const location = activity?.location?.address || activity?.venue_name || [activity?.start_location, activity?.end_location].filter(Boolean).join(' → ') || day?.city || '';
+      const location = activityLocationLabel(activity, day);
       const description = metadataMode === 'full' ? [
         `Type: ${activity?.type || 'activity'}`,
         activity?.why_it_fits ? `Why: ${activity.why_it_fits}` : '',
@@ -86,4 +71,4 @@ function buildItineraryIcs(itinerary = {}, { metadataMode = 'compact' } = {}) {
   ].join('\r\n');
 }
 
-module.exports = { buildItineraryIcs, parseTimeForCalendar, toIcsDate, escapeIcsText };
+module.exports = { buildItineraryIcs, toIcsDate, escapeIcsText };

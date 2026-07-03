@@ -7,15 +7,7 @@ const {
 } = require('../preferences');
 const { getUserData, setUserData, getUserField, setUserField } = require('../userDataStore');
 const { formatProfileForEnrichment } = require('../services/profilePrompt');
-
-function extractText(content = []) {
-  if (!Array.isArray(content)) return '';
-  return content
-    .filter((c) => c?.type === 'text')
-    .map((c) => c.text)
-    .join('\n')
-    .trim();
-}
+const { extractText } = require('../services/llmJson');
 
 function register(app) {
   app.get('/api/preferences', (req, res) => {

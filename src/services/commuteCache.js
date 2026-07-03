@@ -1,57 +1,12 @@
-const fs = require('fs');
 const path = require('path');
+const { jsonFileCache } = require('./jsonFileCache');
 
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
-const CACHE_PATH = path.join(DATA_DIR, 'commute-cache.json');
+const CACHE_PATH = path.join(__dirname, '..', '..', 'data', 'commute-cache.json');
 const TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const NEGATIVE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const NEGATIVE_SENTINEL = -1;
-const FLUSH_DEBOUNCE_MS = 2000;
 
-let cache = null;
-let flushTimer = null;
-let dirty = false;
-
-function load() {
-  if (cache) return cache;
-  try {
-    if (fs.existsSync(CACHE_PATH)) {
-      cache = JSON.parse(fs.readFileSync(CACHE_PATH, 'utf8')) || {};
-    } else {
-      cache = {};
-    }
-  } catch {
-    cache = {};
-  }
-  return cache;
-}
-
-function flushNow() {
-  if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
-  dirty = false;
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(CACHE_PATH, JSON.stringify(cache));
-  } catch {
-    // best-effort cache; swallow
-  }
-}
-
-function scheduleFlush() {
-  dirty = true;
-  if (flushTimer) return;
-  flushTimer = setTimeout(() => {
-    flushTimer = null;
-    if (!dirty) return;
-    dirty = false;
-    try {
-      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-      fs.writeFileSync(CACHE_PATH, JSON.stringify(cache));
-    } catch {
-      // best-effort cache; swallow
-    }
-  }, FLUSH_DEBOUNCE_MS);
-}
+const store = jsonFileCache(CACHE_PATH);
 
 function key(origin, destination, mode) {
   return `${origin}|${destination}|${mode}`;
@@ -59,8 +14,7 @@ function key(origin, destination, mode) {
 
 function get(origin, destination, mode) {
   if (!origin || !destination || !mode) return undefined;
-  const store = load();
-  const entry = store[key(origin, destination, mode)];
+  const entry = store.load()[key(origin, destination, mode)];
   if (!entry) return undefined;
   const age = Date.now() - entry.ts;
   if (entry.minutes === NEGATIVE_SENTINEL) {
@@ -74,35 +28,30 @@ function get(origin, destination, mode) {
 function set(origin, destination, mode, minutes) {
   if (!origin || !destination || !mode) return;
   if (!Number.isFinite(minutes)) return;
-  const store = load();
-  store[key(origin, destination, mode)] = { minutes, ts: Date.now() };
-  scheduleFlush();
+  store.load()[key(origin, destination, mode)] = { minutes, ts: Date.now() };
+  store.scheduleFlush();
 }
 
 function setNegative(origin, destination, mode) {
   if (!origin || !destination || !mode) return;
-  const store = load();
-  store[key(origin, destination, mode)] = { minutes: NEGATIVE_SENTINEL, ts: Date.now() };
-  scheduleFlush();
+  store.load()[key(origin, destination, mode)] = { minutes: NEGATIVE_SENTINEL, ts: Date.now() };
+  store.scheduleFlush();
 }
 
-// Admin: drop cached entries so the next lookups re-fetch live. Clears the
-// in-memory store (the source of truth for the running process) and the file.
+// Admin: drop cached entries so the next lookups re-fetch live.
 function clear() {
-  const store = load();
-  const total = Object.keys(store).length;
-  cache = {};
-  flushNow();
+  const total = Object.keys(store.load()).length;
+  store.reset();
   return { removed: total, kind: 'all' };
 }
 
 function clearNegatives() {
-  const store = load();
+  const entries = store.load();
   let removed = 0;
-  for (const k of Object.keys(store)) {
-    if (store[k]?.minutes === NEGATIVE_SENTINEL) { delete store[k]; removed += 1; }
+  for (const k of Object.keys(entries)) {
+    if (entries[k]?.minutes === NEGATIVE_SENTINEL) { delete entries[k]; removed += 1; }
   }
-  flushNow();
+  store.flushNow();
   return { removed, kind: 'negatives' };
 }
 

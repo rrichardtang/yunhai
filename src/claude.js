@@ -1,4 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const { extractText, tryParseJsonArray } = require('./services/llmJson');
 const { recall } = require('./memory');
 const { getCategoryDefaults, paceDescFromValue } = require('./arrangeConfig');
 
@@ -55,113 +56,6 @@ Return ONLY the JSON array, no markdown, no explanation.`;
 function getClient() {
   if (!process.env.ANTHROPIC_API_KEY) return null;
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-}
-
-function extractTextBlock(content) {
-  if (!Array.isArray(content)) return '';
-  return content.filter((c) => c.type === 'text').map((c) => c.text).join('\n');
-}
-
-function stripCodeFences(raw = '') {
-  let cleaned = String(raw || '').trim();
-  if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  }
-  return cleaned.trim();
-}
-
-function extractLikelyJsonArray(raw = '') {
-  const text = String(raw || '');
-  const start = text.indexOf('[');
-  if (start === -1) return null;
-
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = start; i < text.length; i += 1) {
-    const ch = text[i];
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (ch === '\\') {
-        escaped = true;
-        continue;
-      }
-      if (ch === '"') inString = false;
-      continue;
-    }
-
-    if (ch === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (ch === '[') depth += 1;
-    if (ch === ']') {
-      depth -= 1;
-      if (depth === 0) return text.slice(start, i + 1);
-    }
-  }
-
-  return null;
-}
-
-function repairTruncatedJson(raw = '') {
-  let text = raw.trim();
-  // Remove trailing comma
-  text = text.replace(/,\s*$/, '');
-  // Remove last incomplete key-value (e.g. trailing `"key": ` or `"key": "partial...`)
-  text = text.replace(/,?\s*"[^"]*"\s*:\s*(?:"[^"]*)?$/, '');
-  // Close unclosed braces/brackets
-  const opens = [];
-  let inStr = false, esc = false;
-  for (const ch of text) {
-    if (inStr) { if (esc) { esc = false; } else if (ch === '\\') { esc = true; } else if (ch === '"') { inStr = false; } continue; }
-    if (ch === '"') { inStr = true; continue; }
-    if (ch === '{' || ch === '[') opens.push(ch);
-    if (ch === '}' || ch === ']') opens.pop();
-  }
-  while (opens.length) {
-    const open = opens.pop();
-    text += open === '{' ? '}' : ']';
-  }
-  return text;
-}
-
-function tryParseJsonArray(raw = '') {
-  const attempts = [];
-  const stripped = stripCodeFences(raw);
-  attempts.push(stripped);
-
-  const extracted = extractLikelyJsonArray(stripped);
-  if (extracted && extracted !== stripped) attempts.push(extracted);
-
-  const relaxed = extracted
-    ? extracted
-      .replace(/,\s*([}\]])/g, '$1')
-      .replace(/[\u201C\u201D]/g, '"')
-      .replace(/[\u2018\u2019]/g, "'")
-    : null;
-  if (relaxed && !attempts.includes(relaxed)) attempts.push(relaxed);
-
-  // Truncation repair: try closing unclosed brackets
-  const repaired = repairTruncatedJson(stripped);
-  if (!attempts.includes(repaired)) attempts.push(repaired);
-
-  for (const candidate of attempts) {
-    try {
-      const parsed = JSON.parse(candidate);
-      if (Array.isArray(parsed)) return parsed;
-    } catch {
-      // try next strategy
-    }
-  }
-
-  return null;
 }
 
 function blankActivity(overrides = {}) {
@@ -283,10 +177,6 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
   };
 }
 
-function normalizeLegacyActivity(raw, fallbackCity = '') {
-  return normalizeActivity(raw, fallbackCity);
-}
-
 async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0, lockedActivities = [], tripId = null) {
   const planCityStartTs = Date.now();
   const { name, startDate, endDate, leaveTime, notes, accommodations } = city;
@@ -403,7 +293,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
       messages: [{ role: 'user', content: userContent }]
     });
     const final = await stream.finalMessage();
-    return { text: extractTextBlock(final.content), stop_reason: final.stop_reason };
+    return { text: extractText(final.content), stop_reason: final.stop_reason };
   }
 
   debugLog('plan-city', `LLM_CALL city="${name}" model=${MODEL} prompt_chars=${prompt.length}`);
@@ -506,4 +396,4 @@ function applyMealPoolCap(activities, { city, minMeals }) {
   return [...nonMeals, ...finalMeals];
 }
 
-module.exports = { planCity, normalizeActivity, normalizeLegacyActivity, blankActivity, SYSTEM_PROMPT };
+module.exports = { planCity, normalizeActivity, blankActivity, SYSTEM_PROMPT };
