@@ -1,4 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const { extractText } = require('./services/llmJson');
 
 const SESSION_STORE = new Map();
 const MAX_SESSIONS = 500;
@@ -101,11 +102,7 @@ async function summarizeHistory(history = []) {
     ]
   });
 
-  return (response.content || [])
-    .filter((block) => block.type === 'text')
-    .map((block) => block.text)
-    .join('\n')
-    .trim();
+  return extractText(response.content);
 }
 
 async function compactHistory(sessionId) {

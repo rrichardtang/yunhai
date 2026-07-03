@@ -136,8 +136,7 @@ async function buildCityTravelTiming(cities = []) {
     const cityName = String(city?.name || '').trim();
     if (!cityName) continue;
 
-    const firstAccommodation = pickAccommodation(city);
-    const lastAccommodation = pickAccommodation(city);
+    const accommodation = pickAccommodation(city);
     const logistics = city?.logistics || {};
     const arrivalTime = logistics?.arrival?.time || logistics?.arrival?.customTime
       || extractTimeFromDateTime(city?.travelEntry?.dateTime)
@@ -163,11 +162,11 @@ async function buildCityTravelTiming(cities = []) {
       lng: logistics?.arrival?.longitude ?? city?.travelEntry?.entryPointLng,
       fallbackText: logistics?.arrival?.location || city?.travelEntry?.entryPoint
     });
-    if (arrivalOrigin && firstAccommodation) {
+    if (arrivalOrigin && accommodation) {
       const destination = resolveLocationQuery({
-        lat: firstAccommodation.latitude,
-        lng: firstAccommodation.longitude,
-        fallbackText: firstAccommodation.address
+        lat: accommodation.latitude,
+        lng: accommodation.longitude,
+        fallbackText: accommodation.address
       });
       const arrivalDateTime = `${arrivalDate}T${arrivalTime}:00`;
       const leg = await estimateTravelMinutes({ origin: arrivalOrigin, destination, departureDateTime: arrivalDateTime, arrivalDateTime });
@@ -186,11 +185,11 @@ async function buildCityTravelTiming(cities = []) {
       lng: logistics?.departure?.longitude ?? city?.departureLng,
       fallbackText: logistics?.departure?.location || city?.departureLocation
     });
-    if (lastAccommodation && departureLocation) {
+    if (accommodation && departureLocation) {
       const origin = resolveLocationQuery({
-        lat: lastAccommodation.latitude,
-        lng: lastAccommodation.longitude,
-        fallbackText: lastAccommodation.address
+        lat: accommodation.latitude,
+        lng: accommodation.longitude,
+        fallbackText: accommodation.address
       });
       const departureDateTime = departureDate ? `${departureDate}T${departureTime}:00` : '';
       const leg = await estimateTravelMinutes({ origin, destination: departureLocation, arrivalDateTime: departureDateTime });
@@ -205,17 +204,17 @@ async function buildCityTravelTiming(cities = []) {
 
     if (index > 0) {
       const previousCity = sortedCities[index - 1] || {};
-      const previousLastAccommodation = pickAccommodation(previousCity);
-      if (previousLastAccommodation && firstAccommodation) {
+      const previousAccommodation = pickAccommodation(previousCity);
+      if (previousAccommodation && accommodation) {
         const origin = resolveLocationQuery({
-          lat: previousLastAccommodation.latitude,
-          lng: previousLastAccommodation.longitude,
-          fallbackText: previousLastAccommodation.address
+          lat: previousAccommodation.latitude,
+          lng: previousAccommodation.longitude,
+          fallbackText: previousAccommodation.address
         });
         const destination = resolveLocationQuery({
-          lat: firstAccommodation.latitude,
-          lng: firstAccommodation.longitude,
-          fallbackText: firstAccommodation.address
+          lat: accommodation.latitude,
+          lng: accommodation.longitude,
+          fallbackText: accommodation.address
         });
         const travelDate = String(city?.startDate || '').slice(0, 10);
         const departureRef = `${String(previousCity?.endDate || city?.startDate || '').slice(0, 10)}T${String(previousCity?.leaveTime || '09:00')}:00`;

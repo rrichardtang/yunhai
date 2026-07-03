@@ -1,4 +1,6 @@
 const { fetchWithTimeout } = require('./services/fetchWithTimeout');
+const { extractKeywords, toWordSet } = require('./services/imageQuery');
+const { debugLog } = require('./services/debugLog');
 
 const CACHE_MAX_ENTRIES = 500;
 const cache = new Map();
@@ -10,48 +12,9 @@ function capSize(collection) {
   }
 }
 
-const FALLBACK_STOPWORDS = new Set([
-  'the', 'a', 'an', 'and', 'or', 'at', 'in', 'for', 'on', 'with', 'from', 'to',
-  'of', 'by', 'near', 'around', 'best', 'top'
-]);
-
 function extractFallbackKeywords(preciseQuery, city, type) {
-  const cityWords = new Set(
-    String(city || '')
-      .toLowerCase()
-      .split(/\s+/)
-      .map((word) => word.replace(/[^a-z0-9]/g, ''))
-      .filter(Boolean)
-  );
-
-  const typeWords = new Set(
-    String(type || '')
-      .toLowerCase()
-      .split(/\s+/)
-      .map((word) => word.replace(/[^a-z0-9]/g, ''))
-      .filter(Boolean)
-  );
-
-  const keywords = [];
-  const words = String(preciseQuery || '')
-    .split(/\s+/)
-    .map((word) => word.trim())
-    .filter(Boolean)
-    .map((word) => word.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, ''))
-    .filter(Boolean);
-
-  for (const word of words) {
-    const normalized = word.toLowerCase();
-    if (FALLBACK_STOPWORDS.has(normalized)) continue;
-    if (cityWords.has(normalized)) continue;
-    if (typeWords.has(normalized)) continue;
-    if (normalized.length <= 1) continue;
-    if (keywords.some((keyword) => keyword.toLowerCase() === normalized)) continue;
-    keywords.push(word);
-    if (keywords.length >= 2) break;
-  }
-
-  return keywords;
+  const excludeWords = new Set([...toWordSet(city), ...toWordSet(type)]);
+  return extractKeywords(preciseQuery, { excludeWords, limit: 2 });
 }
 
 async function searchUnsplash(query) {
@@ -80,7 +43,7 @@ async function searchUnsplash(query) {
   });
 
   if (res.status === 403 || res.status === 429) {
-    console.warn('[unsplash] Rate limit hit — returning null');
+    debugLog('unsplash', 'rate limit hit — returning null');
     cache.set(key, null);
     capSize(cache);
     return null;

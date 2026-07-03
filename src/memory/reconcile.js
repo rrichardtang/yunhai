@@ -1,4 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const { extractText } = require('../services/llmJson');
 const semaphore = require('../middleware/llmSemaphore');
 
 const RECONCILE_MODEL = 'claude-haiku-4-5';
@@ -60,7 +61,7 @@ async function reconcile({ existing = [], candidates = [], source = 'manual', co
       max_tokens: 1024,
       messages: [{ role: 'user', content: buildPrompt({ existing, candidates: cleaned, source, context }) }]
     });
-    const text = (response.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
+    const text = extractText(response.content);
     return parseOps(text);
   } finally {
     semaphore.release();

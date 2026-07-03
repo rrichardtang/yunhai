@@ -1,17 +1,20 @@
-const IMAGE_QUERY_STOPWORDS = new Set([
-  'the', 'a', 'an', 'and', 'or', 'at', 'in', 'for', 'on', 'with', 'from', 'to'
+const KEYWORD_STOPWORDS = new Set([
+  'the', 'a', 'an', 'and', 'or', 'at', 'in', 'for', 'on', 'with', 'from', 'to',
+  'of', 'by', 'near', 'around', 'best', 'top'
 ]);
 
-function extractImageKeywords(name = '', city = '') {
-  const cityWords = new Set(
-    String(city || '')
+function toWordSet(text) {
+  return new Set(
+    String(text || '')
       .toLowerCase()
       .split(/\s+/)
       .map((w) => w.replace(/[^a-z0-9]/g, ''))
       .filter(Boolean)
   );
+}
 
-  const words = String(name || '')
+function extractKeywords(text, { excludeWords = new Set(), limit = Infinity } = {}) {
+  const words = String(text || '')
     .replace(/\([^)]*\)|\[[^\]]*\]|\{[^}]*\}/g, ' ')
     .split(/\s+/)
     .map((w) => w.trim())
@@ -22,11 +25,12 @@ function extractImageKeywords(name = '', city = '') {
   const keywords = [];
   for (const word of words) {
     const normalized = word.toLowerCase();
-    if (IMAGE_QUERY_STOPWORDS.has(normalized)) continue;
-    if (cityWords.has(normalized)) continue;
+    if (KEYWORD_STOPWORDS.has(normalized)) continue;
+    if (excludeWords.has(normalized)) continue;
     if (normalized.length <= 1) continue;
     if (keywords.some((k) => k.toLowerCase() === normalized)) continue;
     keywords.push(word);
+    if (keywords.length >= limit) break;
   }
 
   return keywords;
@@ -35,13 +39,8 @@ function extractImageKeywords(name = '', city = '') {
 function buildImageSearchQuery({ name = '', type = '', city = '' } = {}) {
   const normalizedType = String(type || '').trim().toLowerCase();
   const normalizedCity = String(city || '').trim();
-  const keywords = extractImageKeywords(name, normalizedCity);
-  const typeWords = new Set(
-    normalizedType
-      .split(/\s+/)
-      .map((w) => w.replace(/[^a-z0-9]/g, ''))
-      .filter(Boolean)
-  );
+  const keywords = extractKeywords(name, { excludeWords: toWordSet(normalizedCity) });
+  const typeWords = toWordSet(normalizedType);
 
   const filteredKeywords = keywords.filter((word) => !typeWords.has(word.toLowerCase()));
   const preciseQuery = [filteredKeywords.join(' '), normalizedType, normalizedCity]
@@ -54,4 +53,4 @@ function buildImageSearchQuery({ name = '', type = '', city = '' } = {}) {
   return String(name || '').trim() || normalizedCity;
 }
 
-module.exports = { extractImageKeywords, buildImageSearchQuery };
+module.exports = { extractKeywords, toWordSet, buildImageSearchQuery };

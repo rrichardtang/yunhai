@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { fetchWithTimeout } = require('./services/fetchWithTimeout');
+const { parseClockTime } = require('../shared/timeHelpers');
+const { activityLocationLabel } = require('./services/calendarShared');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const TOKENS_PATH = path.join(DATA_DIR, 'google-calendar-tokens.json');
@@ -26,21 +28,6 @@ function writeJson(filePath, value) {
   fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
 }
 
-function parseTime(raw = '') {
-  const normalized = String(raw || '').trim().toLowerCase();
-  const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
-  if (!match) return { hours: 9, minutes: 0 };
-
-  let hours = Number(match[1] || 9);
-  const minutes = Number(match[2] || 0);
-  const meridiem = match[3];
-
-  if (meridiem === 'pm' && hours < 12) hours += 12;
-  if (meridiem === 'am' && hours === 12) hours = 0;
-
-  return { hours: Math.max(0, Math.min(23, hours)), minutes: Math.max(0, Math.min(59, minutes)) };
-}
-
 function buildCalendarItems(itinerary = {}, { metadataMode = 'compact' } = {}) {
   const items = [];
   const days = Array.isArray(itinerary.days) ? itinerary.days : [];
@@ -52,13 +39,13 @@ function buildCalendarItems(itinerary = {}, { metadataMode = 'compact' } = {}) {
 
     const activities = Array.isArray(day?.activities) ? day.activities : [];
     for (const activity of activities) {
-      const startTime = parseTime(activity?.time || activity?.suggested_time || '09:00');
+      const startTime = parseClockTime(activity?.time || activity?.suggested_time || '09:00');
       const durationMinutes = Math.max(30, Math.round(Math.max(0.5, Number(activity?.duration_hours || 1.5)) * 60));
       const start = new Date(y, m - 1, d, startTime.hours, startTime.minutes, 0);
       const end = new Date(start.getTime() + (durationMinutes * 60 * 1000));
 
       const title = String(activity?.name || 'Travel activity').trim();
-      const location = activity?.location?.address || activity?.venue_name || [activity?.start_location, activity?.end_location].filter(Boolean).join(' → ') || day?.city || '';
+      const location = activityLocationLabel(activity, day);
       const compactDescription = '';
       const fullDescription = [
         `Type: ${activity?.type || 'activity'}`,

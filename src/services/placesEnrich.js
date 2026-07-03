@@ -125,9 +125,9 @@ function applyDetails(activity, details) {
   if (details.openingHours) {
     const llmHours = activity?.timing?.opening_hours || activity?.opening_hours || '';
     if (llmHours && llmHours !== details.openingHours) {
-      console.log(`[places-hours-delta] ${JSON.stringify({
+      debugLog('places-hours-delta', JSON.stringify({
         name: activity.name, llm: llmHours, places: details.openingHours
-      })}`);
+      }));
     }
     if (activity.timing) activity.timing.opening_hours = details.openingHours;
     activity.opening_hours = details.openingHours;
@@ -196,7 +196,6 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null) {
 
 module.exports = {
   enrichWithPlaceDetails,
-  enrichWithPriceLevel: enrichWithPlaceDetails,
   isFoodActivity,
   isVenueActivity,
   formatOpeningHoursFromPlaces,
