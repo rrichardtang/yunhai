@@ -1256,10 +1256,11 @@ function syncChecklistDateTimeToPlacement(item = {}) {
   const desiredDate = String(item.activityDate || '').slice(0, 10);
   const desiredTime = parseTimeTo24(item.activityTime || '');
   const matchingDay = desiredDate ? (state.days || []).find((d) => d.date === desiredDate) : null;
+  const nextTime = desiredTime || existing.time || null;
   state.placements[activityId] = {
-    ...existing,
     dayId: matchingDay ? matchingDay.id : existing.dayId,
-    time: desiredTime || existing.time || null
+    time: nextTime,
+    endTime: nextTime === existing.time ? (existing.endTime ?? null) : null
   };
 }
 
@@ -5004,7 +5005,8 @@ function openTimeEditPopup(activityId, anchorEl) {
     const newDurHours = (eMin - sMin) / 60;
     state.placements[activityId] = {
       ...(state.placements[activityId] || {}),
-      time: newStart
+      time: newStart,
+      endTime: newEnd
     };
     if (Math.abs(newDurHours - durHours) > 0.01) {
       item.duration_hours = newDurHours;
@@ -5036,18 +5038,17 @@ function makePlacedCard(item, minTopFloor = null) {
   const { icon, colorClass } = getActivityStyle(item.type);
   const placement = state.placements[item.id] || {};
   const time = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
-  const durHours = actDurationHours(item);
-  const h = Math.max(56, durHours * PX_PER_HOUR);
+  const range = getPlacementTimeRange(item, placement);
+  const spanHours = (range.endMinutes - range.startMinutes) / 60;
+  const h = Math.max(56, spanHours * PX_PER_HOUR);
   const rawY = yFromTime(time);
   const y = Number.isFinite(minTopFloor) ? Math.max(rawY, minTopFloor) : rawY;
   const typeLabel = formatTypeLabel(item.type);
-  const durationLabel = formatDurationHoursLong(durHours);
+  const durationLabel = formatDurationHoursLong(spanHours);
   const activeCity = state.arrangeCity;
   const isLocked = (state.lastFinalizeLocks[activeCity] || []).some((e) => String(e.activity.id) === String(item.id));
   const lockBadge = isLocked ? '<span class="placed-lock-badge" title="Locked"><i class="ph-bold ph-lock-simple" aria-hidden="true"></i></span>' : '';
-  const startMins = minutesFromTime(time);
-  const endMins = startMins + Math.round(durHours * 60);
-  const timeRangeLabel = formatTimeRangeLabel(startMins, endMins);
+  const timeRangeLabel = formatTimeRangeLabel(range.startMinutes, range.endMinutes);
   return `
     <article class="placed-card ${colorClass}${isLocked ? ' placed-card--locked' : ''}" data-id="${item.id}" style="height:${h}px;top:${y}px;">
       ${lockBadge}
@@ -5282,6 +5283,11 @@ function getPlacementTimeRange(activity, placementOverride = null) {
   const placement = placementOverride || state.placements[activity.id] || {};
   const startTime = parseTimeTo24(placement.time || actPreferredTime(activity) || typeToTime(activity.type));
   const startMinutes = minutesFromTime(startTime);
+  // Server-owned end wins; manual edits drop it and fall back to the duration model.
+  const serverEnd = placement.endTime ? minutesFromTime(parseTimeTo24(placement.endTime)) : null;
+  if (Number.isFinite(serverEnd) && serverEnd > startMinutes) {
+    return { startMinutes, endMinutes: serverEnd };
+  }
   const durationMinutes = Math.max(30, actDurationHours(activity) * 60);
   return {
     startMinutes,
@@ -5567,7 +5573,8 @@ function renderArrange() {
     items.forEach((item, index) => {
       const placement = state.placements[item.id] || {};
       const itemTime = parseTimeTo24(placement.time || actPreferredTime(item) || typeToTime(item.type));
-      const itemH = Math.max(56, actDurationHours(item) * PX_PER_HOUR);
+      const range = getPlacementTimeRange(item, placement);
+      const itemH = Math.max(56, ((range.endMinutes - range.startMinutes) / 60) * PX_PER_HOUR);
       const rawY = yFromTime(itemTime);
       const topFloor = prevBottom + PILL_RESERVE;
       const effectiveTop = Math.max(rawY, topFloor);
@@ -5919,7 +5926,7 @@ function onArrangePointerUp() {
   const newTime = timeFromMinutes(target.startMin);
   const prevDayId = srcDayId === '__staging' ? null : srcDayId;
   const prevTime = state.placements[drag.id]?.time || null;
-  state.placements[drag.id] = { ...(state.placements[drag.id] || {}), dayId: target.dayId, time: newTime };
+  state.placements[drag.id] = { dayId: target.dayId, time: newTime };
 
   teardownArrangeDrag();
 
@@ -5965,11 +5972,7 @@ function enforceDayTimeBoundaries(dayId) {
   orderedActivities.forEach((activity) => {
     const isDepartureActivity = /\b(depart|departure)\b/i.test(String(activity.name || ''));
     if (isDepartureActivity && city.endDate === day.date) {
-      state.placements[activity.id] = {
-        ...(state.placements[activity.id] || {}),
-        dayId,
-        time: timeFromMinutes(dayEndMinutes)
-      };
+      state.placements[activity.id] = { dayId, time: timeFromMinutes(dayEndMinutes) };
       return;
     }
 
@@ -5977,11 +5980,7 @@ function enforceDayTimeBoundaries(dayId) {
     const currentStart = minutesFromTime(parseTimeTo24(state.placements[activity.id]?.time || actPreferredTime(activity) || typeToTime(activity.type)));
     const latestStart = Math.max(dayStartMinutes, dayEndMinutes - durationMinutes);
     const boundedStart = Math.max(dayStartMinutes, Math.min(currentStart, latestStart));
-    state.placements[activity.id] = {
-      ...(state.placements[activity.id] || {}),
-      dayId,
-      time: timeFromMinutes(boundedStart)
-    };
+    state.placements[activity.id] = { dayId, time: timeFromMinutes(boundedStart) };
   });
 }
 
@@ -6008,11 +6007,7 @@ function recalculateDayFromIndex(dayId, startIndex = 1) {
     const currentStart = minutesFromTime(parseTimeTo24(state.placements[current.id]?.time || actPreferredTime(current) || typeToTime(current.type)));
     const minByTravel = prevStart + prevDurationMinutes + selected.durationMinutes;
 
-    state.placements[current.id] = {
-      ...(state.placements[current.id] || {}),
-      dayId,
-      time: timeFromMinutes(Math.max(currentStart, minByTravel))
-    };
+    state.placements[current.id] = { dayId, time: timeFromMinutes(Math.max(currentStart, minByTravel)) };
   }
 
   enforceDayTimeBoundaries(dayId);
@@ -6444,7 +6439,7 @@ async function autoArrangeActiveCity(opts = {}) {
 
   allApprovedInCity.forEach((a) => {
     state.activities = state.activities.map((current) => (current.id === a.id ? a : current));
-    state.placements[a.id] = { ...(state.placements[a.id] || {}), dayId: null, time: null };
+    state.placements[a.id] = { dayId: null, time: null };
   });
 
   // Clear cross-city placements: an activity placed on a day whose city doesn't match
@@ -6472,7 +6467,7 @@ async function autoArrangeActiveCity(opts = {}) {
     const dateToDay = Object.fromEntries(activeDays.map((d) => [d.date, d]));
     for (const entry of lockedSet) {
       const day = dateToDay[entry.date];
-      if (day) state.placements[entry.activity.id] = { dayId: day.id, time: entry.time };
+      if (day) state.placements[entry.activity.id] = { dayId: day.id, time: entry.time, endTime: entry.endTime || null };
     }
     state.arrangeUnplaced[activeCity] = [];
     const activeDayIds = activeDays.map((d) => d.id);
@@ -6482,6 +6477,7 @@ async function autoArrangeActiveCity(opts = {}) {
   }
 
   els.autoArrangeBtn.disabled = true;
+  const prevArrangeLabel = els.autoArrangeBtn.textContent;
   els.autoArrangeBtn.textContent = 'Arranging…';
 
   try {
@@ -6564,7 +6560,7 @@ async function autoArrangeActiveCity(opts = {}) {
     for (const [id, placement] of Object.entries(placements || {})) {
       const day = dateToDay[placement.date];
       if (day) {
-        state.placements[id] = { dayId: day.id, time: placement.time };
+        state.placements[id] = { dayId: day.id, time: placement.time, endTime: placement.endTime || null };
         const activity = state.activities.find((a) => a.id === id);
         if (activity) {
           const links = actBookingLinks(activity);
@@ -6583,7 +6579,7 @@ async function autoArrangeActiveCity(opts = {}) {
     // Locked activities always win — overwrite any placements the LLM may have emitted
     for (const entry of lockedSet) {
       const day = dateToDay[entry.date];
-      if (day) state.placements[entry.activity.id] = { dayId: day.id, time: entry.time };
+      if (day) state.placements[entry.activity.id] = { dayId: day.id, time: entry.time, endTime: entry.endTime || null };
     }
 
     const unplacedItems = unplaced
@@ -6595,23 +6591,11 @@ async function autoArrangeActiveCity(opts = {}) {
       })
       .filter(Boolean);
     state.arrangeUnplaced[activeCity] = unplacedItems;
-
-    // Validate flexible placements: drop any that overlap a lock or fall outside the day window
-    const lockedIds = new Set(lockedSet.map((e) => String(e.activity.id)));
-    flexible.forEach((a) => {
-      if (lockedIds.has(String(a.id))) return;
-      const placement = state.placements[a.id];
-      if (!placement?.dayId) return;
-      if (hasOverlapInDay(a.id, placement.dayId, placement)) {
-        state.placements[a.id] = { dayId: null, time: null };
-        state.arrangeUnplaced[activeCity].push({ id: a.id, name: a.name });
-      }
-    });
   } catch (e) {
     showErrorBanner(e?.message || 'Failed to arrange activities.');
   } finally {
     els.autoArrangeBtn.disabled = false;
-    els.autoArrangeBtn.textContent = 'Auto Arrange';
+    els.autoArrangeBtn.textContent = prevArrangeLabel;
   }
 
   const activeDayIds = activeDays.map((d) => d.id);
@@ -6808,6 +6792,8 @@ function bindPlacedCardInteractions() {
         card.classList.remove('resize-hover');
         currentDragMode = null;
         if (isResizing) {
+          const placement = state.placements[id];
+          if (placement?.endTime) state.placements[id] = { dayId: placement.dayId, time: placement.time };
           renderArrange();
           updateCommutesForCityDays([dayId]).then(() => renderArrange()).catch(() => {});
         }

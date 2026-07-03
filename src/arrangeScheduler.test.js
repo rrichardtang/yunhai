@@ -234,3 +234,89 @@ test('brute-force cutoff (n=7) and NN fallback (n=8) both terminate and stay val
     assert.ok(validate({ placements: r.placements, days: [big], activitiesById: map }).ok, `n=${n} valid`);
   }
 });
+
+// ---- authoritative endTime + commute honesty + meal rescue ----
+
+test('every placement carries endTime equal to start + duration', () => {
+  const activitiesById = {
+    A: act('A', 'Sight', 90, '09:00-20:00'),
+    M: meal('M', 'Lunch', 75, '11:00-15:00')
+  };
+  const r = schedule({ assignment: { '2026-05-20': ['A', 'M'] }, days, activitiesById, commuteMatrix: {} });
+  for (const [id, p] of Object.entries(r.placements)) {
+    assert.ok(p.endTime, `${id} has endTime`);
+    const duration = activitiesById[id].timing.duration_minutes;
+    assert.strictEqual(toMin(p.endTime) - toMin(p.time), duration, `${id} end - start === duration`);
+  }
+});
+
+test('real short commute is not floored: 5-min pair yields a 15-min gap', () => {
+  const activitiesById = {
+    A: act('A', 'First', 60, '09:00-22:00'),
+    B: act('B', 'Second', 60, '09:00-22:00')
+  };
+  const r = schedule({ assignment: { '2026-05-20': ['A', 'B'] }, days, activitiesById, commuteMatrix: { A: { B: 5 } } });
+  const gap = toMin(r.placements.B.time) - toMin(r.placements.A.endTime);
+  assert.strictEqual(gap, 15, `gap is commute(5) + buffer(10), not floored to 20 (got ${gap})`);
+});
+
+test('missing commute pair still budgets the 20-min fallback gap', () => {
+  const activitiesById = {
+    A: act('A', 'First', 60, '09:00-22:00'),
+    B: act('B', 'Second', 60, '09:00-22:00')
+  };
+  const r = schedule({ assignment: { '2026-05-20': ['A', 'B'] }, days, activitiesById, commuteMatrix: {} });
+  const gap = toMin(r.placements.B.time) - toMin(r.placements.A.endTime);
+  assert.strictEqual(gap, 20, `fallback(10) + buffer(10) (got ${gap})`);
+});
+
+test('rescue: meal blocked by a lock over its slot moves to a free day (live repro)', () => {
+  const d2 = [
+    { date: '2026-05-20', windowStart: '09:00', windowEnd: '22:00' },
+    { date: '2026-05-21', windowStart: '09:00', windowEnd: '22:00' }
+  ];
+  const activitiesById = { D: meal('D', 'Dinner Only', 60, '17:00-22:00') };
+  // Non-meal lock covers day 1's entire dinner window — anchoring on day 1 is infeasible.
+  const lockedActivities = [{ id: 'L', date: '2026-05-20', time: '17:00', duration_minutes: 300, name: 'Show' }];
+  const r = schedule({ assignment: { '2026-05-20': ['D'], '2026-05-21': [] }, days: d2, activitiesById, lockedActivities, commuteMatrix: {} });
+  assert.ok(r.placements.D, 'meal rescued');
+  assert.strictEqual(r.placements.D.date, '2026-05-21', 'rescued onto the free day');
+  assert.ok(toMin(r.placements.D.time) >= 17 * 60, 'in the dinner window');
+  assert.strictEqual(r.unplaced.length, 0);
+  assert.deepStrictEqual(r.diagnostics, [], 'empty_dinner assert no longer fires');
+});
+
+test('rescue routes around obstacles on the target day', () => {
+  const d2 = [
+    { date: '2026-05-20', windowStart: '09:00', windowEnd: '22:00' },
+    { date: '2026-05-21', windowStart: '09:00', windowEnd: '22:00' }
+  ];
+  const activitiesById = { D: meal('D', 'Dinner Only', 60, '17:00-22:00') };
+  const lockedActivities = [
+    { id: 'L1', date: '2026-05-20', time: '17:00', duration_minutes: 300, name: 'Show' },
+    { id: 'L2', date: '2026-05-21', time: '17:00', duration_minutes: 120, name: 'Concert' }
+  ];
+  const r = schedule({ assignment: { '2026-05-20': ['D'], '2026-05-21': [] }, days: d2, activitiesById, lockedActivities, commuteMatrix: {} });
+  assert.strictEqual(r.placements.D.date, '2026-05-21');
+  assert.strictEqual(r.placements.D.time, '19:00', 'pushed past the 17:00-19:00 lock');
+  assert.ok(validate({ placements: r.placements, lockedActivities, days: d2, activitiesById }).ok);
+});
+
+test('genuinely infeasible meal stays unplaced without a false empty-dinner diagnostic', () => {
+  const activitiesById = { D: meal('D', 'Dinner Only', 60, '17:00-22:00') };
+  const lockedActivities = [
+    { id: 'LM', date: '2026-05-20', time: '19:00', duration_minutes: 90, type: 'meal', name: 'Locked Dinner' }
+  ];
+  const r = schedule({ assignment: { '2026-05-20': ['D'] }, days, activitiesById, lockedActivities, commuteMatrix: {} });
+  assert.ok(!r.placements.D, 'no free dinner slot anywhere');
+  assert.ok(r.unplaced.some((u) => u.id === 'D'));
+  assert.deepStrictEqual(r.diagnostics, [], 'locked dinner counts as filled — check 8 silent');
+});
+
+test('day window ending before dinner does not trigger empty-dinner diagnostic', () => {
+  const shortDay = { date: '2026-05-20', windowStart: '09:00', windowEnd: '11:00' };
+  const activitiesById = { D: meal('D', 'Dinner Only', 60, '17:00-22:00') };
+  const r = schedule({ assignment: { '2026-05-20': ['D'] }, days: [shortDay], activitiesById, commuteMatrix: {} });
+  assert.ok(!r.placements.D, 'cannot fit dinner in a morning-only day');
+  assert.deepStrictEqual(r.diagnostics, [], 'window never reaches dinner — check 8 silent');
+});

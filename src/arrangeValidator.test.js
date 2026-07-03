@@ -211,3 +211,55 @@ test('flags empty_dinner_with_available_meal when unplaced meal fits dinner wind
   assert.equal(v.ok, false);
   assert.ok(v.issues.some((i) => i.type === 'empty_dinner_with_available_meal'));
 });
+
+test('flags commute_gap_violation for a short real commute pair', () => {
+  const a = mkAct('a', { duration: 60 });
+  const b = mkAct('b', { duration: 60 });
+  const v = validate({
+    placements: { a: { date: '2026-05-03', time: '09:00' }, b: { date: '2026-05-03', time: '10:04' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { a, b },
+    commuteMatrix: { a: { b: 5 } }
+  });
+  assert.equal(v.ok, false);
+  assert.ok(v.issues.some((i) => i.type === 'commute_gap_violation'), '4-min gap on a 5-min commute flagged');
+});
+
+test('passes commute_gap for a short real commute pair with commute+buffer respected', () => {
+  const a = mkAct('a', { duration: 60 });
+  const b = mkAct('b', { duration: 60 });
+  const v = validate({
+    placements: { a: { date: '2026-05-03', time: '09:00' }, b: { date: '2026-05-03', time: '10:15' } },
+    lockedActivities: [],
+    days,
+    activitiesById: { a, b },
+    commuteMatrix: { a: { b: 5 } }
+  });
+  assert.equal(v.ok, true, '15-min gap satisfies 5 + 10');
+});
+
+test('empty_dinner not flagged when a locked meal occupies the dinner slot', () => {
+  const m = { ...mkAct('m', { duration: 60 }), type: 'meal', timing: { duration_minutes: 60, opening_hours: '17:00-22:00' } };
+  const v = validate({
+    placements: {},
+    lockedActivities: [{ id: 'lm', date: '2026-05-03', time: '19:00', duration_minutes: 90, type: 'meal', name: 'Locked Dinner' }],
+    days,
+    activitiesById: { m },
+    unplacedIds: ['m']
+  });
+  assert.equal(v.ok, true, 'locked dinner counts as the dinner slot being used');
+});
+
+test('empty_dinner not flagged when the day window ends before dinner', () => {
+  const morningDays = [{ date: '2026-05-03', windowStart: '09:00', windowEnd: '11:00' }];
+  const m = { ...mkAct('m', { duration: 60 }), type: 'meal', timing: { duration_minutes: 60, opening_hours: '17:00-22:00' } };
+  const v = validate({
+    placements: {},
+    lockedActivities: [],
+    days: morningDays,
+    activitiesById: { m },
+    unplacedIds: ['m']
+  });
+  assert.equal(v.ok, true, 'day never reaches the dinner window');
+});

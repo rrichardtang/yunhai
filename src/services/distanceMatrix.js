@@ -9,16 +9,9 @@ const DISTANCE_MATRIX_BASE_URL = 'https://maps.googleapis.com/maps/api/distancem
 const COMMUTE_MODE_ICON = {
   transit: '🚇',
   walking: '🚶',
-  driving: '🚗',
-  bicycling: '🚴'
+  driving: '🚗'
 };
 const COMMUTE_MODE_PRIORITY = ['transit', 'driving', 'walking'];
-
-function normalizeTravelMode(mode = '') {
-  const m = String(mode || '').toLowerCase();
-  if (m === 'transit' || m === 'walking' || m === 'driving' || m === 'bicycling') return m;
-  return 'walking';
-}
 
 function buildDistanceMatrixQuery(activity = {}) {
   const hotelLat = Number(activity.hotel_latitude);
@@ -362,12 +355,13 @@ async function getFastestCommuteWithSource(fromActivity, toActivity) {
 
   const driving = await fetchDistanceMatrixDuration({ origin, destination, mode: 'driving' });
   sources.push(driving.source);
-  return { minutes: driving.minutes, sources };
-}
+  if (driving.minutes != null) return { minutes: driving.minutes, sources };
 
-async function getFastestCommuteMinutes(fromActivity, toActivity) {
-  const { minutes } = await getFastestCommuteWithSource(fromActivity, toActivity);
-  return minutes;
+  // Last resort when transit AND driving both fail (ZERO_RESULTS gaps): real walking
+  // time, then haversine estimate — an honest large value beats a silent miss.
+  const walk = await walkingCommute(fromActivity, toActivity, origin, destination);
+  sources.push(walk.source);
+  return { minutes: walk.minutes, sources };
 }
 
 async function getCommuteBetweenActivities(fromActivity, toActivity) {
@@ -440,7 +434,6 @@ module.exports = {
   DISTANCE_MATRIX_BASE_URL,
   COMMUTE_MODE_ICON,
   COMMUTE_MODE_PRIORITY,
-  normalizeTravelMode,
   buildDistanceMatrixQuery,
   formatLatLng,
   parseMinutesFromTime,
@@ -455,7 +448,6 @@ module.exports = {
   resolveCommuteQuery,
   fetchDistanceMatrixDuration,
   getCommuteBetweenActivities,
-  getFastestCommuteMinutes,
   getFastestCommuteWithSource,
   haversineKm,
   getActivityCoords,

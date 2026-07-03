@@ -1,5 +1,5 @@
-const { minutesFromTime } = require('../shared/timeHelpers');
-const { isMealActivity, LUNCH_WINDOW, DINNER_WINDOW } = require('./arrangeConfig');
+const { minutesFromTime, timeFromMinutes } = require('../shared/timeHelpers');
+const { isMealActivity, LUNCH_WINDOW, DINNER_WINDOW, COMMUTE_BUFFER_MIN } = require('./arrangeConfig');
 
 function getDuration(activity) {
   if (activity?.timing?.duration_minutes != null) return Number(activity.timing.duration_minutes) || 60;
@@ -70,6 +70,15 @@ function startsWithinAnyWindow(startMin, windows) {
 function parseOpeningHoursContains(raw, windowStart, windowEnd) {
   const ranges = parseOpeningHours(raw);
   return ranges.some(([s, e]) => s < windowEnd && e > windowStart);
+}
+
+function mealSlotCapability(activity) {
+  const raw = getOpeningHoursRaw(activity);
+  if (!raw) return { lunch: true, dinner: true };
+  return {
+    lunch: parseOpeningHoursContains(raw, LUNCH_WINDOW[0], LUNCH_WINDOW[1]),
+    dinner: parseOpeningHoursContains(raw, DINNER_WINDOW[0], DINNER_WINDOW[1])
+  };
 }
 
 function validate({ placements, lockedActivities = [], days, activitiesById, commuteMatrix = null, unplacedIds = [] }) {
@@ -176,7 +185,7 @@ function validate({ placements, lockedActivities = [], days, activitiesById, com
           type: 'meal_outside_windows',
           day: date,
           id: e.id,
-          message: `${e.id} ("${e.activity.name}") meal scheduled outside lunch (11:00-14:30) or dinner (17:00-22:00) windows on ${date}`
+          message: `${e.id} ("${e.activity.name}") meal scheduled outside lunch (${timeFromMinutes(LUNCH_WINDOW[0])}-${timeFromMinutes(LUNCH_WINDOW[1])}) or dinner (${timeFromMinutes(DINNER_WINDOW[0])}-${timeFromMinutes(DINNER_WINDOW[1])}) windows on ${date}`
         });
         continue;
       }
@@ -197,34 +206,37 @@ function validate({ placements, lockedActivities = [], days, activitiesById, com
         const prev = sorted[i];
         const next = sorted[i + 1];
         const commute = Number(commuteMatrix?.[prev.id]?.[next.id] ?? commuteMatrix?.[next.id]?.[prev.id]);
-        if (!Number.isFinite(commute) || commute < 15) continue;
-        const required = prev.endMin + commute + 10;
+        if (!Number.isFinite(commute) || commute < 1) continue;
+        const required = prev.endMin + commute + COMMUTE_BUFFER_MIN;
         if (next.startMin < required) {
           issues.push({
             type: 'commute_gap_violation',
             day: date,
             ids: [prev.id, next.id],
-            message: `${prev.id} ("${prev.activity.name}") to ${next.id} ("${next.activity.name}") needs at least ${commute}+10 min between end and next start on ${date}`
+            message: `${prev.id} ("${prev.activity.name}") to ${next.id} ("${next.activity.name}") needs at least ${commute}+${COMMUTE_BUFFER_MIN} min between end and next start on ${date}`
           });
         }
       }
     }
 
-    if (slotsUsed.dinner.length === 0 && Array.isArray(unplacedIds) && unplacedIds.length) {
+    const lockedDinner = lockedActivities.some((l) => l.date === date && isMealActivity(l)
+      && minutesFromTime(l.time || '00:00') >= DINNER_WINDOW[0]);
+    const dayReachesDinner = day
+      && effectiveDayStart(day) < DINNER_WINDOW[1]
+      && effectiveDayEnd(day) > DINNER_WINDOW[0];
+    if (slotsUsed.dinner.length === 0 && !lockedDinner && dayReachesDinner
+      && Array.isArray(unplacedIds) && unplacedIds.length) {
       for (const uid of unplacedIds) {
         const act = activitiesById[uid];
         if (!act || !isMealActivity(act)) continue;
-        const raw = getOpeningHoursRaw(act);
-        const fits = !raw || parseOpeningHoursContains(raw, DINNER_WINDOW[0], DINNER_WINDOW[1]);
-        if (fits) {
-          issues.push({
-            type: 'empty_dinner_with_available_meal',
-            day: date,
-            id: uid,
-            message: `Dinner slot empty on ${date} but unplaced meal ${uid} ("${act.name}") opens during 17:00-22:00 — place it`
-          });
-          break;
-        }
+        if (!mealSlotCapability(act).dinner) continue;
+        issues.push({
+          type: 'empty_dinner_with_available_meal',
+          day: date,
+          id: uid,
+          message: `Dinner slot empty on ${date} but unplaced meal ${uid} ("${act.name}") opens during ${timeFromMinutes(DINNER_WINDOW[0])}-${timeFromMinutes(DINNER_WINDOW[1])} — place it`
+        });
+        break;
       }
     }
   }
@@ -232,4 +244,14 @@ function validate({ placements, lockedActivities = [], days, activitiesById, com
   return { ok: issues.length === 0, issues };
 }
 
-module.exports = { validate, overlaps, parseOpeningHours, parseOpeningHoursContains, getDuration, effectiveDayStart, effectiveDayEnd };
+module.exports = {
+  validate,
+  overlaps,
+  parseOpeningHours,
+  parseOpeningHoursContains,
+  mealSlotCapability,
+  getOpeningHoursRaw,
+  getDuration,
+  effectiveDayStart,
+  effectiveDayEnd
+};
