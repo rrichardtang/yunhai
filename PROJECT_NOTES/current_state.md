@@ -1,54 +1,43 @@
 # Current State
 
-_Last updated: 2026-07-02_
+_Last updated: 2026-07-03_
 
 ## Objective
-Land the mobile-UI feedback pass (branch `claude/mobile-ui-feedback-eqx6he`) — activity-card
-prev/next navigation on all viewports, toast system removed in favor of a persistent error
-banner, grounded activity adds via the new `/api/activity/add`, scrollable preference wizards,
-and mobile overflow fixes — then verify the LLM-dependent paths in a keyed environment and
-deploy. The memory-layer and arrange-redesign verifications remain queued behind their own
-staging deploys.
+Land the codebase clean-sweep (branch `claude/codebase-review-sweep-2z6t4h`) — security
+hardening (entitlement bypass, key leak, IDORs, XSS), correctness fixes, and a
+duplication/dead-code pass — then complete the ops follow-ups (Maps key rotation, new
+required envs) and deploy. The mobile-UI feedback branch and the queued memory-layer /
+arrange-redesign verifications remain pending their staging deploys.
 
 ## Active Workstream
-Branch `claude/mobile-ui-feedback-eqx6he`. Two completed passes: (1) the mobile-UI feedback fixes
-(pushed 2026-07-01), and (2) the auto-arrange overhaul (2026-07-02) — server-authoritative
-`endTime` placements, deletion of the client's post-response re-check, meal rescue pass fixing the
-live `empty_dinner_with_available_meal` assert, unfloored/honest commute values with a walking
-last-resort, and observable telemetry. 160/160 tests; Playwright-verified against canned arrange
-responses. Mobile-UI details below still apply. All five feedback items
-implemented; 144/144 tests pass; UI verified locally via Playwright against `?embed` mode at
-desktop (1280px) and mobile (375px) widths. What could NOT be verified without API keys: the
-`/api/activity/add` LLM fill + Places resolve gate live path, the replace-path retry, and the
-refine re-enrichment (all need `GOOGLE_MAPS_API_KEY` / `ANTHROPIC_API_KEY`).
+Branch `claude/codebase-review-sweep-2z6t4h`, 5 commits, pushed. All fixes are sweep-sized
+(no architectural changes): authed-by-default identity (userId always from the Clerk
+session), fail-closed email webhook, owner-gated debug/admin, tooltip XSS fix, atomic
+store writes, outbound fetch timeouts, bounded in-memory stores, shared `llmJson` /
+`jsonFileCache` / calendar-time helpers. 168/168 tests pass (8 new security smoke
+regressions); server boots clean keyless with correct degradation.
 
 ## Constraints
-- Frontend stays a monolith (`public/app.js`) — only boundary concerns are extracted.
-- `showToast` no longer exists; failures go through `showErrorBanner()` (persistent, dismissible,
-  top-center). Do not reintroduce transient notifications.
-- Add path: Places resolve gate runs before any LLM call; degrade gracefully when
-  `GOOGLE_MAPS_API_KEY` is absent (gate skipped) or `ANTHROPIC_API_KEY` is absent (grounded
-  minimal activity, never an error for a verified venue).
-- Map links prefer `place_id` → lat,lng → name+city text search, in that order.
-- Staging/prod deploy discipline unchanged: `deployment/promotion.sh` only; split env files
-  (`.env` staging / `.env.prod` prod); `CLERK_AUTHORIZED_PARTIES` per env.
+- Frontend stays a monolith (`public/app.js`); all `innerHTML` goes through `esc()`, and
+  `dataset.*` reads must be re-escaped (values come back entity-decoded).
+- Identity is never taken from request body/query — always `getAuthedUserId(req)`.
+- Pre-auth API surface is only `/api/status` (booleans) + the email webhook (secret-gated,
+  fails closed). Debug/admin surfaces require `OWNER_USER_ID`.
+- Staging/prod deploy discipline unchanged: `deployment/promotion.sh` only; split env files.
 
 ## Risks
-- Keyed-environment verification of the grounding fixes is outstanding — the Sisterita-class
-  bugs are fixed by construction but unproven against live Places/Anthropic.
-- Removing success toasts means saves/deletes/copies have no positive confirmation; watch for
-  user confusion reports.
-- Checklist item delete lost its undo (was toast-based).
-- (Carried over) Google OAuth client secret should be rotated; `client_secret_*.json` should be
-  `.gitignore`d.
+- `GOOGLE_MAPS_API_KEY` was publicly retrievable until this branch deploys — must be
+  rotated (open_items 2026-07-03).
+- Email ingest is now disabled until `EMAIL_WEBHOOK_SECRET` is set in the deploy envs;
+  `ADMIN_TOKEN` is retired in favor of `OWNER_USER_ID`.
+- Chat-session ownership is in-memory only; sessions created before a restart lose their
+  owner stamp (first toucher claims) — acceptable for now, worth revisiting if sessions persist.
+- (Carried over) Keyed-environment verification of grounding fixes, memory layer, and the
+  arrange overhaul still outstanding; Google OAuth client secret rotation still deferred.
 
 ## Next Actions
-- Verify on a keyed environment (VPS/staging): add "Sisterita" in San Francisco → gate passes,
-  name verbatim, real address/pin; gibberish name → inline "Couldn't find…" with no LLM call;
-  replace with an unresolvable venue → one retry then `unverified: true`; refine rename →
-  coords/hours refreshed.
-- Merge/deploy `claude/mobile-ui-feedback-eqx6he` via staging → promote.
-- (Queued, from prior sessions) Staging verification of the memory layer
-  (`claude/website-memory-architecture-3BI4W`) and the arrange redesign
-  (`feature/arrange-reliability-thinking`) per open_items.
-- Rotate Google OAuth secret + `.gitignore` the `client_secret` file (deferred).
+- Rotate the Maps key + set `EMAIL_WEBHOOK_SECRET`/`OWNER_USER_ID` in env files (owner/ops).
+- Deploy `claude/codebase-review-sweep-2z6t4h` via staging → verify sign-in, invite redeem,
+  Places autocomplete (new `/api/config/maps-key` path), chat, arrange, admin stats → promote.
+- Then resume the queued items: mobile-UI branch keyed verification, memory-layer staging
+  verification, arrange-overhaul live verification (see open_items).

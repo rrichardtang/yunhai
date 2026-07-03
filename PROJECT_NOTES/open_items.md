@@ -1,5 +1,17 @@
 # Open Items
 
+## [2026-07-03] Post-sweep ops follow-ups: rotate exposed Maps key, set new required envs
+**Status:** Pending input (owner/ops)
+**Description:** The sweep branch closed the leaks, but two ops actions remain: (1) rotate `GOOGLE_MAPS_API_KEY` — until this deploys it was returned verbatim by the unauthenticated `/api/status`, so treat it as exposed; add referrer/IP restrictions on the new key. (2) On deploy, ensure `EMAIL_WEBHOOK_SECRET` (email ingest now 503s without it) and `OWNER_USER_ID` (gates `/debug` and `/api/admin/*`; `ADMIN_TOKEN` is retired) are set in both env files.
+**Context:** decisions [2026-07-03]; changelog [2026-07-03]. Branch `claude/codebase-review-sweep-2z6t4h`.
+**Next action:** Rotate the key in Google Cloud console, update `.env`/`.env.prod`, verify arrange-stats works with the owner account, then deploy the branch.
+
+## [2026-07-03] Encrypt Google OAuth refresh tokens at rest
+**Status:** Deferred
+**Description:** `data/google-calendar-tokens.json` stores users' Google refresh tokens as plaintext JSON. Out of scope for the clean sweep (needs a key-management decision), but a refresh token is a long-lived credential to the user's calendar.
+**Context:** Flagged during the 2026-07-03 review. `calendarSync.js` already imports `crypto`.
+**Next action:** Pick an approach (env-key AES-GCM at minimum) and migrate the existing token file.
+
 ## [2026-04-19] Apply for GetYourGuide Partner API when traffic hits 100k monthly
 
 **Status:** Deferred

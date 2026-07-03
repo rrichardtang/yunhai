@@ -46,7 +46,8 @@ TravelPlannerAgent is a full-stack AI travel itinerary builder: an Express.js ba
 
 ### Key Backend Modules (`src/`)
 
-- **`server.js`** (1611 lines) — Express app, all route definitions, Clerk middleware, global LLM semaphore. The main entry point.
+- **`server.js`** — Express app bootstrap: Clerk middleware, static serving, route registration. Routes live in `src/routes/*.js`; shared middleware in `src/middleware/` (auth incl. `requireOwner`, LLM semaphore, upload). Everything under `/api` requires Clerk auth + entitlement except the public `/api/status`; `/debug` and `/api/admin/*` additionally require `OWNER_USER_ID`.
+- **`services/llmJson.js`** — Shared LLM-output JSON toolkit (`extractText`, `tryParseJsonObject/Array`, fence stripping, truncation repair) used by `claude.js`, the activity routes, chat, and memory reconciliation.
 - **`claude.js`** — `planCity()`: generates activities for one city using Claude Sonnet 4.6. Includes an opinionated SYSTEM_PROMPT with a decision framework (Fun Factor, Disappointment Risk, Cost, Flexibility, Engagement Type). JSON output parsing with retry logic.
 - **`tripHealth.js`** — `computeTripHealth()`: validates trip consistency — detects overlapping dates/activities, missing times, missing bookings. Returns status (`Ready` / `Conflicts found` / `Needs booking`) + issue list + budget summary. Reads stored booking checklist from `itinerary.bookingChecklist`.
 - **`preferences.js`** — Backward-compatible facade over the memory layer. Still exposes the three-tier view (`profileInstruction` (AI summary, file-backed at `/data/users/{userId}.json`), `preferences` (max 30), `constraints` (max 20)) for the preferences UI and `getSummary()`, but preferences/constraints now live in the memory store. `save()` does a diff-based sync so editor saves don't clobber learned-record metadata; legacy arrays migrate into the store on first access.
@@ -60,7 +61,7 @@ TravelPlannerAgent is a full-stack AI travel itinerary builder: an Express.js ba
 
 ### Frontend (`public/`)
 
-- **`app.js`** (7692 lines) — Intentionally monolithic. Vanilla JS, no framework. Do not extract modules from it beyond clear boundary concerns.
+- **`app.js`** (~9900 lines) — Intentionally monolithic. Vanilla JS, no framework. Do not extract modules from it beyond clear boundary concerns. All `innerHTML` interpolation must go through the `esc()` helper; values read back from `dataset.*` come back entity-decoded, so re-escape them at read time.
 - **`js/apiService.js`** — HTTP layer wrapper.
 - **`js/overlayManager.js`** — Modal/overlay lifecycle.
 - **`js/statePersistence.js`** — localStorage helpers.
