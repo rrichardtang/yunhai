@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-07-03] Mobile de-squish: full-width budget meter, city-card date row, compact topbar
+
+Branch `claude/codebase-review-sweep-2z6t4h`. From 390px iPhone staging screenshots (squished tracker meter, wrapping dates, two-row topbar):
+
+- **Budget/Activities tracker**: `trackerRow()` (`public/app.js`) now wraps each row in `.tk-row`; CSS switched from one shared 4-column grid to per-row flex (desktop identical). New `@media (max-width:767px)` block AFTER the base tracker rules (source order matters — the base `.tk-bar{flex:1}` otherwise overrides it): bar becomes `flex:0 0 100%`, order last, 10px tall — full-width meter on its own line under "label … value [Optimize]".
+- **Setup city-card header**: deleted the stale `.city-row-main > :nth-child()` mobile rules (written for pre-redesign markup; they forced the date pill into a half-width cell of the new 5-column `gm-city__head` grid — the actual cause of dates wrapping to two lines). New mobile layout: header collapses to `36px minmax(0,1fr) auto auto`, `.gm-city__dates` spans a full second row, centered; `.nights` gets `white-space:nowrap`.
+- **Tabs**: `.gm-city__tabs` overflow-x auto (scrollbar hidden), tab margin 22→16px, nowrap.
+- **Topbar**: compact pills at ≤767px (32px height, tighter padding/font), health badge 32px (needs the 3-class selector to beat planner.html's inline style), Checklist icon-only via new `.btn-text` span (`planner.html`).
+- Verified via Playwright (Chromium) at 390×844 + 375×667 + 1280px: 20/20 geometry checks (pill spans row, dates single-line, no horizontal scroll, tabs one line, meter ≥321px wide, topbar actions ≤44px tall, desktop tracker unchanged). 168/168 tests pass.
+
 ## [2026-07-03] Codebase clean-sweep: security hardening, correctness fixes, dedup pass
 
 Branch `claude/codebase-review-sweep-2z6t4h` (5 commits). Full-repo review (backend core, services, frontend) then targeted fixes; 168/168 tests green (8 new smoke regressions).

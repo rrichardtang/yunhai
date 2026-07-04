@@ -2163,26 +2163,33 @@ body.overlay-active #chatWidget {
 
   .review-toolbar { grid-template-columns: 1fr; }
 
-  /* City row: 3-row compact grid */
   .city-row { padding: 8px; margin-bottom: 6px; border-radius: 10px; }
-  .city-row-main {
-    grid-template-columns: auto 1fr 1fr auto;
-    grid-template-rows: auto auto auto;
-    gap: 4px;
+
+  /* City card header: name row on top, date pill on its own full-width row */
+  .gm-city__head {
+    grid-template-columns: 36px minmax(0, 1fr) auto auto;
+    gap: 10px 12px;
+    padding: 12px 14px;
   }
-  .city-row-main > :nth-child(1) { grid-column: 1; grid-row: 1; min-height: unset; align-self: center; }
-  .city-row-main > :nth-child(2) { grid-column: 2 / 4; grid-row: 1; }
-  .city-row-main > :nth-child(5) { grid-column: 4; grid-row: 1; min-height: unset; padding: 4px 8px; font-size: .75rem; align-self: center; }
-  .city-row-main > :nth-child(3) { grid-column: 1 / 3; grid-row: 2; }
-  .city-row-main > :nth-child(4) { grid-column: 3 / 5; grid-row: 2; }
-  .city-row-main input[type="date"] { width: 100%; min-width: 0; padding: 4px 2px; font-size: 0.75rem; -webkit-appearance: none; }
+  .gm-city__dates { grid-column: 1 / -1; justify-content: center; }
+
+  /* Tab row: tighter spacing, scroll instead of squeeze */
+  .gm-city__tabs { overflow-x: auto; scrollbar-width: none; }
+  .gm-city__tabs::-webkit-scrollbar { display: none; }
+  .gm-city__tab { margin-right: 16px; white-space: nowrap; flex-shrink: 0; }
+
 
   .hotel-row, .travel-row { grid-template-columns: 1fr; }
 
-  /* Topbar */
+  /* Topbar: compact pills so the action row fits on one line */
   .topbar { padding: 8px 10px; }
   .topbar-row { flex-direction: column; align-items: flex-start; gap: 6px; }
-  .topbar-actions { width: 100%; justify-content: space-between; flex-wrap: wrap; }
+  .topbar-actions { width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+  .topbar .link-btn, .topbar-actions .link-btn { height: 32px; padding: 0 10px; font-size: 9.5px; letter-spacing: 0.1em; }
+  .mode-btn { padding: 5px 12px; font-size: 12px; }
+  .topbar .topbar-actions .trip-health-badge { width: 32px; height: 32px; }
+  .topbar-actions > .secondary { height: 32px; padding: 0 12px; }
+  #checklistBtn .btn-text { display: none; }
 
   /* Step nav */
   .step-nav-split { gap: 4px; }
@@ -2264,17 +2271,17 @@ body.overlay-active #chatWidget {
 .budget-tracker.budget-yellow { background: #fef3c7; color: #92400e; border: 1.5px solid rgba(146,64,14,0.2); }
 .budget-tracker.budget-red { background: #fee2e2; color: #991b1b; border: 1.5px solid rgba(153,27,27,0.2); }
 
-/* Shared single-line grid for Budget + Activities rows */
+/* Budget + Activities rows: one flex line each on desktop, bar wraps full-width on mobile */
 .budget-grid {
-  display: grid;
-  grid-template-columns: auto auto 1fr auto;
-  align-items: center;
-  column-gap: 14px;
-  row-gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
+.tk-row { display: flex; align-items: center; gap: 14px; }
 .tk-label { display: flex; align-items: center; gap: 5px; }
 .tk-value { font-size: 0.82rem; opacity: 0.85; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tk-bar {
+  flex: 1;
   height: 8px;
   border-radius: 99px;
   background: rgba(0,0,0,0.08);
@@ -2282,9 +2289,9 @@ body.overlay-active #chatWidget {
   overflow: hidden;
 }
 .tk-fill { height: 100%; border-radius: 99px; background: currentColor; transition: width 0.3s ease; }
-.tk-trailing { display: flex; align-items: center; gap: 8px; justify-self: end; }
+.tk-trailing { display: flex; align-items: center; gap: 8px; }
 .tk-trailing:empty { display: none; }
-.tk-divider { grid-column: 1 / -1; height: 1px; background: currentColor; opacity: 0.12; }
+.tk-divider { height: 1px; background: currentColor; opacity: 0.12; }
 .budget-label { font-weight: 700; }
 .budget-info-btn {
   background: none;
@@ -2316,6 +2323,13 @@ body.overlay-active #chatWidget {
 }
 .budget-caveat { font-size: 0.78rem; opacity: 0.75; }
 .budget-tracker.budget-neutral { background: #f4f5f7; color: #1f2937; border: 1.5px solid rgba(0,0,0,0.08); }
+
+/* Mobile: meter gets its own full-width line under "label … value [button]" */
+@media (max-width: 767px) {
+  .tk-row { flex-wrap: wrap; row-gap: 8px; }
+  .tk-value { margin-left: auto; }
+  .tk-bar { flex: 0 0 100%; order: 5; height: 10px; }
+}
 
 /* ── Activity cost + booking links ── */
 .activity-cost { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: 4px 0; }
@@ -3496,6 +3510,7 @@ button.secondary:hover:not(:disabled) {
   padding-left: 8px;
   margin-left: 4px;
   border-left: 1px solid var(--hair);
+  white-space: nowrap;
 }
 .gm-city__date {
   background: transparent;

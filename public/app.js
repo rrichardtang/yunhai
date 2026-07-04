@@ -3729,10 +3729,12 @@ function tripDayCount() {
 
 function trackerRow({ label, tooltip, value, fillPct, trailing = '' }) {
   return `
-    <div class="tk-label"><span class="budget-label">${label}</span><button class="budget-info-btn" type="button" aria-label="${label} info" data-tooltip="${tooltip}"><i class="ph-bold ph-info" aria-hidden="true"></i></button></div>
-    <div class="tk-value">${value}</div>
-    <div class="tk-bar"><div class="tk-fill" style="width:${fillPct}%"></div></div>
-    <div class="tk-trailing">${trailing}</div>`;
+    <div class="tk-row">
+      <div class="tk-label"><span class="budget-label">${label}</span><button class="budget-info-btn" type="button" aria-label="${label} info" data-tooltip="${tooltip}"><i class="ph-bold ph-info" aria-hidden="true"></i></button></div>
+      <div class="tk-value">${value}</div>
+      <div class="tk-bar"><div class="tk-fill" style="width:${fillPct}%"></div></div>
+      <div class="tk-trailing">${trailing}</div>
+    </div>`;
 }
 
 // Avg activities/day against a comfortable full day (derived from the trip's pace pref).
