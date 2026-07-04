@@ -10,12 +10,13 @@ required envs) and deploy. The mobile-UI feedback branch and the queued memory-l
 arrange-redesign verifications remain pending their staging deploys.
 
 ## Active Workstream
-Branch `claude/codebase-review-sweep-2z6t4h`, 5 commits, pushed. All fixes are sweep-sized
-(no architectural changes): authed-by-default identity (userId always from the Clerk
-session), fail-closed email webhook, owner-gated debug/admin, tooltip XSS fix, atomic
-store writes, outbound fetch timeouts, bounded in-memory stores, shared `llmJson` /
-`jsonFileCache` / calendar-time helpers. 168/168 tests pass (8 new security smoke
-regressions); server boots clean keyless with correct degradation.
+Branch `claude/codebase-review-sweep-2z6t4h`. Two passes: (1) the security/correctness/dedup
+clean sweep (5 commits — authed-by-default identity, fail-closed email webhook, owner-gated
+debug/admin, tooltip XSS fix, atomic store writes, fetch timeouts, bounded in-memory stores,
+shared `llmJson`/`jsonFileCache`/calendar-time helpers); (2) the mobile de-squish pass
+(2026-07-03) — full-width budget meter on its own line, city-card date pill on a dedicated
+row (stale `.city-row-main` nth-child rules deleted), scrollable tabs, compact one-row
+topbar. 168/168 tests; Playwright-verified 20/20 geometry checks at 390/375/1280px.
 
 ## Constraints
 - Frontend stays a monolith (`public/app.js`); all `innerHTML` goes through `esc()`, and
