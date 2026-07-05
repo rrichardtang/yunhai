@@ -5086,6 +5086,20 @@ select.gm-inp {
   color: var(--text-500);
 }
 
+/* Mobile: stop the 3-column row squeezing the text into a ~110px column.
+   Date badge + text share the top row; the CTA drops to its own row below. */
+@media (max-width: 767px) {
+  #step4 .open-item {
+    grid-template-columns: auto 1fr;
+    gap: 10px 14px;
+    padding: 14px 16px;
+    align-items: start;
+  }
+  #step4 .open-item__when { grid-column: 1; grid-row: 1; }
+  #step4 .open-item__body { grid-column: 2; grid-row: 1; }
+  #step4 .open-item__cta { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+}
+
 /* ---------- 3.5 Day-by-day ---------- */
 #step4 .fin-itin__head {
   display: flex;
