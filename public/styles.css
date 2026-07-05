@@ -2171,7 +2171,27 @@ body.overlay-active #chatWidget {
     gap: 10px 12px;
     padding: 12px 14px;
   }
-  .gm-city__dates { grid-column: 1 / -1; justify-content: center; }
+  /* Date pill spans a full row; native iOS date inputs render the wide "May 7, 2026"
+     format, so shrink the type and let the pill fill the card so the whole
+     "date → date · N nights" string fits without clipping or bleeding off-edge */
+  .gm-city__dates {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
+    font-size: 10px;
+    letter-spacing: 0;
+    gap: 4px;
+    padding: 7px 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .gm-city__dates::-webkit-scrollbar { display: none; }
+  .gm-city__date { flex: 0 0 auto; }
+  .gm-city__dates .arrow { margin: 0 2px; }
+  /* Nights is redundant here on mobile (shown in the expanded "Nights" field) —
+     drop it so the two full-format dates fit the pill without clipping */
+  .gm-city__dates .nights { display: none; }
 
   /* Tab row: tighter spacing, scroll instead of squeeze */
   .gm-city__tabs { overflow-x: auto; scrollbar-width: none; }
