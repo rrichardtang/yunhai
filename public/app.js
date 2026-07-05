@@ -3882,9 +3882,9 @@ function buildBudgetOptCard(a, mode, approved) {
       ${cost != null ? `<span class="opt-cost-chip">$${Math.round(cost).toLocaleString()}</span>` : ''}
     </div>
     <div class="card-content">
-      ${label ? `<span class="opt-card--refined-label">${label}</span>` : ''}
       <div class="activity-card-head-actions" style="margin-bottom:8px;">
         <div>
+          ${label ? `<span class="badge badge-refined">${label}</span>` : ''}
           ${act.type ? `<span class="badge">${esc(act.type)}</span>` : ''}
           ${headerPriceBadgeHtml(act)}
         </div>
@@ -3920,7 +3920,7 @@ function buildBudgetOptCard(a, mode, approved) {
     }
     cardEl.addEventListener('click', (e) => {
       if (e.target.closest('button')) return;
-      openOptCardExpand(a, null);
+      openOptCardExpand(approved, approved.indexOf(a));
     });
     return cardEl;
   }
@@ -3943,13 +3943,13 @@ function buildBudgetOptCard(a, mode, approved) {
   });
   cardEl.addEventListener('click', (e) => {
     if (e.target.closest('button')) return;
-    const nowRefined = budgetOptState.choiceIsRefined.get(a.id) ?? true;
-    openOptCardExpand(nowRefined ? refined : a, nowRefined ? 'Refined' : 'Original');
+    openOptCardExpand(approved, approved.indexOf(a));
   });
   return cardEl;
 }
 
-function openOptCardExpand(act, label) {
+function openOptCardExpand(activities, startIndex) {
+  if (startIndex < 0 || !activities[startIndex]) return;
   document.querySelector('.opt-card-expand-overlay')?.remove();
 
   const overlay = document.createElement('div');
@@ -3960,36 +3960,76 @@ function openOptCardExpand(act, label) {
   closeBtn.setAttribute('aria-label', 'Close');
   closeBtn.innerHTML = '<i class="ph-bold ph-x" aria-hidden="true"></i>';
 
+  const prevBtn = document.createElement('button');
+  prevBtn.className = 'card-expand-nav prev';
+  prevBtn.setAttribute('aria-label', 'Previous activity');
+  prevBtn.innerHTML = '<i class="ph-bold ph-caret-left" aria-hidden="true"></i>';
+
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'card-expand-nav next';
+  nextBtn.setAttribute('aria-label', 'Next activity');
+  nextBtn.innerHTML = '<i class="ph-bold ph-caret-right" aria-hidden="true"></i>';
+
   const body = document.createElement('div');
   body.className = 'card-expand-body';
-  body.innerHTML = `
-    ${activityImgHtml(act.imageUrl, act.name, { style: 'width:100%;height:220px;object-fit:cover;' })}
-    <div class="card-content">
-      ${label ? `<span class="opt-card--refined-label">${label}</span>` : ''}
-      <div class="activity-card-head-actions" style="margin-bottom:8px;">
-        <div>
-          ${act.type ? `<span class="badge">${esc(act.type)}</span>` : ''}
-          ${headerPriceBadgeHtml(act)}
-        </div>
-      </div>
-      <h3>${esc(act.name)}</h3>
-      <p><strong>City:</strong> ${esc(act.city || '')}</p>
-      <p><strong>Why it fits:</strong> ${esc(act.why_it_fits || '')}</p>
-      ${act.pitfall ? `<p><strong>Pitfall:</strong> ${esc(act.pitfall)}</p>` : ''}
-      ${act.booking_advice ? `<p><strong>Booking advice:</strong> ${esc(act.booking_advice)}</p>` : ''}
-      ${act.insider_tips ? `<p class="activity-insider-tip"><i class="ph-bold ph-lightbulb" aria-hidden="true"></i> <strong>Insider tip:</strong> ${esc(act.insider_tips)}</p>` : ''}
-    </div>`;
 
   overlay.appendChild(closeBtn);
+  overlay.appendChild(prevBtn);
+  overlay.appendChild(nextBtn);
   overlay.appendChild(body);
   document.body.appendChild(overlay);
 
+  let index = startIndex;
+
   function close() {
     overlay.classList.add('closing');
+    document.removeEventListener('keydown', onKeydown);
     overlay.addEventListener('animationend', () => overlay.remove(), { once: true });
   }
+
+  function onKeydown(e) {
+    if (e.target instanceof Element && e.target.closest('textarea, input, select')) return;
+    if (e.key === 'Escape') close();
+    else if (e.key === 'ArrowLeft' && index > 0) show(index - 1);
+    else if (e.key === 'ArrowRight' && index < activities.length - 1) show(index + 1);
+  }
+
+  function show(i) {
+    index = i;
+    const a = activities[i];
+    const refined = budgetOptState.refinements.get(a.id);
+    const showRefined = refined && (budgetOptState.choiceIsRefined.get(a.id) ?? true);
+    const act = showRefined ? refined : a;
+    const label = refined ? (showRefined ? 'Refined' : 'Original') : null;
+    body.innerHTML = `
+      ${activityImgHtml(act.imageUrl, act.name, { style: 'width:100%;height:220px;object-fit:cover;' })}
+      <div class="card-content">
+        <div class="activity-card-head-actions" style="margin-bottom:8px;">
+          <div>
+            ${label ? `<span class="badge badge-refined">${label}</span>` : ''}
+            ${act.type ? `<span class="badge">${esc(act.type)}</span>` : ''}
+            ${headerPriceBadgeHtml(act)}
+          </div>
+        </div>
+        <h3>${esc(act.name)}</h3>
+        <p><strong>City:</strong> ${esc(act.city || '')}</p>
+        <p><strong>Why it fits:</strong> ${esc(act.why_it_fits || '')}</p>
+        ${act.pitfall ? `<p><strong>Pitfall:</strong> ${esc(act.pitfall)}</p>` : ''}
+        ${act.booking_advice ? `<p><strong>Booking advice:</strong> ${esc(act.booking_advice)}</p>` : ''}
+        ${act.insider_tips ? `<p class="activity-insider-tip"><i class="ph-bold ph-lightbulb" aria-hidden="true"></i> <strong>Insider tip:</strong> ${esc(act.insider_tips)}</p>` : ''}
+      </div>`;
+    body.scrollTop = 0;
+    prevBtn.disabled = i === 0;
+    nextBtn.disabled = i === activities.length - 1;
+  }
+
   closeBtn.addEventListener('click', close);
+  prevBtn.addEventListener('click', () => { if (index > 0) show(index - 1); });
+  nextBtn.addEventListener('click', () => { if (index < activities.length - 1) show(index + 1); });
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', onKeydown);
+
+  show(startIndex);
 }
 
 function renderBudgetOptCards(activities, mode) {
