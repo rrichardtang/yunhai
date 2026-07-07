@@ -2545,6 +2545,22 @@ body.overlay-active #chatWidget {
 .budget-opt-desc { width: 100%; margin: 0; font-size: .875rem; opacity: .75; flex: none; }
 .budget-opt-header-actions { display: flex; gap: 8px; margin-left: auto; }
 
+.budget-opt-cat-summary { width: 100%; display: flex; gap: 8px; flex-wrap: wrap; }
+.budget-opt-cat-summary:empty { display: none; }
+.opt-cat-chip {
+  flex: 1 1 120px; min-width: 110px;
+  background: var(--paper-1); border: 1px solid rgba(10,22,40,.10);
+  border-radius: 12px; padding: 8px 10px;
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; align-items: baseline;
+  font-size: .8rem;
+}
+.opt-cat-chip .opt-cat-label { font-weight: 600; color: var(--text-700); }
+.opt-cat-chip .opt-cat-amount { font-weight: 700; color: var(--text-900); }
+.opt-cat-chip .opt-cat-pct { grid-column: 2; font-size: .7rem; opacity: .6; }
+.opt-cat-bar { grid-column: 1 / -1; height: 4px; border-radius: 999px; background: var(--secondary-light); overflow: hidden; }
+.opt-cat-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+.opt-cat-chip--top .opt-cat-bar > span { background: var(--warn); }
+
 .budget-opt-grid { /* inherits .cards-grid */ }
 
 .opt-card { position: relative; overflow: visible; }

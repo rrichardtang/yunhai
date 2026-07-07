@@ -52,7 +52,8 @@ const state = {
     search: '',
     city: '',
     type: '',
-    verdict: ''
+    verdict: '',
+    sort: ''
   },
   reviewCardFlips: {},
   viewMode: 'planning',
@@ -105,6 +106,7 @@ const els = {
   reviewCityFilter: document.getElementById('reviewCityFilter'),
   reviewTypeFilter: document.getElementById('reviewTypeFilter'),
   reviewVerdictFilter: document.getElementById('reviewVerdictFilter'),
+  reviewSortFilter: document.getElementById('reviewSortFilter'),
   approveVisibleBtn: document.getElementById('approveVisibleBtn'),
   continueArrangeBtn: document.getElementById('continueArrangeBtn'),
   backToSetupBtn: document.getElementById('backToSetupBtn'),
@@ -3661,7 +3663,7 @@ function getFilteredReviewActivities() {
   const type = String(state.reviewFilters.type || '').trim().toLowerCase();
   const verdict = String(state.reviewFilters.verdict || '').trim();
 
-  return state.activities.filter((a) => {
+  const filtered = state.activities.filter((a) => {
     const review = state.reviewed[a.id] || { approved: null };
     const text = [a.name, a.city, a.type, a.why_it_fits, a.pitfall, a.booking_advice, a.insider_tips].join(' ').toLowerCase();
 
@@ -3673,6 +3675,12 @@ function getFilteredReviewActivities() {
     if (verdict === 'unreviewed' && review.approved !== null) return false;
     return true;
   });
+
+  const sort = state.reviewFilters.sort;
+  if (sort === 'price-desc' || sort === 'price-asc') {
+    filtered.sort(priceComparator(sort === 'price-asc' ? 1 : -1));
+  }
+  return filtered;
 }
 
 function applyVerdictToVisibleActivities(verdict = null) {
@@ -3713,18 +3721,6 @@ async function enrichActivity(a) {
 
 function enrichActivities(items = []) {
   return Promise.all((items || []).filter((a) => a?.name).map(enrichActivity));
-}
-
-function computeApprovedCost(activities) {
-  const adults = state.numTravelers || 1;
-  const children = state.numChildren || 0;
-  return (activities || state.activities.filter((a) => state.reviewed[a.id]?.approved === true))
-    .reduce((sum, a) => {
-      const cost = actCostUsd(a);
-      if (cost === null || cost === undefined) return sum;
-      if (actCostType(a) === 'per_group') return sum + cost;
-      return sum + (cost * adults) + (cost * 0.6 * children);
-    }, 0);
 }
 
 function computeBudgetLensBreakdown() {
@@ -3847,7 +3843,13 @@ function mountBudgetOptOverlay() {
     <div class="budget-opt-shell">
       <div class="budget-opt-header">
         <h3>Budget Optimization</h3>
+        <div class="budget-opt-header-actions">
+          <button class="secondary" id="budgetOptSortBtn" type="button" title="Sort by price">
+            <i class="ph-bold ph-arrows-down-up" aria-hidden="true"></i> <span id="budgetOptSortLabel">Default</span>
+          </button>
+        </div>
         <p class="budget-opt-desc">Unlock the activities you want replaced with cheaper alternatives. Locked activities stay as-is.</p>
+        <div id="budgetOptCatSummary" class="budget-opt-cat-summary" aria-label="Spend by category"></div>
       </div>
       <div id="budgetOptGrid" class="budget-opt-grid cards-grid"></div>
     </div>`;
@@ -3869,20 +3871,27 @@ function mountBudgetOptOverlay() {
     if (budgetOptState.phase === 'flip') onConfirmSelections();
     else onConfirmLocks();
   });
+  document.getElementById('budgetOptSortBtn').addEventListener('click', () => {
+    const order = ['default', 'price-desc', 'price-asc'];
+    const next = order[(order.indexOf(budgetOptState.sortMode) + 1) % order.length];
+    budgetOptState.sortMode = next;
+    document.getElementById('budgetOptSortLabel').textContent =
+      next === 'price-desc' ? 'Price ↓' : next === 'price-asc' ? 'Price ↑' : 'Default';
+    if (budgetOptState.lastRender) renderBudgetOptCards(budgetOptState.lastRender.activities, budgetOptState.lastRender.mode);
+  });
 }
 
 function enterBudgetOptMode() {
-  const allApproved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true);
-  // Exclude free activities — no cost to optimize
-  const approved = allApproved.filter((a) => actCostUsd(a) != null && actCostUsd(a) > 0);
+  // Exclude free/unpriced activities — no cost to optimize
+  const approved = budgetOptApprovedActivities();
   if (!approved.length) return;
   // Default all to locked — user unlocks what they want changed
-  budgetOptState = { phase: 'lock', lockedIds: new Set(approved.map((a) => a.id)), refinements: new Map(), choiceIsRefined: new Map(), inFlight: false };
+  budgetOptState = { phase: 'lock', lockedIds: new Set(approved.map((a) => a.id)), refinements: new Map(), choiceIsRefined: new Map(), inFlight: false, sortMode: 'default', lastRender: null };
   mountBudgetOptOverlay();
   renderBudgetOptCards(approved, 'lock');
   document.querySelector('#budgetOptFooter .budget-opt-progress-wrap')?.classList.remove('hidden');
   document.getElementById('budgetOptProgressLabel')?.classList.remove('hidden');
-  updateBudgetOptProgressBar(approved);
+  updateBudgetOptProgressBar();
   overlayManager.open('budgetOptOverlay');
   document.body.classList.add('budget-opt-active');
 }
@@ -3925,6 +3934,42 @@ function activityCostChipHtml(act) {
   return `<span class="activity-cost-chip" data-cost-chip="${esc(act.id)}" title="${esc(tip)}">~$${Math.round(cost).toLocaleString()}</span>`;
 }
 
+// Eligibility for budget optimization: anything that shows a $ figure on cards/checklist.
+function budgetOptEligible(a) {
+  return (activityCardCostUsd(a) ?? 0) > 0;
+}
+
+function budgetOptApprovedActivities() {
+  return state.activities.filter((a) => state.reviewed[a.id]?.approved === true && budgetOptEligible(a));
+}
+
+function sumCardCosts(activities = []) {
+  return activities.reduce((s, a) => s + (activityCardCostUsd(a) ?? 0), 0);
+}
+
+// Cost of the currently-selected option inside budget-opt. Refined candidates
+// share the original's id, so they must not go through the checklist lookup —
+// activityCardCostUsd would return the original's edited budget.
+function budgetOptCurrentCostUsd(a) {
+  if (budgetOptState?.phase === 'flip') {
+    const refined = budgetOptState.refinements.get(a.id);
+    const showingRefined = budgetOptState.choiceIsRefined.get(a.id) ?? !!refined;
+    if (showingRefined && refined) return activityBudgetUsd(refined);
+  }
+  return activityCardCostUsd(a);
+}
+
+function priceComparator(dir, costOf = activityCardCostUsd) {
+  return (a, b) => {
+    const ca = costOf(a);
+    const cb = costOf(b);
+    if (ca == null && cb == null) return 0;
+    if (ca == null) return 1;
+    if (cb == null) return -1;
+    return (ca - cb) * dir;
+  };
+}
+
 function activityImgHtml(src, alt, { extraClass = '', style = '' } = {}) {
   const cls = `activity-img${extraClass ? ' ' + extraClass : ''}`;
   const ph = `<div class="${cls} activity-img-placeholder"${style ? ` style="${style}"` : ''}><i class="ph-bold ph-mountains" aria-hidden="true"></i></div>`;
@@ -3939,6 +3984,31 @@ function isConfirmedBooking(activityId) {
   );
 }
 
+function renderBudgetOptCategorySummary(activities) {
+  const el = document.getElementById('budgetOptCatSummary');
+  if (!el) return;
+  const totals = new Map();
+  activities.forEach((a) => {
+    const cost = budgetOptCurrentCostUsd(a);
+    if (cost == null || cost <= 0) return;
+    const cat = mapTypeToFinalizeCat(a.type);
+    totals.set(cat, (totals.get(cat) || 0) + cost);
+  });
+  const entries = [...totals.entries()].sort((x, y) => y[1] - x[1]);
+  const grand = entries.reduce((s, [, v]) => s + v, 0);
+  if (!entries.length || grand <= 0) { el.innerHTML = ''; return; }
+  el.innerHTML = entries.map(([cat, sum], i) => {
+    const pct = Math.round((sum / grand) * 100);
+    return `
+      <div class="opt-cat-chip${i === 0 ? ' opt-cat-chip--top' : ''}">
+        <span class="opt-cat-label">${esc(FINALIZE_CAT_LABEL[cat] || cat)}</span>
+        <span class="opt-cat-amount">$${Math.round(sum).toLocaleString()}</span>
+        <span class="opt-cat-pct">${pct}%</span>
+        <span class="opt-cat-bar"><span style="width:${pct}%"></span></span>
+      </div>`;
+  }).join('');
+}
+
 function buildBudgetOptCard(a, mode, approved) {
   const isLocked = budgetOptState.lockedIds.has(a.id);
   const hasRefinement = budgetOptState.refinements.has(a.id);
@@ -3949,8 +4019,8 @@ function buildBudgetOptCard(a, mode, approved) {
   cardEl.className = `card activity-card opt-card${isLocked ? ' opt-card--locked' : ''}`;
   cardEl.dataset.activityId = a.id;
 
-  const faceHtml = (act, label) => {
-    const cost = optActivityCost(act);
+  const faceHtml = (act, label, isRefined = false) => {
+    const cost = isRefined ? activityBudgetUsd(act) : activityCardCostUsd(act);
     return `
     <div class="opt-card-img-wrap">
       ${activityImgHtml(act.imageUrl, act.name, { style: 'width:100%;height:160px;object-fit:cover;border-radius:12px 12px 0 0;' })}
@@ -4006,7 +4076,7 @@ function buildBudgetOptCard(a, mode, approved) {
   cardEl.innerHTML = `
     <button class="opt-flip-btn" type="button" aria-label="Flip card"><i class="ph-bold ph-arrows-clockwise" aria-hidden="true"></i></button>
     <div class="opt-card-inner">
-      <div class="opt-card-face opt-card-front">${faceHtml(refined, 'Refined')}</div>
+      <div class="opt-card-face opt-card-front">${faceHtml(refined, 'Refined', true)}</div>
       <div class="opt-card-face opt-card-back">${faceHtml(a, 'Original')}</div>
     </div>`;
   cardEl.querySelector('.opt-flip-btn').addEventListener('click', (e) => {
@@ -4014,7 +4084,7 @@ function buildBudgetOptCard(a, mode, approved) {
     const nowRefined = budgetOptState.choiceIsRefined.get(a.id) ?? true;
     budgetOptState.choiceIsRefined.set(a.id, !nowRefined);
     cardEl.classList.toggle('is-showing-original', nowRefined);
-    updateBudgetOptProgressBar(approved);
+    updateBudgetOptProgressBar();
   });
   cardEl.addEventListener('click', (e) => {
     if (e.target.closest('button')) return;
@@ -4108,22 +4178,27 @@ function openOptCardExpand(activities, startIndex) {
 }
 
 function renderBudgetOptCards(activities, mode) {
+  budgetOptState.lastRender = { activities, mode };
+  let list = activities;
+  if (budgetOptState.sortMode && budgetOptState.sortMode !== 'default') {
+    list = [...activities].sort(priceComparator(budgetOptState.sortMode === 'price-asc' ? 1 : -1, budgetOptCurrentCostUsd));
+  }
   const grid = document.getElementById('budgetOptGrid');
   grid.innerHTML = '';
-  activities.forEach((a) => grid.appendChild(buildBudgetOptCard(a, mode, activities)));
+  list.forEach((a) => grid.appendChild(buildBudgetOptCard(a, mode, list)));
 }
 
 async function onConfirmLocks() {
   if (budgetOptState.inFlight) return;
-  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true && actCostUsd(a) != null && actCostUsd(a) > 0);
+  const approved = budgetOptApprovedActivities();
   const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id) && !isConfirmedBooking(a.id));
   if (!unlocked.length) {
     alert('All activities are locked — nothing to optimize.');
     return;
   }
   const locked = approved.filter((a) => budgetOptState.lockedIds.has(a.id));
-  const lockedCost = computeApprovedCost(locked);
-  const totalBudget = state.tripBudget || computeApprovedCost(approved) * 0.8;
+  const lockedCost = sumCardCosts(locked);
+  const totalBudget = state.tripBudget || sumCardCosts(approved) * 0.8;
   const perActivityTarget = Math.max(0, Math.round((totalBudget - lockedCost) / unlocked.length));
 
   const btn = document.getElementById('budgetOptConfirmLocksBtn');
@@ -4191,42 +4266,40 @@ function transitionToFlipPhase(approved) {
   if (confirmBtn) confirmBtn.innerHTML = '<i class="ph-bold ph-check-circle" aria-hidden="true"></i> Confirm Selections';
   const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id) && budgetOptState.refinements.has(a.id));
   renderBudgetOptCards(unlocked, 'flip');
-  updateBudgetOptProgressBar(approved);
+  updateBudgetOptProgressBar();
 }
 
-function updateBudgetOptProgressBar(approved) {
+function updateBudgetOptProgressBar() {
   const bar = document.getElementById('budgetOptProgressBar');
   if (!bar) return;
 
+  const approved = budgetOptApprovedActivities();
+
   if (budgetOptState.phase === 'lock') {
     const used = computeBudgetLensBreakdown().budgetLensTotal;
-    const budget = state.tripBudget || computeApprovedCost(approved);
+    const budget = state.tripBudget || sumCardCosts(approved);
     const ratio = budget > 0 ? used / budget : 0;
     bar.style.width = `${Math.min(ratio, 1) * 100}%`;
     bar.className = 'budget-opt-progress-bar' + (ratio >= 0.9 ? ' bar-red' : ratio >= 0.6 ? ' bar-yellow' : '');
     document.getElementById('budgetOptProgressLabel').textContent =
       `$${Math.round(used).toLocaleString()} / $${Math.round(budget).toLocaleString()}`;
+    renderBudgetOptCategorySummary(approved);
     return;
   }
 
-  const totalCost = computeApprovedCost(approved);
-  let selectedCost = 0;
-  approved.forEach((a) => {
-    const refined = budgetOptState.refinements.get(a.id);
-    const showingRefined = budgetOptState.choiceIsRefined.get(a.id) ?? !!refined;
-    const cost = optActivityCost((showingRefined && refined) ? refined : a);
-    if (cost != null) selectedCost += cost;
-  });
+  const totalCost = sumCardCosts(approved);
+  const selectedCost = approved.reduce((s, a) => s + (budgetOptCurrentCostUsd(a) ?? 0), 0);
 
   const pct = totalCost > 0 ? Math.min(selectedCost / totalCost, 1.2) * 100 : 0;
   bar.style.width = `${Math.min(pct, 100)}%`;
   bar.className = 'budget-opt-progress-bar' + (pct > 100 ? ' bar-red' : pct > 80 ? ' bar-yellow' : '');
   document.getElementById('budgetOptProgressLabel').textContent =
     `$${Math.round(selectedCost).toLocaleString()} / $${Math.round(totalCost).toLocaleString()}`;
+  renderBudgetOptCategorySummary(approved);
 }
 
 function onConfirmSelections() {
-  const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved === true && actCostUsd(a) != null && actCostUsd(a) > 0);
+  const approved = budgetOptApprovedActivities();
   approved.forEach((a) => {
     if (budgetOptState.choiceIsRefined.get(a.id) && budgetOptState.refinements.has(a.id)) {
       const idx = state.activities.findIndex((x) => x.id === a.id);
@@ -7168,7 +7241,7 @@ function renderFinalizeOpenItems() {
       ? 'No booking ref'
       : (item.type === 'flight' || item.type === 'transport' ? 'No confirmation' : 'No reservation');
     const why = item.notes || linkedActivity?.why_it_fits || '';
-    const priceUsd = Number(actCostUsd(linkedActivity) || item.budgetUsd || 0);
+    const priceUsd = Number((linkedActivity ? activityCardCostUsd(linkedActivity) : null) ?? item.budgetUsd ?? 0);
     const priceHtml = priceUsd > 0 ? ` <span class="price">$${Math.round(priceUsd).toLocaleString()}</span>` : '';
 
     return `
@@ -8914,7 +8987,7 @@ function resetToFresh() {
   state.arrangeCity = null;
   state.chatHistory = [];
   state.chatLoading = false;
-  state.reviewFilters = { search: '', city: '', type: '', verdict: '' };
+  state.reviewFilters = { search: '', city: '', type: '', verdict: '', sort: '' };
   state.bookingChecklist = [];
   state.tripHealth = null;
   state.bookingChecklistIssueMeta = {};
@@ -8925,6 +8998,7 @@ function resetToFresh() {
   if (els.reviewCityFilter) els.reviewCityFilter.value = '';
   if (els.reviewTypeFilter) els.reviewTypeFilter.value = '';
   if (els.reviewVerdictFilter) els.reviewVerdictFilter.value = '';
+  if (els.reviewSortFilter) els.reviewSortFilter.value = '';
   renderCities();
   addCityRow();
   renderActivities();
@@ -9578,6 +9652,10 @@ els.reviewTypeFilter?.addEventListener('change', (e) => {
 });
 els.reviewVerdictFilter?.addEventListener('change', (e) => {
   state.reviewFilters.verdict = e.target.value || '';
+  renderActivities();
+});
+els.reviewSortFilter?.addEventListener('change', (e) => {
+  state.reviewFilters.sort = e.target.value || '';
   renderActivities();
 });
 els.approveVisibleBtn?.addEventListener('click', () => applyVerdictToVisibleActivities(true));
