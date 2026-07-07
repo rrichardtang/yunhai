@@ -9,13 +9,17 @@ branch (`claude/codebase-review-sweep-2z6t4h`) still awaits its ops follow-ups
 (Maps key rotation, new required envs) and deploy.
 
 ## Active Workstream
-Branch `claude/budget-optimization-loading-screens-4hc6a3`: (1) budget totals now sum
-real per-activity costs (`optActivityCost`) with `budgetUsdAuto` tracking so user edits
-survive and refinements move the meter; refine route normalizes LLM cost shape
-(`applyCostShapeToUpdates`). (2) The planning overlay is a parameterized shared loader
-(`showLoader`/`hideLoader`) reused by budget-opt (determinate), auto-arrange
-draft/finalize (3 milestones), and card replace (indeterminate). 176/176 tests;
-Playwright-verified in embed mode (13 checks + 4 failure/override probes).
+Branch `claude/budget-optimization-loading-screens-4hc6a3`, several stacked changes (all
+Playwright-verified in embed mode; 176/176 tests): (1) budget totals sum real per-activity
+costs with `budgetUsdAuto` tracking; refine route normalizes LLM cost shape
+(`applyCostShapeToUpdates`). (2) Shared interactive loader (`showLoader`/`hideLoader`) for
+budget-opt, auto-arrange, and card replace. (3) `~$` estimate chip on review cards. (4)
+**Single cost basis** — every per-activity $ surface (review chip, checklist, finalize
+open-items, budget-opt chips/bar/summary) now derives from `activityCardCostUsd`, fixing
+the $90-vs-$180 finalize bug; budget-opt eligibility widened to price-level-only meals;
+`computeApprovedCost` deleted, progress bar zero-arg (fixes a flip-denominator jump). (5)
+Category-spend summary in the budget-opt header. (6) Price sorting on Review
+(`#reviewSortFilter`) and budget-opt (cycling toggle).
 
 ## Constraints
 - Frontend stays a monolith (`public/app.js`); all `innerHTML` goes through `esc()`, and

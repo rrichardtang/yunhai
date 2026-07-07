@@ -1338,6 +1338,15 @@ Generation prompt was telling Claude to produce a hard floor of ~72 activities f
 - DELETED `src/services/arrangeTimeAdjuster.js` + `src/arrangeTimeAdjuster.test.js`.
 - Full local suite: 126/126 pass.
 
+## [2026-07-07] Cost consistency across all surfaces + category summary + price sorting
+
+Branch `claude/budget-optimization-loading-screens-4hc6a3` (same-day follow-up).
+
+- **Bug — $90 in budget-opt vs $180 in checklist (2-person trip)**: unified every per-activity $ surface onto `activityCardCostUsd` (party total, user-edited checklist value wins). New helpers in `public/app.js`: `budgetOptEligible`, `budgetOptApprovedActivities`, `sumCardCosts`, `budgetOptCurrentCostUsd` (refined candidates use `activityBudgetUsd`, not the id-keyed checklist lookup), and shared `priceComparator`. Fixed the actual reported surface — finalize open-items `app.js:7171` used raw per-person `actCostUsd` with a `||` that skipped both the traveler multiplier and user edits → now `(linkedActivity ? activityCardCostUsd(...) : null) ?? item.budgetUsd ?? 0`. Budget-opt card chip via `faceHtml(act, label, isRefined)`; footer bar + targeting math (`onConfirmLocks`) moved to `sumCardCosts`; `updateBudgetOptProgressBar` made zero-arg (fixes a latent bug where the flip-toggle denominator jumped because it received only the unlocked subset). Deleted now-unused `computeApprovedCost`. Budget-opt eligibility widened to include price-level-only meals.
+- **Category-spend summary**: `renderBudgetOptCategorySummary` groups approved activities by `mapTypeToFinalizeCat` (6 finalize buckets), sums `budgetOptCurrentCostUsd`, sorts descending, renders stat chips (label/$/%/mini fill bar; largest warn-colored) into the overlay header; live-updates via `updateBudgetOptProgressBar`. New `.budget-opt-cat-summary`/`.opt-cat-chip` CSS.
+- **Sort by price**: Review step `#reviewSortFilter` select (planner.html) + `state.reviewFilters.sort` applied at the end of `getFilteredReviewActivities` (keeps the `openCardExpand` closure index-consistent); budget-opt cycling Default→Price↓→Price↑ toggle button (`.budget-opt-header-actions` hook) with `budgetOptState.sortMode`/`lastRender` so `renderBudgetOptCards` sorts a cached copy across both phases. Nulls/unpriced sort last in both directions.
+- Verified via Playwright (embed mode, 2-traveler Kyoto seed spanning grounded/legacy/per_group/price-level/unpriced): the $90 Wagyu now reads $180 identically on review chip, checklist, finalize open-item, and budget-opt chip; a user edit to $150 propagates to all four; price-level meal is eligible, unpriced excluded; category summary sorts (Food $360 top / Tour $220) and sums correctly; flip denominator stable across toggles; refined face shows $40 (party) not the original override; both sort surfaces order by cost with unpriced last. 176/176 unit tests.
+
 ## [2026-07-07] Price estimate chip on Review activity cards
 
 Branch `claude/budget-optimization-loading-screens-4hc6a3` (follow-up to the same-day budget fix).
