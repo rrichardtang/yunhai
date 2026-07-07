@@ -149,6 +149,30 @@ function groundActivityToPlace(activity, place, { cost = null, costType = 'per_p
   return activity;
 }
 
+// LLM refinements may emit cost in either shape; fold it into the shape the
+// activity actually carries so actCostUsd() sees the new value after merge.
+function applyCostShapeToUpdates(activity, updates) {
+  const activityIsNested = activity.cost && typeof activity.cost === 'object';
+  const updateNested = updates.cost && typeof updates.cost === 'object' ? Number(updates.cost.estimated_usd) : NaN;
+  const updateFlat = Number(updates.estimated_cost_usd);
+
+  if (activityIsNested && Number.isFinite(updateFlat)) {
+    updates.cost = {
+      ...activity.cost,
+      ...(updates.cost || {}),
+      estimated_usd: updateFlat,
+      type: updates.cost_type || updates.cost?.type || activity.cost.type
+    };
+    delete updates.estimated_cost_usd;
+    delete updates.cost_type;
+  } else if (!activityIsNested && Number.isFinite(updateNested)) {
+    updates.estimated_cost_usd = updateNested;
+    updates.cost_type = updates.cost.type || updates.cost_type || activity.cost_type || 'per_person';
+    delete updates.cost;
+  }
+  return updates;
+}
+
 function register(app) {
   app.get('/api/places/resolve', async (req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -284,6 +308,7 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
       });
 
       const updates = JSON.parse(response.choices?.[0]?.message?.content?.trim() || '{}');
+      applyCostShapeToUpdates(activity, updates);
 
       const updatedName = updates.name || activity.name;
       const updatedCity = updates.city || activity.city;
@@ -702,4 +727,4 @@ Return ONLY valid JSON (no markdown fences):
   });
 }
 
-module.exports = { register, groundActivityToPlace };
+module.exports = { register, groundActivityToPlace, applyCostShapeToUpdates };

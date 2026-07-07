@@ -889,6 +889,29 @@ const LOADING_MESSAGES = [
   'Almost there...'
 ];
 
+const BUDGET_OPT_MESSAGES = [
+  'Hunting for hidden deals...',
+  'Haggling on your behalf...',
+  'Keeping the fun, trimming the cost...',
+  'Comparing prices across town...',
+  'Your wallet will thank you...'
+];
+
+const ARRANGE_MESSAGES = [
+  'Measuring walking distances...',
+  'Untangling your days...',
+  'Protecting your lunch break...',
+  'Dodging rush hour...',
+  'Putting the pieces together...'
+];
+
+const REPLACE_MESSAGES = [
+  'Reading between the lines of your note...',
+  'Scouting alternatives nearby...',
+  'Checking what the locals recommend...',
+  'Almost found it...'
+];
+
 let loadingInterval = null;
 let loadingMessageIndex = 0;
 let profileSnapshot = null;
@@ -932,19 +955,20 @@ function showErrorBanner(message) {
   banner.querySelector('.error-banner-message').textContent = String(message);
 }
 
-function updatePlanningStatus(status = '', progress = '') {
+function setLoaderStatus(status = '', progressLabel = '') {
   const overlay = document.getElementById('planningOverlay');
   if (!overlay) return;
   overlay.querySelector('[data-city-status]').textContent = status;
-  overlay.querySelector('[data-progress]').textContent = progress;
+  overlay.querySelector('[data-progress]').textContent = progressLabel;
 }
 
-// Progress-bar trickle: cities are the only real signal (one LLM call each), so we
-// ease the bar forward continuously toward the next real milestone — capped just
-// below it until that city actually completes, then snapped exactly to the milestone.
-let planProgress = null;
+// Progress-bar trickle: completed units (cities, refined activities, arrange
+// milestones) are the only real signal, so we ease the bar forward continuously
+// toward the next real milestone — capped just below it until that unit actually
+// completes, then snapped exactly to the milestone.
+let loaderProgress = null;
 
-function applyPlanProgress(percent) {
+function applyLoaderProgress(percent) {
   const overlay = document.getElementById('planningOverlay');
   if (!overlay) return;
   const clamped = Math.max(0, Math.min(100, percent));
@@ -952,45 +976,83 @@ function applyPlanProgress(percent) {
   overlay.querySelector('.planning-bar')?.setAttribute('aria-valuenow', String(Math.round(clamped)));
 }
 
-function beginPlanProgress(totalCities) {
-  endPlanProgress();
-  planProgress = { total: Math.max(1, totalCities), done: 0, display: 0, ceiling: 0, timer: null };
-  recomputePlanCeiling();
-  applyPlanProgress(0);
-  planProgress.timer = setInterval(() => {
-    planProgress.display += (planProgress.ceiling - planProgress.display) * 0.035;
-    applyPlanProgress(planProgress.display);
+function beginLoaderProgress(totalUnits) {
+  endLoaderProgress();
+  loaderProgress = { total: Math.max(1, totalUnits), done: 0, display: 0, ceiling: 0, timer: null };
+  recomputeLoaderCeiling();
+  applyLoaderProgress(0);
+  loaderProgress.timer = setInterval(() => {
+    loaderProgress.display += (loaderProgress.ceiling - loaderProgress.display) * 0.035;
+    applyLoaderProgress(loaderProgress.display);
   }, 120);
 }
 
-function recomputePlanCeiling() {
-  if (planProgress.done >= planProgress.total) {
-    planProgress.ceiling = 100;
+function recomputeLoaderCeiling() {
+  if (loaderProgress.done >= loaderProgress.total) {
+    loaderProgress.ceiling = 100;
     return;
   }
-  const share = 100 / planProgress.total;
-  planProgress.ceiling = Math.min(planProgress.done * share + share * 0.9, 96);
+  const share = 100 / loaderProgress.total;
+  loaderProgress.ceiling = Math.min(loaderProgress.done * share + share * 0.9, 96);
 }
 
-function setPlanCitiesDone(done) {
-  if (!planProgress) return;
-  planProgress.done = done;
-  recomputePlanCeiling();
-  planProgress.display = Math.max(planProgress.display, done * (100 / planProgress.total));
-  applyPlanProgress(planProgress.display);
+function setLoaderUnitsDone(done) {
+  if (!loaderProgress) return;
+  loaderProgress.done = done;
+  recomputeLoaderCeiling();
+  loaderProgress.display = Math.max(loaderProgress.display, done * (100 / loaderProgress.total));
+  applyLoaderProgress(loaderProgress.display);
 }
 
-function finishPlanProgress() {
-  if (!planProgress) return;
-  clearInterval(planProgress.timer);
-  planProgress.timer = null;
-  applyPlanProgress(100);
+function finishLoaderProgress() {
+  if (!loaderProgress) return;
+  clearInterval(loaderProgress.timer);
+  loaderProgress.timer = null;
+  applyLoaderProgress(100);
 }
 
-function endPlanProgress() {
-  if (planProgress?.timer) clearInterval(planProgress.timer);
-  planProgress = null;
-  applyPlanProgress(0);
+function endLoaderProgress() {
+  if (loaderProgress?.timer) clearInterval(loaderProgress.timer);
+  loaderProgress = null;
+  applyLoaderProgress(0);
+}
+
+let loaderMessages = LOADING_MESSAGES;
+
+function showLoader({ title, status = '', progressLabel = '', messages = LOADING_MESSAGES, totalUnits = 1 }) {
+  const overlay = document.getElementById('planningOverlay');
+  if (!overlay) return;
+
+  loaderMessages = messages;
+  overlay.querySelector('[data-trip-name]').textContent = title;
+  overlay.querySelector('[data-loading-message]').textContent = messages[0];
+  setLoaderStatus(status, progressLabel);
+  beginLoaderProgress(totalUnits);
+  overlay.classList.remove('hidden');
+  refreshOverlayInterlocks();
+
+  if (loadingInterval) clearInterval(loadingInterval);
+  loadingMessageIndex = 0;
+  loadingInterval = setInterval(() => {
+    loadingMessageIndex = (loadingMessageIndex + 1) % loaderMessages.length;
+    const messageEl = overlay.querySelector('[data-loading-message]');
+    messageEl.classList.remove('loading-visible');
+    setTimeout(() => {
+      messageEl.textContent = loaderMessages[loadingMessageIndex];
+      messageEl.classList.add('loading-visible');
+    }, 140);
+  }, 2400);
+}
+
+function hideLoader() {
+  const overlay = document.getElementById('planningOverlay');
+  if (!overlay) return;
+  overlay.classList.add('hidden');
+  refreshOverlayInterlocks();
+  if (loadingInterval) clearInterval(loadingInterval);
+  loadingInterval = null;
+  loadingMessageIndex = 0;
+  endLoaderProgress();
 }
 
 let _stepTransitionLock = false;
@@ -1182,13 +1244,14 @@ function buildChecklistFromState() {
     const day = placement ? state.days.find((d) => d.id === placement.dayId) : null;
     const time = day ? parseTimeTo24(placement.time || actPreferredTime(a) || typeToTime(a.type)) : '';
     const notes = String(state.reviewed[a.id]?.notes || '').trim();
-    const activityEstimatedCost = (() => {
+    const representativeCost = (() => {
       const perPerson = representativeCostUsd(a);
       if (perPerson == null) return null;
       const adults = state.numTravelers || 1;
       const children = state.numChildren || 0;
       return perPerson * adults + perPerson * 0.6 * children;
     })();
+    const activityEstimatedCost = optActivityCost(a) ?? representativeCost;
     const item = normalizeChecklistItem({
       type: 'activity',
       activityId: a.id,
@@ -1198,6 +1261,7 @@ function buildChecklistFromState() {
       activityDate: day ? (day.date || '') : '',
       activityTime: time || '',
       budgetUsd: activityEstimatedCost,
+      budgetUsdAuto: activityEstimatedCost,
       notes
     });
 
@@ -1206,6 +1270,9 @@ function buildChecklistFromState() {
     const idx = existingIdx !== -1 ? existingIdx : fallbackIdx;
 
     if (idx !== -1) {
+      // Items created before budgetUsdAuto existed were auto-derived from the representative cost
+      const priorAuto = items[idx].budgetUsdAuto ?? representativeCost;
+      const userOverrode = items[idx].budgetUsd != null && items[idx].budgetUsd !== priorAuto;
       items[idx] = normalizeChecklistItem({
         ...items[idx],
         activityId: a.id,
@@ -1214,7 +1281,8 @@ function buildChecklistFromState() {
         activityLocation: items[idx].activityLocation || item.activityLocation,
         activityDate: item.activityDate,
         activityTime: item.activityTime,
-        budgetUsd: items[idx].budgetUsd ?? activityEstimatedCost,
+        budgetUsd: userOverrode ? items[idx].budgetUsd : activityEstimatedCost,
+        budgetUsdAuto: activityEstimatedCost,
         notes
       });
       existingKeys.add(keyOf(items[idx]));
@@ -2219,40 +2287,17 @@ function renderTripHealth() {
 }
 
 function setPlanningLoading(isLoading) {
-  const overlay = document.getElementById('planningOverlay');
-  if (!overlay) return;
-
   state.isPlanning = isLoading;
   els.planBtn.disabled = isLoading;
   els.planBtn.innerHTML = isLoading ? 'Planning…' : 'Next <i class="ph-bold ph-arrow-right" aria-hidden="true"></i>';
 
   if (!isLoading) {
-    overlay.classList.add('hidden');
-    refreshOverlayInterlocks();
-    if (loadingInterval) clearInterval(loadingInterval);
-    loadingInterval = null;
-    loadingMessageIndex = 0;
-    endPlanProgress();
+    hideLoader();
     return;
   }
 
   const tripName = (els.tripName.value || state.tripName || 'your trip').trim();
-  overlay.querySelector('[data-trip-name]').textContent = `Planning your trip to ${tripName}`;
-  overlay.querySelector('[data-loading-message]').textContent = LOADING_MESSAGES[0];
-  updatePlanningStatus('Starting planning...', '');
-  overlay.classList.remove('hidden');
-  refreshOverlayInterlocks();
-
-  if (loadingInterval) clearInterval(loadingInterval);
-  loadingInterval = setInterval(() => {
-    loadingMessageIndex = (loadingMessageIndex + 1) % LOADING_MESSAGES.length;
-    const messageEl = overlay.querySelector('[data-loading-message]');
-    messageEl.classList.remove('loading-visible');
-    setTimeout(() => {
-      messageEl.textContent = LOADING_MESSAGES[loadingMessageIndex];
-      messageEl.classList.add('loading-visible');
-    }, 140);
-  }, 2400);
+  showLoader({ title: `Planning your trip to ${tripName}`, status: 'Starting planning...' });
 }
 
 async function goToNextStep(fromStep = state.step) {
@@ -4053,9 +4098,17 @@ async function onConfirmLocks() {
 
   const btn = document.getElementById('budgetOptConfirmLocksBtn');
   btn.disabled = true;
-  btn.innerHTML = '<i class="ph-bold ph-spinner"></i> Optimizing…';
   budgetOptState.inFlight = true;
 
+  showLoader({
+    title: 'Optimizing your budget',
+    status: 'Finding cheaper alternatives…',
+    progressLabel: `Activity 0 of ${unlocked.length}`,
+    messages: BUDGET_OPT_MESSAGES,
+    totalUnits: unlocked.length
+  });
+
+  let settledCount = 0;
   const results = await Promise.allSettled(
     unlocked.map((a) =>
       apiFetch('/api/activity/refine', {
@@ -4070,6 +4123,11 @@ async function onConfirmLocks() {
       })
         .then((r) => (r.ok ? r.json() : Promise.reject()))
         .then(({ updates }) => ({ id: a.id, refined: { ...a, ...updates, id: a.id } }))
+        .finally(() => {
+          settledCount += 1;
+          setLoaderUnitsDone(settledCount);
+          setLoaderStatus('Finding cheaper alternatives…', `Activity ${settledCount} of ${unlocked.length}`);
+        })
     )
   );
 
@@ -4084,12 +4142,16 @@ async function onConfirmLocks() {
   btn.disabled = false;
 
   if (!budgetOptState.refinements.size) {
+    hideLoader();
     btn.innerHTML = '<i class="ph-bold ph-check" aria-hidden="true"></i> Confirm';
     showErrorBanner('Couldn\'t find cheaper alternatives — try again.');
     return;
   }
 
+  setLoaderStatus('Polishing alternatives…', `Activity ${settledCount} of ${unlocked.length}`);
   await enrichActivities([...budgetOptState.refinements.values()]);
+  finishLoaderProgress();
+  hideLoader();
   transitionToFlipPhase(approved);
 }
 
@@ -4373,7 +4435,11 @@ function renderActivities() {
       const reason = declineReason.value.trim();
       if (!reason) return;
       confirmReplace.disabled = true;
-      confirmReplace.innerHTML = '<i class="ph-bold ph-spinner"></i>';
+      showLoader({
+        title: 'Replacing activity',
+        status: `Finding a better ${a.type || 'option'} in ${a.city}…`,
+        messages: REPLACE_MESSAGES
+      });
       try {
         const notes = state.reviewed[a.id]?.notes || '';
         const resp = await apiFetch('/api/activity/replace', {
@@ -4385,10 +4451,13 @@ function renderActivities() {
         const { activity: rawReplacement } = await resp.json();
         if (!rawReplacement) throw new Error('No activity in response');
         const replacement = { id: `${rawReplacement.city || a.city}-replacement-${uid()}`, ...normalizeActivityMetadata(rawReplacement), city: canonicalizeActivityCity(rawReplacement.city, a.city) };
+        finishLoaderProgress();
         replaceActivityInState(a.id, replacement);
       } catch {
         confirmReplace.innerHTML = '<i class="ph-bold ph-arrows-clockwise"></i>';
         confirmReplace.disabled = false;
+      } finally {
+        hideLoader();
       }
     });
     card.querySelector('.mini-map-wrap')?.addEventListener('click', () => {
@@ -4514,7 +4583,12 @@ function renderActivities() {
         const reason = expandDeclineReason.value.trim();
         if (!reason) return;
         expandConfirmReplace.disabled = true;
-        expandConfirmReplace.innerHTML = '<i class="ph-bold ph-spinner"></i>';
+        close();
+        showLoader({
+          title: 'Replacing activity',
+          status: `Finding a better ${a.type || 'option'} in ${a.city}…`,
+          messages: REPLACE_MESSAGES
+        });
         try {
           const notes = state.reviewed[a.id]?.notes || '';
           const resp = await apiFetch('/api/activity/replace', {
@@ -4526,11 +4600,12 @@ function renderActivities() {
           const { activity: rawReplacement } = await resp.json();
           if (!rawReplacement) throw new Error('No activity in response');
           const replacement = { id: `${rawReplacement.city || a.city}-replacement-${uid()}`, ...normalizeActivityMetadata(rawReplacement), city: canonicalizeActivityCity(rawReplacement.city, a.city) };
-          close();
+          finishLoaderProgress();
           replaceActivityInState(a.id, replacement);
         } catch {
-          expandConfirmReplace.innerHTML = '<i class="ph-bold ph-arrows-clockwise"></i>';
-          expandConfirmReplace.disabled = false;
+          showErrorBanner('Couldn\'t find a replacement — try again.');
+        } finally {
+          hideLoader();
         }
       });
 
@@ -6510,8 +6585,12 @@ async function autoArrangeActiveCity(opts = {}) {
   }
 
   els.autoArrangeBtn.disabled = true;
-  const prevArrangeLabel = els.autoArrangeBtn.textContent;
-  els.autoArrangeBtn.textContent = 'Arranging…';
+  showLoader({
+    title: finalize ? `Finalizing ${activeCity}` : `Arranging ${activeCity}`,
+    status: 'Computing commutes…',
+    messages: ARRANGE_MESSAGES,
+    totalUnits: 3
+  });
 
   try {
     const lockedActivities = lockedSet.map((entry) => {
@@ -6565,6 +6644,8 @@ async function autoArrangeActiveCity(opts = {}) {
       }
     }
 
+    setLoaderUnitsDone(1);
+    setLoaderStatus('Assigning activities to days…');
     const arrangeUrl = '/api/arrange' + (location.search.includes('debug=1') ? '?debug=1' : '');
     const res = await apiFetch(arrangeUrl, {
       method: 'POST',
@@ -6587,6 +6668,8 @@ async function autoArrangeActiveCity(opts = {}) {
 
     if (!res.ok) throw new Error('Arrange request failed');
     const { placements, unplaced = [] } = await res.json();
+    setLoaderUnitsDone(2);
+    setLoaderStatus('Building your schedule…');
 
     const dateToDay = Object.fromEntries(activeDays.map((d) => [d.date, d]));
     for (const [id, placement] of Object.entries(placements || {})) {
@@ -6627,12 +6710,16 @@ async function autoArrangeActiveCity(opts = {}) {
     showErrorBanner(e?.message || 'Failed to arrange activities.');
   } finally {
     els.autoArrangeBtn.disabled = false;
-    els.autoArrangeBtn.textContent = prevArrangeLabel;
   }
 
-  const activeDayIds = activeDays.map((d) => d.id);
-  await updateCommutesForCityDays(activeDayIds);
-  renderArrange();
+  try {
+    const activeDayIds = activeDays.map((d) => d.id);
+    await updateCommutesForCityDays(activeDayIds);
+    renderArrange();
+    finishLoaderProgress();
+  } finally {
+    hideLoader();
+  }
 }
 
 let activePlacedCardDragCleanup = null;
@@ -8071,8 +8158,8 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
   let buffer = '';
   let completedCities = 0;
 
-  updatePlanningStatus(`Planning ${cities[0]?.name || 'trip'}...`, `City 0 of ${cities.length} done`);
-  beginPlanProgress(cities.length);
+  setLoaderStatus(`Planning ${cities[0]?.name || 'trip'}...`, `City 0 of ${cities.length} done`);
+  beginLoaderProgress(cities.length);
 
   const handleEvent = async (payloadText) => {
     const evt = JSON.parse(payloadText);
@@ -8103,23 +8190,23 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
       renderActivities();
 
       completedCities += 1;
-      setPlanCitiesDone(completedCities);
+      setLoaderUnitsDone(completedCities);
       const nextCity = cities[completedCities]?.name;
       const progress = `City ${completedCities} of ${cities.length} done`;
       if (nextCity) {
-        updatePlanningStatus(
+        setLoaderStatus(
           `Got ${cityActivities.length} activities for ${evt.city}! Moving to ${nextCity}...`,
           progress
         );
-        setTimeout(() => updatePlanningStatus(`Planning ${nextCity}...`, progress), 700);
+        setTimeout(() => setLoaderStatus(`Planning ${nextCity}...`, progress), 700);
       } else {
-        updatePlanningStatus(`Got ${cityActivities.length} activities for ${evt.city}!`, progress);
+        setLoaderStatus(`Got ${cityActivities.length} activities for ${evt.city}!`, progress);
       }
     }
 
     if (evt.type === 'done') {
-      updatePlanningStatus('Finalizing...', `City ${completedCities} of ${cities.length} done`);
-      finishPlanProgress();
+      setLoaderStatus('Finalizing...', `City ${completedCities} of ${cities.length} done`);
+      finishLoaderProgress();
     }
   };
 
@@ -9364,6 +9451,7 @@ function initEmbedMode() {
   state.profilesStore = loadProfiles();
   state.profile = normalizeProfile(getActiveProfile(state.profilesStore));
   state.schedulingPrefs = loadSchedulingPrefs();
+  mountPlanningOverlay();
 
   state.tripName = 'Andalucía Spring';
   els.tripName.value = state.tripName;
