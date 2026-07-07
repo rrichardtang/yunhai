@@ -2659,6 +2659,15 @@ body.overlay-active #chatWidget {
   display: block;
 }
 
+.activity-cost-chip {
+  position: absolute; bottom: 8px; right: 8px;
+  background: rgba(11,37,69,.72); color: #fff;
+  font-size: .8rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 999px;
+  cursor: help;
+}
+.activity-cost-chip--empty { display: none; }
+
 /* ── Profile Creation Wizard (GuideMe redesign) ── */
 .profile-wizard-overlay {
   position: fixed; inset: 0; z-index: 1700;

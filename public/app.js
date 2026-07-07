@@ -1251,7 +1251,7 @@ function buildChecklistFromState() {
       const children = state.numChildren || 0;
       return perPerson * adults + perPerson * 0.6 * children;
     })();
-    const activityEstimatedCost = optActivityCost(a) ?? representativeCost;
+    const activityEstimatedCost = activityBudgetUsd(a);
     const item = normalizeChecklistItem({
       type: 'activity',
       activityId: a.id,
@@ -3813,7 +3813,7 @@ function renderBudgetTracker() {
   if (hasBudget) {
     const used = computeBudgetLensBreakdown().budgetLensTotal;
     const pct = Math.min(used / state.tripBudget, 1);
-    const nullCount = approved.filter((a) => actCostUsd(a) === null || actCostUsd(a) === undefined).length;
+    const nullCount = approved.filter((a) => activityCardCostUsd(a) == null).length;
     colorClass = pct < 0.6 ? 'budget-green' : pct < 0.9 ? 'budget-yellow' : 'budget-red';
     budgetSection = trackerRow({
       label: 'Budget',
@@ -3893,6 +3893,36 @@ function optActivityCost(act) {
   const adults = state.numTravelers || 1;
   const children = state.numChildren || 0;
   return actCostType(act) === 'per_group' ? cost : cost * adults + Math.round(cost * 0.6 * children);
+}
+
+// Whole-party estimate on the same basis as the checklist budget rollup: the
+// activity's real cost when known, else the type-based representative estimate.
+function activityBudgetUsd(act) {
+  const partyCost = optActivityCost(act);
+  if (partyCost != null) return partyCost;
+  const perPerson = representativeCostUsd(act);
+  if (perPerson == null) return null;
+  const adults = state.numTravelers || 1;
+  const children = state.numChildren || 0;
+  return perPerson * adults + perPerson * 0.6 * children;
+}
+
+// The figure to show on a card — prefer any user-edited checklist budget so the
+// card matches the checklist exactly, else the derived estimate.
+function activityCardCostUsd(act) {
+  const item = (state.bookingChecklist || []).find(
+    (it) => it.type === 'activity' && it.activityId === act.id
+  );
+  if (item && item.budgetUsd != null) return Number(item.budgetUsd);
+  return activityBudgetUsd(act);
+}
+
+function activityCostChipHtml(act) {
+  const cost = activityCardCostUsd(act);
+  if (cost == null) return `<span class="activity-cost-chip activity-cost-chip--empty" data-cost-chip="${esc(act.id)}"></span>`;
+  const party = (state.numTravelers || 1) + (state.numChildren || 0) > 1;
+  const tip = party ? 'Estimated total for your party' : 'Estimated cost';
+  return `<span class="activity-cost-chip" data-cost-chip="${esc(act.id)}" title="${esc(tip)}">~$${Math.round(cost).toLocaleString()}</span>`;
 }
 
 function activityImgHtml(src, alt, { extraClass = '', style = '' } = {}) {
@@ -4264,6 +4294,8 @@ function renderActivities() {
           if (badgeEl) badgeEl.innerHTML = headerPriceBadgeHtml(a);
           const mapsEl = badgeEl?.nextElementSibling;
           if (mapsEl && mapsEl.classList.contains('badge-maps')) mapsEl.outerHTML = googleMapsLinkHtml(a);
+          const chipEl = card.querySelector(`[data-cost-chip="${CSS.escape(a.id)}"]`);
+          if (chipEl) chipEl.outerHTML = activityCostChipHtml(a);
         });
       }
     });
@@ -4324,6 +4356,7 @@ function renderActivities() {
         <div class="activity-card-face activity-card-front">
           <div class="activity-card-img-wrap">
             ${activityImgHtml(a.imageUrl, a.name)}
+            ${activityCostChipHtml(a)}
             <button class="secondary flip-btn activity-flip-btn-overlay" type="button" title="Flip to map" aria-label="Flip card"><i class="ph-bold ph-map-trifold" aria-hidden="true"></i></button>
           </div>
           <div class="card-content">

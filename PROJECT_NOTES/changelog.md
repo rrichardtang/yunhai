@@ -1337,3 +1337,12 @@ Generation prompt was telling Claude to produce a hard floor of ~72 activities f
 - `src/services/arrangeTelemetry.js` — new field set (placedPct, avgUnplacedPerRun, mealRedistributedTotal, droppedByReason); dropped zombie fields.
 - DELETED `src/services/arrangeTimeAdjuster.js` + `src/arrangeTimeAdjuster.test.js`.
 - Full local suite: 126/126 pass.
+
+## [2026-07-07] Price estimate chip on Review activity cards
+
+Branch `claude/budget-optimization-loading-screens-4hc6a3` (follow-up to the same-day budget fix).
+
+- Review activity cards now show a concrete `~$<amount>` cost chip on the image (bottom-right, matching the budget-optimization card chip), sourced identically to the checklist rollup. New shared helpers in `public/app.js`: `activityBudgetUsd(a)` (whole-party estimate: real `optActivityCost` else type-based `representativeCostUsd` × travelers — extracted from `buildChecklistFromState`, which now calls it) and `activityCardCostUsd(a)` (prefers a user-edited checklist `budgetUsd` so the card matches the checklist exactly, else the derived estimate) + `activityCostChipHtml(a)`. Truly unpriced activities render a hidden placeholder chip (refreshed in the late `resolvePlace` callback when a meal's `price_level` arrives). Expanded card inherits the chip via the existing front-face clone.
+- Budget-meter "N unpriced" caveat now counts activities with no estimate at all (`activityCardCostUsd == null`) instead of no real `actCostUsd`, so it agrees with the cards (a meal with a representative estimate is no longer double-messaged as both "$40 on the card" and "unpriced" in the meter).
+- Partially extends decisions [2026-04-19] (which withheld a per-activity dollar figure from cards): the figure is now shown as a clearly-tilde'd estimate with an "Estimated cost / total for your party" tooltip; the GetYourGuide affiliate link and `$$$$` price-level badge remain. `.activity-cost-chip` CSS mirrors `.opt-cost-chip`.
+- Verified via Playwright (embed mode): chips read ~$100 (real), ~$40 (meal price_level), ~$25 (representative landmark), hidden for a truly-unpriced activity; meter reads "1 unpriced $165" matching the three chip sums. 176/176 unit tests.
