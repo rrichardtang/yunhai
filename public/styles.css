@@ -3841,9 +3841,14 @@ select.gm-inp {
 }
 .review-toolbar select:hover { border-color: var(--text-900); }
 
-.review-toolbar .approve-all {
+.review-approve-all-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+.approve-all {
   height: 40px;
-  padding: 0 18px;
+  padding: 0 22px;
   border-radius: var(--r-pill);
   background: var(--ink-900);
   color: var(--paper-0);
@@ -3856,12 +3861,12 @@ select.gm-inp {
   border: 0;
   transition: background var(--dur-fast), box-shadow var(--dur-fast);
 }
-.review-toolbar .approve-all:hover:not(:disabled) {
+.approve-all:hover:not(:disabled) {
   background: var(--ink-800);
   box-shadow: var(--sh-md);
   color: var(--paper-0);
 }
-.review-toolbar .approve-all i { font-size: 14px; }
+.approve-all i { font-size: 14px; }
 
 /* Cards grid — 3D-flipper activity card */
 .cards-grid {
