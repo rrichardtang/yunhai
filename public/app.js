@@ -4005,7 +4005,7 @@ function renderBudgetOptCategorySummary(activities) {
     return `
       <div class="opt-cat-chip${i === 0 ? ' opt-cat-chip--top' : ''}">
         <span class="opt-cat-label">${esc(FINALIZE_CAT_LABEL[cat] || cat)}</span>
-        <span class="opt-cat-amount">$${Math.round(sum).toLocaleString()}</span>
+        <span class="opt-cat-amount">~$${Math.round(sum).toLocaleString()}</span>
         <span class="opt-cat-pct">${pct}%</span>
         <span class="opt-cat-bar"><span style="width:${pct}%"></span></span>
       </div>`;
@@ -4027,7 +4027,7 @@ function buildBudgetOptCard(a, mode, approved) {
     return `
     <div class="opt-card-img-wrap">
       ${activityImgHtml(act.imageUrl, act.name, { style: 'width:100%;height:160px;object-fit:cover;border-radius:12px 12px 0 0;' })}
-      ${cost != null ? `<span class="opt-cost-chip">$${Math.round(cost).toLocaleString()}</span>` : ''}
+      ${cost != null ? `<span class="opt-cost-chip">~$${Math.round(cost).toLocaleString()}</span>` : ''}
     </div>
     <div class="card-content">
       <div class="activity-card-head-actions" style="margin-bottom:8px;">
@@ -4249,15 +4249,39 @@ async function onConfirmLocks() {
   budgetOptState.inFlight = false;
   btn.disabled = false;
 
-  if (!budgetOptState.refinements.size) {
+  const abortToLock = (message) => {
+    budgetOptState.refinements.clear();
+    budgetOptState.choiceIsRefined.clear();
     hideLoader();
     btn.innerHTML = '<i class="ph-bold ph-check" aria-hidden="true"></i> Confirm';
-    showErrorBanner('Couldn\'t find cheaper alternatives — try again.');
+    showErrorBanner(message);
+  };
+
+  if (!budgetOptState.refinements.size) {
+    abortToLock('Couldn\'t find cheaper alternatives — try again.');
     return;
   }
 
   setLoaderStatus('Polishing alternatives…', `Activity ${settledCount} of ${unlocked.length}`);
   await enrichActivities([...budgetOptState.refinements.values()]);
+
+  // Drop refinements that aren't actually cheaper than the original (e.g. a $$
+  // restaurant swapped for another $$) — showing an unchanged price reads as broken.
+  for (const [id, refined] of [...budgetOptState.refinements.entries()]) {
+    const original = approved.find((a) => a.id === id);
+    const refinedCost = activityBudgetUsd(refined);
+    const originalCost = original ? activityCardCostUsd(original) : null;
+    if (refinedCost == null || originalCost == null || refinedCost >= originalCost) {
+      budgetOptState.refinements.delete(id);
+      budgetOptState.choiceIsRefined.delete(id);
+    }
+  }
+
+  if (!budgetOptState.refinements.size) {
+    abortToLock('No cheaper alternatives found at a lower price — your picks are already good value.');
+    return;
+  }
+
   finishLoaderProgress();
   hideLoader();
   transitionToFlipPhase(approved);
@@ -4284,8 +4308,9 @@ function updateBudgetOptProgressBar() {
     const ratio = budget > 0 ? used / budget : 0;
     bar.style.width = `${Math.min(ratio, 1) * 100}%`;
     bar.className = 'budget-opt-progress-bar' + (ratio >= 0.9 ? ' bar-red' : ratio >= 0.6 ? ' bar-yellow' : '');
+    const budgetLabel = state.tripBudget ? `$${Math.round(budget).toLocaleString()}` : `~$${Math.round(budget).toLocaleString()}`;
     document.getElementById('budgetOptProgressLabel').textContent =
-      `$${Math.round(used).toLocaleString()} / $${Math.round(budget).toLocaleString()}`;
+      `~$${Math.round(used).toLocaleString()} / ${budgetLabel}`;
     renderBudgetOptCategorySummary(approved);
     return;
   }
@@ -4297,7 +4322,7 @@ function updateBudgetOptProgressBar() {
   bar.style.width = `${Math.min(pct, 100)}%`;
   bar.className = 'budget-opt-progress-bar' + (pct > 100 ? ' bar-red' : pct > 80 ? ' bar-yellow' : '');
   document.getElementById('budgetOptProgressLabel').textContent =
-    `$${Math.round(selectedCost).toLocaleString()} / $${Math.round(totalCost).toLocaleString()}`;
+    `~$${Math.round(selectedCost).toLocaleString()} / ~$${Math.round(totalCost).toLocaleString()}`;
   renderBudgetOptCategorySummary(approved);
 }
 
