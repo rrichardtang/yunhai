@@ -316,6 +316,9 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
       if (updates.name && updates.name !== activity.name && process.env.GOOGLE_MAPS_API_KEY) {
         const merged = { ...activity, ...updates, city: updatedCity };
         merged.location = { ...(activity.location || {}), lat: null, lng: null };
+        // Clear the old venue's price level so a post-enrich value is known to come
+        // from Places for the NEW venue, not inherited from the one being replaced.
+        delete merged.price_level;
         if (activity.timing) merged.timing = { ...activity.timing, ...(updates.timing || {}) };
         await enrichWithPlaceDetails([merged], updatedCity);
         if (Number.isFinite(Number(merged.location?.lat)) && Number.isFinite(Number(merged.location?.lng))) {
@@ -323,6 +326,8 @@ Return ONLY a JSON object containing the fields that should change. Preserve all
           if (merged.opening_hours) updates.opening_hours = merged.opening_hours;
           if (merged.timing) updates.timing = merged.timing;
         }
+        if (Number.isInteger(merged.price_level)) updates.price_level = merged.price_level;
+        else if (updates.price_level == null && activity.price_level != null) updates.price_level = null;
       }
 
       const isNewShape = activity.booking !== undefined;
