@@ -43,6 +43,7 @@ function normalizeChecklistItem(item = {}) {
   const type = migrateType(item.type || item.kind);
   const status = migrateStatus(item);
   const budgetRaw = Number(item.budgetUsd ?? item.budget ?? item.budget_usd);
+  const budgetAutoRaw = Number(item.budgetUsdAuto);
   const rawScope = String(item.transportScope || item.transport_scope || '').toLowerCase();
   const transportScope = rawScope === 'entry_exit' ? 'entry_exit' : 'experience';
   return {
@@ -56,6 +57,7 @@ function normalizeChecklistItem(item = {}) {
     transportScope: type === 'transportation' ? transportScope : undefined,
     verified: Boolean(item.verified || status === 'resolved' || item.state === 'verified'),
     budgetUsd: Number.isFinite(budgetRaw) && budgetRaw >= 0 ? budgetRaw : null,
+    budgetUsdAuto: Number.isFinite(budgetAutoRaw) && budgetAutoRaw >= 0 ? budgetAutoRaw : null,
     status,
     updatedAt: item.updatedAt || new Date().toISOString()
   };

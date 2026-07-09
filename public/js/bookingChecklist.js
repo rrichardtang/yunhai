@@ -79,9 +79,11 @@
       };
     }
 
+    const budgetAutoRaw = Number(item.budgetUsdAuto);
     return {
       ...base,
       activityId: String(item.activityId || '').trim(),
+      budgetUsdAuto: Number.isFinite(budgetAutoRaw) && budgetAutoRaw >= 0 ? budgetAutoRaw : null,
       bookingNotRequired: Boolean(item.bookingNotRequired || item.booking_not_required),
       activityLocation: String(item.activityLocation || item.city || '').trim(),
       activityLocationPlaceId: String(item.activityLocationPlaceId || '').trim(),
