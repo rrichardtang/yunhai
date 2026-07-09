@@ -3906,9 +3906,12 @@ function optActivityCost(act) {
 
 // Whole-party estimate on the same basis as the checklist budget rollup: the
 // activity's real cost when known, else the type-based representative estimate.
+// A non-positive real cost ($0 or missing) is not a credible estimate for a
+// priced venue (e.g. a refined meal the model priced at $0), so it falls back
+// to the representative estimate rather than displaying an impossible $0.
 function activityBudgetUsd(act) {
   const partyCost = optActivityCost(act);
-  if (partyCost != null) return partyCost;
+  if (partyCost != null && partyCost > 0) return partyCost;
   const perPerson = representativeCostUsd(act);
   if (perPerson == null) return null;
   const adults = state.numTravelers || 1;
