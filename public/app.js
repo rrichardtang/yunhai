@@ -4328,12 +4328,22 @@ function updateBudgetOptProgressBar() {
 
 function onConfirmSelections() {
   const approved = budgetOptApprovedActivities();
+  const swappedIds = new Set();
   approved.forEach((a) => {
     if (budgetOptState.choiceIsRefined.get(a.id) && budgetOptState.refinements.has(a.id)) {
       const idx = state.activities.findIndex((x) => x.id === a.id);
       if (idx !== -1) state.activities[idx] = budgetOptState.refinements.get(a.id);
+      swappedIds.add(a.id);
     }
   });
+  // The swapped activities are now different venues — drop their old checklist
+  // entries (including any cached/manually-set price) so the rebuild re-derives
+  // the new venue's cost instead of freezing the original's.
+  if (swappedIds.size) {
+    state.bookingChecklist = (state.bookingChecklist || []).filter(
+      (it) => !(it.type === 'activity' && swappedIds.has(it.activityId))
+    );
+  }
   exitBudgetOptMode();
   renderActivities();
 }
