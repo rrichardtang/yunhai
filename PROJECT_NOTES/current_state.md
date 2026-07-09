@@ -1,22 +1,25 @@
 # Current State
 
-_Last updated: 2026-07-03_
+_Last updated: 2026-07-07_
 
 ## Objective
-Land the codebase clean-sweep (branch `claude/codebase-review-sweep-2z6t4h`) — security
-hardening (entitlement bypass, key leak, IDORs, XSS), correctness fixes, and a
-duplication/dead-code pass — then complete the ops follow-ups (Maps key rotation, new
-required envs) and deploy. The mobile-UI feedback branch and the queued memory-layer /
-arrange-redesign verifications remain pending their staging deploys.
+Ship the budget-optimization cost fix + shared interactive loading screens (branch
+`claude/budget-optimization-loading-screens-4hc6a3`), while the earlier clean-sweep
+branch (`claude/codebase-review-sweep-2z6t4h`) still awaits its ops follow-ups
+(Maps key rotation, new required envs) and deploy.
 
 ## Active Workstream
-Branch `claude/codebase-review-sweep-2z6t4h`. Two passes: (1) the security/correctness/dedup
-clean sweep (5 commits — authed-by-default identity, fail-closed email webhook, owner-gated
-debug/admin, tooltip XSS fix, atomic store writes, fetch timeouts, bounded in-memory stores,
-shared `llmJson`/`jsonFileCache`/calendar-time helpers); (2) the mobile de-squish pass
-(2026-07-03) — full-width budget meter on its own line, city-card date pill on a dedicated
-row (stale `.city-row-main` nth-child rules deleted), scrollable tabs, compact one-row
-topbar. 168/168 tests; Playwright-verified 20/20 geometry checks at 390/375/1280px.
+Branch `claude/budget-optimization-loading-screens-4hc6a3`, several stacked changes (all
+Playwright-verified in embed mode; 176/176 tests): (1) budget totals sum real per-activity
+costs with `budgetUsdAuto` tracking; refine route normalizes LLM cost shape
+(`applyCostShapeToUpdates`). (2) Shared interactive loader (`showLoader`/`hideLoader`) for
+budget-opt, auto-arrange, and card replace. (3) `~$` estimate chip on review cards. (4)
+**Single cost basis** — every per-activity $ surface (review chip, checklist, finalize
+open-items, budget-opt chips/bar/summary) now derives from `activityCardCostUsd`, fixing
+the $90-vs-$180 finalize bug; budget-opt eligibility widened to price-level-only meals;
+`computeApprovedCost` deleted, progress bar zero-arg (fixes a flip-denominator jump). (5)
+Category-spend summary in the budget-opt header. (6) Price sorting on Review
+(`#reviewSortFilter`) and budget-opt (cycling toggle).
 
 ## Constraints
 - Frontend stays a monolith (`public/app.js`); all `innerHTML` goes through `esc()`, and
@@ -24,21 +27,21 @@ topbar. 168/168 tests; Playwright-verified 20/20 geometry checks at 390/375/1280
 - Identity is never taken from request body/query — always `getAuthedUserId(req)`.
 - Pre-auth API surface is only `/api/status` (booleans) + the email webhook (secret-gated,
   fails closed). Debug/admin surfaces require `OWNER_USER_ID`.
+- The shared loader owns the single `#planningOverlay` node (z 2050) — flows using it are
+  mutually exclusive; a concurrent flow would need a second mount.
 - Staging/prod deploy discipline unchanged: `deployment/promotion.sh` only; split env files.
 
 ## Risks
-- `GOOGLE_MAPS_API_KEY` was publicly retrievable until this branch deploys — must be
-  rotated (open_items 2026-07-03).
-- Email ingest is now disabled until `EMAIL_WEBHOOK_SECRET` is set in the deploy envs;
-  `ADMIN_TOKEN` is retired in favor of `OWNER_USER_ID`.
-- Chat-session ownership is in-memory only; sessions created before a restart lose their
-  owner stamp (first toucher claims) — acceptable for now, worth revisiting if sessions persist.
-- (Carried over) Keyed-environment verification of grounding fixes, memory layer, and the
-  arrange overhaul still outstanding; Google OAuth client secret rotation still deferred.
+- Existing trips' budget meter totals shift once after this branch deploys (real costs
+  replace flat per-type estimates) — intended, per decisions [2026-07-07].
+- The refine cost-shape fix is unit-tested but the live OpenAI refine path is unverified
+  in this keyless container (open_items 2026-07-07).
+- (Carried over from the sweep branch) `GOOGLE_MAPS_API_KEY` rotation +
+  `EMAIL_WEBHOOK_SECRET`/`OWNER_USER_ID` env setup still pending before its deploy;
+  memory-layer / arrange-overhaul / grounding keyed verifications still outstanding.
 
 ## Next Actions
-- Rotate the Maps key + set `EMAIL_WEBHOOK_SECRET`/`OWNER_USER_ID` in env files (owner/ops).
-- Deploy `claude/codebase-review-sweep-2z6t4h` via staging → verify sign-in, invite redeem,
-  Places autocomplete (new `/api/config/maps-key` path), chat, arrange, admin stats → promote.
-- Then resume the queued items: mobile-UI branch keyed verification, memory-layer staging
-  verification, arrange-overhaul live verification (see open_items).
+- Push `claude/budget-optimization-loading-screens-4hc6a3`; deploy after the sweep branch.
+- In a keyed env: run a real budget optimization and confirm the meter drop matches the
+  overlay savings; eyeball the three new loaders with live latencies.
+- Then resume the sweep-branch ops follow-ups and the queued keyed verifications.

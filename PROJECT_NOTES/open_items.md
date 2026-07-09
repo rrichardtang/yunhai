@@ -1,5 +1,11 @@
 # Open Items
 
+## [2026-07-07] Verify budget-opt cost fix + loaders against live LLMs
+**Status:** Pending input (needs API keys)
+**Description:** The refine cost-shape normalization, meter recompute, and the three new interactive loaders are unit-tested (176/176) and Playwright-verified against stubbed responses, but the live OpenAI refine / Anthropic replace+arrange paths are unproven in this keyless container.
+**Context:** decisions [2026-07-07]; changelog [2026-07-07]. Branch `claude/budget-optimization-loading-screens-4hc6a3`.
+**Next action:** In a keyed env: (1) set a trip budget, optimize, accept alternatives → meter drop matches the overlay's flip-phase savings; (2) confirm a real refine response lowers the displayed card cost for both nested-cost and legacy activities; (3) eyeball loader pacing on real latencies (budget-opt N-of-M, arrange milestones, replace).
+
 ## [2026-07-03] Post-sweep ops follow-ups: rotate exposed Maps key, set new required envs
 **Status:** Pending input (owner/ops)
 **Description:** The sweep branch closed the leaks, but two ops actions remain: (1) rotate `GOOGLE_MAPS_API_KEY` — until this deploys it was returned verbatim by the unauthenticated `/api/status`, so treat it as exposed; add referrer/IP restrictions on the new key. (2) On deploy, ensure `EMAIL_WEBHOOK_SECRET` (email ingest now 503s without it) and `OWNER_USER_ID` (gates `/debug` and `/api/admin/*`; `ADMIN_TOKEN` is retired) are set in both env files.

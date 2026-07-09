@@ -1189,7 +1189,7 @@ body.is-dragging-activity .day-schedule.is-no-legal-slot { box-shadow: inset 0 0
   padding: 20px;
   background: rgba(11, 37, 69, .55);
   backdrop-filter: blur(6px);
-  z-index: 1800;
+  z-index: 2050;
 }
 .planning-overlay-card {
   position: relative;
@@ -2545,6 +2545,22 @@ body.overlay-active #chatWidget {
 .budget-opt-desc { width: 100%; margin: 0; font-size: .875rem; opacity: .75; flex: none; }
 .budget-opt-header-actions { display: flex; gap: 8px; margin-left: auto; }
 
+.budget-opt-cat-summary { width: 100%; display: flex; gap: 8px; flex-wrap: wrap; }
+.budget-opt-cat-summary:empty { display: none; }
+.opt-cat-chip {
+  flex: 1 1 120px; min-width: 110px;
+  background: var(--paper-1); border: 1px solid rgba(10,22,40,.10);
+  border-radius: 12px; padding: 8px 10px;
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; align-items: baseline;
+  font-size: .8rem;
+}
+.opt-cat-chip .opt-cat-label { font-weight: 600; color: var(--text-700); }
+.opt-cat-chip .opt-cat-amount { font-weight: 700; color: var(--text-900); }
+.opt-cat-chip .opt-cat-pct { grid-column: 2; font-size: .7rem; opacity: .6; }
+.opt-cat-bar { grid-column: 1 / -1; height: 4px; border-radius: 999px; background: var(--secondary-light); overflow: hidden; }
+.opt-cat-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+.opt-cat-chip--top .opt-cat-bar > span { background: var(--warn); }
+
 .budget-opt-grid { /* inherits .cards-grid */ }
 
 .opt-card { position: relative; overflow: visible; }
@@ -2658,6 +2674,15 @@ body.overlay-active #chatWidget {
   pointer-events: none;
   display: block;
 }
+
+.activity-cost-chip {
+  position: absolute; bottom: 8px; right: 8px;
+  background: rgba(11,37,69,.72); color: #fff;
+  font-size: .8rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 999px;
+  cursor: help;
+}
+.activity-cost-chip--empty { display: none; }
 
 /* ── Profile Creation Wizard (GuideMe redesign) ── */
 .profile-wizard-overlay {
@@ -3816,9 +3841,14 @@ select.gm-inp {
 }
 .review-toolbar select:hover { border-color: var(--text-900); }
 
-.review-toolbar .approve-all {
+.review-approve-all-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+.approve-all {
   height: 40px;
-  padding: 0 18px;
+  padding: 0 22px;
   border-radius: var(--r-pill);
   background: var(--ink-900);
   color: var(--paper-0);
@@ -3831,12 +3861,12 @@ select.gm-inp {
   border: 0;
   transition: background var(--dur-fast), box-shadow var(--dur-fast);
 }
-.review-toolbar .approve-all:hover:not(:disabled) {
+.approve-all:hover:not(:disabled) {
   background: var(--ink-800);
   box-shadow: var(--sh-md);
   color: var(--paper-0);
 }
-.review-toolbar .approve-all i { font-size: 14px; }
+.approve-all i { font-size: 14px; }
 
 /* Cards grid — 3D-flipper activity card */
 .cards-grid {
