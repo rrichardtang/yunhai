@@ -1,47 +1,50 @@
 # Current State
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-30_
 
 ## Objective
-Ship the budget-optimization cost fix + shared interactive loading screens (branch
-`claude/budget-optimization-loading-screens-4hc6a3`), while the earlier clean-sweep
-branch (`claude/codebase-review-sweep-2z6t4h`) still awaits its ops follow-ups
-(Maps key rotation, new required envs) and deploy.
+Ship clean public URLs (branch `claude/yunhai-url-endpoints-t6a3ja`) — no `.html` in the address
+bar, per-step paths, working share links — on top of two earlier branches that are complete but
+still awaiting deploy: the budget-optimization cost fix + loaders
+(`claude/budget-optimization-loading-screens-4hc6a3`) and the clean-sweep branch
+(`claude/codebase-review-sweep-2z6t4h`), which still carries ops follow-ups (Maps key rotation,
+new required envs).
 
 ## Active Workstream
-Branch `claude/budget-optimization-loading-screens-4hc6a3`, several stacked changes (all
-Playwright-verified in embed mode; 176/176 tests): (1) budget totals sum real per-activity
-costs with `budgetUsdAuto` tracking; refine route normalizes LLM cost shape
-(`applyCostShapeToUpdates`). (2) Shared interactive loader (`showLoader`/`hideLoader`) for
-budget-opt, auto-arrange, and card replace. (3) `~$` estimate chip on review cards. (4)
-**Single cost basis** — every per-activity $ surface (review chip, checklist, finalize
-open-items, budget-opt chips/bar/summary) now derives from `activityCardCostUsd`, fixing
-the $90-vs-$180 finalize bug; budget-opt eligibility widened to price-level-only meals;
-`computeApprovedCost` deleted, progress bar zero-arg (fixes a flip-denominator jump). (5)
-Category-spend summary in the budget-opt header. (6) Price sorting on Review
-(`#reviewSortFilter`) and budget-opt (cycling toggle).
+Branch `claude/yunhai-url-endpoints-t6a3ja`, complete and verified locally:
+`/plan`, `/plan/setup|review|arrange|finalize`, `/trip/:id`, `/admin`, with 301s from
+`/planner.html`, `/admin.html`, `/index.html` (query strings preserved). Clean routes are
+registered before `express.static` and all reuse `serveWithClerkKey()`. `setStep()` now pushes a
+real URL; boot clamps a deep-linked step to `state.maxStep` and corrects the URL. Fixed a live bug
+where the Share-trip button emitted `/trip/<id>` that no server route handled — links landed on the
+marketing page; both share paths now emit the same clean URL. 176/176 unit tests, 15/15 Playwright
+checks, curl-verified route table.
 
 ## Constraints
+- `STEP_SLUGS` is duplicated in `src/server.js` and `public/app.js` and its order is coupled to the
+  `#stepIndicator` tabs in `planner.html` — changing the steps means touching all three.
+- Embed mode (`?embed=1`) and read-only share views keep `setStep`'s null-URL behavior; only normal
+  sessions rewrite the address bar.
 - Frontend stays a monolith (`public/app.js`); all `innerHTML` goes through `esc()`, and
   `dataset.*` reads must be re-escaped (values come back entity-decoded).
 - Identity is never taken from request body/query — always `getAuthedUserId(req)`.
-- Pre-auth API surface is only `/api/status` (booleans) + the email webhook (secret-gated,
-  fails closed). Debug/admin surfaces require `OWNER_USER_ID`.
-- The shared loader owns the single `#planningOverlay` node (z 2050) — flows using it are
-  mutually exclusive; a concurrent flow would need a second mount.
+- Pre-auth surface is only `/api/status`, `GET /api/public/itinerary/:id`, and the secret-gated
+  email webhook. Debug/admin surfaces require `OWNER_USER_ID`.
 - Staging/prod deploy discipline unchanged: `deployment/promotion.sh` only; split env files.
 
 ## Risks
-- Existing trips' budget meter totals shift once after this branch deploys (real costs
-  replace flat per-type estimates) — intended, per decisions [2026-07-07].
-- The refine cost-shape fix is unit-tested but the live OpenAI refine path is unverified
-  in this keyless container (open_items 2026-07-07).
-- (Carried over from the sweep branch) `GOOGLE_MAPS_API_KEY` rotation +
-  `EMAIL_WEBHOOK_SECRET`/`OWNER_USER_ID` env setup still pending before its deploy;
-  memory-layer / arrange-overhaul / grounding keyed verifications still outstanding.
+- Any external link, bookmark, or Clerk dashboard setting pointing at `/planner.html` now takes a
+  301. Redirects cover it, but Clerk's allowed redirect origins/paths should be checked at deploy.
+- Share links remain sign-in-gated (`open_items` 2026-07-30) — the URL is clean and resolves, but
+  signed-out recipients still hit `openSignIn()`. Pre-existing, now documented.
+- (Carried over) Existing trips' budget meter totals shift once when the budget-opt branch deploys.
+- (Carried over) `GOOGLE_MAPS_API_KEY` rotation + `EMAIL_WEBHOOK_SECRET`/`OWNER_USER_ID` env setup
+  still pending before the sweep branch deploys; memory-layer / arrange-overhaul / grounding keyed
+  verifications still outstanding.
 
 ## Next Actions
-- Push `claude/budget-optimization-loading-screens-4hc6a3`; deploy after the sweep branch.
-- In a keyed env: run a real budget optimization and confirm the meter drop matches the
-  overlay savings; eyeball the three new loaders with live latencies.
+- Push `claude/yunhai-url-endpoints-t6a3ja`; deploy after the two queued branches.
+- Post-deploy: run the VPS URL checklist (`open_items` 2026-07-30) — redirects, step navigation,
+  sign-out/in round-trip, cross-account share link.
+- Decide whether `/trip/:id` should be truly public (`open_items` 2026-07-30).
 - Then resume the sweep-branch ops follow-ups and the queued keyed verifications.

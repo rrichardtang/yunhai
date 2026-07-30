@@ -4,6 +4,17 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-07-30] Clean URLs: `/plan/<step>`, `/trip/:id`, `/admin` — no `.html` in the address bar
+
+Branch `claude/yunhai-url-endpoints-t6a3ja`.
+
+- **Server routes** (`src/server.js`): replaced the two `*.html` handlers with a clean route table registered before `express.static` (so the static middleware never serves the raw filenames). `/plan`, `/plan/:step` (whitelist `setup|review|arrange|finalize`; unknown slug → 302 `/plan`), `/trip/:id`, and `/admin` all reuse the existing `serveWithClerkKey()` helper. 301 redirects from `/planner.html` → `/plan`, `/admin.html` → `/admin`, `/index.html` → `/`, each preserving the query string via `queryOf(req) = req.url.slice(req.path.length)` (the landing reel's `?embed=1` and legacy `?itinerary=` share links depend on this).
+- **Per-step URLs** (`public/app.js`): new `STEP_SLUGS`/`stepPath(n)`/`stepFromPath()` next to `setStep`, which now passes a real URL to `pushState` instead of the previous null-URL call. Embed mode and read-only share views keep the null URL (the reel runs in an iframe on the landing page). The initial `replaceState` seed reads `stepFromPath()` so a deep link isn't clobbered before `init()` runs.
+- **Deep-link clamp** (`init()`): a fresh load of `/plan/arrange` has `state.maxStep === 1` (maxStep is in-memory only and no trip state is restored on reload — the resume popup is the re-entry path), so boot clamps to `Math.min(stepFromPath(), state.maxStep)` and `replaceState`s the URL to match. Unreachable deep links land on Setup with the URL self-corrected rather than showing a blank panel.
+- **Fixed broken share links**: `/trip/:id` had no server route — the `app.get('*')` catch-all served the marketing landing, so every link from the Share-trip button (`shareTripLinkBtn`) was dead. Added the route; `maybeLoadSharedItineraryFromUrl()` now reads the id from the path with the legacy `?itinerary=` query as fallback, and the `hasShareLink` entitlement bypass recognizes the path form. `shareMinimalItinerary()` switched from `/planner.html?itinerary=…&mode=itinerary` to the same `/trip/<id>` URL, so both share paths agree; the vestigial `mode=itinerary` param (never read) is gone.
+- **Links repointed**: six `href="/planner.html"` → `/plan` (`public/index.html`), `IFRAME_SRC` → `/plan?embed=1` (`public/js/landing-reel.js`).
+- Verified: 176/176 unit tests. curl against a local server — every redirect returns 301 with the query preserved, `/plan/bogus` 302s, `/plan/*` and `/trip/:id` serve the planner shell (`stepIndicator` present, Clerk key injected, `__CLERK_FAPI_DOMAIN__` substituted) while `/` still serves the landing. Playwright, 15/15: step nav rewrites the address bar, Back/Forward move one step with no page reload, deep-link parse + clamp, embed mode leaves the URL untouched, landing has zero `.html` links, reel iframe loads `/plan?embed=1`. Share chain proven against a seeded itinerary: `/trip/<id>` → id from path → `GET /api/public/itinerary/<id>` → hydrated with `readOnlyShare: true`; legacy `?itinerary=` still works.
+
 ## [2026-07-07] Budget-opt cost fix + shared interactive loading screens
 
 Branch `claude/budget-optimization-loading-screens-4hc6a3`.
