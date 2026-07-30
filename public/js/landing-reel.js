@@ -1,5 +1,5 @@
 /* YunHai — Landing demo reel
- * Single iframe loads /planner.html?embed=1 and the engine drives the real app:
+ * Single iframe loads /plan?embed=1 and the engine drives the real app:
  * clicks real buttons, types into real inputs, and jumps between steps via
  * iframe.contentWindow.setStep(n).
  */
@@ -8,7 +8,7 @@
 
   const FRAME_W = 1440;
   const FRAME_H = 880;
-  const IFRAME_SRC = '/planner.html?embed=1';
+  const IFRAME_SRC = '/plan?embed=1';
   // Global pacing multiplier — >1 slows the whole walkthrough (typing, waits, beat budgets).
   // Divided by the live speed multiplier (1× or 2×) so the speed toggle affects everything.
   const PACE_BASE = 1.6;

@@ -1,5 +1,17 @@
 # Open Items
 
+## [2026-07-30] Shared `/trip/:id` links still require the recipient to sign in
+**Status:** Pending input (product decision)
+**Description:** `/trip/:id` now resolves to the planner shell and the client loads the itinerary from the pre-auth `GET /api/public/itinerary/:id`, but a signed-out recipient never gets that far: `init()` awaits `initClerkAuth()` first, which calls `openSignIn()` and throws "Authentication required" before `maybeLoadSharedItineraryFromUrl()` runs. The `hasShareLink` bypass only skips the *entitlement* check, not the Clerk sign-in — so share links work for any signed-in user (entitled or not) and nobody else.
+**Context:** Pre-existing, not introduced by the URL work; surfaced while verifying it (changelog [2026-07-30]). The read-only view and public API are already anonymous-safe, so the plumbing is there. Changing the auth gate is a security-relevant decision, deliberately left out of the URL change.
+**Next action:** Decide whether share links should be truly public. If yes: skip `initClerkAuth()` (or run it non-blocking) when the path matches `/trip/:id`, and confirm the read-only view degrades cleanly without a Clerk session — the topbar, chat widget, and save buttons all assume one.
+
+## [2026-07-30] Verify clean URLs on the VPS after deploy
+**Status:** Pending input (needs deploy)
+**Description:** Routes and redirects are verified locally (curl + Playwright 15/15), but not behind Traefik with real Clerk keys. Two things only a keyed environment can prove: (1) Clerk's sign-in redirect round-trip lands back on `/plan/...` (it uses `window.location.href`, so it should, but the allowed-redirect settings in the Clerk dashboard may reference the old URL); (2) the full share-link render for a signed-in non-owner.
+**Context:** changelog/decisions [2026-07-30]. Branch `claude/yunhai-url-endpoints-t6a3ja`.
+**Next action:** After deploy: hit `https://yunhai.io/planner.html` → expect 301 to `/plan`; click through all four steps watching the address bar; sign out and back in from `/plan/review`; paste a `/trip/<id>` link into a second signed-in account. Check the Clerk dashboard's allowed redirect origins/paths if sign-in bounces.
+
 ## [2026-07-07] Verify budget-opt cost fix + loaders against live LLMs
 **Status:** Pending input (needs API keys)
 **Description:** The refine cost-shape normalization, meter recompute, and the three new interactive loaders are unit-tested (176/176) and Playwright-verified against stubbed responses, but the live OpenAI refine / Anthropic replace+arrange paths are unproven in this keyless container.

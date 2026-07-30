@@ -1057,6 +1057,14 @@ function hideLoader() {
   endLoaderProgress();
 }
 
+const STEP_SLUGS = ['setup', 'review', 'arrange', 'finalize'];
+const stepPath = (n) => `/plan/${STEP_SLUGS[n - 1] || STEP_SLUGS[0]}`;
+function stepFromPath() {
+  const slug = (location.pathname.match(/^\/plan\/([^/]+)/)?.[1] || '').toLowerCase();
+  const index = STEP_SLUGS.indexOf(slug);
+  return index === -1 ? 1 : index + 1;
+}
+
 let _stepTransitionLock = false;
 function setStep(n, { pushHistory = true } = {}) {
   if (_stepTransitionLock) return;
@@ -1071,7 +1079,10 @@ function setStep(n, { pushHistory = true } = {}) {
     el.classList.toggle('reachable', i + 1 <= state.maxStep);
   });
   els.panels.forEach((el, i) => el.classList.toggle('active', i + 1 === n));
-  if (pushHistory) history.pushState({ spa: true, step: n }, '');
+  if (pushHistory) {
+    const keepUrl = state.readOnlyShare || document.body.classList.contains('is-embed');
+    history.pushState({ spa: true, step: n }, '', keepUrl ? '' : stepPath(n));
+  }
   if (typeof renderChatSuggestions === 'function') renderChatSuggestions();
 
   // Ensure the target step's content is rendered regardless of navigation source
@@ -7652,7 +7663,7 @@ async function shareMinimalItinerary() {
     return;
   }
 
-  const shareUrl = `${window.location.origin}/planner.html?itinerary=${encodeURIComponent(state.currentItineraryId)}&mode=itinerary`;
+  const shareUrl = `${window.location.origin}/trip/${encodeURIComponent(state.currentItineraryId)}`;
 
   if (navigator.share) {
     try {
@@ -9258,7 +9269,8 @@ function showResumeTripsPopup() {
 
 async function maybeLoadSharedItineraryFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  const itineraryId = String(params.get('itinerary') || '').trim();
+  const fromPath = window.location.pathname.match(/^\/trip\/([^/]+)/)?.[1];
+  const itineraryId = decodeURIComponent(fromPath || params.get('itinerary') || '').trim();
 
   if (!itineraryId) return false;
 
@@ -10109,7 +10121,7 @@ els.steps.forEach((el, i) => {
 });
 
 // Seed the initial history entry so the browser back button never leaves the SPA
-history.replaceState({ spa: true, step: 1 }, '');
+history.replaceState({ spa: true, step: stepFromPath() }, '');
 
 (async function init() {
   if (new URLSearchParams(location.search).has('embed')) {
@@ -10127,7 +10139,8 @@ history.replaceState({ spa: true, step: 1 }, '');
     return;
   }
 
-  const hasShareLink = new URLSearchParams(location.search).has('itinerary');
+  const hasShareLink = /^\/trip\//.test(location.pathname)
+    || new URLSearchParams(location.search).has('itinerary');
   if (!hasShareLink) {
     const entitled = await enforceEntitlementGate();
     if (!entitled) return;
@@ -10156,5 +10169,8 @@ history.replaceState({ spa: true, step: 1 }, '');
   if (!loadedFromShare) {
     renderMyTrips();
     showResumeTripsPopup();
+    const bootStep = Math.min(stepFromPath(), state.maxStep);
+    setStep(bootStep, { pushHistory: false });
+    history.replaceState({ spa: true, step: bootStep }, '', stepPath(bootStep));
   }
 })();

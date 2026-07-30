@@ -4,6 +4,23 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-07-30] Clean URLs are Express routes over the same SPA shell; steps are real paths, clamped on boot
+
+**Decision:** Public URLs drop the `.html` extension entirely: `/plan`, `/plan/setup|review|arrange|finalize`, `/trip/:id`, `/admin`, with 301s from the old filenames. All planner paths serve the same `planner.html` shell through the existing `serveWithClerkKey()` helper — no new pages, no router library, no build step. `setStep()` now pushes a real URL; on boot the deep-linked step is clamped to `state.maxStep` and the URL is `replaceState`d to match. `?embed=1`, `?invite=`, and `?debug=1` stay query params.
+
+**Reasoning:** `yunhai.io/planner.html` reads as unfinished for a paid product, and the 4 steps were entirely invisible in the address bar (`pushState` was called with a null URL), so no step was linkable and Back was the only way to perceive navigation. Traefik just proxies to Express, so the whole change lives in `server.js` + `app.js` — no infra work. Doing the redirects in Express rather than at the proxy keeps the routing rules in the repo, versioned with the code that depends on them.
+
+The clamp exists because `state.maxStep` is in-memory only and a page reload restores no trip state (the resume popup is the re-entry path). Without it, `/plan/arrange` on a fresh session would render an empty panel behind a URL claiming otherwise — the same class of bug fixed on 2026-05-xx when step tabs and Back could reach unrendered panels. Correcting the URL rather than the content keeps the address bar honest.
+
+**Alternatives rejected:**
+- *`express.static({ extensions: ['html'] })`.* Would serve `/planner` for free, but bypasses `serveWithClerkKey()` — the Clerk publishable key and FAPI domain would never be injected and auth would break.
+- *A hash router (`/plan#review`).* No server changes, but hash URLs are not indexable, not server-resolvable, and read as dated.
+- *A real client router (page.js and friends).* A dependency and an abstraction layer for four static slugs; `setStep()` already centralizes every transition.
+- *Restoring the deep-linked step by persisting `maxStep`/trip state to localStorage.* Genuinely better UX, but it is a state-restoration feature, not a URL change — it would quietly expand the scope into the resume-popup flow.
+- *`/trip/:id` as `/plan/trip/:id`.* Longer, and shared links are the one URL that gets pasted into messages — the short form is the point.
+
+**Tradeoffs:** `STEP_SLUGS` is now duplicated in `src/server.js` and `public/app.js` (the server whitelists, the client maps); the two must stay in sync, and the order is coupled to the `#stepIndicator` tabs in `planner.html`. A signed-in user deep-linking to a step they haven't reached gets bounced to Setup — correct, but it means a copied `/plan/arrange` URL is only useful within a live session. Embed mode and share views deliberately keep the null-URL behavior, so `setStep` has two modes to reason about.
+
 ## [2026-05-30] Concierge search is model-driven tool-calling, not a regex gate
 
 **Decision:** The chat concierge no longer decides whether/what to search via regex. It is given a single `web_search` OpenAI function tool (`src/services/chatTools.js`) and writes its own query; `runChatTurn` in `src/routes/chat.js` runs a bounded tool loop (max 2 searches) feeding results back. Deleted: the `chat_concierge` branch of `shouldUseBrave`, `scopeQueryToTrip`/`HOTEL_PHRASE`, and `braveSearch.searchForChat`. The model reads the now-enriched trip context (accommodation address + coords, per-activity cost/booking/why_it_fits/etc.) to ground location/value/booking/rationale questions directly. `response_format: json_object` was dropped — it conflicts with mid-loop tool calls; the `{reply,signals}` contract now rests on the system-prompt instruction plus `parseChatResponse`'s existing prose fallback.

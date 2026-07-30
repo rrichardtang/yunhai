@@ -37,8 +37,20 @@ function serveWithClerkKey(filename) {
   };
 }
 
-app.get('/planner.html', serveWithClerkKey('planner.html'));
-app.get('/admin.html', serveWithClerkKey('admin.html'));
+const STEP_SLUGS = ['setup', 'review', 'arrange', 'finalize'];
+const servePlanner = serveWithClerkKey('planner.html');
+
+app.get('/plan', servePlanner);
+app.get('/plan/:step', (req, res, next) => (
+  STEP_SLUGS.includes(req.params.step) ? servePlanner(req, res, next) : res.redirect(302, '/plan')
+));
+app.get('/trip/:id', servePlanner);
+app.get('/admin', serveWithClerkKey('admin.html'));
+
+const queryOf = (req) => req.url.slice(req.path.length);
+app.get('/planner.html', (req, res) => res.redirect(301, `/plan${queryOf(req)}`));
+app.get('/admin.html', (req, res) => res.redirect(301, `/admin${queryOf(req)}`));
+app.get('/index.html', (req, res) => res.redirect(301, `/${queryOf(req)}`));
 
 app.post('/debug/client', requireConfiguredAuth, (req, res) => {
   const scope = String(req.body?.scope || 'client').slice(0, 40);
