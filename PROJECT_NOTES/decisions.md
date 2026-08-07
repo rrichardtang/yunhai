@@ -4,6 +4,40 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-07] Activity images come from the venue first, a per-city pool second — never a per-activity keyword search
+
+**Decision:** Drop per-activity Unsplash keyword search entirely. Activities that resolve to a Google Place take that venue's own photo, fetched by adding `places.photos` to the field mask `enrichWithPlaceDetails` already sends. Everything else matches against a per-city pool of ~90 photos built from 3 searches, scored locally by name/tag overlap with per-type hints.
+
+**Reasoning:** The reported bug was that the fully qualified Places city name (`Shangri-La City, Diqing Tibetan Autonomous Prefecture, Yunnan, China`) was appended to every query, so nothing matched. But fixing the query only papers over the real problem: the search term is an *AI-generated activity name*, and no stock library reliably contains a photo captioned "Tibetan Thangka Painting Workshop". Searching per activity is structurally fragile and costs one request each, which blows the 50/hour quota on the first plan. Inverting it — fetch the candidates, then assign — makes the match a local scoring problem with no quota pressure, and the venue-photo path removes matching from the equation altogether for the majority of activities.
+
+**Alternatives rejected:** (a) Fix the query and throttle the client fan-out — keeps the fragile name→photo assumption and still spends one request per activity. (b) Google Places photos only — leaves district walks, sunset spots and unresolved venues with placeholders. (c) Cache the resolved `photoUri` alone — those URLs expire; storing `photoName` beside them leaves a refresh path.
+
+**Tradeoffs:** Places photo-media lookups are billed (~$7/1000, so ~$0.50 per 66-activity plan) where Unsplash was free, though `placesCache` amortises it across replans. Pool photos are city-generic rather than activity-specific when nothing scores — an honest floor, and still better than the placeholder icon. Cache entries written before this change must be refetched once, detected by the absence of the `photoName` key rather than a version bump.
+
+---
+
+## [2026-08-07] The plan stream reports phases, not just finished cities
+
+**Decision:** `/api/plan` emits `city_start` and per-phase events (research / generating / enriching) plus a 15s SSE comment heartbeat, and the client's progress bar counts 4 steps per city instead of 1.
+
+**Reasoning:** The endpoint wrote nothing between the response headers and the first fully finished city. With cities planned in parallel and each taking minutes, the bar's ceiling formula capped it at 45% for the entire run — indistinguishable from a hung request, which is exactly how it was reported. The three phases were already `debugLog` points inside `planCity`, so surfacing them cost an `onPhase` callback rather than new instrumentation. The heartbeat separately makes silence diagnosable: with a frame every 15s, a genuinely dead connection is now distinguishable from a slow one, which it wasn't before.
+
+**Alternatives rejected:** (a) Stream activities as they generate — the model returns one JSON array, so there is nothing to stream until it completes. (b) Chunk generation per day to shorten each call — a real speed win, but it changes activity selection and dedup behaviour and belongs behind the bake-off, not in a progress fix. (c) A client-side timeout alone — surfaces a failure without explaining the wait.
+
+**Tradeoffs:** Phase events are coarse; the `generating` phase is still the long one and the bar sits within a step for most of it. Parallel cities interleave, so the status line lists what each is doing rather than telling a single story.
+
+---
+
+## [2026-08-07] Model choice for planCity is decided by measurement, not by spec comparison
+
+**Decision:** Extract the streaming call in `planCity` behind an injectable `generate`, and decide Sonnet 4.6 vs Sonnet 5 vs GPT-5.6 with `scripts/planCityBakeoff.js` before migrating anything. Venue-resolution rate and seconds-per-city are the deciding metrics.
+
+**Reasoning:** Sonnet 5's specs are verifiable (effort ladder, schema-enforced JSON that would delete the parse retry, ~30% more tokens under the new tokenizer, adaptive thinking sharing the `max_tokens` budget). GPT-5.6's are not confirmable from here — its output ceiling and pricing are unknown, and either could disqualify it for a call that needs ~12k output tokens in one response. More importantly, the thing that actually matters for this product — whether a model knows *real venues in remote Yunnan* — is not in any spec sheet. Venue-resolution rate measures exactly that, costs nothing extra because `enrichWithPlaceDetails` already logs it, and is a number rather than an opinion.
+
+**Alternatives rejected:** (a) Migrate to Sonnet 5 on the strength of its spec sheet — probably right, but assumes the answer to the question worth asking. (b) Stay on 4.6 — forfeits the effort dial, the only real latency lever available, and the intro pricing window. (c) Judge by reading activity lists alone — the failure mode is plausible-sounding invented venues, which read fine and resolve badly.
+
+**Tradeoffs:** The bake-off costs API spend and wall time (4 arms × 3 runs × 2 cities). The `generate` seam is a small permanent widening of `planCity`'s interface that is only exercised by the harness until a migration lands. Brave results are frozen for fairness, which means the arms are compared on one snapshot of research rather than across the variance real users see.
+
 ## [2026-07-30] Clean URLs are Express routes over the same SPA shell; steps are real paths, clamped on boot
 
 **Decision:** Public URLs drop the `.html` extension entirely: `/plan`, `/plan/setup|review|arrange|finalize`, `/trip/:id`, `/admin`, with 301s from the old filenames. All planner paths serve the same `planner.html` shell through the existing `serveWithClerkKey()` helper — no new pages, no router library, no build step. `setStep()` now pushes a real URL; on boot the deep-linked step is clamped to `state.maxStep` and the URL is `replaceState`d to match. `?embed=1`, `?invite=`, and `?debug=1` stay query params.
