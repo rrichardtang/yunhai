@@ -8236,12 +8236,16 @@ const PLAN_PHASE_LABELS = {
 async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
   syncTripMetaFromInputs();
   syncLegacyTravelsFromCities();
-  const allCities = state.cities.map(({name,startDate,endDate,leaveTime,notes,accommodation,travelEntry,logistics}) => ({
+  const allCities = state.cities.map(({name,startDate,endDate,leaveTime,notes,accommodation,travelEntry,logistics,latitude,longitude}) => ({
     name,
     startDate,
     endDate,
     leaveTime,
     notes,
+    // Validated before planning, and the server's only location anchor when no
+    // accommodation address has been entered yet.
+    latitude,
+    longitude,
     logistics: logistics ? JSON.parse(JSON.stringify(logistics)) : null,
     accommodation: accommodation ? { ...accommodation } : null,
     travelEntry: travelEntry ? { ...travelEntry } : null
@@ -8318,6 +8322,7 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
   let buffer = '';
   let completedCities = 0;
   let stepsDone = 0;
+  const failedCities = [];
 
   // Cities are planned in parallel and each takes minutes, so completed-city
   // count alone leaves the bar frozen. Count the four observable steps per city
@@ -8356,6 +8361,14 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
 
     if (evt.type === 'phase') {
       cityPhase.set(evt.city, PLAN_PHASE_LABELS[evt.phase] || 'Working on');
+      advance();
+      return;
+    }
+
+    // One city failing leaves the others usable, so surface it and keep reading.
+    if (evt.type === 'city_error') {
+      failedCities.push(truncateLocation(evt.city, 40));
+      cityPhase.delete(evt.city);
       advance();
       return;
     }
@@ -8409,6 +8422,10 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
       const payloadText = lines.map((line) => line.slice(6)).join('\n');
       await handleEvent(payloadText);
     }
+  }
+
+  if (failedCities.length) {
+    showErrorBanner(`Couldn't plan ${failedCities.join(' or ')}. The rest of your trip is ready — go back to Setup to retry.`);
   }
 
   state.lastPlannedFingerprint = step1Fingerprint();

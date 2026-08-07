@@ -675,6 +675,8 @@ Return ONLY valid JSON (no markdown fences):
     const heartbeat = setInterval(() => res.write(': ping\n\n'), PLAN_HEARTBEAT_MS);
     req.on('close', () => clearInterval(heartbeat));
 
+    const failures = [];
+
     try {
       const tripTravels = Array.isArray(travels) ? travels.slice(0, 1) : [];
       const cityTravelTiming = await buildCityTravelTiming(cities);
@@ -687,15 +689,9 @@ Return ONLY valid JSON (no markdown fences):
         sendEvent({ type: 'city_start', city: city.name });
         await acquireLlmSlot();
         try {
-          let activities;
-          try {
-            activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren, cityLocked, tripId || null, {
-              onPhase: (phase) => sendEvent({ type: 'phase', city: city.name, phase })
-            });
-          } catch (planErr) {
-            debugLog('plan', `planCity THREW city=${city.name} err=${planErr?.message || planErr}`);
-            throw planErr;
-          }
+          const activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren, cityLocked, tripId || null, {
+            onPhase: (phase) => sendEvent({ type: 'phase', city: city.name, phase })
+          });
           debugLog('plan', `planCity RETURNED city=${city.name} count=${activities?.length || 0}`);
 
           const cityStartDate = city.startDate || '';
@@ -713,6 +709,17 @@ Return ONLY valid JSON (no markdown fences):
           }
 
           sendEvent({ type: 'city', city: city.name, activities, travelTiming: timing });
+        } catch (planErr) {
+          // One bad city must not discard the cities that succeeded, and it must
+          // not end the stream while its siblings are still writing to it.
+          debugLog('plan', `CITY_FAILED city=${city.name} err=${planErr?.message || planErr}`);
+          failures.push(planErr);
+          sendEvent({
+            type: 'city_error',
+            city: city.name,
+            error: planErr?.message || 'Failed to plan this city',
+            code: planErr?.code || null
+          });
         } finally {
           releaseLlmSlot();
         }
@@ -723,8 +730,10 @@ Return ONLY valid JSON (no markdown fences):
         await Promise.all(cities.slice(i, i + CONCURRENCY).map(planAndEnrich));
       }
 
+      if (failures.length === cities.length) throw failures[0];
+
       sendEvent({ type: 'done' });
-      debugLog('plan', `DONE cities=${cities.length} elapsed_ms=${Date.now() - planStartTs}`);
+      debugLog('plan', `DONE cities=${cities.length} failed=${failures.length} elapsed_ms=${Date.now() - planStartTs}`);
     } catch (error) {
       debugLog('plan', `ERROR msg="${error?.message || error}" code=${error?.code || ''} elapsed_ms=${Date.now() - planStartTs}`);
       if (error.code === 'ANTHROPIC_KEY_MISSING') {
