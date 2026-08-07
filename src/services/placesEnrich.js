@@ -57,6 +57,23 @@ function formatOpeningHoursFromPlaces(regularOpeningHours) {
 
 const CITY_BIAS_RADIUS_M = 30000;
 const CITY_REJECT_RADIUS_KM = 50;
+const PHOTO_MAX_WIDTH_PX = 800;
+
+// Resolves a photo resource name to a public googleusercontent URL. skipHttpRedirect
+// returns the URL as JSON instead of a 302, so the API key never reaches the client.
+async function fetchPlacePhotoUrl(photoName) {
+  try {
+    const res = await fetchWithTimeout(
+      `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${PHOTO_MAX_WIDTH_PX}&skipHttpRedirect=true`,
+      { headers: { 'X-Goog-Api-Key': process.env.GOOGLE_MAPS_API_KEY } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.photoUri || null;
+  } catch {
+    return null;
+  }
+}
 
 async function fetchPlaceDetails(name, city, cityCenter = null) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -80,7 +97,7 @@ async function fetchPlaceDetails(name, city, cityCenter = null) {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'places.priceLevel,places.displayName,places.regularOpeningHours,places.location'
+        'X-Goog-FieldMask': 'places.priceLevel,places.displayName,places.regularOpeningHours,places.location,places.photos'
       },
       body: JSON.stringify(body)
     });
@@ -105,11 +122,17 @@ async function fetchPlaceDetails(name, city, cityCenter = null) {
         return null;
       }
     }
-    debugLog('places-fetch', `OK name="${name}" city="${city}" lat=${lat ?? 'none'} lng=${lng ?? 'none'} price=${Number.isInteger(tier) ? tier : 'none'} source=live`);
+    // photoName is the stable resource id; photoUri expires, so keeping the name
+    // alongside it leaves a cheap refresh path when a cached URL goes stale.
+    const photoName = place.photos?.[0]?.name || null;
+    const imageUrl = photoName ? await fetchPlacePhotoUrl(photoName) : null;
+    debugLog('places-fetch', `OK name="${name}" city="${city}" lat=${lat ?? 'none'} lng=${lng ?? 'none'} price=${Number.isInteger(tier) ? tier : 'none'} photo=${imageUrl ? 'yes' : 'no'} source=live`);
     return {
       priceTier: Number.isInteger(tier) ? tier : null,
       openingHours: formatOpeningHoursFromPlaces(place.regularOpeningHours),
-      location: place.location || null
+      location: place.location || null,
+      photoName,
+      imageUrl
     };
   } catch (err) {
     debugLog('places-fetch', `FAIL name="${name}" city="${city}" reason=exception msg="${(err?.message || err).toString().slice(0, 200).replace(/"/g, "'")}"`);
@@ -139,6 +162,7 @@ function applyDetails(activity, details) {
     activity.location.lat = lat;
     activity.location.lng = lng;
   }
+  if (details.imageUrl && !activity.imageUrl) activity.imageUrl = details.imageUrl;
 }
 
 function hasCoords(activity) {
@@ -152,18 +176,21 @@ function hasCoords(activity) {
 
 async function enrichWithPlaceDetails(activities, cityName, cityCenter = null) {
   if (!Array.isArray(activities) || activities.length === 0) return activities;
-  const targets = activities.filter((a) => !hasCoords(a));
-  const withCoordsBefore = activities.length - targets.length;
+  const targets = activities.filter((a) => !hasCoords(a) || !a.imageUrl);
+  const withCoordsBefore = activities.length - activities.filter((a) => !hasCoords(a)).length;
   debugLog('places-enrich', `START city="${cityName}" activities=${activities.length} targets=${targets.length} with_coords_before=${withCoordsBefore} bias=${cityCenter ? `${cityCenter.lat},${cityCenter.lng}` : 'none'}`);
   function hasUsefulDetails(d) {
-    return !!(d && (Number.isInteger(d.priceTier) || d.openingHours || (d.location?.latitude && d.location?.longitude)));
+    return !!(d && (Number.isInteger(d.priceTier) || d.openingHours || d.imageUrl || (d.location?.latitude && d.location?.longitude)));
   }
   function hasLocation(d) {
     return !!(d && d.location?.latitude && d.location?.longitude);
   }
   await Promise.all(targets.map(async (activity) => {
     const cached = placesCache.get(activity.name, cityName);
-    if (hasUsefulDetails(cached) && hasLocation(cached)) {
+    // Entries written before photo support lack the key entirely. Without this the
+    // 90-day cache would serve permanently photo-less hits for every known venue.
+    const cacheCoversPhotos = cached && Object.prototype.hasOwnProperty.call(cached, 'photoName');
+    if (hasUsefulDetails(cached) && hasLocation(cached) && cacheCoversPhotos) {
       const cLat = Number(cached.location?.latitude);
       const cLng = Number(cached.location?.longitude);
       if (cityCenter && Number.isFinite(cLat) && Number.isFinite(cLng)
@@ -185,7 +212,8 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null) {
   }));
   const stillMissing = activities.filter((a) => !hasCoords(a));
   const withCoordsAfter = activities.length - stillMissing.length;
-  debugLog('places-enrich', `DONE city="${cityName}" with_coords_after=${withCoordsAfter}/${activities.length}`);
+  const withPhotos = activities.filter((a) => a.imageUrl).length;
+  debugLog('places-enrich', `DONE city="${cityName}" with_coords_after=${withCoordsAfter}/${activities.length} with_photos=${withPhotos}/${activities.length}`);
   if (stillMissing.length) {
     const names = stillMissing.slice(0, 10).map((a) => a.name).join(' | ');
     const overflow = stillMissing.length > 10 ? ` (+${stillMissing.length - 10} more)` : '';
