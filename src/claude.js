@@ -58,6 +58,32 @@ function getClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
 
+const MAX_OUTPUT_TOKENS = 32768;
+
+// The only provider-specific step in planCity. Everything before it is prompt
+// assembly and everything after is parsing and grounding, so swapping this one
+// function is enough to run the same pipeline on another model.
+function anthropicGenerator() {
+  const client = getClient();
+  if (!client) {
+    const err = new Error('Anthropic API key not configured');
+    err.code = 'ANTHROPIC_KEY_MISSING';
+    throw err;
+  }
+  const generate = async ({ system, prompt }) => {
+    const stream = client.messages.stream({
+      model: MODEL,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      system,
+      messages: [{ role: 'user', content: prompt }]
+    });
+    const final = await stream.finalMessage();
+    return { text: extractText(final.content), stop_reason: final.stop_reason, usage: final.usage };
+  };
+  generate.modelId = MODEL;
+  return generate;
+}
+
 function blankActivity(overrides = {}) {
   return {
     id: overrides.id || '',
@@ -192,16 +218,16 @@ function resolveAccommodations(city = {}) {
   return entries.filter((a) => a && (String(a.address || '').trim() || coordsOf(a)));
 }
 
-async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0, lockedActivities = [], tripId = null, { onPhase = () => {} } = {}) {
+async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0, lockedActivities = [], tripId = null, { onPhase = () => {}, generate = null } = {}) {
   const planCityStartTs = Date.now();
   const { name, startDate, endDate, leaveTime, notes } = city;
   const accommodations = resolveAccommodations(city);
   debugLog('plan-city', `START city="${name}" travelers=${numTravelers} children=${numChildren} budget=${budget || 'none'} locked=${Array.isArray(lockedActivities) ? lockedActivities.length : 0}`);
-  const client = getClient();
-  if (!client) {
+  let generateText;
+  try {
+    generateText = generate || anthropicGenerator();
+  } catch (err) {
     debugLog('plan-city', `THREW city="${name}" reason=anthropic_key_missing`);
-    const err = new Error('Anthropic API key not configured');
-    err.code = 'ANTHROPIC_KEY_MISSING';
     throw err;
   }
 
@@ -301,19 +327,10 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     ? `${SYSTEM_PROMPT}\n\n${learnedSummary}`
     : SYSTEM_PROMPT;
 
-  async function streamMessage(userContent) {
-    const stream = client.messages.stream({
-      model: MODEL,
-      max_tokens: 32768,
-      system: effectiveSystemPrompt,
-      messages: [{ role: 'user', content: userContent }]
-    });
-    const final = await stream.finalMessage();
-    return { text: extractText(final.content), stop_reason: final.stop_reason };
-  }
+  const streamMessage = (userContent) => generateText({ system: effectiveSystemPrompt, prompt: userContent });
 
   onPhase('generating');
-  debugLog('plan-city', `LLM_CALL city="${name}" model=${MODEL} prompt_chars=${prompt.length}`);
+  debugLog('plan-city', `LLM_CALL city="${name}" model=${generateText.modelId || MODEL} prompt_chars=${prompt.length}`);
   const { text: response, stop_reason } = await streamMessage(prompt);
   debugLog('plan-city', `LLM_RESPONSE city="${name}" chars=${response.length} stop_reason=${stop_reason}`);
   let parsed = tryParseJsonArray(response);
