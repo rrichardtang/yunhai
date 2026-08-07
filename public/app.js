@@ -110,7 +110,6 @@ const els = {
   approveVisibleBtn: document.getElementById('approveVisibleBtn'),
   continueArrangeBtn: document.getElementById('continueArrangeBtn'),
   backToSetupBtn: document.getElementById('backToSetupBtn'),
-  continueArrangeHint: document.getElementById('continueArrangeHint'),
   arrangeCityNav: document.getElementById('arrangeCityNav'),
   arrangeDiagnostics: document.getElementById('arrangeDiagnostics'),
   dayColumns: document.getElementById('dayColumns'),
@@ -2299,7 +2298,7 @@ function renderTripHealth() {
   }
 }
 
-function setPlanningLoading(isLoading) {
+function setPlanningLoading(isLoading, cityCount = 1) {
   state.isPlanning = isLoading;
   els.planBtn.disabled = isLoading;
   els.planBtn.innerHTML = isLoading ? 'Planning…' : 'Next <i class="ph-bold ph-arrow-right" aria-hidden="true"></i>';
@@ -2310,7 +2309,11 @@ function setPlanningLoading(isLoading) {
   }
 
   const tripName = (els.tripName.value || state.tripName || 'your trip').trim();
-  showLoader({ title: `Planning your trip to ${tripName}`, status: 'Starting planning...' });
+  showLoader({
+    title: `Planning your trip to ${tripName}`,
+    status: 'Starting planning...',
+    totalUnits: cityCount * PLAN_PHASES_PER_CITY
+  });
 }
 
 async function goToNextStep(fromStep = state.step) {
@@ -2357,7 +2360,7 @@ async function goToNextStep(fromStep = state.step) {
     }
     clearSnapshot();
     if (!citiesToRegenerate) clearPlannedResultsKeepSetup();
-    setPlanningLoading(true);
+    setPlanningLoading(true, (citiesToRegenerate || state.cities).length);
     try { await planTrip(citiesToRegenerate, lockedByCity); }
     catch (e) { showErrorBanner(e?.message || 'Failed to plan trip.'); }
     finally { setPlanningLoading(false); }
@@ -3631,15 +3634,10 @@ function getActivityStyle(type = '') {
 
 
 function updateReviewNav() {
-  const approvedCount = state.activities.filter((a) => state.reviewed[a.id]?.approved).length;
-  const canContinue = approvedCount > 0;
-  if (els.continueArrangeBtn) {
-    els.continueArrangeBtn.disabled = !canContinue;
-    els.continueArrangeBtn.title = canContinue ? '' : 'Approve at least one activity to continue';
-  }
-  if (els.continueArrangeHint) {
-    els.continueArrangeHint.classList.toggle('hidden', canContinue);
-  }
+  if (!els.continueArrangeBtn) return;
+  const canContinue = state.activities.some((a) => state.reviewed[a.id]?.approved);
+  els.continueArrangeBtn.disabled = !canContinue;
+  els.continueArrangeBtn.title = canContinue ? '' : 'Approve at least one activity to continue';
 }
 
 function populateReviewCityFilter() {
@@ -8228,6 +8226,13 @@ function syncTripMetaFromInputs() {
   state.numChildren = Math.max(0, parseInt(els.numChildren?.value, 10) || 0);
 }
 
+const PLAN_PHASES_PER_CITY = 4;
+const PLAN_PHASE_LABELS = {
+  research: 'Researching',
+  generating: 'Writing activities for',
+  enriching: 'Finding places in'
+};
+
 async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
   syncTripMetaFromInputs();
   syncLegacyTravelsFromCities();
@@ -8312,14 +8317,48 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
   const decoder = new TextDecoder();
   let buffer = '';
   let completedCities = 0;
+  let stepsDone = 0;
 
-  setLoaderStatus(`Planning ${cities[0]?.name || 'trip'}...`, `City 0 of ${cities.length} done`);
-  beginLoaderProgress(cities.length);
+  // Cities are planned in parallel and each takes minutes, so completed-city
+  // count alone leaves the bar frozen. Count the four observable steps per city
+  // the server now reports instead.
+  const cityPhase = new Map();
+  const totalSteps = cities.length * PLAN_PHASES_PER_CITY;
+
+  const renderLoaderStatus = () => {
+    const active = [...cityPhase.entries()]
+      .map(([city, label]) => `${label} ${truncateLocation(city, 20)}`)
+      .join(' · ');
+    setLoaderStatus(
+      active || 'Starting planning...',
+      `${completedCities} of ${cities.length} cities · step ${stepsDone} of ${totalSteps}`
+    );
+  };
+
+  const advance = () => {
+    stepsDone += 1;
+    setLoaderUnitsDone(stepsDone);
+    renderLoaderStatus();
+  };
+
+  renderLoaderStatus();
 
   const handleEvent = async (payloadText) => {
     const evt = JSON.parse(payloadText);
 
     if (evt.type === 'error') throw new Error(evt.error || 'Failed to plan');
+
+    if (evt.type === 'city_start') {
+      cityPhase.set(evt.city, 'Starting');
+      renderLoaderStatus();
+      return;
+    }
+
+    if (evt.type === 'phase') {
+      cityPhase.set(evt.city, PLAN_PHASE_LABELS[evt.phase] || 'Working on');
+      advance();
+      return;
+    }
 
     if (evt.type === 'city') {
       const cityIndex = state.cities.findIndex((c) => cityMatches(c.name, evt.city));
@@ -8345,22 +8384,13 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
       renderActivities();
 
       completedCities += 1;
-      setLoaderUnitsDone(completedCities);
-      const nextCity = cities[completedCities]?.name;
-      const progress = `City ${completedCities} of ${cities.length} done`;
-      if (nextCity) {
-        setLoaderStatus(
-          `Got ${cityActivities.length} activities for ${evt.city}! Moving to ${nextCity}...`,
-          progress
-        );
-        setTimeout(() => setLoaderStatus(`Planning ${nextCity}...`, progress), 700);
-      } else {
-        setLoaderStatus(`Got ${cityActivities.length} activities for ${evt.city}!`, progress);
-      }
+      cityPhase.delete(evt.city);
+      advance();
     }
 
     if (evt.type === 'done') {
-      setLoaderStatus('Finalizing...', `City ${completedCities} of ${cities.length} done`);
+      cityPhase.clear();
+      setLoaderStatus('Finalizing...', `${cities.length} of ${cities.length} cities`);
       finishLoaderProgress();
     }
   };
