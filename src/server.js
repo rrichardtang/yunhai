@@ -80,6 +80,47 @@ app.get('/debug/clear', requireConfiguredAuth, requireOwner, (_req, res) => {
   res.type('text/plain').send(clearDebugLog() ? 'cleared' : 'failed');
 });
 
+// Results of scripts/planCityBakeoff.js, which runs wherever the API keys are.
+// Owner-gated text, same as the debug log — not a UI, and nothing links to it.
+app.get('/debug/bakeoff', requireConfiguredAuth, requireOwner, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  const dir = path.join(__dirname, '..', 'data', 'bakeoff');
+
+  let entries;
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    return res.status(404).type('text/plain').send('No bake-off run yet — run: node scripts/planCityBakeoff.js');
+  }
+
+  // Match against the real directory listing rather than joining the query onto
+  // a path, so a traversal attempt simply finds no entry.
+  const requested = String(req.query.file || '').trim();
+  if (requested) {
+    const match = entries.find((entry) => entry === requested || entry === `${requested}.json`);
+    if (!match) return res.status(404).type('text/plain').send('Unknown file');
+    return res
+      .type(match.endsWith('.json') ? 'application/json' : 'text/plain')
+      .send(fs.readFileSync(path.join(dir, match), 'utf8'));
+  }
+
+  const report = entries.includes('report.md')
+    ? fs.readFileSync(path.join(dir, 'report.md'), 'utf8')
+    : 'No report.md yet — the run may not have finished.';
+  const activityLists = entries
+    .filter((entry) => entry.endsWith('.json') && !['results.json', 'brave-cassette.json'].includes(entry))
+    .sort()
+    .map((entry) => `  /debug/bakeoff?file=${entry}`);
+
+  res.type('text/plain').send([
+    report,
+    'Raw rows:  /debug/bakeoff?file=results.json',
+    '',
+    `Activity lists for the blind read (${activityLists.length}):`,
+    ...activityLists
+  ].join('\n'));
+});
+
 const noStoreFor = (res, filePath) => {
   if (/\.(html|js|css)$/.test(filePath)) {
     res.setHeader('Cache-Control', 'no-store, must-revalidate');
