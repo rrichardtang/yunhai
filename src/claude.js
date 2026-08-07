@@ -177,9 +177,25 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
   };
 }
 
+function coordsOf(source = {}) {
+  const lat = Number(source.latitude);
+  const lng = Number(source.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat === 0 && lng === 0) return null;
+  return { lat, lng };
+}
+
+// The client sends a single `accommodation`; older payloads carried an
+// `accommodations` array. Accept both, and drop entries with nothing usable.
+function resolveAccommodations(city = {}) {
+  const entries = Array.isArray(city.accommodations) ? city.accommodations : [city.accommodation];
+  return entries.filter((a) => a && (String(a.address || '').trim() || coordsOf(a)));
+}
+
 async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0, lockedActivities = [], tripId = null, { onPhase = () => {} } = {}) {
   const planCityStartTs = Date.now();
-  const { name, startDate, endDate, leaveTime, notes, accommodations } = city;
+  const { name, startDate, endDate, leaveTime, notes } = city;
+  const accommodations = resolveAccommodations(city);
   debugLog('plan-city', `START city="${name}" travelers=${numTravelers} children=${numChildren} budget=${budget || 'none'} locked=${Array.isArray(lockedActivities) ? lockedActivities.length : 0}`);
   const client = getClient();
   if (!client) {
@@ -189,14 +205,13 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     throw err;
   }
 
-  const cityAccommodations = Array.isArray(accommodations) && accommodations.length
+  const cityAccommodationText = accommodations.length
     ? accommodations.map((accommodation) => {
-      const coordText = (Number.isFinite(Number(accommodation.latitude)) && Number.isFinite(Number(accommodation.longitude)))
-        ? ` [${Number(accommodation.latitude)}, ${Number(accommodation.longitude)}]`
-        : '';
+      const coords = coordsOf(accommodation);
+      const coordText = coords ? ` [${coords.lat}, ${coords.lng}]` : '';
       return `Accommodation: ${accommodation.address || 'Address missing'}${coordText} | ${accommodation.checkIn || '?'} → ${accommodation.checkOut || '?'}`;
     }).join('\n')
-    : 'No accommodations provided for this city yet.';
+    : 'No accommodation booked yet — plan around the city centre and keep first/last activities near transport hubs.';
 
   const relatedTravels = Array.isArray(travels) ? travels.slice(0, 1) : [];
 
@@ -279,7 +294,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
       }`
     : '';
 
-  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodations}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace.\n\nACTIVITY COUNT\nGenerate ${minTotal} activities (${minTotal}–${maxTotal} acceptable). Composition: ${minNonMeal} non-meal (${nonMealPerDay}/day) + AT MOST ${minMeals} meal-type activities total. Slot assignment (lunch vs dinner) is decided downstream by the arrange step — do not pre-assign by name. Names must be the restaurant name as-is, no "Lunch at" / "Dinner at" prefix. If you have more strong restaurant candidates than slots, pick the best ${minMeals} and skip the rest. On arrival/departure days, drop a meal whose natural time falls outside the available window (e.g. drop lunch on a 3pm arrival, drop dinner on an 11am departure) — each dropped meal reduces the count by 1. Use accommodation and travel timing to shape sequencing — lighter arrivals/departures, first/last activities near accommodation or transport hubs.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}${insiderBlock}${shoppingBlock}\n\nReturn JSON only.`;
+  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodationText}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace.\n\nACTIVITY COUNT\nGenerate ${minTotal} activities (${minTotal}–${maxTotal} acceptable). Composition: ${minNonMeal} non-meal (${nonMealPerDay}/day) + AT MOST ${minMeals} meal-type activities total. Slot assignment (lunch vs dinner) is decided downstream by the arrange step — do not pre-assign by name. Names must be the restaurant name as-is, no "Lunch at" / "Dinner at" prefix. If you have more strong restaurant candidates than slots, pick the best ${minMeals} and skip the rest. On arrival/departure days, drop a meal whose natural time falls outside the available window (e.g. drop lunch on a 3pm arrival, drop dinner on an 11am departure) — each dropped meal reduces the count by 1. Use accommodation and travel timing to shape sequencing — lighter arrivals/departures, first/last activities near accommodation or transport hubs.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}${insiderBlock}${shoppingBlock}\n\nReturn JSON only.`;
 
   const learnedSummary = recall({ userId, tripId, query: name }).text;
   const effectiveSystemPrompt = learnedSummary
@@ -320,12 +335,9 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   const validTyped = filterInvalidTypes(normalized, name);
   const filtered = applyMealPoolCap(validTyped, { city: name, minMeals });
   debugLog('plan-city', `NORMALIZED city="${name}" raw=${parsed.length} after_type_filter=${validTyped.length} after_meal_cap=${filtered.length}`);
-  const firstAccomWithCoords = Array.isArray(accommodations)
-    ? accommodations.find((a) => Number.isFinite(Number(a?.latitude)) && Number.isFinite(Number(a?.longitude)))
-    : null;
-  const cityCenter = firstAccomWithCoords
-    ? { lat: Number(firstAccomWithCoords.latitude), lng: Number(firstAccomWithCoords.longitude) }
-    : null;
+  // Bias venue lookups to the hotel when there is one, otherwise to the city
+  // itself — a trip planned before booking still deserves a bias centre.
+  const cityCenter = accommodations.map(coordsOf).find(Boolean) || coordsOf(city);
   onPhase('enriching');
   debugLog('plan-city', `ENRICH_CALL city="${name}" activities=${filtered.length} bias=${cityCenter ? `${cityCenter.lat},${cityCenter.lng}` : 'none'}`);
   await enrichWithPlaceDetails(filtered, name, cityCenter);

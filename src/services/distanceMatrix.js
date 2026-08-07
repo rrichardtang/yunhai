@@ -61,6 +61,21 @@ function resolveLocationQuery({ lat, lng, fallbackText }) {
   return text || '';
 }
 
+// Best available point to measure a city-to-city leg from: the hotel if one is
+// booked, otherwise the city itself. Without the fallback, a trip planned before
+// booking gets no transfer estimate at all.
+function cityAnchor(city = {}) {
+  const accommodation = pickAccommodation(city);
+  if (accommodation) {
+    return resolveLocationQuery({
+      lat: accommodation.latitude,
+      lng: accommodation.longitude,
+      fallbackText: accommodation.address
+    });
+  }
+  return resolveLocationQuery({ lat: city.latitude, lng: city.longitude, fallbackText: city.name });
+}
+
 async function fetchDistanceMatrixLeg({
   origin,
   destination,
@@ -204,26 +219,27 @@ async function buildCityTravelTiming(cities = []) {
 
     if (index > 0) {
       const previousCity = sortedCities[index - 1] || {};
-      const previousAccommodation = pickAccommodation(previousCity);
-      if (previousAccommodation && accommodation) {
-        const origin = resolveLocationQuery({
-          lat: previousAccommodation.latitude,
-          lng: previousAccommodation.longitude,
-          fallbackText: previousAccommodation.address
-        });
-        const destination = resolveLocationQuery({
-          lat: accommodation.latitude,
-          lng: accommodation.longitude,
-          fallbackText: accommodation.address
-        });
+      const origin = cityAnchor(previousCity);
+      const destination = cityAnchor(city);
+      if (origin && destination) {
         const travelDate = String(city?.startDate || '').slice(0, 10);
-        const departureRef = `${String(previousCity?.endDate || city?.startDate || '').slice(0, 10)}T${String(previousCity?.leaveTime || '09:00')}:00`;
-        const leg = await estimateTravelMinutes({ origin, destination, departureDateTime: departureRef, arrivalDateTime: `${travelDate}T09:00:00` });
+        // The traveller leaves the previous city at its leaveTime, not at 09:00.
+        // Assuming 09:00 let both cities claim the whole transfer day.
+        const departFromPrevious = String(previousCity?.leaveTime || '09:00');
+        const departureRef = `${String(previousCity?.endDate || city?.startDate || '').slice(0, 10)}T${departFromPrevious}:00`;
+        const leg = await estimateTravelMinutes({ origin, destination, departureDateTime: departureRef, arrivalDateTime: departureRef });
         if (leg?.durationMinutes) {
           timing.interCityTravelMinutes = leg.durationMinutes;
-          const earliestAfterTransfer = timeFromMinutes((9 * 60) + leg.durationMinutes);
+          const earliestAfterTransfer = timeFromMinutes(parseMinutesFromTime(departFromPrevious) + leg.durationMinutes);
           timing.arrivalAvailableTime = timeFromMinutes(Math.max(parseMinutesFromTime(timing.arrivalAvailableTime), parseMinutesFromTime(earliestAfterTransfer)));
-          timing.interCitySummary = `Inter-city transfer from ${previousCity?.name || 'previous city'} accommodation to ${cityName} accommodation takes about ${leg.durationMinutes} min; schedule no activities before ${timing.arrivalAvailableTime} on ${travelDate || 'travel day'}.`;
+          timing.interCitySummary = `Inter-city transfer from ${previousCity?.name || 'previous city'} to ${cityName} on ${travelDate || 'travel day'}: depart ${departFromPrevious}, about ${leg.durationMinutes} min travel, so schedule no activities here before ${timing.arrivalAvailableTime}. ${previousCity?.name || 'The previous city'} owns that day up to ${departFromPrevious}.`;
+
+          // Same day, other side: without this the departing city plans a full day.
+          const previousTiming = timingByCity[String(previousCity?.name || '').trim()];
+          if (previousTiming && !previousTiming.departureSummary) {
+            previousTiming.interCityTravelMinutes = leg.durationMinutes;
+            previousTiming.departureSummary = `On ${travelDate || 'the last day'} the traveller departs for ${cityName} at ${departFromPrevious} (about ${leg.durationMinutes} min in transit). Schedule nothing in ${previousTiming.city} after ${departFromPrevious} that day.`;
+          }
         }
       }
     }

@@ -78,3 +78,60 @@ test('no key and no coords resolves to null, never a fabricated value', async ()
   const r = await getFastestCommuteWithSource({ name: 'G', city: 'Testville' }, { name: 'H', city: 'Testville' });
   assert.equal(r.minutes, null);
 });
+
+// --- Inter-city transfer timing ---
+
+const { buildCityTravelTiming } = require('./services/distanceMatrix');
+
+function legOfMinutes(minutes) {
+  return {
+    ok: true,
+    json: async () => ({
+      status: 'OK',
+      rows: [{ elements: [{ status: 'OK', duration: { value: minutes * 60 } }] }]
+    })
+  };
+}
+
+function yunnanTrip({ address = '' } = {}) {
+  return [
+    { name: 'Lijiang, Yunnan, China', startDate: '2026-10-08', endDate: '2026-10-13', leaveTime: '18:00', latitude: 26.87, longitude: 100.22, accommodation: { address } },
+    { name: 'Shangri-La City, Diqing, Yunnan, China', startDate: '2026-10-13', endDate: '2026-10-17', leaveTime: '18:00', latitude: 27.82, longitude: 99.70, accommodation: { address } }
+  ];
+}
+
+test('an inter-city transfer is estimated even with no accommodation address', async () => {
+  process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+  global.fetch = async () => legOfMinutes(240);
+  const timing = await buildCityTravelTiming(yunnanTrip());
+  assert.equal(timing['Shangri-La City, Diqing, Yunnan, China'].interCityTravelMinutes, 240);
+});
+
+test('the arriving city cannot start before the departing city actually leaves', async () => {
+  process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+  global.fetch = async () => legOfMinutes(240);
+  const timing = await buildCityTravelTiming(yunnanTrip());
+  // Departs 18:00 + 4h transit. A hardcoded 09:00 departure gave 13:00 here and
+  // let both cities book the transfer day.
+  assert.equal(timing['Shangri-La City, Diqing, Yunnan, China'].arrivalAvailableTime, '22:00');
+});
+
+test('the departing city is told the transfer day ends at its leave time', async () => {
+  process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+  global.fetch = async () => legOfMinutes(240);
+  const timing = await buildCityTravelTiming(yunnanTrip());
+  const summary = timing['Lijiang, Yunnan, China'].departureSummary;
+  assert.match(summary, /after 18:00/);
+  assert.match(summary, /2026-10-13/);
+});
+
+test('an accommodation address is preferred over the city centre as the anchor', async () => {
+  process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+  const origins = [];
+  global.fetch = async (url) => {
+    origins.push(new URL(url).searchParams.get('origins'));
+    return legOfMinutes(240);
+  };
+  await buildCityTravelTiming(yunnanTrip({ address: '123 Old Town Road, Lijiang' }));
+  assert.ok(origins.some((o) => o.includes('Old Town Road')), `expected the hotel address in ${JSON.stringify(origins)}`);
+});
