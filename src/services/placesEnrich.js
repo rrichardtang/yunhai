@@ -56,7 +56,12 @@ function formatOpeningHoursFromPlaces(regularOpeningHours) {
 }
 
 const CITY_BIAS_RADIUS_M = 30000;
-const CITY_REJECT_RADIUS_KM = 50;
+// Search is biased to the city centre, but the reject radius has to clear a
+// full day trip: Meili Snow Mountain is 104km from Shangri-La and Baishuitai
+// ~60km, and rejecting those threw away correct coordinates, leaving arrange to
+// guess a commute for a three-hour drive. 150km still catches a venue that
+// resolved to the wrong province.
+const CITY_REJECT_RADIUS_KM = 150;
 const PHOTO_MAX_WIDTH_PX = 800;
 
 // Resolves a photo resource name to a public googleusercontent URL. skipHttpRedirect
@@ -119,7 +124,9 @@ async function fetchPlaceDetails(name, city, cityCenter = null) {
       const distKm = haversineKm(cityCenter.lat, cityCenter.lng, lat, lng);
       if (distKm > CITY_REJECT_RADIUS_KM) {
         debugLog('places-fetch', `REJECT name="${name}" city="${city}" reason=too_far_from_city dist_km=${distKm.toFixed(1)} lat=${lat} lng=${lng}`);
-        return null;
+        // Carries no usable detail, so callers treat it as a miss — but the
+        // reason distinguishes an invented venue from a real one out of range.
+        return { rejected: 'too_far', distanceKm: distKm };
       }
     }
     // photoName is the stable resource id; photoUri expires, so keeping the name
@@ -174,8 +181,23 @@ function hasCoords(activity) {
   return Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
 }
 
-async function enrichWithPlaceDetails(activities, cityName, cityCenter = null) {
+// onOutcome is instrumentation for the model bake-off: it reports per activity
+// whether the venue resolved, and the model's opening hours before applyDetails
+// replaces them with the real ones — that comparison is unrecoverable
+// afterwards. Production callers omit it.
+async function enrichWithPlaceDetails(activities, cityName, cityCenter = null, onOutcome = null) {
   if (!Array.isArray(activities) || activities.length === 0) return activities;
+  const report = (activity, status, details) => {
+    if (!onOutcome) return;
+    onOutcome({
+      name: activity.name,
+      type: activity.type,
+      status,
+      distanceKm: details?.distanceKm ?? null,
+      llmHours: activity?.timing?.opening_hours || activity?.opening_hours || null,
+      placesHours: details?.openingHours || null
+    });
+  };
   const targets = activities.filter((a) => !hasCoords(a) || !a.imageUrl);
   const withCoordsBefore = activities.length - activities.filter((a) => !hasCoords(a)).length;
   debugLog('places-enrich', `START city="${cityName}" activities=${activities.length} targets=${targets.length} with_coords_before=${withCoordsBefore} bias=${cityCenter ? `${cityCenter.lat},${cityCenter.lng}` : 'none'}`);
@@ -198,16 +220,21 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null) {
         debugLog('places-fetch', `REJECT name="${activity.name}" city="${cityName}" reason=too_far_cached lat=${cLat} lng=${cLng}`);
       } else {
         debugLog('places-fetch', `OK name="${activity.name}" city="${cityName}" lat=${cLat} lng=${cLng} source=cache`);
+        report(activity, 'resolved', cached);
         applyDetails(activity, cached);
         return;
       }
     }
     const details = await fetchPlaceDetails(activity.name, cityName, cityCenter);
     if (hasUsefulDetails(details)) {
+      report(activity, 'resolved', details);
       applyDetails(activity, details);
       placesCache.set(activity.name, cityName, details);
     } else if (hasUsefulDetails(cached)) {
+      report(activity, 'resolved', cached);
       applyDetails(activity, cached);
+    } else {
+      report(activity, details?.rejected === 'too_far' ? 'too_far' : 'no_place', details);
     }
   }));
   const stillMissing = activities.filter((a) => !hasCoords(a));

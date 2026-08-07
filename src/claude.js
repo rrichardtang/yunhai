@@ -218,7 +218,59 @@ function resolveAccommodations(city = {}) {
   return entries.filter((a) => a && (String(a.address || '').trim() || coordsOf(a)));
 }
 
-async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0, lockedActivities = [], tripId = null, { onPhase = () => {}, generate = null } = {}) {
+function addDays(ymd, n) {
+  const date = new Date(`${ymd}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + n);
+  return date.toISOString().slice(0, 10);
+}
+
+// Generation time is linear in activity count — ~6.2s each, with no measurable
+// fixed cost — so a long stay is far quicker as parallel day-windows than as one
+// serial call. Returns a single window when splitting is off or the stay is short.
+function dateWindows(startDate, tripDays, splitDays) {
+  if (!splitDays || !startDate || tripDays <= splitDays) {
+    return [{ startDate, endDate: startDate ? addDays(startDate, tripDays - 1) : '', days: tripDays }];
+  }
+  const windows = [];
+  for (let offset = 0; offset < tripDays; offset += splitDays) {
+    const days = Math.min(splitDays, tripDays - offset);
+    windows.push({
+      startDate: addDays(startDate, offset),
+      endDate: addDays(startDate, offset + days - 1),
+      days
+    });
+  }
+  return windows;
+}
+
+// Parallel windows cannot see each other's picks, and even a single call repeats
+// itself — one Shangri-La run returned Pudacuo National Park three times under
+// three names. Collapse anything that grounded to the same venue.
+function dedupeByVenue(activities, city) {
+  const seen = new Set();
+  const kept = [];
+  const dropped = [];
+  for (const activity of activities) {
+    // 0,0 is the unset sentinel across the codebase, not a location — treating it
+    // as one would collapse every unresolved activity into a single entry.
+    const coords = coordsOf({ latitude: activity?.location?.lat, longitude: activity?.location?.lng });
+    const key = coords
+      ? `${coords.lat.toFixed(4)},${coords.lng.toFixed(4)}`
+      : `name:${String(activity?.name || '').trim().toLowerCase()}`;
+    if (seen.has(key)) {
+      dropped.push(activity?.name);
+      continue;
+    }
+    seen.add(key);
+    kept.push(activity);
+  }
+  if (dropped.length) {
+    debugLog('plan-city', `DEDUPE city="${city}" dropped=${dropped.length} names="${dropped.slice(0, 8).join(' | ')}"`);
+  }
+  return kept;
+}
+
+async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0, lockedActivities = [], tripId = null, { onPhase = () => {}, generate = null, splitDays = null, onEnrichOutcome = null } = {}) {
   const planCityStartTs = Date.now();
   const { name, startDate, endDate, leaveTime, notes } = city;
   const accommodations = resolveAccommodations(city);
@@ -320,7 +372,22 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
       }`
     : '';
 
-  const prompt = `Plan activities for: ${name} (${startDate} to ${endDate}).\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodationText}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace.\n\nACTIVITY COUNT\nGenerate ${minTotal} activities (${minTotal}–${maxTotal} acceptable). Composition: ${minNonMeal} non-meal (${nonMealPerDay}/day) + AT MOST ${minMeals} meal-type activities total. Slot assignment (lunch vs dinner) is decided downstream by the arrange step — do not pre-assign by name. Names must be the restaurant name as-is, no "Lunch at" / "Dinner at" prefix. If you have more strong restaurant candidates than slots, pick the best ${minMeals} and skip the rest. On arrival/departure days, drop a meal whose natural time falls outside the available window (e.g. drop lunch on a 3pm arrival, drop dinner on an 11am departure) — each dropped meal reduces the count by 1. Use accommodation and travel timing to shape sequencing — lighter arrivals/departures, first/last activities near accommodation or transport hubs.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}${insiderBlock}${shoppingBlock}\n\nReturn JSON only.`;
+  const windows = dateWindows(startDate, tripDays, splitDays);
+
+  // Each window carries the same city context and research, and differs only in
+  // its dates and its share of the activity budget.
+  const buildPrompt = (window, index) => {
+    const winNonMeal = nonMealPerDay * window.days;
+    const winMeals = 2 * window.days;
+    const winTotal = winNonMeal + winMeals;
+    const segmentBlock = windows.length > 1
+      ? `\n\nThis is days ${window.startDate} to ${window.endDate} of a longer stay in ${name} (${startDate} to ${endDate}). Plan ONLY these days. Other days are being planned separately, so choose venues that stand on their own and avoid the single most obvious headline sight unless it belongs in this window.`
+      : '';
+    // Shopping is a whole-stay target, so it rides on the first window only
+    // rather than being multiplied across every one of them.
+    const winShoppingBlock = index === 0 ? shoppingBlock : '';
+    return `Plan activities for: ${name} (${window.startDate} to ${window.endDate}).${segmentBlock}\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodationText}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nThis traveler prefers a ${paceDesc} pace.\n\nACTIVITY COUNT\nGenerate ${winTotal} activities (${winTotal}–${Math.round(winTotal * 1.15)} acceptable). Composition: ${winNonMeal} non-meal (${nonMealPerDay}/day) + AT MOST ${winMeals} meal-type activities. Slot assignment (lunch vs dinner) is decided downstream by the arrange step — do not pre-assign by name. Names must be the restaurant name as-is, no "Lunch at" / "Dinner at" prefix. If you have more strong restaurant candidates than slots, pick the best ${winMeals} and skip the rest. On arrival/departure days, drop a meal whose natural time falls outside the available window (e.g. drop lunch on a 3pm arrival, drop dinner on an 11am departure) — each dropped meal reduces the count by 1. Use accommodation and travel timing to shape sequencing — lighter arrivals/departures, first/last activities near accommodation or transport hubs.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}${insiderBlock}${winShoppingBlock}\n\nReturn JSON only.`;
+  };
 
   const learnedSummary = recall({ userId, tripId, query: name }).text;
   const effectiveSystemPrompt = learnedSummary
@@ -329,23 +396,35 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
 
   const streamMessage = (userContent) => generateText({ system: effectiveSystemPrompt, prompt: userContent });
 
+  const generateWindow = async (window, index) => {
+    const prompt = buildPrompt(window, index);
+    const label = windows.length > 1 ? `${name} [${window.startDate}..${window.endDate}]` : name;
+    debugLog('plan-city', `LLM_CALL city="${label}" model=${generateText.modelId || MODEL} prompt_chars=${prompt.length}`);
+    const first = await streamMessage(prompt);
+    debugLog('plan-city', `LLM_RESPONSE city="${label}" chars=${first.text.length} stop_reason=${first.stop_reason}`);
+    let parsed = tryParseJsonArray(first.text);
+    let last = first;
+
+    if (!parsed) {
+      debugLog('plan-city', `PARSE_FAIL city="${label}" stop_reason=${first.stop_reason} tail="${first.text.slice(-200).replace(/"/g, "'")}"`);
+      debugLog('plan-city', `RETRY city="${label}"`);
+      last = await streamMessage(`${prompt}\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.`);
+      debugLog('plan-city', `LLM_RESPONSE city="${label}" chars=${last.text.length} stop_reason=${last.stop_reason} (retry)`);
+      parsed = tryParseJsonArray(last.text);
+    }
+
+    if (!parsed) {
+      debugLog('plan-city', `THREW city="${label}" reason=parse_failed_after_retry`);
+      throw new Error(`Claude returned invalid JSON for ${label}.`);
+    }
+    return { parsed, retried: last !== first, response: last };
+  };
+
   onPhase('generating');
-  debugLog('plan-city', `LLM_CALL city="${name}" model=${generateText.modelId || MODEL} prompt_chars=${prompt.length}`);
-  const { text: response, stop_reason } = await streamMessage(prompt);
-  debugLog('plan-city', `LLM_RESPONSE city="${name}" chars=${response.length} stop_reason=${stop_reason}`);
-  let parsed = tryParseJsonArray(response);
-
-  if (!parsed) {
-    debugLog('plan-city', `PARSE_FAIL city="${name}" stop_reason=${stop_reason} tail="${response.slice(-200).replace(/"/g, "'")}"`);
-    debugLog('plan-city', `RETRY city="${name}"`);
-    const retry = await streamMessage(prompt + '\n\nIMPORTANT: Return ONLY a valid JSON array. No text before or after.');
-    debugLog('plan-city', `LLM_RESPONSE city="${name}" chars=${retry.text.length} stop_reason=${retry.stop_reason} (retry)`);
-    parsed = tryParseJsonArray(retry.text);
-  }
-
-  if (!parsed) {
-    debugLog('plan-city', `THREW city="${name}" reason=parse_failed_after_retry`);
-    throw new Error(`Claude returned invalid JSON for ${name}.`);
+  const results = await Promise.all(windows.map(generateWindow));
+  const parsed = results.flatMap((result) => result.parsed);
+  if (windows.length > 1) {
+    debugLog('plan-city', `WINDOWS city="${name}" count=${windows.length} split_days=${splitDays} activities=${parsed.length}`);
   }
 
   const normalized = parsed.map((item) => normalizeActivity(item, name));
@@ -357,9 +436,12 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   const cityCenter = accommodations.map(coordsOf).find(Boolean) || coordsOf(city);
   onPhase('enriching');
   debugLog('plan-city', `ENRICH_CALL city="${name}" activities=${filtered.length} bias=${cityCenter ? `${cityCenter.lat},${cityCenter.lng}` : 'none'}`);
-  await enrichWithPlaceDetails(filtered, name, cityCenter);
-  debugLog('plan-city', `RETURN city="${name}" count=${filtered.length} elapsed_ms=${Date.now() - planCityStartTs}`);
-  return filtered;
+  await enrichWithPlaceDetails(filtered, name, cityCenter, onEnrichOutcome);
+  // Runs after grounding so duplicates are caught by resolved venue rather than
+  // by name — the same place arrives under three different labels.
+  const deduped = dedupeByVenue(filtered, name);
+  debugLog('plan-city', `RETURN city="${name}" count=${deduped.length} elapsed_ms=${Date.now() - planCityStartTs}`);
+  return deduped;
 }
 
 function filterInvalidTypes(activities, city) {
@@ -428,4 +510,4 @@ function applyMealPoolCap(activities, { city, minMeals }) {
   return [...nonMeals, ...finalMeals];
 }
 
-module.exports = { planCity, normalizeActivity, blankActivity, SYSTEM_PROMPT };
+module.exports = { planCity, normalizeActivity, blankActivity, dedupeByVenue, dateWindows, SYSTEM_PROMPT };
