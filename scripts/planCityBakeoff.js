@@ -181,18 +181,22 @@ function mean(values) {
   return usable.length ? usable.reduce((a, b) => a + b, 0) / usable.length : null;
 }
 
+// Emitted to stdout and to a markdown file, because the run happens wherever the
+// API keys live and the numbers have to travel back to whoever decides.
 function report(rows) {
   const arms = [...new Set(rows.map((r) => r.arm))];
   const fmt = (v, digits = 1) => (v == null ? '—' : v.toFixed(digits));
+  const lines = [];
 
-  console.log('\n' + '='.repeat(94));
-  console.log('arm               runs  sec/city  retry%  trunc%   raw   kept  resolved%  photo%   $/city');
-  console.log('-'.repeat(94));
+  lines.push(`# planCity bake-off — ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`);
+  lines.push('');
+  lines.push('| arm | runs | sec/city | retry% | trunc% | raw | kept | resolved% | photo% | $/city |');
+  lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
 
   for (const arm of arms) {
     const armRows = rows.filter((r) => r.arm === arm && !r.error);
     if (!armRows.length) {
-      console.log(`${arm.padEnd(17)} all runs failed: ${rows.find((r) => r.arm === arm)?.error}`);
+      lines.push(`| ${arm} | — | all runs failed: ${rows.find((r) => r.arm === arm)?.error} | | | | | | | |`);
       continue;
     }
     const pct = (predicate) => (armRows.filter(predicate).length / armRows.length) * 100;
@@ -200,26 +204,37 @@ function report(rows) {
     const photoPct = mean(armRows.map((r) => (r.kept ? (r.withPhoto / r.kept) * 100 : null)));
     const cost = mean(armRows.map((r) => r.cost));
 
-    console.log(
-      arm.padEnd(17) +
-      String(armRows.length).padStart(4) +
-      fmt(mean(armRows.map((r) => r.seconds))).padStart(10) +
-      fmt(pct((r) => r.retried), 0).padStart(8) +
-      fmt(pct((r) => r.truncated), 0).padStart(8) +
-      fmt(mean(armRows.map((r) => r.raw)), 0).padStart(6) +
-      fmt(mean(armRows.map((r) => r.kept)), 0).padStart(7) +
-      fmt(resolvedPct, 0).padStart(11) +
-      fmt(photoPct, 0).padStart(8) +
-      (cost == null ? '—' : `$${cost.toFixed(3)}`).padStart(9)
-    );
+    lines.push([
+      '', arm, armRows.length,
+      fmt(mean(armRows.map((r) => r.seconds))),
+      fmt(pct((r) => r.retried), 0),
+      fmt(pct((r) => r.truncated), 0),
+      fmt(mean(armRows.map((r) => r.raw)), 0),
+      fmt(mean(armRows.map((r) => r.kept)), 0),
+      fmt(resolvedPct, 0),
+      fmt(photoPct, 0),
+      cost == null ? '—' : `$${cost.toFixed(3)}`,
+      ''
+    ].join(' | ').trim());
   }
 
-  console.log('='.repeat(94));
-  console.log('sec/city and resolved% are the deciding columns: they are speed and quality.');
-  console.log('resolved% = share of activities whose venue name matched a real Google Place.');
-  console.log(`Activity lists written to ${OUT_DIR} — read them blind before trusting the numbers.`);
-  if (rows.some((r) => r.cost == null)) console.log('Missing $/city means no confirmed price for that model.');
-  if (rows.some((r) => r.truncated)) console.log('WARNING: an arm hit its output cap; raise MAX_OUTPUT_TOKENS before believing its yield.');
+  lines.push('');
+  lines.push('`sec/city` and `resolved%` are the deciding columns — they are speed and quality.');
+  lines.push('`resolved%` is the share of activities whose venue name matched a real Google Place;');
+  lines.push('a model that invents plausible venues scores badly here with no human in the loop.');
+  lines.push('');
+  lines.push('Decision rule: >8 points of `resolved%` decides it. Within ~5 points the arms are');
+  lines.push('equivalent on quality — prefer Sonnet 5 (no prompt re-tuning) and pick the effort');
+  lines.push('rung on `sec/city`. Faster but lower `resolved%` loses: speed has a cheaper fix.');
+  lines.push('');
+  lines.push(`Per-arm activity lists are in \`${path.relative(process.cwd(), OUT_DIR)}/\` — read a few blind before trusting the table.`);
+  if (rows.some((r) => r.cost == null)) lines.push('A missing `$/city` means that model has no confirmed price yet.');
+  if (rows.some((r) => r.truncated)) lines.push('**WARNING:** an arm hit its output cap. Raise `MAX_OUTPUT_TOKENS` and re-run before believing its yield.');
+
+  const text = lines.join('\n');
+  console.log('\n' + text);
+  fs.writeFileSync(path.join(OUT_DIR, 'report.md'), text + '\n');
+  console.log(`\nWritten to ${path.relative(process.cwd(), path.join(OUT_DIR, 'report.md'))} — paste that file to share the result.`);
 }
 
 async function main() {
