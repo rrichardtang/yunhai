@@ -1,5 +1,23 @@
 # Open Items
 
+## [2026-08-07] Run the planCity model bake-off and decide Sonnet 5 vs GPT-5.6
+**Status:** Pending input (needs API keys)
+**Description:** `scripts/planCityBakeoff.js` is built and its seam is proven with a stubbed generator, but it has never run against real models — this container has no keys. `planCity` stays on `claude-sonnet-4-6` until it reports.
+**Context:** decisions [2026-08-07]. Two facts about GPT-5.6 are unconfirmed and either disqualifies it outright: its max output tokens (a 36-activity Lijiang array is ~12k) and whether it supports `response_format: {type: "json_schema"}` (which decides whether the parse-retry can be deleted, as `output_config.format` would on Sonnet 5). Sonnet 5 pricing is $3/$15 with an introductory $2/$10 through 2026-08-31.
+**Next action:** Confirm those two GPT-5.6 facts, then `node scripts/planCityBakeoff.js` with all four keys set. Weight sec/city and venue-resolution %; read the per-arm activity lists blind before trusting the table. A tie goes to Sonnet 5 (model-ID swap vs re-tuning SYSTEM_PROMPT for another family).
+
+## [2026-08-07] Verify the Setup → Review fixes against live providers
+**Status:** Pending input (needs deploy)
+**Description:** The plan-progress stream, image ladder, transfer-day timing and per-city failure isolation are unit-tested (202/202) and verified against stubs, but no part of this branch has touched a real LLM, Brave, Places or Unsplash.
+**Context:** changelog [2026-08-07]. Branch `claude/guide-me-setup-stuck-mszkyo`.
+**Next action:** After deploy, replan the Yunnan trip: (1) EventStream shows `city_start`/`phase` within seconds, `: ping` every 15s, no silent gap >15s, bar advances 8 times; (2) cards show venue photos for meals/museums/landmarks and matched pool images elsewhere — `GET /debug?scope=places-fetch` for `photo=yes`, `GET /debug?scope=unsplash` for ~3 pool queries per city and no `rate limit hit`; (3) `GET /debug?scope=plan-city` shows `elapsed_ms` per city to confirm where the time actually goes; (4) confirm no activities land on 2026-10-13 in both cities.
+
+## [2026-08-07] Watch the Google Places photo-media cost line
+**Status:** Deferred
+**Description:** Adding `places.photos` to the field mask plus a `/media` resolve per venue introduces a billed lookup (~$7/1000) where images were previously free via Unsplash. A 66-activity plan is roughly $0.50 before caching.
+**Context:** decisions [2026-08-07]. `placesCache` (90-day TTL) amortises replans, and the first plan after deploy refetches every previously cached venue once because old entries lack the `photoName` key.
+**Next action:** Check the Places billing line after a week of real traffic. If it is material, cap photo lookups to `VENUE_TYPES` only, or resolve photos lazily on card render rather than during planning.
+
 ## [2026-07-30] Shared `/trip/:id` links still require the recipient to sign in
 **Status:** Pending input (product decision)
 **Description:** `/trip/:id` now resolves to the planner shell and the client loads the itinerary from the pre-auth `GET /api/public/itinerary/:id`, but a signed-out recipient never gets that far: `init()` awaits `initClerkAuth()` first, which calls `openSignIn()` and throws "Authentication required" before `maybeLoadSharedItineraryFromUrl()` runs. The `hasShareLink` bypass only skips the *entitlement* check, not the Clerk sign-in — so share links work for any signed-in user (entitled or not) and nobody else.
