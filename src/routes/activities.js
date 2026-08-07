@@ -22,6 +22,7 @@ const { debugLog } = require('../services/debugLog');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
 const ARRANGE_MODEL = 'claude-sonnet-4-6';
+const PLAN_HEARTBEAT_MS = 15000;
 
 const ASSIGN_TOOL = {
   name: 'assign_days',
@@ -668,6 +669,12 @@ Return ONLY valid JSON (no markdown fences):
       res.write(`data: ${JSON.stringify(payload)}\n\n`);
     };
 
+    // Nothing crosses the wire between the headers and the first finished city —
+    // minutes, for a dense multi-city trip. The comment frames keep intermediaries
+    // from idling the connection out and let the client tell "slow" from "dead".
+    const heartbeat = setInterval(() => res.write(': ping\n\n'), PLAN_HEARTBEAT_MS);
+    req.on('close', () => clearInterval(heartbeat));
+
     try {
       const tripTravels = Array.isArray(travels) ? travels.slice(0, 1) : [];
       const cityTravelTiming = await buildCityTravelTiming(cities);
@@ -677,11 +684,14 @@ Return ONLY valid JSON (no markdown fences):
         const cityLocked = Array.isArray(resolvedLockedActivities[city.name])
           ? resolvedLockedActivities[city.name]
           : [];
+        sendEvent({ type: 'city_start', city: city.name });
         await acquireLlmSlot();
         try {
           let activities;
           try {
-            activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren, cityLocked, tripId || null);
+            activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren, cityLocked, tripId || null, {
+              onPhase: (phase) => sendEvent({ type: 'phase', city: city.name, phase })
+            });
           } catch (planErr) {
             debugLog('plan', `planCity THREW city=${city.name} err=${planErr?.message || planErr}`);
             throw planErr;
@@ -715,7 +725,6 @@ Return ONLY valid JSON (no markdown fences):
 
       sendEvent({ type: 'done' });
       debugLog('plan', `DONE cities=${cities.length} elapsed_ms=${Date.now() - planStartTs}`);
-      res.end();
     } catch (error) {
       debugLog('plan', `ERROR msg="${error?.message || error}" code=${error?.code || ''} elapsed_ms=${Date.now() - planStartTs}`);
       if (error.code === 'ANTHROPIC_KEY_MISSING') {
@@ -727,6 +736,8 @@ Return ONLY valid JSON (no markdown fences):
       } else {
         sendEvent({ type: 'error', error: error.message || 'Failed to generate plan' });
       }
+    } finally {
+      clearInterval(heartbeat);
       res.end();
     }
   });

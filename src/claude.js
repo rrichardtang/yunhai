@@ -177,7 +177,7 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
   };
 }
 
-async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0, lockedActivities = [], tripId = null) {
+async function planCity(city, profile = null, userId = 'default', travels = [], travelTiming = null, budget = null, numCities = 1, numTravelers = 1, numChildren = 0, lockedActivities = [], tripId = null, { onPhase = () => {} } = {}) {
   const planCityStartTs = Date.now();
   const { name, startDate, endDate, leaveTime, notes, accommodations } = city;
   debugLog('plan-city', `START city="${name}" travelers=${numTravelers} children=${numChildren} budget=${budget || 'none'} locked=${Array.isArray(lockedActivities) ? lockedActivities.length : 0}`);
@@ -244,6 +244,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   const shoppingInterests = String(profile?.answers?.shoppingInterests || '').trim();
   const shoppingActive = shoppingPerson >= 3;
 
+  onPhase('research');
   const [webResearch, restaurantResearch, insiderResearch, shoppingResearch] = await Promise.all([
     searchCityActivities(name, { year: tripYear }),
     searchTopRestaurants(name, { year: tripYear }),
@@ -296,6 +297,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     return { text: extractText(final.content), stop_reason: final.stop_reason };
   }
 
+  onPhase('generating');
   debugLog('plan-city', `LLM_CALL city="${name}" model=${MODEL} prompt_chars=${prompt.length}`);
   const { text: response, stop_reason } = await streamMessage(prompt);
   debugLog('plan-city', `LLM_RESPONSE city="${name}" chars=${response.length} stop_reason=${stop_reason}`);
@@ -324,6 +326,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   const cityCenter = firstAccomWithCoords
     ? { lat: Number(firstAccomWithCoords.latitude), lng: Number(firstAccomWithCoords.longitude) }
     : null;
+  onPhase('enriching');
   debugLog('plan-city', `ENRICH_CALL city="${name}" activities=${filtered.length} bias=${cityCenter ? `${cityCenter.lat},${cityCenter.lng}` : 'none'}`);
   await enrichWithPlaceDetails(filtered, name, cityCenter);
   debugLog('plan-city', `RETURN city="${name}" count=${filtered.length} elapsed_ms=${Date.now() - planCityStartTs}`);
