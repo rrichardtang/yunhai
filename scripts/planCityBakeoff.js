@@ -106,29 +106,77 @@ const ARMS = {
   'gpt-5.6': () => openaiArm('gpt-5.6')
 };
 
+// What the prompt asks each city for, so a model that quietly under-delivers is
+// visible rather than just looking fast.
+function targetActivityCount(city, profile) {
+  const nonMealPerDay = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6 }[
+    Math.max(1, Math.min(5, Math.round(Number(profile?.answers?.pace) || 3)))
+  ];
+  const days = Math.round((new Date(city.endDate) - new Date(city.startDate)) / 86400000) + 1;
+  return (nonMealPerDay + 2) * days;
+}
+
 // Wraps an arm so the harness can see what planCity does not return: how many
 // generations it took (a second one means the JSON failed to parse), how many
 // activities the model actually emitted before filtering, and token spend.
+const RETRY_MARKER = 'IMPORTANT: Return ONLY a valid JSON array';
+let SPLIT_DAYS = null;
+
 function instrument(generate) {
-  const stats = { calls: 0, rawActivities: 0, inputTokens: 0, outputTokens: 0, truncated: false };
+  const stats = { calls: [], rawActivities: 0, inputTokens: 0, outputTokens: 0, truncated: false, retried: false };
   const wrapped = async (args) => {
-    stats.calls += 1;
     const result = await generate(args);
     stats.inputTokens += result.inputTokens;
     stats.outputTokens += result.outputTokens;
     if (['max_tokens', 'length'].includes(result.stop_reason)) stats.truncated = true;
+    if (String(args.prompt).includes(RETRY_MARKER)) stats.retried = true;
     const parsed = tryParseJsonArray(result.text);
-    if (parsed) stats.rawActivities = parsed.length;
+    // A failed parse contributes nothing and its retry contributes the real
+    // count, so summing stays correct across both retries and split windows.
+    if (parsed) stats.rawActivities += parsed.length;
+    stats.calls.push({
+      promptChars: String(args.prompt).length,
+      stopReason: result.stop_reason,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      parsed: parsed ? parsed.length : null,
+      text: result.text
+    });
     return result;
   };
   wrapped.modelId = generate.modelId;
   return { wrapped, stats };
 }
 
-function costUsd(modelId, stats) {
+function costUsd(modelId, inputTokens, outputTokens) {
   const price = PRICING[modelId];
   if (!price) return null;
-  return (stats.inputTokens / 1e6) * price.in + (stats.outputTokens / 1e6) * price.out;
+  return (inputTokens / 1e6) * price.in + (outputTokens / 1e6) * price.out;
+}
+
+// Rounded to ~11m, the same key planCity dedupes on.
+function distinctVenues(activities) {
+  const keys = new Set();
+  for (const a of activities) {
+    const lat = Number(a?.location?.lat);
+    const lng = Number(a?.location?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) continue;
+    keys.add(`${lat.toFixed(4)},${lng.toFixed(4)}`);
+  }
+  return keys.size;
+}
+
+function summariseOutcomes(outcomes) {
+  const isMeal = (o) => String(o.type || '').toLowerCase() === 'meal';
+  const comparable = outcomes.filter((o) => o.llmHours && o.placesHours);
+  return {
+    noPlace: outcomes.filter((o) => o.status === 'no_place').length,
+    tooFar: outcomes.filter((o) => o.status === 'too_far').length,
+    mealTotal: outcomes.filter(isMeal).length,
+    mealResolved: outcomes.filter((o) => isMeal(o) && o.status === 'resolved').length,
+    hoursComparable: comparable.length,
+    hoursMatched: comparable.filter((o) => o.llmHours === o.placesHours).length
+  };
 }
 
 async function runArm(armName, runIndex) {
@@ -137,6 +185,7 @@ async function runArm(armName, runIndex) {
 
   for (const city of TRIP.cities) {
     const { wrapped, stats } = instrument(generate);
+    const outcomes = [];
     const started = Date.now();
     let activities = [];
     let error = null;
@@ -145,7 +194,7 @@ async function runArm(armName, runIndex) {
       activities = await planCity(
         city, TRIP.profile, 'bakeoff', [], null, null,
         TRIP.cities.length, 1, 0, [], null,
-        { generate: wrapped }
+        { generate: wrapped, splitDays: SPLIT_DAYS, onEnrichOutcome: (o) => outcomes.push(o) }
       );
     } catch (err) {
       error = err.message;
@@ -153,24 +202,40 @@ async function runArm(armName, runIndex) {
 
     const resolved = activities.filter((a) => Number.isFinite(a?.location?.lat) && a.location.lat !== 0).length;
     const withPhoto = activities.filter((a) => a?.imageUrl).length;
+    const seconds = (Date.now() - started) / 1000;
+    const cost = costUsd(generate.modelId, stats.inputTokens, stats.outputTokens);
 
     rows.push({
       arm: armName,
       run: runIndex,
       city: city.name.split(',')[0],
-      seconds: (Date.now() - started) / 1000,
-      retried: stats.calls > 1,
+      seconds,
+      // The number the arms are actually comparable on: sec/city rewards a model
+      // for generating fewer activities than asked.
+      secondsPerActivity: activities.length ? seconds / activities.length : null,
+      target: targetActivityCount(city, TRIP.profile),
+      retried: stats.retried,
       truncated: stats.truncated,
+      stopReasons: stats.calls.map((c) => c.stopReason),
+      windows: stats.calls.length,
       raw: stats.rawActivities,
       kept: activities.length,
       resolved,
+      distinctVenues: distinctVenues(activities),
       withPhoto,
-      cost: costUsd(generate.modelId, stats),
+      ...summariseOutcomes(outcomes),
+      inputTokens: stats.inputTokens,
+      outputTokens: stats.outputTokens,
+      cost,
+      costPerActivity: cost != null && activities.length ? cost / activities.length : null,
       error
     });
 
     const slug = `${armName}-run${runIndex}-${city.name.split(',')[0].replace(/\s+/g, '_')}`;
     fs.writeFileSync(path.join(OUT_DIR, `${slug}.json`), JSON.stringify(activities, null, 2));
+    // Insurance: with the raw text on disk, a metric neither of us thought of is
+    // recomputable offline instead of costing another matrix.
+    fs.writeFileSync(path.join(OUT_DIR, `${slug}.raw.json`), JSON.stringify({ calls: stats.calls, outcomes }, null, 2));
   }
 
   return rows;
@@ -190,8 +255,8 @@ function report(rows) {
 
   lines.push(`# planCity bake-off — ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`);
   lines.push('');
-  lines.push('| arm | runs | sec/city | retry% | trunc% | raw | kept | resolved% | photo% | $/city |');
-  lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
+  lines.push('| arm | runs | sec/act | sec/city | kept/target | distinct% | resolved% | meal res% | hours ok% | noPlace | tooFar | retry% | trunc% | photo% | $/act | $/city |');
+  lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
 
   for (const arm of arms) {
     const armRows = rows.filter((r) => r.arm === arm && !r.error);
@@ -200,32 +265,48 @@ function report(rows) {
       continue;
     }
     const pct = (predicate) => (armRows.filter(predicate).length / armRows.length) * 100;
-    const resolvedPct = mean(armRows.map((r) => (r.kept ? (r.resolved / r.kept) * 100 : null)));
-    const photoPct = mean(armRows.map((r) => (r.kept ? (r.withPhoto / r.kept) * 100 : null)));
+    const ratio = (num, den) => mean(armRows.map((r) => (r[den] ? (r[num] / r[den]) * 100 : null)));
     const cost = mean(armRows.map((r) => r.cost));
+    const costPerAct = mean(armRows.map((r) => r.costPerActivity));
 
     lines.push([
       '', arm, armRows.length,
+      fmt(mean(armRows.map((r) => r.secondsPerActivity)), 2),
       fmt(mean(armRows.map((r) => r.seconds))),
+      `${fmt(mean(armRows.map((r) => r.kept)), 0)}/${fmt(mean(armRows.map((r) => r.target)), 0)}`,
+      fmt(ratio('distinctVenues', 'resolved'), 0),
+      fmt(ratio('resolved', 'kept'), 0),
+      fmt(ratio('mealResolved', 'mealTotal'), 0),
+      fmt(ratio('hoursMatched', 'hoursComparable'), 0),
+      fmt(mean(armRows.map((r) => r.noPlace)), 1),
+      fmt(mean(armRows.map((r) => r.tooFar)), 1),
       fmt(pct((r) => r.retried), 0),
       fmt(pct((r) => r.truncated), 0),
-      fmt(mean(armRows.map((r) => r.raw)), 0),
-      fmt(mean(armRows.map((r) => r.kept)), 0),
-      fmt(resolvedPct, 0),
-      fmt(photoPct, 0),
+      fmt(ratio('withPhoto', 'kept'), 0),
+      costPerAct == null ? '—' : `$${costPerAct.toFixed(4)}`,
       cost == null ? '—' : `$${cost.toFixed(3)}`,
       ''
     ].join(' | ').trim());
   }
 
   lines.push('');
-  lines.push('`sec/city` and `resolved%` are the deciding columns — they are speed and quality.');
-  lines.push('`resolved%` is the share of activities whose venue name matched a real Google Place;');
-  lines.push('a model that invents plausible venues scores badly here with no human in the loop.');
+  lines.push('Read `sec/act`, not `sec/city` — a model that under-delivers against `kept/target`');
+  lines.push('looks fast for the wrong reason. Sonnet 4.6 baselines at ~6.2 sec/act.');
   lines.push('');
-  lines.push('Decision rule: >8 points of `resolved%` decides it. Within ~5 points the arms are');
-  lines.push('equivalent on quality — prefer Sonnet 5 (no prompt re-tuning) and pick the effort');
-  lines.push('rung on `sec/city`. Faster but lower `resolved%` loses: speed has a cheaper fix.');
+  lines.push('`distinct%` is unique venues over resolved ones: it catches a model padding to hit');
+  lines.push('the target by selling the same place three times, which `resolved%` scores as a win.');
+  lines.push('`resolved%` split into `noPlace` (invented venue — the real quality signal) and');
+  lines.push('`tooFar` (real venue beyond the day-trip radius, usually not the model\'s fault).');
+  lines.push('`meal res%` matters on its own: restaurants carry the strictest naming rules and are');
+  lines.push('where the baseline failed. `hours ok%` is how often the model\'s opening hours matched');
+  lines.push('Google — the baseline was 0 for 3 on Pudacuo, inventing evening hours for a park that');
+  lines.push('shuts at 16:30.');
+  lines.push('');
+  lines.push('Decision rule: quality first — `distinct%`, `noPlace`, and `meal res%` together, not');
+  lines.push('`resolved%` alone, which sat at 93% for the baseline and has little room to separate');
+  lines.push('the arms. On a quality tie, prefer Sonnet 5 (no prompt re-tuning) and choose the');
+  lines.push('effort rung on `sec/act` and `$/act`. Faster but worse loses: splitting the call is a');
+  lines.push('~3x speed lever available to every arm, so speed is the cheap axis here.');
   lines.push('');
   lines.push(`Per-arm activity lists are in \`${path.relative(process.cwd(), OUT_DIR)}/\` — read a few blind before trusting the table.`);
   if (rows.some((r) => r.cost == null)) lines.push('A missing `$/city` means that model has no confirmed price yet.');
@@ -240,6 +321,9 @@ function report(rows) {
 async function main() {
   const args = process.argv.slice(2);
   const runs = Number(args[args.indexOf('--runs') + 1]) || 3;
+  // --split N generates the stay as parallel N-day windows instead of one call.
+  // Off by default so the baseline arm stays comparable to production.
+  SPLIT_DAYS = args.includes('--split') ? Number(args[args.indexOf('--split') + 1]) || null : null;
   const selected = args.includes('--arms')
     ? args[args.indexOf('--arms') + 1].split(',')
     : Object.keys(ARMS);

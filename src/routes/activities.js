@@ -21,6 +21,10 @@ const { enrichWithPlaceDetails, formatOpeningHoursFromPlaces, PRICE_LEVEL_MAP } 
 const { debugLog } = require('../services/debugLog');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
+// Generating a stay as parallel N-day windows instead of one serial call is
+// roughly a 3x speed win, but it changes the activity mix, so it ships off and
+// is enabled per environment once the bake-off has compared the two.
+const PLAN_SPLIT_DAYS = Number(process.env.PLAN_SPLIT_DAYS) || null;
 const ARRANGE_MODEL = 'claude-sonnet-4-6';
 const PLAN_HEARTBEAT_MS = 15000;
 
@@ -690,7 +694,8 @@ Return ONLY valid JSON (no markdown fences):
         await acquireLlmSlot();
         try {
           const activities = await planCity(city, profile, resolvedUserId, tripTravels, timing, resolvedBudget, cities.length, resolvedTravelers, resolvedChildren, cityLocked, tripId || null, {
-            onPhase: (phase) => sendEvent({ type: 'phase', city: city.name, phase })
+            onPhase: (phase) => sendEvent({ type: 'phase', city: city.name, phase }),
+            splitDays: PLAN_SPLIT_DAYS
           });
           debugLog('plan', `planCity RETURNED city=${city.name} count=${activities?.length || 0}`);
 
