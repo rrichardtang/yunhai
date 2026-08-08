@@ -1551,8 +1551,13 @@ Removed from all three prompts and from the user prompt built in `planCity`:
   before enrichment is what deleted a full 12-restaurant meal list.
 - **`cost_type`** — `normalizeActivity` collapsed anything but the exact string `per_group` to
   `per_person` regardless.
-- **`booking_type`** — `normalizeActivity` already carried the type→booking mapping as a fallback;
-  removing the field simply lets it run.
+- **`booking_type`** — now derived from type *and cost*. The type-only mapping already in
+  `normalizeActivity` disagreed with the model on **36 of 135** saved activities, in both
+  directions: it put an affiliate link on free hikes and viewpoints (`sports`/`landmark`
+  `none → attraction`) and stripped it from ticketed parks the model had typed `neighborhood`
+  (`attraction → none`). Cost was the signal the model was reading. `bookingTypeFor` is now
+  meal→restaurant, tour→tour, shopping→none (its cost is spend, not admission), everything else
+  `attraction` when it costs something and `none` when it does not.
 - **`city`** — `planCity` now passes `shortCity(name)` as the fallback, so `activity.city` stays
   `Lijiang` rather than becoming the qualified `Lijiang, Yunnan, China` that broke image queries.
 - **The "no Lunch at / Dinner at prefix" rule** — `stripMealPrefix` in `normalizeActivity` does it
