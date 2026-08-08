@@ -4,13 +4,13 @@ data/
 logs/
 .env
 *.log
-.claude/
 # InsForge & AI agent skills
 .insforge
 .agent
 .agents
 .augment
-.claude
+.claude/*
+!.claude/settings.json
 .cline
 .github/copilot*
 .kilocode
