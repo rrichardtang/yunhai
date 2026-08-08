@@ -4,6 +4,55 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-08] Blind read of all four arms, and the opening-hours fabrication it found
+
+Read the 8 saved lists at `/debug/bakeoff?file=blind-read.md` (2 cities x 4 arms), keyed after
+judging. Three findings.
+
+**The museum question is answered, and museums were never the problem.** Against a profile of
+museums 2/5, performances 2/5, structuredTours 1/5:
+
+| arm | museums | `tour` type | of which real performances/workshops |
+|---|---:|---:|---:|
+| gpt-5.6 bare | 5 | 0 | 0 |
+| gpt-5.6+gpt | 0 | 0 | 0 |
+| sonnet-4-6 | 2 | 12 | 6 |
+| gpt-5.6+lean | 1 | 0 | 0 |
+
+Sonnet 4.6 respects the museum rating but puts 12 `tour` activities in 66. Roughly half are
+mislabels (Pudacuo National Park and Balagezong are scenic areas). The rest are real: Impression
+Lijiang ($45), Naxi Ancient Music ($23), Tibetan Folk Dance Show, Thangka Workshop ($35), Butter
+Tea Ceremony, Pu'er Tea Tasting — six structured/performance bookings against ratings of 1/5 and
+2/5, plus an Evening Bar Crawl against nightlife 1/5.
+
+**Sonnet also produces trip-level errors no other arm does.** A 10-hour "Lijiang to Shangri-La
+Scenic Drive (Day Trip)" on an itinerary that moves to Shangri-La five days later; a Meili Snow
+Mountain entry whose own pitfall says it "requires an overnight stay in Deqin"; a Tiger Leaping
+Gorge entry filed under Shangri-La with venue city `Lijiang`, whose pitfall calls the single-day
+version "brutal"; and 7 Shangri-La meal entries across 4 restaurants (Compass three times, Xiaocai
+twice). `gpt-5.6+lean` has none of these — one gorge entry, no cross-city day trip, 12 Lijiang
+meals across 12 distinct restaurants. The two lean-prompt lines added for this ("One destination is
+one activity"; "Drop any activity whose own pitfall argues against doing it") are doing the work,
+and no metric column shows it.
+
+**The defect: `normalizeActivity` invented opening hours for unstructured activities.** 11 of 24
+non-meal Lijiang activities asked for a time their own hours forbade — a dawn old-town walk at
+07:00 carrying `neighborhood`'s 09:00-21:00, a 10-hour Tiger Leaping Gorge hike at 06:30 carrying
+`sports`' 10:00-21:00 so it could not start before 10:00. Cause was `claude.js:307` falling back to
+`arrangeConfig`'s category default whenever the model omitted `opening_hours`, which is always —
+none of the three prompts ask for the field. Fixed by keying the fallback on `venue_name` rather
+than type (commit `92fdce9`): a gated venue keeps a default until Places answers, an unstructured
+activity gets `''`, which `parseOpeningHours` already reads as `[[0, 1440]]`. Meals unchanged —
+their category default was already `''` and they always carry a synthesised `venue_name`.
+
+Verified against the exact failing cases: all now schedulable at the time they ask for, Mu Mansion
+still keeps 09:00-18:00. Two tests added to `planPrompt.test.js`, no API key needed; 273/273 pass.
+
+Also checked and **not** a bug: all 22 lean meals carry empty hours, which looked like broken
+lunch/dinner anchoring. `mealSlotCapability` returns `{lunch: true, dinner: true}` on empty, so they
+place freely. Sonnet's invented restaurant hours are the riskier behaviour — a fabricated window can
+wrongly exclude a slot.
+
 ## [2026-08-08] The traveler profile never reached the planner
 
 Branch `claude/guide-me-setup-stuck-mszkyo`. `planCity` read three keys off `profile.answers` —

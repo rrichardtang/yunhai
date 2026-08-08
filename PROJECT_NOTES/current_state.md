@@ -3,73 +3,77 @@
 _Last updated: 2026-08-08_
 
 ## Objective
-Ship branch `claude/guide-me-setup-stuck-mszkyo`. The model question that gated it is **closed** —
-`planCity` stays on `claude-sonnet-4-6` (decisions [2026-08-08]). What remains is one measurement
-(`--split 2`), then deploy behind the three queued branches (`claude/yunhai-url-endpoints-t6a3ja`,
-`claude/budget-optimization-loading-screens-4hc6a3`, `claude/codebase-review-sweep-2z6t4h`).
+Ship branch `claude/guide-me-setup-stuck-mszkyo`. Two decisions remain open — which model
+`planCity` runs, and whether `PLAN_SPLIT_DAYS` is set — then deploy behind the three queued
+branches (`claude/yunhai-url-endpoints-t6a3ja`, `claude/budget-optimization-loading-screens-4hc6a3`,
+`claude/codebase-review-sweep-2z6t4h`).
 
 ## Active Workstream
-The branch fixed the reported "stuck" plan, then found and fixed the grounding bug underneath it.
-Measured on staging, both Yunnan cities:
+The branch fixed the reported "stuck" plan, then found three bugs underneath it that each
+invalidated the measurement before it. In order: `planCity` read 3 of ~12 profile keys and dropped
+the rest, so no arm was ever judged on profile fit; `applyMealPoolCap` deleted every meal that
+arrived without opening hours, which the report then displayed as "the model returned no meals";
+and `normalizeActivity` stamped a category-default opening window on activities that have no venue,
+which `arrangeScheduler` enforced.
 
-| | delivered / target | grounding | sec/act | $/act |
-|---|---:|---:|---:|---:|
-| Sonnet 4.6 (kept) | 66 / 66 | 100% | 6.08 | $0.0054 |
-| GPT-5.6 Sol | 70 / 66 | 100% | 6.24 | $0.0083 |
+Current standing on staging, both Yunnan cities, after Phase 1A/1B and the hours fix:
 
-GPT-5.6 was 3% slower, 54% dearer, and returned **zero meals in both cities** with non-activity
-filler. Sonnet 5 was rejected on analysis, not measurement — see the tradeoff note in decisions.
+| run | arm | sec/act | kept/target | distinct% | meals | $/act |
+|---|---|---:|---:|---:|---:|---:|
+| control | sonnet-4-6 | 6.08 | 66/66 | 71 | 17/22 | $0.0054 |
+| 06:20 | gpt-5.6+lean | 9.13 | 22/33 | 90 | 0/22 | $0.0155 |
+| **17:53** | **gpt-5.6+lean** | **5.65** | **33/33** | **89** | **22/22** | **$0.0094** |
 
-The decisive finding was that the plan step's problem was never the model: before the `venue_name`
-lookup fix the same model delivered 30/36 and 22/30 with mis-resolved pins and destroyed opening
-hours. Four grounding fixes landed on this branch — Places keyed on `venue_name`, dedupe by name
-rather than coordinate, 24/7 Places hours no longer overwriting the model's, and concurrent
-lookups for one venue coalesced.
+`kept/target` and `meals` are per-city averages in the raw report; totals shown here.
+
+The second blind read (8 lists, 2 cities x 4 arms) is done and is the only evidence on profile fit.
+It clears `gpt-5.6+lean` on every axis and finds Sonnet 4.6 placing 12 `tour` activities against a
+structuredTours rating of 1/5, a cross-city day trip to the city the traveler moves to five days
+later, and three meal entries pointing at one restaurant. See changelog [2026-08-08].
 
 ## Constraints
-- Do not revisit the model without new evidence. The harness (`scripts/planCityBakeoff.js`) and its
-  Brave cassette are checked in; a rerun costs ~$0.20 per arm per city.
-- `PLAN_SPLIT_DAYS` stays unset until the A/B reports — splitting changes the activity mix, not
-  just the latency.
-- Sonnet 5's introductory $2/$10 expires **2026-08-31**; any future cost case built on it dies then.
-- Bake-off rows are priced on the model the provider reports serving, not the string requested —
-  GPT-5.6 tiers differ 5x on output price. Keep it that way.
-- Places photo-media lookups are billed (~$7/1000); `placesCache` amortises them.
+- **Meals may not be planned independently of activities.** A restaurant an hour from any activity
+  is not a valid suggestion; it must be near one or on the way between two. Governs Phase 2.
+- **Never prompt for something the pipeline then silently drops, overrides or calls an error.** If
+  deterministic logic covers it, it does not belong in the prompt at all. This is what the hours fix
+  enforced, and what `applyMealPoolCap` violated.
+- `SYSTEM_PROMPT` is byte-identical to its pre-bake-off state on purpose — changing it moves the
+  control arm. Three quality rules are therefore missing from production; see open_items.
+- `PLAN_SPLIT_DAYS` stays unset until the A/B reports — splitting changes activity mix, not just
+  latency.
+- Bake-off rows are priced on the model the provider reports serving, not the string requested.
+- Sonnet 5's introductory $2/$10 expires **2026-08-31**; any cost case built on it dies then.
+- Places photo-media lookups are billed (~$7/1000); a cache miss costs 2 requests (Text Search +
+  `/media`). Live cache hit rate is 25%.
 - `PLAN_PHASES_PER_CITY` (client) must equal the progress-emitting events per city on the server.
 - Frontend stays a monolith (`public/app.js`); `innerHTML` through `esc()`, `dataset.*` re-escaped.
   Identity always from `getAuthedUserId(req)`. `STEP_SLUGS` duplicated in `src/server.js` and
   `public/app.js`. Deploys via `deployment/promotion.sh` only; run the harness from the staging tree.
 
 ## Risks
-- Nothing on this branch has been verified through the UI — the plan stream, image ladder,
-  transfer-day timing and per-city failure isolation are unit-tested and proven against the
-  `/api/plan` route, but no one has watched a real browser session.
-- **The blind read found a live defect in the kept model's output**: 11 of Sonnet 4.6's 66
-  activities (17%) carry a `preferred_time` outside their own `opening_hours`, and
-  `arrangeScheduler` honours the hours — so a "Napa Lake Sunrise" at 06:30 gets rescheduled to
-  09:00 and the activity's premise is destroyed. Seven of those are `placesEnrich` overwriting the
-  model's hours with a gate or box-office window for `neighborhood`/`tour` activities. See
-  open_items [2026-08-08]; six ranked fixes, all prompt or enrichment, none a model change.
-- `distinct%` is weaker evidence than it looked. It keys on Places coordinates, and the collapse it
-  penalises concentrates in dense-old-town restaurants — which GPT-5.6 produced none of, so its 76%
-  vs Sonnet's 71% partly measures the meals failure rather than padding. GPT also leaves
-  `venue_name` null on 41% of activities (Sonnet 26%), so more of its list is never grounded.
-  The prose shows **both** models padding to hit the count, by different mechanisms.
-- Two rejections rest on analysis, not measurement: Sonnet 5 was never run, and GPT-5.6's cheaper
-  tiers were inferred from Sol's result. Both are stated as assumptions in decisions [2026-08-08].
-  One supporting argument in that record — GPT's zero meals — is partly explained by a
-  contradiction in our own prompt (open_items [2026-08-08]). The decision still stands on cost and
-  speed, which are unambiguous.
+- **Nothing on this branch has been verified through the UI.** The plan stream, image ladder,
+  transfer-day timing and per-city failure isolation are unit-tested (273/273) and proven against
+  the `/api/plan` route, but no one has watched a real browser session.
+- **Three measurements in a row were invalidated by bugs in our own pipeline, not the models.** Each
+  looked like a clean model result and read as a quality finding. Treat any single bake-off column
+  as provisional until a blind read or a diagnostic confirms the mechanism behind it.
+- `distinct%` keys on Places coordinates and penalises the dense-old-town restaurant clustering that
+  a good meal list produces, so it partly measures meal density rather than padding.
+- `--split 2` is still unmeasured — it is the actual fix for the complaint that opened this session
+  (~186s/city) and the last untested lever on the branch.
+- Report columns `kept/target` and `meals ok` are per-city averages, which read as totals and have
+  caused two misreadings. Fix the harness label when next touching it.
 - (Carried over) `GOOGLE_MAPS_API_KEY` rotation + `EMAIL_WEBHOOK_SECRET`/`OWNER_USER_ID` env setup
   still pending; memory-layer / arrange-overhaul / grounding keyed verifications still outstanding.
 
 ## Next Actions
-1. Decide which of the six quality fixes in open_items [2026-08-08] land. The hours-overwrite fix
-   and the meals contradiction are the two with user-visible consequences.
-2. A/B `--split 2` against unsplit — the last unmeasured lever, ~3x on wall time (225s → ~75s per
-   city) and the actual fix for the reported complaint. Costs one run. Worth folding the prompt
-   fixes in first so one run measures both.
-3. Decide `PLAN_SPLIT_DAYS` from that run: the speed win against whatever it does to activity mix.
-4. Deploy the branch behind the three queued ones, then walk the post-deploy checklist in
+1. Run `--split 2` (~$0.60). Back up `data/bakeoff` first — it reuses the same filenames. Compare
+   `sec/city` against 186.3 and watch `kept/target` and `distinct%` for what splitting costs in mix.
+2. Decide the model (open_items [2026-08-08]). This is the branch's biggest open question and it
+   gates whether the three missing `SYSTEM_PROMPT` rules need porting at all.
+3. Decide `PLAN_SPLIT_DAYS` from the run in (1).
+4. Phase 2: cluster-based meal sourcing, so restaurants are drawn near or between activity clusters
+   rather than planned independently. Designed in `PROJECT_NOTES/plan-deterministic-prompt-split.md`,
+   not started.
+5. Deploy behind the three queued branches, then walk the post-deploy checklist in
    open_items [2026-08-07].
-5. Resume the sweep-branch ops follow-ups and the queued keyed verifications.

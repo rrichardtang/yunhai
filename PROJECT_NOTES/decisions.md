@@ -4,6 +4,18 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-08] A category default for opening hours is keyed on whether the place has a gate, not on its type
+
+**Decision:** `normalizeActivity` applies `arrangeConfig`'s per-type `openingHours` default only when the activity has a `venue_name`. An activity with `venue_name: null` — a district walk, a sunset spot, a trailhead — gets `''`.
+
+**Reasoning:** None of the three prompts ask the model for `opening_hours`, so the default fired on essentially every activity. For a gated venue that is harmless: it is a placeholder that `enrichWithPlaceDetails` overwrites with real Places hours moments later, and a reasonable guess if Places has nothing. For an unstructured activity it is a fabrication about a gate that does not exist, and `arrangeScheduler` treats it as a hard constraint. The blind read measured the cost at 11 of 24 non-meal Lijiang activities carrying a `preferred_time` their own hours forbade. `venue_name` is exactly the right key because it is already the signal for "this is a real place Google can resolve" — the same field that selects the full vs minimal Places field mask.
+
+**Alternatives rejected:** *Widen the neighborhood/sports defaults to 00:00-24:00.* Encodes the same claim (this activity has hours, and they are all day) in a form that still gets parsed and compared; `''` says the honest thing, and the scheduler already reads it as unconstrained. *Ask the model for `opening_hours`.* Directly violates the standing rule that anything covered by deterministic logic stays out of the prompt — and the model's answer would be a guess we then enforce, which is the failure mode being fixed. *Drop the defaults entirely, for gated venues too.* Loses a genuinely useful fallback when Places has no hours for a real venue; a museum probably is 10:00-18:00.
+
+**Tradeoffs:** An unstructured activity that genuinely does have hours — a ticketed park the model typed `neighborhood`, a boardwalk that closes at dusk — is now unconstrained and can be scheduled outside them. That was already true whenever the model's `venue_name` was null, since Places never supplied hours for those after the Phase 1B minimal-lookup change; this makes it explicit rather than papering over it with a wrong constant. Genuine cases should surface as a `venue_name`, which is the field that fixes them properly.
+
+**Note on how it was missed:** Phase 1B stopped Places from writing a district gate's hours onto a district walk and added `smokePlaces.js` to assert it. That assertion passes and always did — it checks that Places writes no hours, not that the activity ends up unconstrained, so the category default underneath was invisible to it. Coverage now sits in `planPrompt.test.js` at the layer that matters, and needs no API key.
+
 ## [2026-08-07] Activity images come from the venue first, a per-city pool second — never a per-activity keyword search
 
 **Decision:** Drop per-activity Unsplash keyword search entirely. Activities that resolve to a Google Place take that venue's own photo, fetched by adding `places.photos` to the field mask `enrichWithPlaceDetails` already sends. Everything else matches against a per-city pool of ~90 photos built from 3 searches, scored locally by name/tag overlap with per-type hints.
