@@ -611,35 +611,20 @@ function applyMealPoolCap(activities, { city, minMeals }) {
     if (isMealNormalized(a)) meals.push(a);
     else nonMeals.push(a);
   }
+  if (meals.length <= minMeals) return [...nonMeals, ...meals];
 
-  const kept = [];
-  const droppedNoHours = [];
-  for (const m of meals) {
-    if (m.timing?.opening_hours) kept.push(m);
-    else droppedNoHours.push(m);
-  }
+  const ranked = [...meals]
+    .map((m, idx) => ({ m, idx, score: mealQualityScore(m) }))
+    .sort((a, b) => (b.score - a.score) || (a.idx - b.idx));
+  const finalMeals = ranked.slice(0, minMeals).map((entry) => entry.m);
 
-  let droppedOverage = [];
-  let finalMeals = kept;
-  if (kept.length > minMeals) {
-    const ranked = [...kept]
-      .map((m, idx) => ({ m, idx, score: mealQualityScore(m) }))
-      .sort((a, b) => (b.score - a.score) || (a.idx - b.idx));
-    finalMeals = ranked.slice(0, minMeals).map((entry) => entry.m);
-    droppedOverage = ranked.slice(minMeals).map((entry) => entry.m);
-  }
-
-  if (droppedNoHours.length || droppedOverage.length) {
-    console.warn('[plan] meal pool trim', {
-      city,
-      generated: meals.length,
-      kept: finalMeals.length,
-      cap: minMeals,
-      dropped_no_hours: droppedNoHours.map((m) => m.name),
-      dropped_overage: droppedOverage.map((m) => m.name)
-    });
-  }
-
+  console.warn('[plan] meal pool trim', {
+    city,
+    generated: meals.length,
+    kept: finalMeals.length,
+    cap: minMeals,
+    dropped_overage: ranked.slice(minMeals).map((entry) => entry.m.name)
+  });
   return [...nonMeals, ...finalMeals];
 }
 
