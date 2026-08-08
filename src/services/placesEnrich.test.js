@@ -135,6 +135,21 @@ test('the venue name is what reaches Places, not the activity label', async () =
   assert.doesNotMatch(query, /Kora Circuit/);
 });
 
+test('concurrent activities at one venue share a single lookup', async () => {
+  process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+  const calls = stubFetch(() => searchResponse());
+
+  // Six Dukezong activities in one Shangri-La run cost six lookups apiece.
+  const venueName = venue('Dukezong Ancient Town');
+  const activities = ['Evening Wander', 'Rooftop Sunset', 'Bar Crawl'].map((label) => ({
+    name: label, venue_name: venueName, type: 'neighborhood'
+  }));
+  await enrichWithPlaceDetails(activities, 'Shangri-La');
+
+  assert.equal(calls.filter((c) => c.url.includes(':searchText')).length, 1);
+  for (const activity of activities) assert.equal(activity.location.lat, 26.88);
+});
+
 test('an activity with no venue name falls back to its label', async () => {
   process.env.GOOGLE_MAPS_API_KEY = 'test-key';
   const calls = stubFetch(() => searchResponse());

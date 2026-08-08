@@ -223,6 +223,15 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null, o
   function hasLocation(d) {
     return !!(d && d.location?.latitude && d.location?.longitude);
   }
+  // Activities resolve concurrently, so several at one venue all miss the disk
+  // cache at the same instant and fetch it separately — one Shangri-La run spent
+  // 10 lookups on 4 venues, each photo hit billed twice over. Sharing the
+  // in-flight promise collapses them. The map lives for this call only.
+  const inFlight = new Map();
+  const resolveVenue = (name) => {
+    if (!inFlight.has(name)) inFlight.set(name, fetchPlaceDetails(name, cityName, cityCenter));
+    return inFlight.get(name);
+  };
   await Promise.all(targets.map(async (activity) => {
     const lookupName = placesQuery(activity);
     const cached = placesCache.get(lookupName, cityName);
@@ -242,7 +251,7 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null, o
         return;
       }
     }
-    const details = await fetchPlaceDetails(lookupName, cityName, cityCenter);
+    const details = await resolveVenue(lookupName);
     if (hasUsefulDetails(details)) {
       report(activity, 'resolved', details);
       applyDetails(activity, details);
