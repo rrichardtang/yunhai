@@ -663,3 +663,27 @@ deliberately disagree.
 twice until one arm wins and the loser is deleted. That is accepted as the cost of a clean
 measurement, and it is explicitly temporary — the intent is to merge the winner and delete the
 other, not to maintain two prompts indefinitely.
+
+## [2026-08-08] Correction to the planCity model decision: the zero-meal evidence was false
+
+**Correction, not a reversal.** The [2026-08-08] decision to keep `claude-sonnet-4-6` cites
+"GPT-5.6 returned zero meals in both cities against a mandatory 12 and 10" as supporting evidence.
+That is wrong. GPT-5.6 emitted 12 meal objects for Lijiang — exactly the target — and
+`applyMealPoolCap` deleted all of them before enrichment because it screened on `opening_hours`
+while the prompt instructed the model to leave unknown hours null. `raw: 36, kept: 24, meals: 0`
+with 12 `"type": "meal"` objects in the saved call text.
+
+**The decision stands** on cost and speed, which the bug does not touch: GPT-5.6 Sol was ~3% slower
+and 54% more expensive per activity. Nothing in the correction moves those.
+
+**What it does invalidate:** every quality comparison involving meals, and by extension the claim
+that Sonnet handled the strictest naming rules better. Sonnet only cleared the screen because it
+emitted `opening_hours` — including five distinct split-shift patterns for five Lijiang restaurants
+that look invented. The pipeline was rewarding hallucinated hours and deleting honest nulls, so the
+meals column measured willingness to guess, not restaurant quality.
+
+**Reasoning for recording rather than quietly re-running:** the decision is referenced by
+`current_state.md` and gated a branch. A reader who finds the zero-meal claim elsewhere needs to
+find this next to it. The quality comparison is re-run after Phase 1 of
+`plan-deterministic-prompt-split.md`, not before — until the pipeline stops fighting the model,
+another run measures the same artifact.
