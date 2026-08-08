@@ -72,13 +72,82 @@ test('the restaurant research block does not re-open the meals escape hatch', as
   assert.doesNotMatch(prompt, /if hours aren't listed/);
 });
 
-test('the GPT prompt closes the escape hatch that produced zero meals', () => {
-  // SYSTEM_PROMPT holds both "meals are MANDATORY" and "omit the restaurant if
-  // hours are missing". GPT-5.6 obeyed the second one, in both cities.
-  assert.match(SYSTEM_PROMPT, /OMIT the restaurant from your output rather than guessing/);
-  assert.doesNotMatch(SYSTEM_PROMPT_GPT, /OMIT the restaurant/);
-  assert.match(SYSTEM_PROMPT_GPT, /set opening_hours to null and STILL INCLUDE IT/);
-  assert.match(SYSTEM_PROMPT_GPT, /never a reason to drop a meal/);
+test('no prompt asks for a field the pipeline decides itself', async () => {
+  // The governing rule: if deterministic logic covers it, it is not in the prompt.
+  // Asking and then overwriting wastes output tokens and lets prompt and code
+  // disagree silently — which is how applyMealPoolCap deleted a full meal list.
+  const deterministic = [
+    [/opening_hours/, 'placesEnrich overwrites it from Google'],
+    [/cost_type/, 'normalizeActivity collapses everything to per_person'],
+    [/booking_type/, 'normalizeActivity derives it from type'],
+    [/Lunch at/, 'stripMealPrefix removes the prefix'],
+    [/appears at most once/, 'dedupeActivities collapses a repeated venue']
+  ];
+  const prompts = { SYSTEM_PROMPT, SYSTEM_PROMPT_GPT, SYSTEM_PROMPT_GPT_LEAN };
+  for (const [label, prompt] of Object.entries(prompts)) {
+    for (const [pattern, why] of deterministic) {
+      assert.doesNotMatch(prompt, pattern, `${label} still asks for ${pattern} — ${why}`);
+    }
+  }
+  const { prompt } = await capture(PROFILE);
+  for (const [pattern, why] of deterministic) {
+    assert.doesNotMatch(prompt, pattern, `user prompt still asks for ${pattern} — ${why}`);
+  }
+});
+
+test('code supplies what the prompt stopped asking for', async () => {
+  const seen = [];
+  const generate = async ({ prompt }) => {
+    seen.push(prompt);
+    return {
+      text: JSON.stringify([
+        { name: 'Dinner at Heshu Restaurant', type: 'meal', venue_name: 'Heshu, Lijiang', why_it_fits: 'Order the stone pot fish.', duration_hours: 1.5, estimated_cost_usd: 25 },
+        { name: 'Visit Mu Family Mansion', type: 'landmark', venue_name: 'Mu Family Mansion, Lijiang', duration_hours: 1.5, estimated_cost_usd: 8 },
+        { name: 'Black Dragon Pool Dawn', type: 'neighborhood', duration_hours: 1, estimated_cost_usd: 0 }
+      ]),
+      stop_reason: 'end_turn'
+    };
+  };
+  generate.modelId = 'test';
+  const out = await planCity(CITY, PROFILE, 'strip-test', [], null, null, 1, 1, 0, [], null, { generate });
+  const byName = Object.fromEntries(out.map((a) => [a.name, a]));
+
+  assert.ok(byName['Heshu Restaurant'], 'meal-slot prefix stripped from the name');
+  assert.ok(byName['Mu Family Mansion'], '"Visit " stripped too');
+  assert.equal(byName['Heshu Restaurant'].booking.type, 'restaurant', 'booking type derived from type');
+  assert.equal(byName['Mu Family Mansion'].booking.type, 'attraction');
+  assert.equal(byName['Black Dragon Pool Dawn'].booking.type, 'none');
+  assert.equal(byName['Heshu Restaurant'].cost.type, 'per_person');
+  // The qualified name is what broke every image query, so the fallback shortens it.
+  assert.equal(byName['Heshu Restaurant'].city, 'Lijiang');
+});
+
+test('a venue sold twice under two names collapses', async () => {
+  // Sonnet sold Compass three times in one Shangri-La list. The prompt rule that
+  // forbade it is gone, so this has to hold in code.
+  const generate = async () => ({
+    text: JSON.stringify([
+      { name: 'Compass Yak Burger', type: 'meal', venue_name: 'Compass, Shangri-La', why_it_fits: 'Order the yak burger.', duration_hours: 1.5 },
+      { name: 'Compass Goat Hot Pot', type: 'meal', venue_name: 'Compass, Shangri-La', why_it_fits: 'Order the goat hot pot.', duration_hours: 1.5 },
+      { name: 'Dukezong Evening Wander', type: 'neighborhood', duration_hours: 2 },
+      { name: 'Dukezong Dawn Walk', type: 'neighborhood', duration_hours: 1 }
+    ]),
+    stop_reason: 'end_turn'
+  });
+  generate.modelId = 'test';
+  const out = await planCity(CITY, PROFILE, 'dedupe-test', [], null, null, 1, 1, 0, [], null, { generate });
+
+  assert.equal(out.filter((a) => a.venue_name === 'Compass, Shangri-La').length, 1, 'repeated venue collapsed');
+  // Two unstructured walks in one district are genuinely distinct — venue_name is
+  // null by design there, so they must survive.
+  assert.equal(out.filter((a) => a.type === 'neighborhood').length, 2);
+});
+
+test('the meals rule survives without the hours it used to hang on', () => {
+  for (const prompt of [SYSTEM_PROMPT, SYSTEM_PROMPT_GPT, SYSTEM_PROMPT_GPT_LEAN]) {
+    assert.match(prompt, /must-order dishes/);
+    assert.doesNotMatch(prompt, /OMIT the restaurant/);
+  }
 });
 
 test('the GPT prompt states a null rate for insider_tips instead of permitting one', () => {
@@ -93,7 +162,6 @@ test('the GPT prompt names the padding shapes both models actually produced', ()
     /return fewer and stop/,
     /Logistics as activities/,
     /Splitting one destination/,
-    /Re-using a venue/,
     /whose own pitfall argues against doing it/,
     /day trip to a city that appears elsewhere/
   ]) {
@@ -101,11 +169,11 @@ test('the GPT prompt names the padding shapes both models actually produced', ()
   }
 });
 
-test('venue_name and suggested_time rules close the two grounding gaps', () => {
+test('the venue_name rule still closes the grounding gap', () => {
   // GPT left venue_name null on 41% of activities, including priced ones, which
-  // dodges Places grounding entirely.
+  // dodges Places grounding entirely. This is a correctness rule, not a
+  // deterministic one — no code can tell whether a place has a gate.
   assert.match(SYSTEM_PROMPT_GPT, /If it charges admission or has a scheduled start, it HAS a venue/);
-  assert.match(SYSTEM_PROMPT_GPT, /must fall inside opening_hours/);
 });
 
 const CITY = {
@@ -169,7 +237,7 @@ test('the lean prompt drops the coaching the verbose one added', () => {
     assert.match(SYSTEM_PROMPT_GPT, coaching, 'verbose prompt should still carry it');
     assert.doesNotMatch(SYSTEM_PROMPT_GPT_LEAN, coaching);
   }
-  assert.ok(SYSTEM_PROMPT_GPT_LEAN.length < SYSTEM_PROMPT.length);
+  assert.ok(SYSTEM_PROMPT_GPT_LEAN.length < SYSTEM_PROMPT_GPT.length);
 });
 
 test('the lean prompt keeps what is load-bearing or untested', () => {
@@ -178,9 +246,7 @@ test('the lean prompt keeps what is load-bearing or untested', () => {
   for (const kept of [
     /1-2 — actively avoid/,
     /At most ONE such activity for the entire city/,
-    /set opening_hours to null and include it anyway/,
     /target, not a quota/,
-    /Each venue appears at most once/,
     /One destination is one activity/,
     /tour \/ meal \/ sports \/ museum \/ landmark \/ neighborhood \/ shopping/,
     /must-order dishes/

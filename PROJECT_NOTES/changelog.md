@@ -1540,3 +1540,38 @@ Branch `claude/guide-me-setup-stuck-mszkyo`.
   they measured a traveler the planner knew nothing about — they are not a content baseline.
 - `CLAUDE.md` Engineering Practices now states always-active status and points at the hook.
 249/249 tests.
+
+## [2026-08-08] Phase 1A — deterministic fields out of the plan prompt
+
+Branch `claude/guide-me-setup-stuck-mszkyo`. Plan:
+`PROJECT_NOTES/plan-deterministic-prompt-split.md`.
+
+Removed from all three prompts and from the user prompt built in `planCity`:
+- **`opening_hours`** — `placesEnrich.applyDetails` overwrites it from Google, and screening on it
+  before enrichment is what deleted a full 12-restaurant meal list.
+- **`cost_type`** — `normalizeActivity` collapsed anything but the exact string `per_group` to
+  `per_person` regardless.
+- **`booking_type`** — `normalizeActivity` already carried the type→booking mapping as a fallback;
+  removing the field simply lets it run.
+- **`city`** — `planCity` now passes `shortCity(name)` as the fallback, so `activity.city` stays
+  `Lijiang` rather than becoming the qualified `Lijiang, Yunnan, China` that broke image queries.
+- **The "no Lunch at / Dinner at prefix" rule** — `stripMealPrefix` in `normalizeActivity` does it
+  exactly, mirroring the client-side stripper in `public/js/activityCard.js`.
+- **The "each venue appears at most once" rule** — `dedupeByName` was renamed `dedupeActivities`
+  and now collapses a repeated non-null `venue_name` as well as a repeated name. Coordinates cannot
+  make this call (a district centroid is the correct point for every activity in that district) and
+  a null `venue_name` is a design feature, so only a named venue repeating counts as padding.
+
+`suggested_time` stays as intent; the rule that it must fall inside `opening_hours` is gone, since
+the model no longer emits hours and `arrangeScheduler` assigns the real time against Google's.
+
+Prompt sizes: `SYSTEM_PROMPT` 4444→2807, `SYSTEM_PROMPT_GPT` 5954→4914, `..._LEAN` 3909→3366.
+Output tokens drop by roughly four fields × ~30 activities per city on top of that.
+
+New tests assert no prompt — including the assembled user prompt — mentions a field the pipeline
+decides, and that code now supplies each one. 261/261.
+
+**Not yet verified:** `booking_type` drives the GetYourGuide affiliate link, and the derived mapping
+differs from the model wherever the model deviated from it (`sports` is the likely case: the mapping
+says `attraction`, a free hike arguably wants `none`). Compare the distribution against the saved
+bake-off lists before deploying.

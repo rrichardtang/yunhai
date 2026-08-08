@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'test-key';
-const { planCity, dedupeByName } = require('./claude');
+const { planCity, dedupeActivities } = require('./claude');
 
 const CITY = { name: 'Testville', startDate: '2026-10-08', endDate: '2026-10-13' }; // 6 days
 
@@ -96,14 +96,14 @@ test('windows are told they cover part of a longer stay', async () => {
 const at = (name, lat, lng) => ({ name, location: { lat, lng } });
 
 test('the same name arriving from two windows collapses', () => {
-  const out = dedupeByName([at('Yak Hot Pot Dinner', 0, 0), at('Yak Hot Pot Dinner', 0, 0)], 'Shangri-La');
+  const out = dedupeActivities([at('Yak Hot Pot Dinner', 0, 0), at('Yak Hot Pot Dinner', 0, 0)], 'Shangri-La');
   assert.equal(out.length, 1);
 });
 
 test('different activities at one venue are all kept', () => {
   // A district centroid is the correct coordinate for everything in the
   // district. Collapsing on it deleted three real Dukezong activities.
-  const out = dedupeByName([
+  const out = dedupeActivities([
     at('Dukezong Ancient Town Evening Wander', 27.810488, 99.7086132),
     at('Dukezong Old Town Rooftop & Prayer Wheel Hill', 27.810488, 99.7086132),
     at('Tibetan Cultural Performance at Dukezong', 27.810488, 99.7086132),
@@ -115,7 +115,7 @@ test('different activities at one venue are all kept', () => {
 test('one venue sold under three names survives to be measured, not hidden', () => {
   // Pudacuo National Park came back three times in one Shangri-La run. That is a
   // model-quality signal the bake-off scores as distinct%, not a duplicate.
-  const out = dedupeByName([
+  const out = dedupeActivities([
     at('Potatso Park — Alpine Meadow Boardwalk', 27.8006835, 99.9071603),
     at('Pudacuo National Park — Shudu & Bita Lake Loop', 27.8006835, 99.9071603),
     at('Potatso National Park — Bita Lake Morning Walk', 27.8006835, 99.9071603)

@@ -7,6 +7,7 @@ const CANONICAL_TYPES = new Set(['tour', 'meal', 'sports', 'museum', 'landmark',
 const { searchCityActivities, searchTopRestaurants, searchInsiderTips, searchShoppingDistricts } = require('./braveSearch');
 const { enrichWithPlaceDetails } = require('./services/placesEnrich');
 const { formatProfileForEnrichment } = require('./services/profilePrompt');
+const { shortCity } = require('./services/imageQuery');
 const { debugLog } = require('./services/debugLog');
 const { isLegacyActivity, parseTimeString, parseDurationToMinutes } = require('../shared/activityMigration');
 
@@ -27,7 +28,6 @@ Return a JSON array of activity objects. Each object must have these fields:
   - neighborhood: unstructured outdoor exploration on foot (district walks, park strolls, sunset spots); use suggested_time/preferred_time to encode time-of-day intent
   - sports: ticketed sporting events or active recreation
   - shopping: specific stores, markets, or shopping districts
-- city (string)
 - venue_name (string or null) — the specific place as it appears on Google Maps (e.g. \`Casa Lucio, Madrid\`, \`Colosseum, Rome\`). For meals, this MUST be the restaurant name + city. For unstructured neighborhood activities (free time, district walks, sunset spots), set to null.
 - why_it_fits (string, 1-2 sentences)
 - pitfall (string, 1 sentence)
@@ -36,18 +36,14 @@ Return a JSON array of activity objects. Each object must have these fields:
 - smarter_alternative (string or null)
 - suggested_time (string — e.g. "9:00am", "2:00pm", "sunset")
 - duration_hours (number)
-- opening_hours (string, e.g. "10:00-18:00" or "12:00-14:30,19:00-22:00") — MANDATORY for type "meal". Use the restaurant's actual hours from the restaurant research provided. Format: "HH:MM-HH:MM" or "HH:MM-HH:MM,HH:MM-HH:MM" for split-shift venues. If actual hours are not in the research, OMIT the restaurant from your output rather than guessing.
 - estimated_cost_usd (number — estimated cost in USD. Overestimate rather than underestimate. Scale to the city's cost of living. Return 0 for free activities like walks, parks, sunsets.)
-- cost_type (string: "per_person" or "per_group" — per_person: any activity where each person pays individually (museum entry, meal, theme park ticket, boat tour ticket, cooking class). per_group: a single price covers the whole group regardless of headcount (private airport transfer, car rental, private guided tour hired for the group, apartment/villa rental). When in doubt, use per_person.)
-- booking_type (string: "tour" / "attraction" / "restaurant" / "none" — tour: guided or operator-led experiences booked through tour platforms, e.g. "Guided Walking Tour of Alhambra", "Pub Crawl", "Cooking Class with Local Chef". attraction: standalone venues with their own ticketing website, e.g. "teamLab Borderless", "Colosseum", "Disneyland", "Sagrada Familia". restaurant: a specific named restaurant, e.g. "Sukiyabashi Jiro", "Café Central". none: generic or free activities, e.g. "Morning walk", "Sunset at the beach" — NEVER use "none" for type "meal" activities.)
 
-MANDATORY RULE — meals: Every activity with type "meal" MUST name a specific restaurant (not a cuisine, neighborhood, or meal slot). The name field MUST be the restaurant's name as-is (e.g. "Ichiran Ramen Shinjuku", "Sukiyabashi Jiro"). DO NOT prefix the name with "Lunch at" / "Dinner at" / "Breakfast at" / "Brunch at" — the arrange step decides which slot each meal fills based on opening_hours, not the name. The why_it_fits field must mention 1–2 must-order dishes at that restaurant.
+MANDATORY RULE — meals: Every activity with type "meal" MUST name a specific restaurant (not a cuisine, neighborhood, or meal slot). The why_it_fits field must mention 1–2 must-order dishes at that restaurant.
 
 Example object:
 {
   "name": "Wander Alfama at Dawn",
   "type": "neighborhood",
-  "city": "Lisbon",
   "venue_name": null,
   "why_it_fits": "..."
 }
@@ -74,7 +70,7 @@ Dietary restrictions and mobility considerations are absolute constraints, not p
 ## Output Format
 
 Return a JSON array of activity objects. Each object must have these fields:
-- name (string) — for meals, the restaurant's name exactly as it is, with no "Lunch at" / "Dinner at" prefix
+- name (string) — for meals, the restaurant's name exactly as it is
 - type (string, exactly one of: tour / meal / sports / museum / landmark / neighborhood / shopping)
   - meal: any restaurant or food experience
   - museum: indoor exhibit-style attractions (museums, galleries, art spaces, science centers)
@@ -83,7 +79,6 @@ Return a JSON array of activity objects. Each object must have these fields:
   - neighborhood: unstructured outdoor exploration on foot (district walks, park strolls, sunset spots); use suggested_time to encode time-of-day intent
   - sports: ticketed sporting events or active recreation
   - shopping: specific stores, markets, or shopping districts
-- city (string)
 - venue_name (string or null) — the place as it appears on Google Maps (e.g. \`Casa Lucio, Madrid\`). Set null ONLY when the activity has no gate, no ticket and no operator — a district walk, a canal at night, a public viewpoint. If it charges admission or has a scheduled start, it HAS a venue: name it. When in doubt, name the venue.
 - why_it_fits (string, 1-2 sentences) — reference what this traveler rated highly, not what the city is known for
 - pitfall (string, 1 sentence)
@@ -93,14 +88,11 @@ Return a JSON array of activity objects. Each object must have these fields:
   Expect to return null for roughly a third of activities. A null is a correct answer. A filler tip is a wrong one, and writing one is worse than leaving the field empty.
   Never advise avoiding, evading or re-using an entry fee or ticket.
 - smarter_alternative (string or null)
-- suggested_time (string — e.g. "9:00am", "2:00pm", "sunset") — must fall inside opening_hours. If the activity only works at dawn or after closing, that is the wrong venue for this slot; pick another.
+- suggested_time (string — e.g. "9:00am", "2:00pm", "sunset") — the time of day the activity is best, as intent. The schedule is assigned downstream against the venue's real hours.
 - duration_hours (number) — the time the WHOLE visit needs, including getting there
-- opening_hours (string, e.g. "10:00-18:00" or "12:00-14:30,19:00-22:00", or null if genuinely unknown)
 - estimated_cost_usd (number — overestimate rather than underestimate, scaled to the city's cost of living. 0 for free activities.)
-- cost_type (string: "per_person" or "per_group" — per_person: each person pays individually (museum entry, meal, ticket, cooking class). per_group: one price covers the whole group (private transfer, car rental, private guide). When in doubt, per_person.)
-- booking_type (string: "tour" / "attraction" / "restaurant" / "none" — tour: operator-led experiences. attraction: venues with their own ticketing. restaurant: a specific named restaurant. none: generic or free activities — NEVER "none" for type "meal".)
 
-MANDATORY RULE — meals: Every activity with type "meal" MUST name a specific restaurant, never a cuisine, neighborhood or meal slot. why_it_fits MUST name 1-2 must-order dishes there. If the research does not give that restaurant's hours, set opening_hours to null and STILL INCLUDE IT — downstream enrichment fills real hours from Google. Missing hours is never a reason to drop a meal, and a list short on meals is a failed list.
+MANDATORY RULE — meals: Every activity with type "meal" MUST name a specific restaurant, never a cuisine, neighborhood or meal slot. why_it_fits MUST name 1-2 must-order dishes there. A list short on meals is a failed list.
 
 ## Do not pad
 The activity count is a target, not a quota. It is the least important instruction here. If you run out of places that genuinely fit this traveler, return fewer and stop — a short honest list is a good answer.
@@ -108,7 +100,6 @@ The activity count is a target, not a quota. It is the least important instructi
 Specifically forbidden:
 - Logistics as activities: station or airport arrival walks, departure buffers, "pre-departure" strolls, hotel check-in blocks, supermarket runs.
 - Splitting one destination across several activities. A national park with four viewpoints is ONE activity with the duration the whole visit needs, not four. A canyon and its boardwalk and its overlook are one activity.
-- Re-using a venue. Each venue appears at most once in the whole list; a restaurant you already used is not available for a second meal.
 - Any activity whose own pitfall argues against doing it. If you would write "there is little to see here" or "this really needs an overnight to work", drop it instead of writing that sentence.
 - A day trip to a city that appears elsewhere in this traveler's itinerary.
 
@@ -142,7 +133,7 @@ Fame, a UNESCO listing, or being "the thing everyone does here" is not a reason 
 ## Output Format
 
 Return a JSON array of activity objects with these fields:
-- name (string) — for meals, the restaurant's name as-is, with no "Lunch at" / "Dinner at" prefix
+- name (string) — for meals, the restaurant's name as-is
 - type (string, exactly one of: tour / meal / sports / museum / landmark / neighborhood / shopping)
   - meal: any restaurant or food experience
   - museum: indoor exhibit-style attractions (museums, galleries, art spaces, science centers)
@@ -151,30 +142,25 @@ Return a JSON array of activity objects with these fields:
   - neighborhood: unstructured outdoor exploration on foot (district walks, park strolls, sunset spots)
   - sports: ticketed sporting events or active recreation
   - shopping: specific stores, markets, or shopping districts
-- city (string)
 - venue_name (string or null) — the place as it appears on Google Maps (e.g. \`Casa Lucio, Madrid\`). Null ONLY when the activity has no gate, ticket or operator: a district walk, a canal at night, a public viewpoint.
 - why_it_fits (string, 1-2 sentences)
 - pitfall (string, 1 sentence)
 - booking_advice (string, 1 sentence)
 - insider_tips (string or null, 1-2 sentences) — something a first-time visitor could not guess: a specific gate, a named stretch of street, a pricing quirk, an "if you do X also do Y" pairing. Crowd timing is not a tip unless it names something specific. Return null rather than write filler — a null is a correct answer. Never advise avoiding or re-using an entry fee.
 - smarter_alternative (string or null)
-- suggested_time (string — e.g. "9:00am", "sunset") — must fall inside opening_hours
+- suggested_time (string — e.g. "9:00am", "sunset") — the time of day the activity is best, as intent. The schedule is assigned downstream against the venue's real hours.
 - duration_hours (number) — what the whole visit needs, including getting there
-- opening_hours (string, e.g. "10:00-18:00" or "12:00-14:30,19:00-22:00", or null if unknown)
 - estimated_cost_usd (number — overestimate rather than under, scaled to the city's cost of living. 0 for free activities.)
-- cost_type (string: "per_person" or "per_group" — per_group only when one price covers the whole group, e.g. a private transfer or a private guide. When in doubt, per_person.)
-- booking_type (string: "tour" / "attraction" / "restaurant" / "none" — never "none" for type "meal")
 
-MANDATORY RULE — meals: every activity of type "meal" names a specific restaurant, and why_it_fits names 1-2 must-order dishes there. If the research lacks that restaurant's hours, set opening_hours to null and include it anyway — enrichment fills real hours from Google. Missing hours is never a reason to drop a meal.
+MANDATORY RULE — meals: every activity of type "meal" names a specific restaurant, and why_it_fits names 1-2 must-order dishes there. A list short on meals is a failed list.
 
 ## Do not pad
-The activity count is a target, not a quota, and it is the least important instruction here. If you run out of places that genuinely fit this traveler, return fewer and stop. Each venue appears at most once. One destination is one activity, whatever its internal parts. Drop any activity whose own pitfall argues against doing it, rather than writing that sentence.
+The activity count is a target, not a quota, and it is the least important instruction here. If you run out of places that genuinely fit this traveler, return fewer and stop. One destination is one activity, whatever its internal parts. Drop any activity whose own pitfall argues against doing it, rather than writing that sentence.
 
 Example object:
 {
   "name": "Wander Alfama at Dawn",
   "type": "neighborhood",
-  "city": "Lisbon",
   "venue_name": null,
   "why_it_fits": "..."
 }
@@ -253,6 +239,15 @@ function blankActivity(overrides = {}) {
   };
 }
 
+// The arrange step picks lunch vs dinner from opening_hours, so a slot baked into
+// the name is both wrong and unremovable downstream. Mirrors the client-side
+// stripper in public/js/activityCard.js.
+const MEAL_PREFIX_RE = /^(Lunch|Dinner|Breakfast|Brunch|Drinks|Coffee|Visit)\s+at\s+/i;
+
+function stripMealPrefix(name) {
+  return String(name || '').replace(MEAL_PREFIX_RE, '').replace(/^Visit\s+/i, '').trim();
+}
+
 function normalizeActivity(raw = {}, fallbackCity = '') {
   if (!isLegacyActivity(raw)) return raw;
 
@@ -262,7 +257,7 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
   const duration = Number(raw.duration_hours);
   const durationHours = Number.isFinite(duration) && duration > 0 ? duration : defaults.durationHours;
 
-  const name = String(raw.name || 'Untitled activity').trim();
+  const name = stripMealPrefix(String(raw.name || 'Untitled activity'));
 
   const city = String(raw.city || fallbackCity).trim();
   const rawVenue = raw.venue_name == null ? '' : String(raw.venue_name).trim();
@@ -382,17 +377,25 @@ function dateWindows(startDate, tripDays, splitDays) {
 // model selling one park three times under three names is a different problem —
 // a model-quality one, which the bake-off's distinct% measures and selects
 // against. Collapsing it here would only hide it.
-function dedupeByName(activities, city) {
-  const seen = new Set();
+// Collapses a repeated name, and a repeated venue under two names — one café sold
+// three times was the padding shape both models produced. venue_name is null by
+// design for unstructured activities, and two district walks are genuinely
+// distinct, so only a named venue counts. Coordinates cannot make this call: a
+// district centroid is the correct point for every activity in that district.
+function dedupeActivities(activities, city) {
+  const seenNames = new Set();
+  const seenVenues = new Set();
   const kept = [];
   const dropped = [];
   for (const activity of activities) {
-    const key = String(activity?.name || '').trim().toLowerCase();
-    if (seen.has(key)) {
+    const name = String(activity?.name || '').trim().toLowerCase();
+    const venue = String(activity?.venue_name || '').trim().toLowerCase();
+    if (seenNames.has(name) || (venue && seenVenues.has(venue))) {
       dropped.push(activity?.name);
       continue;
     }
-    seen.add(key);
+    seenNames.add(name);
+    if (venue) seenVenues.add(venue);
     kept.push(activity);
   }
   if (dropped.length) {
@@ -480,7 +483,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     ? `\n\nWeb research (use as supplementary inspiration, not a strict list):\n${webResearch}`
     : '';
   const restaurantBlock = restaurantResearch
-    ? `\n\nTop restaurant research — output up to ${minMeals} meal-type activities total across the stay, picked from this list, and aim for that number rather than treating it only as a ceiling. Give each meal the restaurant's actual opening_hours from the research; where the research does not list them, set opening_hours to null and include the restaurant anyway — enrichment backfills real hours from Google. Missing hours is never a reason to drop a restaurant. Use neutral names — the restaurant name itself, no "Lunch at" / "Dinner at" prefix. Choose options that fit the day's geographic area relative to the accommodation. The arrange step decides which slot (lunch vs dinner) each meal fills based on opening_hours. Include 1–2 must-order dishes in why_it_fits:\n${restaurantResearch}`
+    ? `\n\nTop restaurant research — output up to ${minMeals} meal-type activities total across the stay, picked from this list, and aim for that number rather than treating it only as a ceiling. Include 1–2 must-order dishes in why_it_fits:\n${restaurantResearch}`
     : '';
   const insiderBlock = insiderResearch
     ? `\n\nLocal knowledge / insider notes — use these to populate the insider_tips field with specific, factual tips (peak crowding, best arrival time, common tourist mistakes, neighborhood quirks). Do not copy phrases verbatim; synthesize:\n${insiderResearch}`
@@ -518,7 +521,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     // Shopping is a whole-stay target, so it rides on the first window only
     // rather than being multiplied across every one of them.
     const winShoppingBlock = index === 0 ? shoppingBlock : '';
-    return `Plan activities for: ${name} (${window.startDate} to ${window.endDate}).${segmentBlock}\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodationText}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nTRAVELER PROFILE — filter every candidate through this before the city's reputation:\n${profileBlock}\n\nACTIVITY COUNT\nGenerate ${winTotal} activities (${winTotal}–${Math.round(winTotal * 1.15)} acceptable). Composition: ${winNonMeal} non-meal (${nonMealPerDay}/day) + AT MOST ${winMeals} meal-type activities. Slot assignment (lunch vs dinner) is decided downstream by the arrange step — do not pre-assign by name. Names must be the restaurant name as-is, no "Lunch at" / "Dinner at" prefix. If you have more strong restaurant candidates than slots, pick the best ${winMeals} and skip the rest. On arrival/departure days, drop a meal whose natural time falls outside the available window (e.g. drop lunch on a 3pm arrival, drop dinner on an 11am departure) — each dropped meal reduces the count by 1. Use accommodation and travel timing to shape sequencing — lighter arrivals/departures, first/last activities near accommodation or transport hubs.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}${insiderBlock}${winShoppingBlock}\n\nReturn JSON only.`;
+    return `Plan activities for: ${name} (${window.startDate} to ${window.endDate}).${segmentBlock}\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodationText}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nTRAVELER PROFILE — filter every candidate through this before the city's reputation:\n${profileBlock}\n\nACTIVITY COUNT\nGenerate ${winTotal} activities (${winTotal}–${Math.round(winTotal * 1.15)} acceptable). Composition: ${winNonMeal} non-meal (${nonMealPerDay}/day) + AT MOST ${winMeals} meal-type activities. If you have more strong restaurant candidates than slots, pick the best ${winMeals} and skip the rest. On arrival/departure days, drop a meal whose natural time falls outside the available window (e.g. drop lunch on a 3pm arrival, drop dinner on an 11am departure) — each dropped meal reduces the count by 1. Use accommodation and travel timing to shape sequencing — lighter arrivals/departures, first/last activities near accommodation or transport hubs.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}${insiderBlock}${winShoppingBlock}\n\nReturn JSON only.`;
   };
 
   const basePrompt = systemPrompt || SYSTEM_PROMPT;
@@ -560,7 +563,10 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     debugLog('plan-city', `WINDOWS city="${name}" count=${windows.length} split_days=${splitDays} activities=${parsed.length}`);
   }
 
-  const normalized = parsed.map((item) => normalizeActivity(item, name));
+  // The model no longer emits `city`, so the fallback is the only source. It must
+  // be the short form: the qualified name ("Lijiang, Yunnan, China") is what broke
+  // every image query, and it rides into the Places and commute lookups too.
+  const normalized = parsed.map((item) => normalizeActivity(item, shortCity(name)));
   const validTyped = filterInvalidTypes(normalized, name);
   const filtered = applyMealPoolCap(validTyped, { city: name, minMeals });
   debugLog('plan-city', `NORMALIZED city="${name}" raw=${parsed.length} after_type_filter=${validTyped.length} after_meal_cap=${filtered.length}`);
@@ -572,7 +578,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   await enrichWithPlaceDetails(filtered, name, cityCenter, onEnrichOutcome);
   // Runs after grounding so duplicates are caught by resolved venue rather than
   // by name — the same place arrives under three different labels.
-  const deduped = dedupeByName(filtered, name);
+  const deduped = dedupeActivities(filtered, name);
   debugLog('plan-city', `RETURN city="${name}" count=${deduped.length} elapsed_ms=${Date.now() - planCityStartTs}`);
   return deduped;
 }
@@ -628,4 +634,4 @@ function applyMealPoolCap(activities, { city, minMeals }) {
   return [...nonMeals, ...finalMeals];
 }
 
-module.exports = { planCity, normalizeActivity, blankActivity, dedupeByName, dateWindows, SYSTEM_PROMPT, SYSTEM_PROMPT_GPT, SYSTEM_PROMPT_GPT_LEAN };
+module.exports = { planCity, normalizeActivity, blankActivity, dedupeActivities, dateWindows, SYSTEM_PROMPT, SYSTEM_PROMPT_GPT, SYSTEM_PROMPT_GPT_LEAN };
