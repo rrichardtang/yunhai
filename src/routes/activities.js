@@ -741,10 +741,10 @@ Return ONLY valid JSON (no markdown fences):
       debugLog('plan', `DONE cities=${cities.length} failed=${failures.length} elapsed_ms=${Date.now() - planStartTs}`);
     } catch (error) {
       debugLog('plan', `ERROR msg="${error?.message || error}" code=${error?.code || ''} elapsed_ms=${Date.now() - planStartTs}`);
-      if (error.code === 'ANTHROPIC_KEY_MISSING') {
+      if (error.code === 'OPENAI_KEY_MISSING') {
         sendEvent({
           type: 'error',
-          error: 'Anthropic API key not configured',
+          error: 'OpenAI API key not configured',
           code: error.code
         });
       } else {
