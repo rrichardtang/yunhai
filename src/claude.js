@@ -243,20 +243,23 @@ function dateWindows(startDate, tripDays, splitDays) {
   return windows;
 }
 
-// Parallel windows cannot see each other's picks, and even a single call repeats
-// itself — one Shangri-La run returned Pudacuo National Park three times under
-// three names. Collapse anything that grounded to the same venue.
-function dedupeByVenue(activities, city) {
+// Parallel windows cannot see each other's picks, so the same activity can come
+// back twice under one name. That is the only duplicate a window boundary
+// creates, so name identity is the whole rule.
+//
+// Keying on the grounded coordinate looked stronger and was much worse: a
+// district centroid is the correct coordinate for every activity in that
+// district, so one run deleted a rooftop visit, a cultural performance and a
+// departure-morning wander at Dukezong as duplicates of an evening wander. A
+// model selling one park three times under three names is a different problem —
+// a model-quality one, which the bake-off's distinct% measures and selects
+// against. Collapsing it here would only hide it.
+function dedupeByName(activities, city) {
   const seen = new Set();
   const kept = [];
   const dropped = [];
   for (const activity of activities) {
-    // 0,0 is the unset sentinel across the codebase, not a location — treating it
-    // as one would collapse every unresolved activity into a single entry.
-    const coords = coordsOf({ latitude: activity?.location?.lat, longitude: activity?.location?.lng });
-    const key = coords
-      ? `${coords.lat.toFixed(4)},${coords.lng.toFixed(4)}`
-      : `name:${String(activity?.name || '').trim().toLowerCase()}`;
+    const key = String(activity?.name || '').trim().toLowerCase();
     if (seen.has(key)) {
       dropped.push(activity?.name);
       continue;
@@ -439,7 +442,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   await enrichWithPlaceDetails(filtered, name, cityCenter, onEnrichOutcome);
   // Runs after grounding so duplicates are caught by resolved venue rather than
   // by name — the same place arrives under three different labels.
-  const deduped = dedupeByVenue(filtered, name);
+  const deduped = dedupeByName(filtered, name);
   debugLog('plan-city', `RETURN city="${name}" count=${deduped.length} elapsed_ms=${Date.now() - planCityStartTs}`);
   return deduped;
 }
@@ -510,4 +513,4 @@ function applyMealPoolCap(activities, { city, minMeals }) {
   return [...nonMeals, ...finalMeals];
 }
 
-module.exports = { planCity, normalizeActivity, blankActivity, dedupeByVenue, dateWindows, SYSTEM_PROMPT };
+module.exports = { planCity, normalizeActivity, blankActivity, dedupeByName, dateWindows, SYSTEM_PROMPT };

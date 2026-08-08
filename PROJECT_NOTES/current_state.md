@@ -22,10 +22,20 @@ Consequence: **splitting one call into parallel day-windows is a ~3x speed lever
 a faster model is ~30%.** Speed is the cheap axis, available to every arm, so the bake-off decides on
 quality and cost. `PLAN_SPLIT_DAYS` implements the split and is off by default pending its own A/B.
 
-Just landed: Places lookups now key on `venue_name` rather than the activity label. This was
-corrupting the exact columns the decision rests on — wrong pins collapsed distinct activities and
-locality centroids overwrote the model's opening hours. `noPlace` became `ghost`, counting only
-venues the model named and Google has never heard of.
+Just landed, both aimed at the same problem — the quality columns were measuring grounding bugs
+rather than the model:
+
+- Places lookups key on `venue_name` rather than the activity label. `noPlace` became `ghost`,
+  counting only venues the model named and Google has never heard of.
+- `dedupeByVenue` → `dedupeByName`. Coordinate identity is not activity identity, and the
+  coordinate rule was the entire delivered-count shortfall: 37 and 31 raw against targets of 36
+  and 30, cut to 31 and 24.
+
+Neither has been measured yet. The one staging run so far almost certainly predates both — its
+cache hits and meal queries carry label-shaped keys, which the `venue_name` path cannot produce.
+**Confirm the container is on the branch head before trusting any run:**
+`docker exec travelplanner-staging-travelplanner-1 grep -c placesQuery /app/src/services/placesEnrich.js`
+→ 2 means the fix is live, 0 means it is not.
 
 ## Constraints
 - `planCity` stays on `claude-sonnet-4-6` until the bake-off reports. Do not migrate on spec
@@ -45,9 +55,11 @@ venues the model named and Google has never heard of.
   `src/server.js` and `public/app.js`. Deploys via `deployment/promotion.sh` only.
 
 ## Risks
-- `dedupeByVenue` is unproven and currently suspect: most collisions it fired on were artifacts of
-  the label-lookup bug, and it dropped delivered counts to 30/36 and 22/30. The next baseline run
-  decides whether it stays, shrinks, or goes.
+- Staging may not be running what this branch says it is. One full baseline was read as evidence
+  before noticing its lookups were label-shaped. Verify the container's code, not just the push.
+- `dedupeByName` no longer collapses a model that sells one park three times under three names.
+  That is intentional — `distinct%` measures it — but it means duplicate-looking output can now
+  reach the UI if the winning model does this. Watch the blind read.
 - For meals `normalizeActivity` synthesises `venue_name` as `"<name>, <city>"`, so the Places query
   now carries the city twice. `distanceMatrix` has done this for meals all along without harm, but
   `meal res%` on the next run is the check.
@@ -61,10 +73,10 @@ venues the model named and Google has never heard of.
   still pending; memory-layer / arrange-overhaul / grounding keyed verifications still outstanding.
 
 ## Next Actions
-1. Re-run the unsplit baseline on staging with the `venue_name` fix (4 generations, ~13 min, ~$0.70).
-   Expect false dedupes to largely vanish, counts back near 30/36 and 26–30/30, `00:00-23:59` in the
-   `places-hours-delta` lines to disappear, and `ghost` roughly flat.
-2. Decide `dedupeByVenue`'s fate from that run, not from argument.
+1. Verify the staging container is on the branch head (the `grep -c placesQuery` check above).
+2. Re-run the unsplit baseline (4 generations, ~13 min, ~$0.70). Expect delivered counts at or
+   above target, near-empty DEDUPE lines, and Places queries in the log that read like venue names
+   with meals carrying a city suffix — the visible signature that the fix is live.
 3. A/B `--split 2` against unsplit — the ~3x speed lever, and the one experiment that changes the
    shape of the answer.
 4. `--arms gpt-5.6 --runs 1` to prove the arm works and settle max-output-tokens empirically.
