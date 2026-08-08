@@ -86,6 +86,10 @@ function openaiArm(model) {
   const generate = async ({ system, prompt }) => {
     const res = await client.chat.completions.create({
       model,
+      // Without an explicit cap, a truncated array can't be told apart from the
+      // model's real output ceiling — and the ceiling is the fact that decides
+      // whether this arm is viable at all.
+      max_completion_tokens: MAX_OUTPUT_TOKENS,
       messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }]
     });
     const choice = res.choices?.[0];
