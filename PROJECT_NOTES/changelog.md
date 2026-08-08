@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-08] A 24/7 Places result no longer overwrites the model's opening hours
+
+Branch `claude/guide-me-setup-stuck-mszkyo`. From the first staging run that confirmed the `venue_name` lookup was live.
+
+- **`src/services/placesEnrich.js`**: Places returns `00:00-23:59` for a district or any venue with no posted hours — the absence of hours data, not a schedule. `applyDetails` was letting it replace the model's window, so `Lijiang Old Town Night Wander` (model: 09:00-21:00) became bookable at 08:00 and `Wenhai Eco-Village Trek` (10:00-21:00) at any hour. Now skipped when the model supplied a window; still applied when it did not. New `ALL_DAY` constant, exported.
+- **`scripts/planCityBakeoff.js`**: `hours ok%` excludes 24/7 Places results, which were scoring a correct model window as a miss. `distinct%` demoted to a cross-arm comparison — Places collapsed three separate Lijiang Old Town restaurants onto one coordinate at one price tier, so it has a floor no model can clear. Report text notes that no metric catches a wrong-city venue (Sonnet 4.6 offered Shangri-La's Dukezong Old Town inside Lijiang and Places snapped it to a Lijiang coordinate, scoring as a clean resolve) — that is the blind read's job.
+- **`src/services/placesEnrich.test.js`**: 2 new cases — a 24/7 result leaves the model's hours alone but still applies its coordinate; a 24/7 result is used when the model supplied nothing.
+- Verified: 223/223 unit tests. Confirmed live on staging: Lijiang returned 36/36 against a target of 36 with no DEDUPE line and 36/36 coordinate resolution, and Places queries in the log read as venue names with meals carrying the city suffix.
+
 ## [2026-08-08] Deduplicate activities by name, not by grounded coordinate
 
 Branch `claude/guide-me-setup-stuck-mszkyo`. From the first staging baseline that showed the drop list.

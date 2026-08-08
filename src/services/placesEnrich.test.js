@@ -145,6 +145,49 @@ test('an activity with no venue name falls back to its label', async () => {
   assert.match(JSON.parse(calls[0].options.body).textQuery, /Dukezong Old Town Evening Stroll/);
 });
 
+test('a 24/7 Places result does not overwrite the model\'s opening hours', async () => {
+  process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+  stubFetch(() => ({
+    ok: true,
+    json: async () => ({
+      places: [{
+        location: { latitude: 26.87, longitude: 100.23 },
+        regularOpeningHours: { periods: [{ open: { day: 0, hour: 0, minute: 0 } }] }
+      }]
+    })
+  }));
+
+  const activity = {
+    name: venue('Lijiang Old Town Night Wander'),
+    type: 'neighborhood',
+    opening_hours: '09:00-21:00',
+    timing: { opening_hours: '09:00-21:00' }
+  };
+  await enrichWithPlaceDetails([activity], 'Lijiang');
+
+  assert.equal(activity.opening_hours, '09:00-21:00');
+  assert.equal(activity.timing.opening_hours, '09:00-21:00');
+  assert.equal(activity.location.lat, 26.87, 'the coordinate is still applied');
+});
+
+test('a 24/7 result is still used when the model supplied no hours', async () => {
+  process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+  stubFetch(() => ({
+    ok: true,
+    json: async () => ({
+      places: [{
+        location: { latitude: 26.87, longitude: 100.23 },
+        regularOpeningHours: { periods: [{ open: { day: 0, hour: 0, minute: 0 } }] }
+      }]
+    })
+  }));
+
+  const activity = { name: venue('Round The Clock Viewpoint'), type: 'landmark' };
+  await enrichWithPlaceDetails([activity], 'Lijiang');
+
+  assert.equal(activity.opening_hours, '00:00-23:59');
+});
+
 test('a cache entry predating photo support is refetched, not served photo-less', async () => {
   process.env.GOOGLE_MAPS_API_KEY = 'test-key';
   const name = venue('Legacy Cached Venue F');
