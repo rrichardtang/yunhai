@@ -12,9 +12,15 @@ branch that replaced `ANTHROPIC_KEY_MISSING`.
 already required for chat and refine, so a correctly configured environment needs no new secret —
 but an environment that had only `ANTHROPIC_API_KEY` working will now fail to plan at all rather
 than degrading.
-**Next action:** On deploy, confirm `/api/status` reports `openaiConfigured: true`, then replan the
-Yunnan trip and check `GET /debug?scope=plan-city` shows `model=gpt-5.6` and a `RETURN` per city.
-Separately, unset `OPENAI_API_KEY` in a scratch env and confirm `/api/plan` emits the typed
+**Next action:** **Check `OPENAI_API_KEY` in both env files before promoting** — staging reads
+`/docker/travelplanner/.env`, prod reads `/docker/travelplanner/.env.prod`, so a green staging check
+proves nothing about prod, and `promote` deletes the feature branch as it runs:
+`grep -c '^OPENAI_API_KEY=..*' /docker/travelplanner/.env /docker/travelplanner/.env.prod` — both
+must be 1. Then confirm status and replan the Yunnan trip. Neither compose file publishes a port
+(Traefik routes by host to 3457 *inside* the container), so `localhost:3457` from the host never
+answers: use `docker exec travelplanner-staging-travelplanner-1 curl -s localhost:3457/api/status`
+or the staging hostname. Check `GET /debug?scope=plan-city` shows `model=gpt-5.6` and a `RETURN` per
+city. Separately, unset `OPENAI_API_KEY` in a scratch env and confirm `/api/plan` emits the typed
 `OPENAI_KEY_MISSING` event rather than a generic failure.
 
 ## [2026-08-07] Verify the Setup → Review fixes against live providers
