@@ -57,6 +57,23 @@ test('a named activity list is served as JSON', async () => {
   assert.match(res.text, /Black Dragon Pool Park/);
 });
 
+test('an arm label containing "+" is reachable from the listing', async () => {
+  // "+" decodes to a space in a query string, so the endpoint was printing links
+  // for gpt-5.6+lean that it then could not resolve itself.
+  const name = 'gpt-5.6+lean-run1-Lijiang.json';
+  fs.writeFileSync(path.join(OUT_DIR, name), JSON.stringify([{ name: 'Wenhai Trek' }]));
+
+  const listing = await request(appAs('user_owner')).get('/debug/bakeoff');
+  assert.match(listing.text, /file=gpt-5\.6%2Blean-run1-Lijiang\.json/, 'listing encodes the +');
+
+  for (const query of [encodeURIComponent(name), name]) {
+    const res = await request(appAs('user_owner')).get(`/debug/bakeoff?file=${query}`);
+    assert.equal(res.status, 200, `expected 200 for ${query}`);
+    assert.match(res.text, /Wenhai Trek/);
+  }
+  fs.rmSync(path.join(OUT_DIR, name));
+});
+
 test('a non-owner cannot read bake-off results', async () => {
   const res = await request(appAs('user_someone_else')).get('/debug/bakeoff');
   assert.equal(res.status, 403);
