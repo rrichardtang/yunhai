@@ -1517,3 +1517,26 @@ Branch `claude/budget-optimization-loading-screens-4hc6a3`. Two honesty/clarity 
 ## [2026-07-07] Fix stale price after confirming a budget swap
 
 Branch `claude/budget-optimization-loading-screens-4hc6a3`. Bug: the budget-opt flip phase showed the new alternative's lower price, but after "Confirm Selections" the review card reverted to the original price. Cause: `onConfirmSelections` replaced the activity (new name/photo/description) but left the old checklist entry in place; when that entry's stored `budgetUsd` didn't match the freshly-derived value (e.g. saved under a different traveler count or an earlier cost basis, or with a missing `budgetUsdAuto`), the refresh heuristic in `buildChecklistFromState` mistook it for a manual override and froze the original price — which `activityCardCostUsd` then returned for the (different) new venue. Fix: `onConfirmSelections` now drops the checklist entries for swapped activities so the rebuild re-derives each new venue's cost from scratch. Verified via Playwright: with a checklist entry whose stored budget differs from the derived value, the review chip now updates to the new price after confirm (was reverting); pizzeria/nested/normal confirm flows and the cheaper/parity/consistency suites remain green. 176/176 unit tests.
+
+## [2026-08-08] Engineering practices: mechanical enforcement + real profile in the harness
+
+Branch `claude/guide-me-setup-stuck-mszkyo`.
+- `scripts/checkPractices.js` + `.claude/settings.json`: PostToolUse hook on Edit|Write failing any
+  write that leaves a TODO/FIXME/XXX/HACK marker or placeholder stub, reporting `file:line` back
+  into the session. One rule by design — a checker that guesses at readability or function size
+  produces false positives, gets disabled, and takes the real check with it. Repo starts at zero
+  markers and `src/checkPractices.test.js` asserts it stays there.
+- `.gitignore`: `.claude/` was listed twice and git cannot re-include a file beneath an excluded
+  directory, so both entries became `.claude/*` plus `!.claude/settings.json`. `settings.local.json`
+  stays ignored.
+- The hook caught two defects in its own construction: a false positive on the test that must
+  contain the markers it detects (exemption scoped to the detector and its test only), and a
+  module-level stdin listener that hung any test requiring the module (`require.main` guard).
+- Audited commit 5a8402d against the practices and removed 31 comment lines that restated the
+  commit message, `decisions.md` and the tests.
+- `scripts/planCityBakeoff.js` now carries the owner's real profile instead of an invented literal:
+  food 5, outdoors 5, shopping 4 (fragrances/clothes/Pokemon cards), museums 2, performances 2,
+  structured tours 1, nightlife 1, plus budget style and aboutMe. Earlier runs predate 5a8402d, so
+  they measured a traveler the planner knew nothing about — they are not a content baseline.
+- `CLAUDE.md` Engineering Practices now states always-active status and points at the hook.
+249/249 tests.

@@ -103,7 +103,14 @@ Uses Node.js built-in `node:test` — no Jest or external runner. Tests live alo
 
 ## Engineering Practices
 
-These rules apply to all code generation, editing, and refactoring.
+These rules are always active during any code generation, editing, or refactoring — they are
+not opt-in and not something to defer. Reinforce them when output turns verbose, redundant, or
+structurally complex.
+
+One of them is mechanically enforced: `scripts/checkPractices.js` runs as a PostToolUse hook
+(`.claude/settings.json`) and fails any Edit/Write that leaves a TODO/FIXME/XXX/HACK marker or
+placeholder stub. The rest are judgement calls, so the enforcement is self-audit: before
+presenting code, re-read it against this list and fix what violates rather than explaining it.
 
 ### Code Quality
 - Simplify hard-to-read blocks; no overly complex logic
