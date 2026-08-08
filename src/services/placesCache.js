@@ -9,27 +9,12 @@ const MISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const store = jsonFileCache(CACHE_PATH);
 
-function strip(text) {
-  return String(text || '')
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-// The key used to be the model's raw prose, so a hit needed two runs to invent an
-// identical string. Collapsing case, punctuation, a leading "The" and the trailing
-// city qualifier the prompt asks for on meals ("Casa Lucio, Madrid") lets the same
-// venue match itself across runs, models and prompt revisions.
-function normalize(name, city) {
-  const cityWords = new Set(strip(city).split(' ').filter(Boolean));
-  const words = strip(name).replace(/^the /, '').split(' ').filter(Boolean);
-  while (words.length > 1 && cityWords.has(words[words.length - 1])) words.pop();
-  return words.join(' ');
-}
-
+// Case and whitespace only. Aggressive normalisation — diacritics, punctuation, a
+// leading "The", the trailing city qualifier — was built and then measured against
+// the 222 venue names in data/bakeoff: it gained ONE hit, on a single pair, while
+// re-keying every existing entry. scripts/cacheHitRate.js reproduces that.
 function key(name, city) {
-  return `${normalize(name, city)}|${strip(city)}`;
+  return `${String(name || '').trim().toLowerCase()}|${String(city || '').trim().toLowerCase()}`;
 }
 
 function get(name, city) {
@@ -45,7 +30,7 @@ function set(name, city, value, aliases = []) {
   const data = store.load();
   const entry = { ...value, ts: Date.now() };
   for (const alias of [name, ...aliases]) {
-    if (normalize(alias, city)) data[key(alias, city)] = entry;
+    if (String(alias || "").trim()) data[key(alias, city)] = entry;
   }
   store.scheduleFlush();
 }
@@ -55,4 +40,4 @@ function setMiss(name, city) {
   store.scheduleFlush();
 }
 
-module.exports = { get, set, setMiss, normalize, key };
+module.exports = { get, set, setMiss, key };

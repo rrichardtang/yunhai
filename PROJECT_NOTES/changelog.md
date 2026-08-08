@@ -1580,3 +1580,42 @@ decides, and that code now supplies each one. 261/261.
 differs from the model wherever the model deviated from it (`sports` is the likely case: the mapping
 says `attraction`, a free hike arguably wants `none`). Compare the distribution against the saved
 bake-off lists before deploying.
+
+## [2026-08-08] Phase 1B — cache aliasing and negative caching; normalisation reverted on measurement
+
+Branch `claude/guide-me-setup-stuck-mszkyo`. `scripts/cacheHitRate.js` (step 0, no API spend)
+replayed the 222 venue names in `data/bakeoff/` through each keying scheme:
+
+```
+exact key      hits 42  18.9%   distinct 180
+normalised     hits 43  19.4%   distinct 179
+  gained by normalising: 1
+label-only lookups, skippable: 77 (34.7% of all calls)
+```
+
+**Reverted: aggressive key normalisation.** Diacritics, punctuation, a leading "The" and the
+trailing city qualifier were built, tested and then measured — one extra hit, on a single pair
+(`Dukezong Ancient Town` == `Dukezong Ancient Town, Shangri-La`), in exchange for re-keying all 180
+existing entries. The production key is back to case and whitespace. The normaliser lives on in
+`scripts/cacheHitRate.js` so the comparison stays runnable as the corpus grows or new lookup paths
+appear — the measurement only covers plan-generated names, not the add/refine/client paths where the
+same venue is queried without a city suffix.
+
+**Correction:** the earlier claim that the hit rate was "near zero by construction" was wrong. It is
+**18.9%** — canonical venue names repeat across runs and models far more than that reasoning
+assumed. The cache was working; it was the two-calls-per-miss and the label-only lookups that made
+the request count large.
+
+**Kept, on structural grounds rather than this measurement:**
+- **Alias on resolve** — entries also written under Google's `displayName`. Not measurable offline
+  (it needs Places responses), and unlike normalisation it adds keys rather than re-keying, so it
+  carries no cold-cache cost.
+- **Negative caching** — a genuine `no_place` is remembered for 7 days. `fetchPlaceDetails` now
+  returns `{miss:'no_place'}` for that case specifically, so a missing key, HTTP error or timeout
+  cannot be frozen in.
+- **Ghost flagging** — `unverified: true` rather than deletion, since deleting on `no_place` would
+  empty an itinerary during a Places outage.
+
+**Next, and now clearly the priority:** item 3, skipping venue resolution for `venue_name: null`
+activities. The measurement puts it at **34.7% of all Places calls** — larger than every caching
+layer combined, and it needs no cache at all.
