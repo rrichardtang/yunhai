@@ -117,3 +117,15 @@ restaurant research block before re-weighting the meals evidence.
 **Description:** The server-authoritative endTime contract, meal rescue pass, and commute-honesty changes are unit-tested (160/160) and Playwright-verified against canned responses, but not against a live LLM+Google run. Also deferred: budgeting commute to/from LOCKED activities — requires the client to send lock coords and include locks in the `/api/commute-matrix` request (absent today, app.js lockedActivities payload), so locks currently get obstacle collision-avoidance only.
 **Context:** decisions [2026-07-02]; changelog [2026-07-02]. Supersedes the live-verification checklist of the 2026-06-10 redesign item (endTime now expected in placements).
 **Next action:** On VPS: dense-city arrange → `SCHED_DAY` per day, no `SCHED_ASSERT_FAIL`, `SCHED_MEAL_RESCUE` firing where applicable; `GET /api/admin/arrange-stats` populated (telemetry now observable); `[dm]` logs show walking-sourced recoveries where transit+driving ZERO_RESULT; watch `droppedByReason.no_time_slot_remaining` for regressions from honest-but-large haversine commutes.
+
+## [2026-08-08] Take deterministic work out of the plan prompt
+**Status:** Pending input (plan written, not started)
+**Description:** The plan prompt asks the model for fields code overwrites (`opening_hours`,
+`cost_type`, `booking_type`, `city`) and states rules code already enforces (venue dedupe, name
+prefixes). `applyMealPoolCap` deleting all 12 of GPT-5.6's Lijiang restaurants was one instance of
+that class. Phase 2 sources meals from activity coordinates via a Places cluster search instead of
+from the model's memory, which makes the hour-away restaurant unselectable rather than forbidden.
+**Context:** `PROJECT_NOTES/plan-deterministic-prompt-split.md`. Owner principle: if deterministic
+logic covers it, it does not belong in the prompt at all.
+**Next action:** Phase 1 (mechanical, self-contained), then the free baseline measurement, then
+Phase 2.
