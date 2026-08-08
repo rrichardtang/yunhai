@@ -1,5 +1,38 @@
 # Open Items
 
+## [2026-08-08] Activity-quality fixes found in the blind read
+**Status:** Pending input (which to land)
+**Description:** Six defects the metric table could not see, all fixable in `SYSTEM_PROMPT`
+(`src/claude.js:14-54`) or `placesEnrich.js` — none require a model change. Ranked by user impact:
+(1) **Places hours overwrite the model's for `neighborhood` and `tour` activities**, where the
+venue's gate/box-office hours describe something other than the activity window — 7 of Sonnet's 11
+`preferred_time` vs `opening_hours` contradictions, and `arrangeScheduler` then reschedules a
+sunrise walk to 09:00. Fix mirrors the existing `ALL_DAY` guard: skip the hours overwrite for those
+two types. (2) **Line 38's "OMIT the restaurant rather than guessing" contradicts line 43's
+mandatory-meals rule** — change it to null the hours, not drop the restaurant, and let enrichment
+fill them. (3) `insider_tips` needs crowd-timing named as a platitude and returning null stated as
+expected. (4) Nothing tells the model to drop an activity when the pitfall it would write argues
+against doing it. (5) No rule against splitting one destination into several activities or re-using
+a venue to reach the count — needs explicit permission to return fewer. (6) Two tips coached fee
+avoidance; needs an explicit prohibition.
+**Context:** changelog [2026-08-08] "Blind quality read". Full lists at `/debug/bakeoff?file=blind-read.md`.
+**Next action:** Pick which fixes land. Then re-run the two cities on the same cassette and diff:
+timing contradictions should go to ~0, meals stay ≥ target, insider-tip nulls become non-zero for
+GPT-shaped models, and no activity should re-use a venue.
+
+## [2026-08-08] Confirm whether GPT-5.6's zero meals were self-inflicted by the prompt
+**Status:** Deferred (only matters if the model question reopens)
+**Description:** `SYSTEM_PROMPT` line 38 tells the model to omit a restaurant whose hours are not in
+the research. That plausibly explains zero meals in Shangri-La (thin restaurant research — Sonnet
+padded 7 meals across 4 venues there) but not in Lijiang, where Sonnet found 10 distinct restaurants
+with dishes and hours from the same research block. So the escape hatch is a contributing cause at
+most, and GPT-5.6's zero-meal result is partly its own.
+**Context:** The recorded model decision [2026-08-08] cites zero meals as supporting evidence. The
+decision stands on cost and speed regardless, but that one supporting argument is weaker than it
+reads. Checkable offline — `{arm}-run{n}-{City}.raw.json` holds the full call text.
+**Next action:** If the model question ever reopens, grep the GPT Lijiang raw call for the
+restaurant research block before re-weighting the meals evidence.
+
 ## [2026-08-07] Verify the Setup → Review fixes against live providers
 **Status:** Pending input (needs deploy)
 **Description:** The plan-progress stream, image ladder, transfer-day timing and per-city failure isolation are unit-tested (202/202) and verified against stubs, but no part of this branch has touched a real LLM, Brave, Places or Unsplash.
