@@ -4,6 +4,14 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-08] Deduplicate activities by name, not by grounded coordinate
+
+Branch `claude/guide-me-setup-stuck-mszkyo`. From the first staging baseline that showed the drop list.
+
+- **`src/claude.js`**: `dedupeByVenue` → `dedupeByName`, keying on the lowercased name only. The coordinate key dropped 13 activities across the two cities — 4 Dukezong Old Town activities collapsed onto one district centroid, 3 Lijiang Old Town likewise, a butter-tea workshop onto Ganden Sumtseling, a hotel dining room onto the Old Town breakfast stalls — against 2 genuine duplicates. It was also the whole delivered-count shortfall: 37 and 31 raw against targets of 36 and 30, cut to 31 and 24. `coordsOf` is no longer used by the dedupe path.
+- **`src/planCitySplit.test.js`**: the three coordinate-collapse cases replaced by name-collapse across windows, four Dukezong activities at one centroid all surviving, and one park under three names surviving to be measured as `distinct%` rather than hidden.
+- Verified: 221/221 unit tests.
+
 ## [2026-08-08] Google Places lookups keyed on `venue_name`
 
 Branch `claude/guide-me-setup-stuck-mszkyo`. Found while auditing why the split-generation baseline run delivered 30/36 and 22/30 activities and why several Shangri-La activities shared one map pin.

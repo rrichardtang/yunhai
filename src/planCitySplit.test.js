@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'test-key';
-const { planCity, dedupeByVenue } = require('./claude');
+const { planCity, dedupeByName } = require('./claude');
 
 const CITY = { name: 'Testville', startDate: '2026-10-08', endDate: '2026-10-13' }; // 6 days
 
@@ -93,46 +93,34 @@ test('windows are told they cover part of a longer stay', async () => {
   }
 });
 
-// Coordinates only ever arrive from Google Places (normalizeActivity leaves
-// location.lat/lng null), so the venue-collapse rule is exercised directly.
 const at = (name, lat, lng) => ({ name, location: { lat, lng } });
 
-test('activities that ground to the same venue collapse to one', () => {
-  // The real case: Pudacuo National Park returned three times under three names.
-  const out = dedupeByVenue([
+test('the same name arriving from two windows collapses', () => {
+  const out = dedupeByName([at('Yak Hot Pot Dinner', 0, 0), at('Yak Hot Pot Dinner', 0, 0)], 'Shangri-La');
+  assert.equal(out.length, 1);
+});
+
+test('different activities at one venue are all kept', () => {
+  // A district centroid is the correct coordinate for everything in the
+  // district. Collapsing on it deleted three real Dukezong activities.
+  const out = dedupeByName([
+    at('Dukezong Ancient Town Evening Wander', 27.810488, 99.7086132),
+    at('Dukezong Old Town Rooftop & Prayer Wheel Hill', 27.810488, 99.7086132),
+    at('Tibetan Cultural Performance at Dukezong', 27.810488, 99.7086132),
+    at('Dukezong Old Town Departure Morning', 27.810488, 99.7086132)
+  ], 'Shangri-La');
+  assert.equal(out.length, 4);
+});
+
+test('one venue sold under three names survives to be measured, not hidden', () => {
+  // Pudacuo National Park came back three times in one Shangri-La run. That is a
+  // model-quality signal the bake-off scores as distinct%, not a duplicate.
+  const out = dedupeByName([
     at('Potatso Park — Alpine Meadow Boardwalk', 27.8006835, 99.9071603),
     at('Pudacuo National Park — Shudu & Bita Lake Loop', 27.8006835, 99.9071603),
-    at('Potatso National Park — Bita Lake Morning Walk', 27.8006835, 99.9071603),
-    at('Ganden Sumtseling Monastery', 27.816877, 99.705421)
-  ], 'Shangri-La');
-
-  assert.deepEqual(out.map((a) => a.name), [
-    'Potatso Park — Alpine Meadow Boardwalk',
-    'Ganden Sumtseling Monastery'
-  ]);
-});
-
-test('distinct venues a few hundred metres apart are both kept', () => {
-  const out = dedupeByVenue([
-    at('Riwuqie Tibetan Restaurant', 27.81173, 99.70505),
-    at('Dukezong Old Town Nightlife Bar Strip', 27.81171, 99.705503)
-  ], 'Shangri-La');
-  assert.equal(out.length, 2);
-});
-
-test('unresolved activities are not collapsed into each other', () => {
-  // 0,0 is the unset sentinel; treating it as a location would drop all but one.
-  const out = dedupeByVenue([
-    at('No coords A', 0, 0),
-    at('No coords B', 0, 0),
-    at('No coords C', null, null)
+    at('Potatso National Park — Bita Lake Morning Walk', 27.8006835, 99.9071603)
   ], 'Shangri-La');
   assert.equal(out.length, 3);
-});
-
-test('the same unresolved name arriving from two windows collapses', () => {
-  const out = dedupeByVenue([at('Yak Hot Pot Dinner', 0, 0), at('Yak Hot Pot Dinner', 0, 0)], 'Shangri-La');
-  assert.equal(out.length, 1);
 });
 
 test('windows do not multiply coordinate-less activities', async () => {

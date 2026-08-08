@@ -593,3 +593,15 @@ The clamp exists because `state.maxStep` is in-memory only and a page reload res
 **Alternatives rejected:** (a) Validate the returned `displayName` against the activity name and reject weak matches — compensating logic layered on a lookup that was asking the wrong question. (b) A top-up pass re-querying rejects with a trimmed name — same, plus extra billed calls. (c) Skip Places entirely when `venue_name` is null — the schema says these are district walks and sunset spots, but a district centroid is still the right coordinate for commute math, and dropping it would trade wrong pins for no pins.
 
 **Tradeoffs:** For meals `normalizeActivity` synthesises `venue_name` as `"<name>, <city>"`, so the query now carries the city twice once `fetchPlaceDetails` appends it. `distanceMatrix` has done this for meals all along without harm, so it was left alone rather than adding string-matching to strip the duplicate — `meal res%` on the next baseline run measures whether that judgement holds. Cache entries written under label keys are stranded rather than migrated; they expire on the 90-day TTL and the correct keys refetch on first touch.
+
+---
+
+## [2026-08-08] Duplicate activities are collapsed by name, never by grounded coordinate
+
+**Decision:** `dedupeByVenue` becomes `dedupeByName` and keys only on the lowercased activity name. Two activities that ground to the same coordinate are both kept.
+
+**Reasoning:** Coordinate identity is not activity identity. A district centroid is the correct coordinate for every activity in that district, so one Shangri-La run dropped a rooftop visit, a cultural performance and a departure-morning wander as duplicates of an evening wander at Dukezong — four genuinely different activities at one correct location. Across both cities the coordinate rule dropped 13 activities, of which roughly 8 were this pattern, 3 were mis-resolved venues, and only 2 were real duplicates. It was also the entire delivered-count shortfall: raw generation produced 37 and 31 against targets of 36 and 30, and dedupe cut them to 31 and 24. Fixing the `venue_name` lookup makes coordinate dedupe *worse*, not better — correct resolution puts every Dukezong activity on exactly the same point. Name identity is the only duplicate a parallel window boundary actually creates, which is what the function was added for.
+
+**Alternatives rejected:** (a) Add time-of-day to the coordinate key — recovers the Dukezong case but not the real duplicates it was meant to catch, and invents a similarity threshold to tune. (b) Drop deduplication entirely — parallel windows have no shared context, so an exact-name repeat is a real artifact of the split and cheap to collapse. (c) Fuzzy name matching to catch Pudacuo/Potatso — see the tradeoff below.
+
+**Tradeoffs:** A model that sells one park three times under three names now ships all three. That is deliberate: it is a model-quality failure, it is exactly what the bake-off scores as `distinct%`, and collapsing it in production would hide the signal the model decision is supposed to rest on. If the winning model still does it, fix it in `SYSTEM_PROMPT`, not in a post-filter.
