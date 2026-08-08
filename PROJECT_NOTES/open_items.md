@@ -115,5 +115,8 @@ that class. Phase 2 sources meals from activity coordinates via a Places cluster
 from the model's memory, which makes the hour-away restaurant unselectable rather than forbidden.
 **Context:** `PROJECT_NOTES/plan-deterministic-prompt-split.md`. Owner principle: if deterministic
 logic covers it, it does not belong in the prompt at all.
-**Next action:** Phase 1 (mechanical, self-contained), then the free baseline measurement, then
-Phase 2.
+Phase 1B addresses the ~1,150 Places requests across four runs: a miss costs two calls (search +
+photo media) and the cache is keyed on the model's prose, so it almost never hits.
+**Next action:** Phase 1A (mechanical, self-contained), then Phase 1B step 0 — a free measurement
+over the 300+ saved venue names that decides whether the normalise and alias layers are worth
+building — then Phase 2.

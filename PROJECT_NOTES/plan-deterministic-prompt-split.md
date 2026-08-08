@@ -16,7 +16,7 @@ attention against the judgement work, and a place where prompt and code can sile
 **Governing principle (owner, 2026-08-08):** if something is covered by deterministic logic it
 should not be in the prompt at all. Never require output we then drop or count as an error.
 
-## Phase 1 — strip what code already decides
+## Phase 1A — strip what code already decides
 
 Applies to all three prompts (`SYSTEM_PROMPT`, `SYSTEM_PROMPT_GPT`, `SYSTEM_PROMPT_GPT_LEAN`) and
 to the user prompt built in `planCity`.
@@ -41,6 +41,68 @@ class of prompt/code disagreement that ate the meals becomes unrepresentable.
 **Risk:** `booking_type` drives the GetYourGuide affiliate link and the booking checklist. The
 lookup must reproduce today's distribution — verify against the four saved bake-off activity lists,
 which are ground truth for what the model currently emits.
+
+## Phase 1B — stop paying twice for the same venue
+
+Observed: ~1,150 Places requests across four bake-off runs plus UI use. A cache miss costs **two**
+requests (Text Search, then a separate `/media` call for the photo), and the hit rate is near zero
+because `placesCache` is keyed on `(venue_name || name, city)` — the model's own prose. A hit
+requires two runs to invent an identical string.
+
+**Step 0 — size it before building it. No API spend.** `data/bakeoff/` holds 300+ real venue names
+across four runs. Compute the would-be hit rate under (a) today's exact key, (b) normalised, (c)
+normalised + alias. If (b) and (c) do not move the number materially, do not build them. This also
+yields the near-miss pairs needed to tune any similarity threshold, and the test fixtures.
+
+**1. Normalise the cache key.** Lowercase, strip diacritics and punctuation, drop a trailing
+`, <city>`, collapse whitespace, drop a leading "The". Zero false-positive risk. One-time cost: it
+re-keys the existing cache, so the first run after deploy is cold — the same one-off already
+accepted for the `photoName` migration.
+
+**2. Alias on resolve.** Text Search returns `displayName`. Write the resolved details under both
+the query string *and* the canonical name, so the cache accumulates Google's own synonym knowledge
+instead of us guessing at it — `Songzanlin Monastery` and `Ganden Sumtseling Monastery` converge
+after the first resolution, across models and prompt revisions, retroactively.
+*Check during Step 0:* `displayName` for Chinese venues may come back in the local script, in which
+case the alias is dead weight for this trip and worth more elsewhere. Verify before building.
+
+**3. Do not resolve venues for `venue_name: null` activities.** 26–41% of lookups, and they are the
+permanently uncacheable population: the key is a unique sentence describing an activity, not a
+place. Today they Text Search by that sentence, Places snaps to whatever sounds closest — the
+district-centroid problem that forced the `ALL_DAY` guard — and we pay for a Pro-tier search plus a
+photo call to get a wrong answer and a meaningless "venue photo".
+
+  **Open decision — where their coordinate comes from.** Arrange needs one for commute. Options, in
+  order of preference:
+  - *Minimal field mask:* same Text Search, but request `location` only — a cheaper SKU, and it
+    skips the `/media` call entirely. Keeps coordinates, drops the photo (correctly: these
+    activities should draw from the Unsplash city pool, which is what it is for).
+  - *City centre:* free, but co-locates every district walk, which degrades commute optimisation.
+  - *Geocoding API:* cheaper than Places, but still a call and still a district centroid.
+
+  Recommended: minimal field mask. It is the smallest change that removes the photo call and the
+  tier cost while preserving what arrange actually needs.
+
+**4. Cache negative results — carefully.** `placesCache.set` runs only on `hasUsefulDetails`, so a
+venue Google has never heard of is re-queried on every run, forever. Cache the miss, but:
+  - Only for a genuine `no_place` result. `fetchPlaceDetails` currently returns `null` for missing
+    API key, HTTP error and timeout as well — caching those would freeze a transient outage into a
+    90-day negative. The return needs to distinguish the reason first.
+  - Short TTL (~7 days, not 90). A venue absent from Google today may be added tomorrow.
+
+**Deliberately not in this phase:** fuzzy matching between cache entries. A false-positive hit
+silently attaches another venue's coordinates, hours and photo — the same class of silent wrongness
+that deleted the meals. It needs a threshold tuned against the Step 0 near-miss pairs and a test
+asserting known-distinct pairs stay distinct, and it belongs after the free layers are measured.
+Note also that Text Search *is* a better fuzzy matcher than anything we would write; local matching
+should gate the call, never replace it.
+
+**Deliberately not doing:** strengthening naming conventions in the prompt to raise the hit rate.
+That makes cache correctness depend on prompt compliance, which is unverifiable at runtime and
+invalidated by every prompt edit — and two distinct venues normalising to one enforced name is a
+false hit. The one naming rule worth keeping is already in `SYSTEM_PROMPT_GPT` and is a correctness
+rule that happens to help the cache: *"If it charges admission or has a scheduled start, it HAS a
+venue: name it."*
 
 ## Phase 2 — source meals from coordinates, not from the model's memory
 
@@ -97,7 +159,11 @@ Phase 2 needs.
 ## Verification
 
 - `npm test`, plus a new test asserting no prompt mentions a field the pipeline overwrites, so
-  Phase 1 cannot regress silently.
+  Phase 1A cannot regress silently.
+- Phase 1B step 0 doubles as the test fixture source: the measured hit rates become assertions, so
+  a later change to the key derivation cannot quietly cost cache hits.
+- After Phase 1B, one replan of the same city should show `source=cache` in `GET
+  /debug?scope=places-fetch` for the venues the previous run resolved. That log line already exists.
 - **Baseline, no API spend:** replay the saved bake-off lists through `schedule()` and compute, per
   placed meal, the commute distance to the nearest same-day activity. Gives a number for today's
   meal geography to prove Phase 2 improves on, and costs nothing since the lists are on disk.
