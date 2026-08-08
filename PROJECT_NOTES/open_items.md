@@ -1,25 +1,41 @@
 # Open Items
 
-## [2026-08-08] Activity-quality fixes found in the blind read
-**Status:** Pending input (which to land)
-**Description:** Six defects the metric table could not see, all fixable in `SYSTEM_PROMPT`
-(`src/claude.js:14-54`) or `placesEnrich.js` — none require a model change. Ranked by user impact:
-(1) **Places hours overwrite the model's for `neighborhood` and `tour` activities**, where the
-venue's gate/box-office hours describe something other than the activity window — 7 of Sonnet's 11
-`preferred_time` vs `opening_hours` contradictions, and `arrangeScheduler` then reschedules a
-sunrise walk to 09:00. Fix mirrors the existing `ALL_DAY` guard: skip the hours overwrite for those
-two types. (2) ~~Line 38's "OMIT the restaurant rather than guessing" contradicts the mandatory-meals
-rule~~ — **resolved and the diagnosis was wrong**: line 38 was warning the model off producing meals
-`applyMealPoolCap` would delete, not contradicting anything. Fixed in the code (changelog
-[2026-08-08], commit `8e35f6e`). (3) `insider_tips` needs crowd-timing named as a platitude and returning null stated as
-expected. (4) Nothing tells the model to drop an activity when the pitfall it would write argues
-against doing it. (5) No rule against splitting one destination into several activities or re-using
-a venue to reach the count — needs explicit permission to return fewer. (6) Two tips coached fee
-avoidance; needs an explicit prohibition.
-**Context:** changelog [2026-08-08] "Blind quality read". Full lists at `/debug/bakeoff?file=blind-read.md`.
-**Next action:** Pick which fixes land. Then re-run the two cities on the same cassette and diff:
-timing contradictions should go to ~0, meals stay ≥ target, insider-tip nulls become non-zero for
-GPT-shaped models, and no activity should re-use a venue.
+## [2026-08-08] Three quality rules exist only in the GPT arms, not in production's SYSTEM_PROMPT
+**Status:** Pending input (sequencing — changing it invalidates the bake-off baseline)
+**Description:** Of the six defects the first blind read found, three are now fixed everywhere and
+three are fixed **only** in `SYSTEM_PROMPT_GPT` / `SYSTEM_PROMPT_GPT_LEAN`. `SYSTEM_PROMPT`
+(`src/claude.js:16-52`) is deliberately held byte-identical so the bake-off moves one variable, so
+production Sonnet 4.6 still lacks: (4) drop an activity when the pitfall it would write argues
+against doing it; (5) one destination is one activity, and explicit permission to return fewer than
+the target rather than re-use a venue; (6) never advise avoiding, evading or re-using an entry fee.
+The second blind read confirms Sonnet exhibits all three — Compass sold three times in one
+Shangri-La list, a Meili Snow Mountain entry whose own pitfall says it needs an overnight in Deqin,
+and a Sumtseling tip noting "guards rarely check return visits the following day… to potentially
+save the re-entry cost". Already fixed everywhere: (1) the hours fabrication (commit `92fdce9`,
+decisions [2026-08-08]), (2) the meal-cap contradiction (commit `8e35f6e`), (3) the `insider_tips`
+platitude rule, which `SYSTEM_PROMPT` already carries.
+**Context:** changelog [2026-08-08] "Blind read of all four arms". Lists at `/debug/bakeoff?file=blind-read.md`.
+**Next action:** Decide the order. Porting the three rules into `SYSTEM_PROMPT` breaks byte-identity
+with the recorded Sonnet rows, so either accept that the control arm moves and re-run it, or land
+them after the model question below is settled. If Sonnet is not going to stay in production, this
+item dies with it.
+
+## [2026-08-08] The model question is reopened by new evidence
+**Status:** Pending input (owner call)
+**Description:** decisions [2026-08-08] closed this on `claude-sonnet-4-6`, on evidence that is now
+known to be invalid: GPT-5.6's "zero meals in both cities" was `applyMealPoolCap` deleting them, and
+its profile-fit was judged from a run where the traveler profile never reached the model. Both bugs
+are fixed. The current arm, `gpt-5.6+lean`, measures better than the Sonnet control on every column
+and wins the blind read: 33/33 delivered, 22/22 meals, 5.65 sec/act vs 6.08, $0.0094/act vs
+$0.0054, and none of the profile violations or trip-level errors listed in the item above. Cost is
+the one column Sonnet still wins, at ~1.7x.
+**Context:** changelog [2026-08-08] (both entries); the invalidated reasoning is in decisions
+[2026-08-08] "planCity stays on claude-sonnet-4-6", which should be superseded by a new entry rather
+than edited. `planCity` still runs `claude-sonnet-4-6`; the `generate` / `systemPrompt` options are
+bake-off-only seams.
+**Next action:** Decide whether to switch production to GPT-5.6 with `SYSTEM_PROMPT_GPT_LEAN`. If
+yes, that also settles the item above and retires `SYSTEM_PROMPT_GPT` (the losing verbose arm). If
+no, port the three missing rules into `SYSTEM_PROMPT` and re-run the control.
 
 ## [2026-08-07] Verify the Setup → Review fixes against live providers
 **Status:** Pending input (needs deploy)
