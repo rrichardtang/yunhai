@@ -26,11 +26,18 @@ const CASSETTE = path.join(OUT_DIR, 'brave-cassette.json');
 const MAX_OUTPUT_TOKENS = 64000;
 
 // Per million tokens. Sonnet 5 is on introductory pricing through 2026-08-31.
-// GPT-5.6 is deliberately null: confirm it upstream rather than guess here.
+// GPT-5.6 bills per tier and the tier decides the whole cost argument — Sol is
+// twice Sonnet 4.6's output price, Luna is 40% of it. The bare 'gpt-5.6' key
+// stays null so an unidentified tier prints an em dash instead of a wrong
+// number; rows are priced on the model the provider says it served, so a run
+// reveals the real tier IDs if these slugs are wrong.
 const PRICING = {
   'claude-sonnet-4-6': { in: 3, out: 15 },
   'claude-sonnet-5': { in: 2, out: 10 },
-  'gpt-5.6': null
+  'gpt-5.6': null,
+  'gpt-5.6-sol': { in: 5, out: 30 },
+  'gpt-5.6-terra': { in: 2.5, out: 15 },
+  'gpt-5.6-luna': { in: 1, out: 6 }
 };
 
 const TRIP = {
@@ -72,6 +79,7 @@ function anthropicArm(model, effort) {
     const final = await client.messages.stream(params).finalMessage();
     return {
       text: extractText(final.content),
+      servedModel: final.model,
       stop_reason: final.stop_reason,
       inputTokens: final.usage?.input_tokens || 0,
       outputTokens: final.usage?.output_tokens || 0
@@ -95,6 +103,9 @@ function openaiArm(model) {
     const choice = res.choices?.[0];
     return {
       text: choice?.message?.content || '',
+      // The requested string can route to any tier, and the tiers differ 5x on
+      // output price — bill on what the provider says it actually served.
+      servedModel: res.model,
       stop_reason: choice?.finish_reason,
       inputTokens: res.usage?.prompt_tokens || 0,
       outputTokens: res.usage?.completion_tokens || 0
@@ -128,9 +139,10 @@ const RETRY_MARKER = 'IMPORTANT: Return ONLY a valid JSON array';
 let SPLIT_DAYS = null;
 
 function instrument(generate) {
-  const stats = { calls: [], rawActivities: 0, inputTokens: 0, outputTokens: 0, truncated: false, retried: false };
+  const stats = { calls: [], rawActivities: 0, inputTokens: 0, outputTokens: 0, truncated: false, retried: false, servedModel: null };
   const wrapped = async (args) => {
     const result = await generate(args);
+    if (result.servedModel) stats.servedModel = result.servedModel;
     stats.inputTokens += result.inputTokens;
     stats.outputTokens += result.outputTokens;
     if (['max_tokens', 'length'].includes(result.stop_reason)) stats.truncated = true;
@@ -217,11 +229,12 @@ async function runArm(armName, runIndex) {
     const resolved = activities.filter((a) => Number.isFinite(a?.location?.lat) && a.location.lat !== 0).length;
     const withPhoto = activities.filter((a) => a?.imageUrl).length;
     const seconds = (Date.now() - started) / 1000;
-    const cost = costUsd(generate.modelId, stats.inputTokens, stats.outputTokens);
+    const cost = costUsd(stats.servedModel || generate.modelId, stats.inputTokens, stats.outputTokens);
 
     rows.push({
       arm: armName,
       run: runIndex,
+      servedModel: stats.servedModel,
       city: city.name.split(',')[0],
       seconds,
       // The number the arms are actually comparable on: sec/city rewards a model
