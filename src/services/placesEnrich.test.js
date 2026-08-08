@@ -119,6 +119,32 @@ test('an activity that already has coordinates but no image is still enriched', 
   assert.equal(activity.imageUrl, PHOTO_URI);
 });
 
+test('the venue name is what reaches Places, not the activity label', async () => {
+  process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+  const calls = stubFetch(() => searchResponse());
+
+  const activity = {
+    name: 'Zhuanshan Temple Kora Circuit',
+    venue_name: venue('Zhuanshan Temple'),
+    type: 'landmark'
+  };
+  await enrichWithPlaceDetails([activity], 'Shangri-La');
+
+  const query = JSON.parse(calls[0].options.body).textQuery;
+  assert.match(query, /Zhuanshan Temple t\d/);
+  assert.doesNotMatch(query, /Kora Circuit/);
+});
+
+test('an activity with no venue name falls back to its label', async () => {
+  process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+  const calls = stubFetch(() => searchResponse());
+
+  const label = venue('Dukezong Old Town Evening Stroll');
+  await enrichWithPlaceDetails([{ name: label, venue_name: null, type: 'neighborhood' }], 'Shangri-La');
+
+  assert.match(JSON.parse(calls[0].options.body).textQuery, /Dukezong Old Town Evening Stroll/);
+});
+
 test('a cache entry predating photo support is refetched, not served photo-less', async () => {
   process.env.GOOGLE_MAPS_API_KEY = 'test-key';
   const name = venue('Legacy Cached Venue F');

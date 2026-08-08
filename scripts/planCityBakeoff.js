@@ -170,7 +170,10 @@ function summariseOutcomes(outcomes) {
   const isMeal = (o) => String(o.type || '').toLowerCase() === 'meal';
   const comparable = outcomes.filter((o) => o.llmHours && o.placesHours);
   return {
-    noPlace: outcomes.filter((o) => o.status === 'no_place').length,
+    // Only counts activities where the model committed to a venue name. An
+    // unstructured activity carries venue_name null by design, so its label
+    // failing to geocode says nothing about the model.
+    ghost: outcomes.filter((o) => o.status === 'no_place' && o.venueName).length,
     tooFar: outcomes.filter((o) => o.status === 'too_far').length,
     mealTotal: outcomes.filter(isMeal).length,
     mealResolved: outcomes.filter((o) => isMeal(o) && o.status === 'resolved').length,
@@ -255,7 +258,7 @@ function report(rows) {
 
   lines.push(`# planCity bake-off — ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`);
   lines.push('');
-  lines.push('| arm | runs | sec/act | sec/city | kept/target | distinct% | resolved% | meal res% | hours ok% | noPlace | tooFar | retry% | trunc% | photo% | $/act | $/city |');
+  lines.push('| arm | runs | sec/act | sec/city | kept/target | distinct% | resolved% | meal res% | hours ok% | ghost | tooFar | retry% | trunc% | photo% | $/act | $/city |');
   lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
 
   for (const arm of arms) {
@@ -278,7 +281,7 @@ function report(rows) {
       fmt(ratio('resolved', 'kept'), 0),
       fmt(ratio('mealResolved', 'mealTotal'), 0),
       fmt(ratio('hoursMatched', 'hoursComparable'), 0),
-      fmt(mean(armRows.map((r) => r.noPlace)), 1),
+      fmt(mean(armRows.map((r) => r.ghost)), 1),
       fmt(mean(armRows.map((r) => r.tooFar)), 1),
       fmt(pct((r) => r.retried), 0),
       fmt(pct((r) => r.truncated), 0),
@@ -295,14 +298,16 @@ function report(rows) {
   lines.push('');
   lines.push('`distinct%` is unique venues over resolved ones: it catches a model padding to hit');
   lines.push('the target by selling the same place three times, which `resolved%` scores as a win.');
-  lines.push('`resolved%` split into `noPlace` (invented venue — the real quality signal) and');
-  lines.push('`tooFar` (real venue beyond the day-trip radius, usually not the model\'s fault).');
+  lines.push('`ghost` is the real quality signal: the model named a venue and Google has never');
+  lines.push('heard of it. Activities the model left venue_name null are excluded — those are');
+  lines.push('unstructured by design. `tooFar` is a real venue beyond the day-trip radius,');
+  lines.push('usually not the model\'s fault.');
   lines.push('`meal res%` matters on its own: restaurants carry the strictest naming rules and are');
   lines.push('where the baseline failed. `hours ok%` is how often the model\'s opening hours matched');
   lines.push('Google — the baseline was 0 for 3 on Pudacuo, inventing evening hours for a park that');
   lines.push('shuts at 16:30.');
   lines.push('');
-  lines.push('Decision rule: quality first — `distinct%`, `noPlace`, and `meal res%` together, not');
+  lines.push('Decision rule: quality first — `distinct%`, `ghost`, and `meal res%` together, not');
   lines.push('`resolved%` alone, which sat at 93% for the baseline and has little room to separate');
   lines.push('the arms. On a quality tie, prefer Sonnet 5 (no prompt re-tuning) and choose the');
   lines.push('effort rung on `sec/act` and `$/act`. Faster but worse loses: splitting the call is a');

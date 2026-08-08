@@ -172,6 +172,15 @@ function applyDetails(activity, details) {
   if (details.imageUrl && !activity.imageUrl) activity.imageUrl = details.imageUrl;
 }
 
+// venue_name is the model's Google-Maps-resolvable place ("Casa Lucio, Madrid");
+// name is a descriptive label ("Zhuanshan Temple Kora Circuit") that Places
+// resolves to whatever sounds closest. Same preference distanceMatrix and the
+// activity add/replace routes already apply. Unstructured activities carry a
+// null venue_name by design, so the label is all there is to search on.
+function placesQuery(activity) {
+  return String(activity?.venue_name || '').trim() || activity?.name;
+}
+
 function hasCoords(activity) {
   const rawLat = activity?.location?.lat;
   const rawLng = activity?.location?.lng;
@@ -192,6 +201,7 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null, o
     onOutcome({
       name: activity.name,
       type: activity.type,
+      venueName: activity.venue_name || null,
       status,
       distanceKm: details?.distanceKm ?? null,
       llmHours: activity?.timing?.opening_hours || activity?.opening_hours || null,
@@ -208,7 +218,8 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null, o
     return !!(d && d.location?.latitude && d.location?.longitude);
   }
   await Promise.all(targets.map(async (activity) => {
-    const cached = placesCache.get(activity.name, cityName);
+    const lookupName = placesQuery(activity);
+    const cached = placesCache.get(lookupName, cityName);
     // Entries written before photo support lack the key entirely. Without this the
     // 90-day cache would serve permanently photo-less hits for every known venue.
     const cacheCoversPhotos = cached && Object.prototype.hasOwnProperty.call(cached, 'photoName');
@@ -217,19 +228,19 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null, o
       const cLng = Number(cached.location?.longitude);
       if (cityCenter && Number.isFinite(cLat) && Number.isFinite(cLng)
         && haversineKm(cityCenter.lat, cityCenter.lng, cLat, cLng) > CITY_REJECT_RADIUS_KM) {
-        debugLog('places-fetch', `REJECT name="${activity.name}" city="${cityName}" reason=too_far_cached lat=${cLat} lng=${cLng}`);
+        debugLog('places-fetch', `REJECT name="${lookupName}" city="${cityName}" reason=too_far_cached lat=${cLat} lng=${cLng}`);
       } else {
-        debugLog('places-fetch', `OK name="${activity.name}" city="${cityName}" lat=${cLat} lng=${cLng} source=cache`);
+        debugLog('places-fetch', `OK name="${lookupName}" city="${cityName}" lat=${cLat} lng=${cLng} source=cache`);
         report(activity, 'resolved', cached);
         applyDetails(activity, cached);
         return;
       }
     }
-    const details = await fetchPlaceDetails(activity.name, cityName, cityCenter);
+    const details = await fetchPlaceDetails(lookupName, cityName, cityCenter);
     if (hasUsefulDetails(details)) {
       report(activity, 'resolved', details);
       applyDetails(activity, details);
-      placesCache.set(activity.name, cityName, details);
+      placesCache.set(lookupName, cityName, details);
     } else if (hasUsefulDetails(cached)) {
       report(activity, 'resolved', cached);
       applyDetails(activity, cached);

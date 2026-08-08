@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-08] Google Places lookups keyed on `venue_name`
+
+Branch `claude/guide-me-setup-stuck-mszkyo`. Found while auditing why the split-generation baseline run delivered 30/36 and 22/30 activities and why several Shangri-La activities shared one map pin.
+
+- **`src/services/placesEnrich.js`**: `enrichWithPlaceDetails` queried `activity.name` — the descriptive label — instead of `venue_name`, the field `SYSTEM_PROMPT` defines as the Google-Maps-resolvable place. New `placesQuery()` prefers `venue_name` and falls back to the label only when it is null (unstructured activities, by schema). `placesCache` get/set and the `places-fetch` debug lines follow the same value, so the log shows the query that was actually sent. The `onOutcome` instrumentation now also reports `venueName`.
+- **`scripts/planCityBakeoff.js`**: `noPlace` renamed `ghost` and narrowed to activities where the model named a venue Google has never heard of. Activities with `venue_name: null` no longer count against a model for failing to geocode a label. Table header, decision-rule text and metric notes updated.
+- **`src/services/placesEnrich.test.js`**: 2 new cases — the venue name reaches Places rather than the label, and a null `venue_name` falls back to the label.
+- Verified: 222/222 unit tests (220 → 222). Not yet re-measured against live providers; the effect on delivered counts, `distinct%` and `meal res%` is the point of the next baseline run.
+
 ## [2026-08-07] Plan-step progress reporting, image sourcing rework, no-hotel planning, model bake-off
 
 Branch `claude/guide-me-setup-stuck-mszkyo`. From a 2-city Yunnan trip (Lijiang 10-08→10-13, Shangri-La 10-13→10-17) reported as "stuck" at Setup → Next, with missing card images and prose crowding the review nav pill.
