@@ -82,7 +82,12 @@ async function fetchPlacePhotoUrl(photoName) {
   }
 }
 
-async function fetchPlaceDetails(name, city, cityCenter = null) {
+const FULL_FIELDS = 'places.priceLevel,places.displayName,places.regularOpeningHours,places.location,places.photos';
+// Only what a venue-less activity can actually use. Fewer fields is a cheaper SKU,
+// and it removes the photo resolve — the second billed call on every miss.
+const MINIMAL_FIELDS = 'places.displayName,places.location';
+
+async function fetchPlaceDetails(name, city, cityCenter = null, { minimal = false } = {}) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     debugLog('places-fetch', `FAIL name="${name}" city="${city}" reason=no_api_key`);
@@ -104,7 +109,7 @@ async function fetchPlaceDetails(name, city, cityCenter = null) {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'places.priceLevel,places.displayName,places.regularOpeningHours,places.location,places.photos'
+        'X-Goog-FieldMask': minimal ? MINIMAL_FIELDS : FULL_FIELDS
       },
       body: JSON.stringify(body)
     });
@@ -132,6 +137,10 @@ async function fetchPlaceDetails(name, city, cityCenter = null) {
         // reason distinguishes an invented venue from a real one out of range.
         return { rejected: 'too_far', distanceKm: distKm };
       }
+    }
+    if (minimal) {
+      debugLog('places-fetch', `OK name="${name}" city="${city}" lat=${lat ?? 'none'} lng=${lng ?? 'none'} source=live_minimal`);
+      return { location: place.location || null, displayName: place.displayName?.text || null, minimal: true };
     }
     // photoName is the stable resource id; photoUri expires, so keeping the name
     // alongside it leaves a cheap refresh path when a cached URL goes stale.
@@ -230,24 +239,26 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null, o
   // cache at the same instant and fetch it separately — one Shangri-La run spent
   // 10 lookups on 4 venues, each photo hit billed twice over. Sharing the
   // in-flight promise collapses them. The map lives for this call only.
-  // Flagged rather than deleted: a no_place on a named venue is a likely
-  // invention, but deleting on it would empty an itinerary the moment Places has
-  // a bad day. An activity with venue_name null resolved nothing by design and is
-  // not a ghost.
-  const markUnverified = (activity) => {
-    if (activity?.venue_name) activity.unverified = true;
-  };
   const inFlight = new Map();
-  const resolveVenue = (name) => {
-    if (!inFlight.has(name)) inFlight.set(name, fetchPlaceDetails(name, cityName, cityCenter));
-    return inFlight.get(name);
+  const resolveVenue = (name, minimal) => {
+    const key = `${minimal ? 'min' : 'full'}|${name}`;
+    if (!inFlight.has(key)) inFlight.set(key, fetchPlaceDetails(name, cityName, cityCenter, { minimal }));
+    return inFlight.get(key);
   };
   await Promise.all(targets.map(async (activity) => {
     const lookupName = placesQuery(activity);
+    // A null venue_name means the query is a sentence describing an activity, not
+    // a place. Google will still return its closest text match, so asking for
+    // hours, price and a photo buys a district's gate hours written over the
+    // model's intent and a photo of whatever business sounded similar. Ask for the
+    // coordinate alone: it is the only field this population has a real use for.
+    const minimal = !activity.venue_name;
     const cached = placesCache.get(lookupName, cityName);
     // Entries written before photo support lack the key entirely. Without this the
     // 90-day cache would serve permanently photo-less hits for every known venue.
-    const cacheCoversPhotos = cached && Object.prototype.hasOwnProperty.call(cached, 'photoName');
+    // A minimal entry carries no photoName by design and is complete as it stands.
+    const cacheCoversPhotos = cached
+      && (cached.minimal || Object.prototype.hasOwnProperty.call(cached, 'photoName'));
     if (hasUsefulDetails(cached) && hasLocation(cached) && cacheCoversPhotos) {
       const cLat = Number(cached.location?.latitude);
       const cLng = Number(cached.location?.longitude);
@@ -263,11 +274,10 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null, o
     }
     if (cached?.miss) {
       debugLog('places-fetch', `SKIP name="${lookupName}" city="${cityName}" reason=cached_miss`);
-      markUnverified(activity);
       report(activity, 'no_place', null);
       return;
     }
-    const details = await resolveVenue(lookupName);
+    const details = await resolveVenue(lookupName, minimal);
     if (hasUsefulDetails(details)) {
       report(activity, 'resolved', details);
       applyDetails(activity, details);
@@ -278,13 +288,10 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null, o
       report(activity, 'resolved', cached);
       applyDetails(activity, cached);
     } else {
-      // Only a genuine no_place is cacheable or a ghost. A null here is transient
-      // — missing key, HTTP error, timeout — and freezing that into the cache
-      // would outlive the outage that caused it.
-      if (details?.miss === 'no_place') {
-        placesCache.setMiss(lookupName, cityName);
-        markUnverified(activity);
-      }
+      // Only a genuine no_place is cacheable. A null here is transient — missing
+      // key, HTTP error, timeout — and freezing that into the cache would outlive
+      // the outage that caused it.
+      if (details?.miss === 'no_place') placesCache.setMiss(lookupName, cityName);
       report(activity, details?.rejected === 'too_far' ? 'too_far' : 'no_place', details);
     }
   }));
