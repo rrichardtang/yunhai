@@ -31,11 +31,8 @@ function formatProfileForEnrichment(profile = {}) {
   ];
   const paceLabels = { 1: 'Very relaxed', 2: 'Easy-going', 3: 'Moderate', 4: 'Active', 5: 'Non-stop' };
 
-  // The numeral carries the filtering rule the plan prompt keys on; the words
-  // alone left "Slightly interested" open to interpretation as "include a few".
-  // An unanswered slider is omitted rather than reported as a neutral 3 — the
-  // planner defaults unanswered shopping to 1, so claiming 3/5 here would hand
-  // the model an opinion the traveler never gave.
+  // Omit unanswered rather than reporting a neutral 3: planCity defaults
+  // unanswered shopping to 1 and plans none, so 3/5 would contradict it in-prompt.
   const lines = sliderQuestions
     .filter(([key]) => answers[key] != null && answers[key] !== '')
     .map(([key, label]) => `- ${label}: ${sliderRating(answers[key])}/5 (${sliderInterestLabel(answers[key])})`);

@@ -54,23 +54,10 @@ Example object:
 
 Return ONLY the JSON array, no markdown, no explanation.`;
 
-// Deliberately a standalone prompt rather than a diff over SYSTEM_PROMPT: the two
-// are competing experiment arms, and an arm you cannot read end-to-end is an arm
-// you cannot tune. SYSTEM_PROMPT stays byte-identical so a bake-off comparing the
-// two moves exactly one variable.
-//
-// Written against what GPT-5.6 actually did on the first bake-off, where it read
-// the Claude-tuned prompt literally and we scored it for obeying us:
-//   - "OMIT the restaurant rather than guessing" (opening_hours) beat the
-//     mandatory-meals rule. It returned zero meals in both cities.
-//   - "Skip prestige picks when they're likely to feel flat" is a judgement call
-//     with no threshold, so it quoted the sentence back as justification prose
-//     and included the museums anyway. Ratings are now thresholds.
-//   - It never once returned insider_tips: null across 70 activities, filling
-//     ~17% with the exact "arrive early" platitude the prompt forbids. A null
-//     rate is now stated as an expectation, not permission.
-//   - It padded to the target with logistics blocks and split single
-//     destinations four ways, because nothing said it could return fewer.
+// Competing arm to SYSTEM_PROMPT, which stays byte-identical so a bake-off moves
+// one variable. Standalone rather than a diff: an arm you cannot read end to end
+// is an arm you cannot tune. Each rule below guards a specific GPT-5.6 behaviour
+// from the first bake-off — src/planPrompt.test.js names which.
 const SYSTEM_PROMPT_GPT = `## Role
 You are a blunt, opinionated travel planning agent. You are planning for ONE specific traveler whose profile appears in the user message. Fit-to-person beats fit-to-tourist-list. Be concise: at most 3 sentences per activity.
 
@@ -398,10 +385,6 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   const { value: pace } = paceDescFromValue(profile?.answers?.pace);
   const nonMealPerDayByPace = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6 };
   const nonMealPerDay = nonMealPerDayByPace[pace];
-  // Every answer except pace and shopping used to be read off the profile and
-  // dropped here, so the model planned for a stranger: the interest ratings the
-  // SYSTEM_PROMPT tells it to filter on never arrived, and neither did dietary
-  // restrictions or mobility needs. Same block the profile summariser gets.
   const profileBlock = formatProfileForEnrichment(profile || {});
 
   const tripDays = (() => {

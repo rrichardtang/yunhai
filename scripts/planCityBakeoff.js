@@ -42,7 +42,26 @@ const PRICING = {
 };
 
 const TRIP = {
-  profile: { answers: { pace: 3, museumPerson: 2, foodTravel: 5, livePerformances: 2, outdoorNature: 4, nightlifeBars: 3 } },
+  // The owner's real profile, mapped from their own description. Until 5a8402d
+  // none of this reached the model, so runs before that one measured a traveler
+  // the planner knew nothing about beyond the pace.
+  profile: {
+    answers: {
+      pace: 3,
+      foodTravel: 5,
+      outdoorNature: 5,
+      shoppingPerson: 4,
+      museumPerson: 2,
+      livePerformances: 2,
+      structuredTours: 1,
+      nightlifeBars: 1,
+      shoppingInterests: 'fragrances, clothes, Pokemon cards',
+      budgetStyle: 'Budget-conscious overall, with one exceptional splurge meal per city'
+    },
+    aboutMe: 'Food-focused explorer who seeks out local culinary scenes and prefers spicy cuisines. '
+      + 'Happy to splurge on one standout meal per city and stay budget-conscious elsewhere. '
+      + 'Wants nature and outdoor adventure at an unhurried pace.'
+  },
   cities: [
     { name: 'Lijiang, Yunnan, China', startDate: '2026-10-08', endDate: '2026-10-13', leaveTime: '18:00', latitude: 26.8721, longitude: 100.2299, accommodation: { address: '' } },
     { name: 'Shangri-La City, Diqing Tibetan Autonomous Prefecture, Yunnan, China', startDate: '2026-10-13', endDate: '2026-10-17', leaveTime: '18:00', latitude: 27.8269, longitude: 99.7065, accommodation: { address: '' } }
@@ -211,9 +230,7 @@ function summariseOutcomes(outcomes) {
 async function runArm(armName, runIndex) {
   const generate = ARMS[armName]();
   const rows = [];
-  // A prompt is as much an arm as a model is. Tagging it keeps the two runs'
-  // activity lists from overwriting each other and makes the report say which
-  // prompt produced which row.
+  // A prompt is as much an arm as a model is, so it rides in the row and filename.
   const armLabel = PROMPT_LABEL === 'default' ? armName : `${armName}+${PROMPT_LABEL}`;
 
   for (const city of TRIP.cities) {
@@ -366,8 +383,7 @@ async function main() {
   // Off by default so the baseline arm stays comparable to production.
   SPLIT_DAYS = args.includes('--split') ? Number(args[args.indexOf('--split') + 1]) || null : null;
 
-  // --prompt gpt swaps in SYSTEM_PROMPT_GPT for every arm in the run. Run the
-  // same arms twice, once each way, and the pair isolates the prompt.
+  // Run the same arms twice, once each way, and the pair isolates the prompt.
   PROMPT_LABEL = args.includes('--prompt') ? String(args[args.indexOf('--prompt') + 1] || 'default') : 'default';
   const PROMPTS = { default: null, gpt: SYSTEM_PROMPT_GPT };
   if (!(PROMPT_LABEL in PROMPTS)) {
