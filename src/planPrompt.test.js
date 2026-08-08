@@ -63,6 +63,15 @@ test('the GPT prompt turns the ratings into thresholds instead of a judgement ca
   assert.match(SYSTEM_PROMPT_GPT, /reputation is NOT a reason/);
 });
 
+test('the restaurant research block does not re-open the meals escape hatch', async () => {
+  // The same contradiction lived twice: SYSTEM_PROMPT line 38 and the user
+  // prompt's restaurant block. Closing only the first took GPT-5.6 from 0 meals
+  // to 6 against a target of 2/day — the user prompt was still saying "omit".
+  const { prompt } = await capture(PROFILE, { systemPrompt: SYSTEM_PROMPT_GPT });
+  assert.doesNotMatch(prompt, /omit that restaurant/);
+  assert.doesNotMatch(prompt, /if hours aren't listed/);
+});
+
 test('the GPT prompt closes the escape hatch that produced zero meals', () => {
   // SYSTEM_PROMPT holds both "meals are MANDATORY" and "omit the restaurant if
   // hours are missing". GPT-5.6 obeyed the second one, in both cities.
