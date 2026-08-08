@@ -4,6 +4,43 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-08] The traveler profile never reached the planner
+
+Branch `claude/guide-me-setup-stuck-mszkyo`. `planCity` read three keys off `profile.answers` —
+`pace`, `shoppingPerson`, `shoppingInterests` (`claude.js:315,338,340`) — and dropped everything
+else. `museumPerson`, `foodTravel`, `livePerformances`, `outdoorNature` and `nightlifeBars` were
+passed in and discarded, as were `dietaryRestrictions`, `mobilityConsiderations`, `budgetStyle`,
+`travelCompanions` and `aboutMe`. The one function that renders them,
+`formatProfileForEnrichment`, was imported by `routes/preferences.js` alone, where it feeds a Haiku
+call that writes `profileInstruction` — which reaches the planner via `recall()` only if the user
+completed the wizard and the summary regenerated. The raw ratings never reached it at all.
+
+`SYSTEM_PROMPT` line 15 ("Filter everything through what they actually enjoy… skip prestige picks
+when they're likely to feel flat for this person") was therefore addressed to a model told exactly
+one fact about the traveler: the pace. **This invalidates the profile-fit half of the blind read
+[2026-08-08]** — the bake-off runs as `userId: 'bakeoff'` with no `data/users/bakeoff.json`, so
+`getProfileInstruction` returned `''` and both models planned for a stranger. Neither disobeyed the
+prestige-pick instruction; neither was given the information it needs to obey it.
+
+- `claude.js` now injects the same structured block the summariser gets, under a `TRAVELER PROFILE`
+  heading placed before `ACTIVITY COUNT`. The standalone pace sentence is gone (the block carries it).
+- `profilePrompt.js` renders `2/5 (Slightly interested)` rather than the word alone, so a prompt can
+  key thresholds on the numeral. Extracted `sliderRating` (the clamp was inline and duplicated).
+- Unanswered sliders are omitted rather than reported as a neutral 3: `planCity` treats unanswered
+  shopping as 1 and plans none, so a block claiming 3/5 contradicted the same prompt's instructions.
+- New `SYSTEM_PROMPT_GPT`, written against GPT-5.6's observed behaviour: interest ratings become
+  1-2/3/4-5 thresholds rather than a judgement call; the `opening_hours` escape hatch that beat the
+  mandatory-meals rule is closed (null the hours, keep the restaurant); `insider_tips` states an
+  expected null rate rather than merely permitting null, and names crowd-timing as the platitude;
+  the padding shapes both models produced (logistics blocks, one destination split several ways,
+  venue re-use, activities their own pitfall refutes) are enumerated and forbidden; `venue_name`
+  null is restricted to activities with no gate, ticket or operator.
+- `planCity` takes a `systemPrompt` override and the harness takes `--prompt default|gpt`, tagging
+  rows and activity-list filenames as `{arm}+{prompt}`. `SYSTEM_PROMPT` is byte-identical, so the
+  pair of runs isolates the prompt.
+- New `src/planPrompt.test.js` (13 tests) — captures the prompt `planCity` actually sends rather
+  than asserting on the template. 243/243 total.
+
 ## [2026-08-08] Blind quality read of the bake-off activity lists
 
 Branch `claude/guide-me-setup-stuck-mszkyo`. Read all 136 generated activities (Sonnet 4.6 and

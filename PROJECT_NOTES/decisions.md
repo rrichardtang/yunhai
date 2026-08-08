@@ -617,3 +617,49 @@ The clamp exists because `state.maxStep` is in-memory only and a page reload res
 **Alternatives rejected:** (a) **GPT-5.6 on Terra or Luna** — the quality measured came from Sol, the top tier; the cheaper rungs are unlikely to fix a contract failure the flagship exhibits, and only Luna beats Sonnet 4.6 on price. (b) **Sonnet 5** — same $3/$15 sticker, ~30% more tokens for the same text on the new tokenizer, and adaptive thinking on by default where 4.6 ran thinking-off, estimated ~$0.46/trip against 4.6's $0.35. The $2/$10 introductory rate expires 2026-08-31, so a cost case built on it has a three-week shelf life. (c) **Fixing GPT-5.6's meal omission with a prompt iteration** — break-even against the ~$0.24/trip saving on Luna is roughly 500 trips, and it buys permanent exposure to a Claude-tuned decision framework drifting on another family.
 
 **Tradeoffs:** Two rejections rest on analysis rather than measurement and should be labelled as such: Sonnet 5 was never run (one run at ~$0.45 would settle it if the estimate is ever challenged), and GPT-5.6's cheaper tiers were inferred from Sol's result. Total spend to reach the decision was about $0.20 for the GPT probe plus the baseline runs — the four-arm, three-run matrix originally planned would have cost $3–4 and answered the same question.
+
+## [2026-08-08] Send the profile to the planner verbatim, not only as a Haiku paraphrase
+
+**Decision:** `planCity` injects the structured profile block (`formatProfileForEnrichment`) into
+the user prompt directly, alongside — not instead of — the existing `recall()` path that carries
+`profileInstruction` and learned memory.
+
+**Reasoning:** The ratings were reaching the planner, at best, as prose a Haiku call wrote about
+them, and only for users who finished the wizard. The structured answers are the highest-signal,
+zero-cost thing available at plan time, and a prompt that says "filter through what they enjoy"
+needs them present to mean anything. Rendering the numeral (`2/5`) as well as the label lets a
+prompt state a threshold; "Slightly interested" alone was read as "include a few".
+
+**Alternatives rejected:** (a) Rely on `profileInstruction` alone — it is lossy, LLM-generated, and
+absent for any user who skipped the wizard, which is exactly the user whose plan looks generic.
+(b) A planning-specific formatter — would duplicate the question list, and the summariser benefits
+from the numeral too. (c) Feed the raw `answers` object as JSON — cheaper to build, but the labels
+carry the semantics ("Travels for food" vs `foodTravel`) and the model should not have to guess the
+scale direction.
+
+**Tradeoffs:** The plan prompt grows by ~250 characters per city, which is negligible against the
+Brave research blocks. Injecting real preferences will change output for every existing user —
+plans will skew away from low-rated categories, which is the point, but it is a behaviour change
+that lands with the branch rather than a pure bug fix. Unanswered sliders are now omitted, so a
+user who answered nothing gets the same plan as before.
+
+## [2026-08-08] Keep two plan prompts as competing arms rather than one merged prompt
+
+**Decision:** `SYSTEM_PROMPT` stays byte-identical and `SYSTEM_PROMPT_GPT` is a standalone second
+prompt selected by `planCity`'s `systemPrompt` option and the harness's `--prompt` flag.
+
+**Reasoning:** Several of the GPT-tuned fixes (closing the meals escape hatch, forbidding padding,
+naming the platitude) are almost certainly improvements for Sonnet too. Applying them to
+`SYSTEM_PROMPT` at the same time as measuring them would mean the bake-off compares two prompts
+that both moved, and the model question would reopen on evidence that cannot separate model from
+prompt. Two arms, one variable.
+
+**Alternatives rejected:** (a) Fix `SYSTEM_PROMPT` in place and re-run — cheaper, but destroys the
+control. (b) Compose both prompts from a shared field spec — less duplication, but an experiment
+arm you cannot read end-to-end is an arm you cannot tune, and the fields are where the two
+deliberately disagree.
+
+**Tradeoffs:** Real duplication between the two prompts; a field-taxonomy change now has to be made
+twice until one arm wins and the loser is deleted. That is accepted as the cost of a clean
+measurement, and it is explicitly temporary — the intent is to merge the winner and delete the
+other, not to maintain two prompts indefinitely.
