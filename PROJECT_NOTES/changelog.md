@@ -4,6 +4,56 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-08] Production planning switched to GPT-5.6
+
+`planCity` now defaults to `gpt-5.6` with `SYSTEM_PROMPT_GPT_LEAN`, one call per city
+(decisions [2026-08-08]). Owner call, on the measured bake-off plus the blind read.
+
+- `src/claude.js`: `anthropicGenerator()` + `getClient()` replaced by `openaiGenerator()`; the
+  `@anthropic-ai/sdk` import is gone from this module. `MODEL` is `gpt-5.6`. The default
+  `basePrompt` moves from `SYSTEM_PROMPT` to `SYSTEM_PROMPT_GPT_LEAN`. The `generate` seam is
+  unchanged, so the bake-off still drives Sonnet arms through the same pipeline.
+- `src/routes/activities.js`: the typed key-missing branch is now `OPENAI_KEY_MISSING`.
+- `src/planPrompt.test.js`: the default-prompt test now asserts the lean prompt and uses
+  `SYSTEM_PROMPT` as the override case.
+- `CLAUDE.md`: request-flow and `claude.js` module notes corrected — planning is GPT-5.6,
+  auto-arrange remains Sonnet 4.6, and the semaphore is described as provider-neutral because it
+  counts calls rather than Anthropic calls.
+
+`@anthropic-ai/sdk` remains a dependency — chat, auto-arrange, profile summaries and memory
+reconciliation are untouched. `SYSTEM_PROMPT` and `SYSTEM_PROMPT_GPT` are retained as bake-off arms
+(`--prompt default|gpt`), not dead code. 273/273 pass.
+
+## [2026-08-08] `--split 2` measured and rejected
+
+Ran `gpt-5.6+lean --split 2` on staging against the unsplit run of the same arm and cities. It was
+the last unmeasured lever on the branch.
+
+| | unsplit | split 2 | |
+|---|---:|---:|---|
+| sec/city | 186.3 | 119.2 | −36% |
+| sec/act | 5.65 | 4.89 | −13% |
+| kept/target | 33/33 | 25/33 | −8 activities |
+| distinct% | 89 | 76 | −13 pts |
+| $/city | $0.308 | $0.476 | **+55%** |
+| $/act | $0.0094 | $0.0193 | **+105%** |
+| meals ok | 11/11 | 11/11 | held |
+| ghost | 0.5 | 0.0 | improved |
+| photo% | 76 | 70 | worse |
+
+Rejected — decisions [2026-08-08]. The predicted ~3x speed-up did not appear (1.56x), and the cost
+increase was structural and should have been predicted before the run: each window is a full call
+carrying the same system prompt and Brave research block while producing half the activities.
+
+Also settled `hours ok%`, which read 0 in this run. Not a regression from the opening-hours fix:
+`hoursMatched/hoursComparable` compares `llmHours` against Places, but since no prompt asks for
+`opening_hours`, `llmHours` was never the model's answer — it was our own `arrangeConfig` category
+default, so the column has been scoring our fabrication against Places. It was already degenerate
+(`hoursComparable` of 0 and 3 in the two runs checked pre-fix). Removing the default from
+venue-less activities shrinks the denominator further, which is the correct direction. The column
+now measures nothing useful and should be re-pointed at the fraction of *named* venues that got
+hours from Places at all.
+
 ## [2026-08-08] Blind read of all four arms, and the opening-hours fabrication it found
 
 Read the 8 saved lists at `/debug/bakeoff?file=blind-read.md` (2 cities x 4 arms), keyed after

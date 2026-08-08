@@ -4,6 +4,30 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-08] `planCity` runs GPT-5.6 on a single call — supersedes the earlier "stays on claude-sonnet-4-6"
+
+**Decision:** `planCity` defaults to `gpt-5.6` via `openaiGenerator()`, paired with `SYSTEM_PROMPT_GPT_LEAN`, in one call per city. This **supersedes** the earlier entry in this file that closed the question on `claude-sonnet-4-6`; that entry stays as written per the append-only rule, but its conclusion is no longer in force.
+
+**Reasoning:** The earlier decision rested on two facts that were later found to be bugs in our own pipeline, not properties of the model. GPT's "zero meals in both cities" was `applyMealPoolCap` deleting every meal that arrived without opening hours, and its profile-fit was judged from a run in which `planCity` read 3 of ~12 profile keys, so no arm was ever scored on fit. With both fixed, `gpt-5.6+lean` measures 33/33 delivered, 22/22 meals, 5.65 sec/act against Sonnet 4.6's 6.08, and wins the blind read outright: zero `tour` activities against a structuredTours rating of 1/5 where Sonnet placed 12, no cross-city day trip to the city the traveler moves to five days later, no venue sold three times, and no self-refuting entry whose own pitfall says it needs an overnight.
+
+The model and the prompt travel together. `SYSTEM_PROMPT` is Claude-shaped, and swapping the model without the prompt is not a supported configuration — the lean prompt is where the "one destination is one activity", "drop an activity whose pitfall argues against it" and fee-avoidance rules live, and those are three of the defects the blind read found in Sonnet's output.
+
+**Alternatives rejected:** *Stay on Sonnet 4.6 and port the three missing rules into `SYSTEM_PROMPT`.* Cheaper per activity and avoids a provider change, but it re-opens prompt tuning on the arm that also produced the cross-city and duplicate-venue errors, and those are not obviously prompt-fixable. *Run GPT-5.6 split across parallel date windows.* Rejected separately and on its own measurement — see the `PLAN_SPLIT_DAYS` entry below. *Keep Anthropic as a fallback when `OPENAI_API_KEY` is absent.* Adds a second live path through the least-tested part of the pipeline to serve a misconfiguration; the existing pattern is to throw a typed key-missing error, which `/api/plan` already surfaces.
+
+**Tradeoffs:** Cost per activity rises from $0.0054 to $0.0094, roughly 1.7x, which is the one column Sonnet still wins. Planning now depends on `OPENAI_API_KEY` rather than `ANTHROPIC_API_KEY`; both were already required, since chat, refine, auto-arrange, profile summaries and memory reconciliation are unchanged. The error code on the plan stream changed from `ANTHROPIC_KEY_MISSING` to `OPENAI_KEY_MISSING` — no client reads it, but it is a new untested failure path in production.
+
+## [2026-08-08] `PLAN_SPLIT_DAYS` stays unset — splitting the plan call is a bad trade, measured
+
+**Decision:** Do not split the per-city plan into parallel date windows. `PLAN_SPLIT_DAYS` stays unset and `--split N` remains a harness-only lever.
+
+**Reasoning:** Measured on staging against the same arm and cities. Splitting bought 36% wall time (186.3 → 119.2 sec/city) and cost 24% of delivery (33/33 → 25/33), 13 points of `distinct%` (89 → 76), and **55% more money per city** ($0.308 → $0.476, or $0.0094 → $0.0193 per activity). The cost increase is structural rather than incidental: each window is a full call carrying the same system prompt and the same Brave research block while producing half the activities, so input tokens roughly double and output stays flat. This was derivable from the design before the run and should have been stated as a prediction.
+
+The speed result is the more useful finding. Two parallel windows should approach 2x; getting 1.56x says the LLM call is not the whole critical path — Places enrichment runs as two batches and does not halve. Splitting attacks the cheaper half of the wait.
+
+**Alternatives rejected:** *Split only long stays (e.g. >7 days).* Keeps the per-window prompt duplication, so it keeps the cost multiplier on exactly the trips that are already the most expensive to plan. *Accept the activity loss for the speed.* The complaint that motivated this was a progress bar parked at 45% with no feedback, not the absolute duration — that is already fixed on this branch by the SSE phase events and heartbeat, which makes the same 186 seconds legible.
+
+**Tradeoffs:** ~186 sec/city stays the floor for a 2-city plan, so the plan step remains a genuinely long wait that depends on the loader being informative. If wall time later has to come down, the evidence points at Places enrichment and the Brave research phase rather than at the generation call.
+
 ## [2026-08-08] A category default for opening hours is keyed on whether the place has a gate, not on its type
 
 **Decision:** `normalizeActivity` applies `arrangeConfig`'s per-type `openingHours` default only when the activity has a `venue_name`. An activity with `venue_name: null` — a district walk, a sunset spot, a trailhead — gets `''`.

@@ -267,11 +267,14 @@ test('the profile is framed as a filter and still names the pace', async () => {
   assert.ok(prompt.indexOf('TRAVELER PROFILE') < prompt.indexOf('ACTIVITY COUNT'));
 });
 
-test('planCity uses SYSTEM_PROMPT unless an override is passed', async () => {
+test('planCity defaults to the lean GPT prompt, which pairs with the production model', async () => {
+  // The default moved from SYSTEM_PROMPT when planCity switched to gpt-5.6
+  // (decisions [2026-08-08]). The two travel together: SYSTEM_PROMPT is
+  // Claude-shaped and is not a drop-in for this model.
   const plain = await capture(PROFILE);
-  assert.equal(plain.system, SYSTEM_PROMPT);
-  const swapped = await capture(PROFILE, { systemPrompt: SYSTEM_PROMPT_GPT });
-  assert.equal(swapped.system, SYSTEM_PROMPT_GPT);
+  assert.equal(plain.system, SYSTEM_PROMPT_GPT_LEAN);
+  const swapped = await capture(PROFILE, { systemPrompt: SYSTEM_PROMPT });
+  assert.equal(swapped.system, SYSTEM_PROMPT);
   // The user message is the same either way — the arm moves one variable.
   assert.equal(swapped.prompt, plain.prompt);
 });

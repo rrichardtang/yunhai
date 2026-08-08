@@ -1,4 +1,4 @@
-const Anthropic = require('@anthropic-ai/sdk');
+const OpenAI = require('openai');
 const { extractText, tryParseJsonArray } = require('./services/llmJson');
 const { recall } = require('./memory');
 const { getCategoryDefaults, paceDescFromValue } = require('./arrangeConfig');
@@ -11,7 +11,10 @@ const { shortCity } = require('./services/imageQuery');
 const { debugLog } = require('./services/debugLog');
 const { isLegacyActivity, parseTimeString, parseDurationToMinutes } = require('../shared/activityMigration');
 
-const MODEL = 'claude-sonnet-4-6';
+// Chosen over claude-sonnet-4-6 on a measured bake-off plus a blind read of both
+// arms' output — decisions [2026-08-08]. Pairs with SYSTEM_PROMPT_GPT_LEAN, which
+// is written for this model; SYSTEM_PROMPT is Claude-shaped and is not a drop-in.
+const MODEL = 'gpt-5.6';
 
 const SYSTEM_PROMPT = `## Role
 You are a blunt, opinionated travel planning agent. Design itineraries tailored to this specific traveler's preferences and profile. Filter everything through what they actually enjoy — fit-to-person beats fit-to-tourist-list. Skip prestige picks (museums, ceremonies, big-name attractions) when they're likely to feel flat for this person, regardless of cultural or historical reputation. Be concise: at most 3 sentences per activity.
@@ -167,32 +170,29 @@ Example object:
 
 Return ONLY the JSON array, no markdown, no explanation.`;
 
-function getClient() {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-}
-
 const MAX_OUTPUT_TOKENS = 32768;
 
 // The only provider-specific step in planCity. Everything before it is prompt
 // assembly and everything after is parsing and grounding, so swapping this one
-// function is enough to run the same pipeline on another model.
-function anthropicGenerator() {
-  const client = getClient();
-  if (!client) {
-    const err = new Error('Anthropic API key not configured');
-    err.code = 'ANTHROPIC_KEY_MISSING';
+// function is enough to run the same pipeline on another model — which is how
+// the bake-off ran Sonnet 4.6 and Sonnet 5 through this exact code path.
+function openaiGenerator() {
+  if (!process.env.OPENAI_API_KEY) {
+    const err = new Error('OpenAI API key not configured');
+    err.code = 'OPENAI_KEY_MISSING';
     throw err;
   }
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const generate = async ({ system, prompt }) => {
-    const stream = client.messages.stream({
+    const res = await client.chat.completions.create({
       model: MODEL,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      system,
-      messages: [{ role: 'user', content: prompt }]
+      // Without an explicit cap a truncated array cannot be told apart from the
+      // model's own ceiling, and trunc% is what would catch that regression.
+      max_completion_tokens: MAX_OUTPUT_TOKENS,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }]
     });
-    const final = await stream.finalMessage();
-    return { text: extractText(final.content), stop_reason: final.stop_reason, usage: final.usage };
+    const choice = res.choices?.[0];
+    return { text: choice?.message?.content || '', stop_reason: choice?.finish_reason };
   };
   generate.modelId = MODEL;
   return generate;
@@ -425,9 +425,9 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   debugLog('plan-city', `START city="${name}" travelers=${numTravelers} children=${numChildren} budget=${budget || 'none'} locked=${Array.isArray(lockedActivities) ? lockedActivities.length : 0}`);
   let generateText;
   try {
-    generateText = generate || anthropicGenerator();
+    generateText = generate || openaiGenerator();
   } catch (err) {
-    debugLog('plan-city', `THREW city="${name}" reason=anthropic_key_missing`);
+    debugLog('plan-city', `THREW city="${name}" reason=openai_key_missing`);
     throw err;
   }
 
@@ -538,7 +538,7 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
     return `Plan activities for: ${name} (${window.startDate} to ${window.endDate}).${segmentBlock}\n${notes ? `City-specific notes from the traveler: ${notes}\n` : ''}Accommodation context:\n${cityAccommodationText}\n\nTravel entry context touching this city:\n${travelContext}\n\nDeparture context:\n${departureContext}\n\nComputed travel-time constraints:\n${travelTimingContext}\n\nTRAVELER PROFILE — filter every candidate through this before the city's reputation:\n${profileBlock}\n\nACTIVITY COUNT\nGenerate ${winTotal} activities (${winTotal}–${Math.round(winTotal * 1.15)} acceptable). Composition: ${winNonMeal} non-meal (${nonMealPerDay}/day) + AT MOST ${winMeals} meal-type activities. If you have more strong restaurant candidates than slots, pick the best ${winMeals} and skip the rest. On arrival/departure days, drop a meal whose natural time falls outside the available window (e.g. drop lunch on a 3pm arrival, drop dinner on an 11am departure) — each dropped meal reduces the count by 1. Use accommodation and travel timing to shape sequencing — lighter arrivals/departures, first/last activities near accommodation or transport hubs.${budgetBlock}${lockedBlock}${webBlock}${restaurantBlock}${insiderBlock}${winShoppingBlock}\n\nReturn JSON only.`;
   };
 
-  const basePrompt = systemPrompt || SYSTEM_PROMPT;
+  const basePrompt = systemPrompt || SYSTEM_PROMPT_GPT_LEAN;
   const learnedSummary = recall({ userId, tripId, query: name }).text;
   const effectiveSystemPrompt = learnedSummary
     ? `${basePrompt}\n\n${learnedSummary}`

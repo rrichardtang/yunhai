@@ -1,41 +1,21 @@
 # Open Items
 
-## [2026-08-08] Three quality rules exist only in the GPT arms, not in production's SYSTEM_PROMPT
-**Status:** Pending input (sequencing — changing it invalidates the bake-off baseline)
-**Description:** Of the six defects the first blind read found, three are now fixed everywhere and
-three are fixed **only** in `SYSTEM_PROMPT_GPT` / `SYSTEM_PROMPT_GPT_LEAN`. `SYSTEM_PROMPT`
-(`src/claude.js:16-52`) is deliberately held byte-identical so the bake-off moves one variable, so
-production Sonnet 4.6 still lacks: (4) drop an activity when the pitfall it would write argues
-against doing it; (5) one destination is one activity, and explicit permission to return fewer than
-the target rather than re-use a venue; (6) never advise avoiding, evading or re-using an entry fee.
-The second blind read confirms Sonnet exhibits all three — Compass sold three times in one
-Shangri-La list, a Meili Snow Mountain entry whose own pitfall says it needs an overnight in Deqin,
-and a Sumtseling tip noting "guards rarely check return visits the following day… to potentially
-save the re-entry cost". Already fixed everywhere: (1) the hours fabrication (commit `92fdce9`,
-decisions [2026-08-08]), (2) the meal-cap contradiction (commit `8e35f6e`), (3) the `insider_tips`
-platitude rule, which `SYSTEM_PROMPT` already carries.
-**Context:** changelog [2026-08-08] "Blind read of all four arms". Lists at `/debug/bakeoff?file=blind-read.md`.
-**Next action:** Decide the order. Porting the three rules into `SYSTEM_PROMPT` breaks byte-identity
-with the recorded Sonnet rows, so either accept that the control arm moves and re-run it, or land
-them after the model question below is settled. If Sonnet is not going to stay in production, this
-item dies with it.
-
-## [2026-08-08] The model question is reopened by new evidence
-**Status:** Pending input (owner call)
-**Description:** decisions [2026-08-08] closed this on `claude-sonnet-4-6`, on evidence that is now
-known to be invalid: GPT-5.6's "zero meals in both cities" was `applyMealPoolCap` deleting them, and
-its profile-fit was judged from a run where the traveler profile never reached the model. Both bugs
-are fixed. The current arm, `gpt-5.6+lean`, measures better than the Sonnet control on every column
-and wins the blind read: 33/33 delivered, 22/22 meals, 5.65 sec/act vs 6.08, $0.0094/act vs
-$0.0054, and none of the profile violations or trip-level errors listed in the item above. Cost is
-the one column Sonnet still wins, at ~1.7x.
-**Context:** changelog [2026-08-08] (both entries); the invalidated reasoning is in decisions
-[2026-08-08] "planCity stays on claude-sonnet-4-6", which should be superseded by a new entry rather
-than edited. `planCity` still runs `claude-sonnet-4-6`; the `generate` / `systemPrompt` options are
-bake-off-only seams.
-**Next action:** Decide whether to switch production to GPT-5.6 with `SYSTEM_PROMPT_GPT_LEAN`. If
-yes, that also settles the item above and retires `SYSTEM_PROMPT_GPT` (the losing verbose arm). If
-no, port the three missing rules into `SYSTEM_PROMPT` and re-run the control.
+## [2026-08-08] Verify the GPT-5.6 switch on a keyed environment before it reaches users
+**Status:** Pending input (needs deploy)
+**Description:** `planCity` now runs `gpt-5.6` with `SYSTEM_PROMPT_GPT_LEAN` (decisions
+[2026-08-08]). The arm is well measured through the bake-off harness, but the harness injects its
+own `generate` — so `openaiGenerator()`, the function production actually calls, has never run.
+Two things are new and untested end to end: the OpenAI call inside the real `/api/plan` request
+(under the shared LLM semaphore, three cities in parallel), and the `OPENAI_KEY_MISSING` error
+branch that replaced `ANTHROPIC_KEY_MISSING`.
+**Context:** changelog [2026-08-08] "Production planning switched to GPT-5.6". `OPENAI_API_KEY` was
+already required for chat and refine, so a correctly configured environment needs no new secret —
+but an environment that had only `ANTHROPIC_API_KEY` working will now fail to plan at all rather
+than degrading.
+**Next action:** On deploy, confirm `/api/status` reports `openaiConfigured: true`, then replan the
+Yunnan trip and check `GET /debug?scope=plan-city` shows `model=gpt-5.6` and a `RETURN` per city.
+Separately, unset `OPENAI_API_KEY` in a scratch env and confirm `/api/plan` emits the typed
+`OPENAI_KEY_MISSING` event rather than a generic failure.
 
 ## [2026-08-07] Verify the Setup → Review fixes against live providers
 **Status:** Pending input (needs deploy)
