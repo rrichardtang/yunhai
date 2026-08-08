@@ -248,6 +248,19 @@ function stripMealPrefix(name) {
   return String(name || '').replace(MEAL_PREFIX_RE, '').replace(/^Visit\s+/i, '').trim();
 }
 
+// booking_type tracks whether there is anything to buy, not the category. A
+// type-only mapping disagreed with the model on 36 of 135 saved activities, and
+// in both directions: it put an affiliate link on free hikes and viewpoints, and
+// stripped it from ticketed parks typed `neighborhood`. Cost is the signal the
+// model was actually reading. Shopping is excluded because its cost is estimated
+// spend, not admission.
+function bookingTypeFor(type, costUsd) {
+  if (type === 'meal') return 'restaurant';
+  if (type === 'tour') return 'tour';
+  if (type === 'shopping') return 'none';
+  return Number(costUsd) > 0 ? 'attraction' : 'none';
+}
+
 function normalizeActivity(raw = {}, fallbackCity = '') {
   if (!isLegacyActivity(raw)) return raw;
 
@@ -267,13 +280,9 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
   const preferred_time = (rawSuggested && rawSuggested !== '10:00am')
     ? parseTimeString(rawSuggested) : null;
 
-  const bookingType = (() => {
-    if (['tour', 'attraction', 'restaurant', 'none'].includes(raw.booking_type)) return raw.booking_type;
-    if (type === 'tour') return 'tour';
-    if (['museum', 'landmark', 'sports'].includes(type)) return 'attraction';
-    if (type === 'meal') return 'restaurant';
-    return 'none';
-  })();
+  const costUsd = (Number.isFinite(Number(raw.estimated_cost_usd)) && Number(raw.estimated_cost_usd) >= 0)
+    ? Number(raw.estimated_cost_usd) : null;
+  const bookingType = bookingTypeFor(type, costUsd);
 
   const address = String(raw.start_location || raw.location?.address || venue_name || '').trim();
 
@@ -312,9 +321,8 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
     },
 
     cost: {
-      estimated_usd: (Number.isFinite(Number(raw.estimated_cost_usd)) && Number(raw.estimated_cost_usd) >= 0)
-        ? Number(raw.estimated_cost_usd) : null,
-      type: raw.cost_type === 'per_group' ? 'per_group' : 'per_person'
+      estimated_usd: costUsd,
+      type: 'per_person'
     },
 
     dedicated_time_block: durationHours >= 2,

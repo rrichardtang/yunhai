@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { planCity, SYSTEM_PROMPT, SYSTEM_PROMPT_GPT, SYSTEM_PROMPT_GPT_LEAN } = require('./claude');
+const { planCity, normalizeActivity, SYSTEM_PROMPT, SYSTEM_PROMPT_GPT, SYSTEM_PROMPT_GPT_LEAN } = require('./claude');
 const { formatProfileForEnrichment, sliderRating } = require('./services/profilePrompt');
 
 const PROFILE = {
@@ -78,8 +78,8 @@ test('no prompt asks for a field the pipeline decides itself', async () => {
   // disagree silently — which is how applyMealPoolCap deleted a full meal list.
   const deterministic = [
     [/opening_hours/, 'placesEnrich overwrites it from Google'],
-    [/cost_type/, 'normalizeActivity collapses everything to per_person'],
-    [/booking_type/, 'normalizeActivity derives it from type'],
+    [/cost_type/, 'normalizeActivity always writes per_person'],
+    [/booking_type/, 'normalizeActivity derives it from type and cost'],
     [/Lunch at/, 'stripMealPrefix removes the prefix'],
     [/appears at most once/, 'dedupeActivities collapses a repeated venue']
   ];
@@ -114,12 +114,31 @@ test('code supplies what the prompt stopped asking for', async () => {
 
   assert.ok(byName['Heshu Restaurant'], 'meal-slot prefix stripped from the name');
   assert.ok(byName['Mu Family Mansion'], '"Visit " stripped too');
-  assert.equal(byName['Heshu Restaurant'].booking.type, 'restaurant', 'booking type derived from type');
-  assert.equal(byName['Mu Family Mansion'].booking.type, 'attraction');
-  assert.equal(byName['Black Dragon Pool Dawn'].booking.type, 'none');
+  assert.equal(byName['Heshu Restaurant'].booking.type, 'restaurant', 'a meal is always bookable');
+  assert.equal(byName['Mu Family Mansion'].booking.type, 'attraction', '$8 admission is something to buy');
+  assert.equal(byName['Black Dragon Pool Dawn'].booking.type, 'none', 'a free walk has nothing to book');
   assert.equal(byName['Heshu Restaurant'].cost.type, 'per_person');
   // The qualified name is what broke every image query, so the fallback shortens it.
   assert.equal(byName['Heshu Restaurant'].city, 'Lijiang');
+});
+
+test('booking type follows cost, not category', () => {
+  // A type-only mapping disagreed with the model on 36 of 135 saved activities:
+  // it put an affiliate link on free hikes and viewpoints, and stripped it from
+  // ticketed parks the model had typed `neighborhood`.
+  const bt = (type, cost) => normalizeActivity(
+    { name: 'x', type, duration_hours: 1, estimated_cost_usd: cost }, 'Lijiang'
+  ).booking.type;
+
+  assert.equal(bt('sports', 0), 'none', 'a free hike is not an attraction');
+  assert.equal(bt('landmark', 0), 'none', 'a free viewpoint is not an attraction');
+  assert.equal(bt('neighborhood', 8), 'attraction', 'a ticketed park is');
+  assert.equal(bt('museum', 6), 'attraction');
+  assert.equal(bt('tour', 0), 'tour', 'an operator-led experience is bookable regardless');
+  assert.equal(bt('meal', 0), 'restaurant');
+  // Shopping cost is estimated spend, not admission.
+  assert.equal(bt('shopping', 30), 'none');
+  assert.equal(bt('landmark', null), 'none', 'unknown cost must not invent a booking link');
 });
 
 test('a venue sold twice under two names collapses', async () => {
