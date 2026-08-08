@@ -2,6 +2,7 @@
 // Compares models for planCity on the trip that surfaced the slow-plan report.
 //
 //   node scripts/planCityBakeoff.js [--runs 3] [--arms sonnet-4-6,sonnet-5-medium]
+//                                   [--split N] [--prompt default|gpt]
 //
 // Needs ANTHROPIC_API_KEY, OPENAI_API_KEY, BRAVE_API_KEY and GOOGLE_MAPS_API_KEY.
 // Without the Maps key every venue lookup short-circuits and the venue-resolution
@@ -17,7 +18,7 @@ const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
 
-const { planCity } = require('../src/claude');
+const { planCity, SYSTEM_PROMPT_GPT } = require('../src/claude');
 const { ALL_DAY } = require('../src/services/placesEnrich');
 const { extractText, tryParseJsonArray } = require('../src/services/llmJson');
 
@@ -137,6 +138,8 @@ function targetActivityCount(city, profile) {
 // activities the model actually emitted before filtering, and token spend.
 const RETRY_MARKER = 'IMPORTANT: Return ONLY a valid JSON array';
 let SPLIT_DAYS = null;
+let SYSTEM_PROMPT_OVERRIDE = null;
+let PROMPT_LABEL = 'default';
 
 function instrument(generate) {
   const stats = { calls: [], rawActivities: 0, inputTokens: 0, outputTokens: 0, truncated: false, retried: false, servedModel: null };
@@ -208,6 +211,10 @@ function summariseOutcomes(outcomes) {
 async function runArm(armName, runIndex) {
   const generate = ARMS[armName]();
   const rows = [];
+  // A prompt is as much an arm as a model is. Tagging it keeps the two runs'
+  // activity lists from overwriting each other and makes the report say which
+  // prompt produced which row.
+  const armLabel = PROMPT_LABEL === 'default' ? armName : `${armName}+${PROMPT_LABEL}`;
 
   for (const city of TRIP.cities) {
     const { wrapped, stats } = instrument(generate);
@@ -220,7 +227,7 @@ async function runArm(armName, runIndex) {
       activities = await planCity(
         city, TRIP.profile, 'bakeoff', [], null, null,
         TRIP.cities.length, 1, 0, [], null,
-        { generate: wrapped, splitDays: SPLIT_DAYS, onEnrichOutcome: (o) => outcomes.push(o) }
+        { generate: wrapped, splitDays: SPLIT_DAYS, systemPrompt: SYSTEM_PROMPT_OVERRIDE, onEnrichOutcome: (o) => outcomes.push(o) }
       );
     } catch (err) {
       error = err.message;
@@ -232,7 +239,7 @@ async function runArm(armName, runIndex) {
     const cost = costUsd(stats.servedModel || generate.modelId, stats.inputTokens, stats.outputTokens);
 
     rows.push({
-      arm: armName,
+      arm: armLabel,
       run: runIndex,
       servedModel: stats.servedModel,
       city: city.name.split(',')[0],
@@ -258,7 +265,7 @@ async function runArm(armName, runIndex) {
       error
     });
 
-    const slug = `${armName}-run${runIndex}-${city.name.split(',')[0].replace(/\s+/g, '_')}`;
+    const slug = `${armLabel}-run${runIndex}-${city.name.split(',')[0].replace(/\s+/g, '_')}`;
     fs.writeFileSync(path.join(OUT_DIR, `${slug}.json`), JSON.stringify(activities, null, 2));
     // Insurance: with the raw text on disk, a metric neither of us thought of is
     // recomputable offline instead of costing another matrix.
@@ -358,6 +365,17 @@ async function main() {
   // --split N generates the stay as parallel N-day windows instead of one call.
   // Off by default so the baseline arm stays comparable to production.
   SPLIT_DAYS = args.includes('--split') ? Number(args[args.indexOf('--split') + 1]) || null : null;
+
+  // --prompt gpt swaps in SYSTEM_PROMPT_GPT for every arm in the run. Run the
+  // same arms twice, once each way, and the pair isolates the prompt.
+  PROMPT_LABEL = args.includes('--prompt') ? String(args[args.indexOf('--prompt') + 1] || 'default') : 'default';
+  const PROMPTS = { default: null, gpt: SYSTEM_PROMPT_GPT };
+  if (!(PROMPT_LABEL in PROMPTS)) {
+    console.error(`Unknown --prompt ${PROMPT_LABEL}. Available: ${Object.keys(PROMPTS).join(', ')}`);
+    process.exit(1);
+  }
+  SYSTEM_PROMPT_OVERRIDE = PROMPTS[PROMPT_LABEL];
+
   const selected = args.includes('--arms')
     ? args[args.indexOf('--arms') + 1].split(',')
     : Object.keys(ARMS);
