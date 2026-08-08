@@ -1619,3 +1619,33 @@ the request count large.
 **Next, and now clearly the priority:** item 3, skipping venue resolution for `venue_name: null`
 activities. The measurement puts it at **34.7% of all Places calls** — larger than every caching
 layer combined, and it needs no cache at all.
+
+## [2026-08-08] Phase 1B item 3 — venue-less activities ask for the coordinate only
+
+Branch `claude/guide-me-setup-stuck-mszkyo`. Step 0 put label-only lookups at **77 of 222 (34.7%)**
+of all Places calls — larger than every caching layer combined, and needing no cache.
+
+An activity with `venue_name: null` is unstructured by design, so its query is a sentence describing
+an activity rather than a place. Google still returns its closest text match, and asking for the
+full field set bought three problems: a district's gate hours written over the model's time-of-day
+intent (7 of the 11 `preferred_time` contradictions found in the blind read), a "venue photo" of
+whatever business sounded similar, and a second billed `/media` call to fetch it.
+
+Those lookups now send `places.displayName,places.location` and skip the photo resolve entirely —
+one cheaper call instead of two, for a third of all traffic. The coordinate still arrives, so the
+map pin survives; the image correctly falls through to the Unsplash city pool. Cached minimal
+entries carry `minimal: true` so the photo-migration check does not treat them as permanently stale,
+and the in-flight coalescing map is keyed by shape so a minimal and a full lookup of one name cannot
+share a promise.
+
+**Removed: ghost flagging.** It set `unverified: true` on the plan path, but nothing in `public/`
+renders that field — `/api/activity/replace` already returned it and the frontend already ignored
+it. Adding a second producer to an unconsumed field is how the `opening_hours` situation started.
+Negative caching stays: unlike the flag it changes behaviour (a ghost is no longer re-billed every
+run), though with `ghost 0.0` across every measured run it is insurance rather than a measured
+saving, and should be read that way.
+
+Existing `placesEnrich` tests set `name` but not `venue_name` on fixtures whose photos and hours were
+under test, so they were taking the new minimal path; `venue_name` added where the fixture is a
+venue. New tests pin both paths: the field mask a venue-less lookup sends, that no `/media` call
+follows it, that Places hours never reach it, and that a named venue still gets the full set. 271/271.

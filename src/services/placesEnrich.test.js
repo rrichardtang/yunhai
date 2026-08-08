@@ -50,7 +50,7 @@ test('a venue photo becomes the activity image', async () => {
       : { ok: true, json: async () => ({ photoUri: PHOTO_URI }) }
   ));
 
-  const activity = { name: venue('Photo Venue A'), type: 'landmark' };
+  const activity = { name: venue('Photo Venue A'), venue_name: venue('Photo Venue A'), type: 'landmark' };
   await enrichWithPlaceDetails([activity], 'Lijiang');
 
   assert.equal(activity.imageUrl, PHOTO_URI);
@@ -72,7 +72,7 @@ test('the API key never travels to the client in the image URL', async () => {
       : { ok: true, json: async () => ({ photoUri: PHOTO_URI }) }
   ));
 
-  const activity = { name: venue('Photo Venue B'), type: 'landmark' };
+  const activity = { name: venue('Photo Venue B'), venue_name: venue('Photo Venue B'), type: 'landmark' };
   await enrichWithPlaceDetails([activity], 'Lijiang');
 
   assert.doesNotMatch(activity.imageUrl, /secret-key/);
@@ -82,7 +82,7 @@ test('a venue with no photos still gets coordinates', async () => {
   process.env.GOOGLE_MAPS_API_KEY = 'test-key';
   const calls = stubFetch(() => searchResponse());
 
-  const activity = { name: venue('Photoless Venue C'), type: 'landmark' };
+  const activity = { name: venue('Photoless Venue C'), venue_name: venue('Photoless Venue C'), type: 'landmark' };
   await enrichWithPlaceDetails([activity], 'Lijiang');
 
   assert.equal(activity.imageUrl, undefined);
@@ -98,7 +98,7 @@ test('a failed photo lookup degrades to coordinates only', async () => {
       : { ok: false, status: 403, text: async () => 'denied' }
   ));
 
-  const activity = { name: venue('Photo Fail Venue D'), type: 'landmark' };
+  const activity = { name: venue('Photo Fail Venue D'), venue_name: venue('Photo Fail Venue D'), type: 'landmark' };
   await enrichWithPlaceDetails([activity], 'Lijiang');
 
   assert.equal(activity.imageUrl, undefined);
@@ -113,7 +113,7 @@ test('an activity that already has coordinates but no image is still enriched', 
       : { ok: true, json: async () => ({ photoUri: PHOTO_URI }) }
   ));
 
-  const activity = { name: venue('Coords Only Venue E'), type: 'landmark', location: { lat: 26.88, lng: 100.23 } };
+  const activity = { name: venue('Coords Only Venue E'), venue_name: venue('Coords Only Venue E'), type: 'landmark', location: { lat: 26.88, lng: 100.23 } };
   await enrichWithPlaceDetails([activity], 'Lijiang');
 
   assert.equal(activity.imageUrl, PHOTO_URI);
@@ -160,6 +160,51 @@ test('an activity with no venue name falls back to its label', async () => {
   assert.match(JSON.parse(calls[0].options.body).textQuery, /Dukezong Old Town Evening Stroll/);
 });
 
+test('a venue-less activity asks for the coordinate and nothing else', async () => {
+  process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+  // 34.7% of lookups in the saved bake-off data are this shape: the query is a
+  // sentence describing an activity, so Google returns its closest text match and
+  // the extra fields buy a district's gate hours over the model's intent, a photo
+  // of whatever business sounded similar, and a second billed call to fetch it.
+  const calls = stubFetch(() => searchResponse({
+    photos: [{ name: 'places/p1/photos/ph1' }],
+    regularOpeningHours: { periods: [{ open: { day: 0, hour: 9, minute: 0 }, close: { day: 0, hour: 17, minute: 0 } }] }
+  }));
+
+  const activity = {
+    name: venue('Dayan Back-Lane Walk'),
+    venue_name: null,
+    type: 'neighborhood',
+    timing: { opening_hours: '' }
+  };
+  await enrichWithPlaceDetails([activity], 'Lijiang');
+
+  const mask = calls[0].options.headers['X-Goog-FieldMask'];
+  assert.doesNotMatch(mask, /photos/, 'no photo field, so no second /media call');
+  assert.doesNotMatch(mask, /regularOpeningHours/, 'a district gate is not this activity\'s window');
+  assert.doesNotMatch(mask, /priceLevel/);
+  assert.equal(calls.filter((c) => c.url.includes('/media')).length, 0, 'the photo resolve is skipped entirely');
+  assert.equal(activity.location.lat, 26.88, 'the coordinate still arrives');
+  assert.equal(activity.timing.opening_hours, '', 'Places hours never reach a venue-less activity');
+});
+
+test('a named venue still gets the full field set', async () => {
+  process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+  const calls = stubFetch((url) => (
+    url.includes(':searchText')
+      ? searchResponse({ photos: [{ name: 'places/p1/photos/ph1' }] })
+      : { ok: true, json: async () => ({ photoUri: PHOTO_URI }) }
+  ));
+
+  const name = venue('Mu Family Mansion');
+  await enrichWithPlaceDetails([{ name, venue_name: name, type: 'landmark' }], 'Lijiang');
+
+  const mask = calls[0].options.headers['X-Goog-FieldMask'];
+  assert.match(mask, /photos/);
+  assert.match(mask, /regularOpeningHours/);
+  assert.equal(calls.filter((c) => c.url.includes('/media')).length, 1);
+});
+
 test('a 24/7 Places result does not overwrite the model\'s opening hours', async () => {
   process.env.GOOGLE_MAPS_API_KEY = 'test-key';
   stubFetch(() => ({
@@ -197,7 +242,7 @@ test('a 24/7 result is still used when the model supplied no hours', async () =>
     })
   }));
 
-  const activity = { name: venue('Round The Clock Viewpoint'), type: 'landmark' };
+  const activity = { name: venue('Round The Clock Viewpoint'), venue_name: venue('Round The Clock Viewpoint'), type: 'landmark' };
   await enrichWithPlaceDetails([activity], 'Lijiang');
 
   assert.equal(activity.opening_hours, '00:00-23:59');
@@ -218,7 +263,7 @@ test('a cache entry predating photo support is refetched, not served photo-less'
       : { ok: true, json: async () => ({ photoUri: PHOTO_URI }) }
   ));
 
-  const activity = { name, type: 'landmark' };
+  const activity = { name, venue_name: name, type: 'landmark' };
   await enrichWithPlaceDetails([activity], 'Lijiang');
 
   assert.equal(activity.imageUrl, PHOTO_URI);
@@ -238,7 +283,7 @@ test('a cache entry written with photo support short-circuits the fetch', async 
 
   const calls = stubFetch(() => searchResponse());
 
-  const activity = { name, type: 'landmark' };
+  const activity = { name, venue_name: name, type: 'landmark' };
   await enrichWithPlaceDetails([activity], 'Lijiang');
 
   assert.equal(activity.imageUrl, PHOTO_URI);
