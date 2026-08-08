@@ -30,6 +30,8 @@ function isVenueActivity(activity) {
   return VENUE_TYPES.has(activityType(activity));
 }
 
+const ALL_DAY = '00:00-23:59';
+
 function pad2(n) {
   return String(n).padStart(2, '0');
 }
@@ -43,7 +45,7 @@ function formatOpeningHoursFromPlaces(regularOpeningHours) {
     const sh = Number(p.open.hour) || 0;
     const sm = Number(p.open.minute) || 0;
     if (!p.close) {
-      ranges.add('00:00-23:59');
+      ranges.add(ALL_DAY);
       continue;
     }
     let eh = Number(p.close.hour) || 0;
@@ -152,8 +154,12 @@ function applyDetails(activity, details) {
   if (Number.isInteger(details.priceTier) && isFoodActivity(activity)) {
     activity.price_level = details.priceTier;
   }
-  if (details.openingHours) {
-    const llmHours = activity?.timing?.opening_hours || activity?.opening_hours || '';
+  const llmHours = activity?.timing?.opening_hours || activity?.opening_hours || '';
+  // ALL_DAY is what Places returns for a district or any venue with no posted
+  // hours — the absence of hours data, not a schedule. Letting it overwrite the
+  // model's window turned "Lijiang Old Town Night Wander" into an activity
+  // arrange could book at 08:00.
+  if (details.openingHours && !(details.openingHours === ALL_DAY && llmHours)) {
     if (llmHours && llmHours !== details.openingHours) {
       debugLog('places-hours-delta', JSON.stringify({
         name: activity.name, llm: llmHours, places: details.openingHours
@@ -265,6 +271,7 @@ module.exports = {
   isFoodActivity,
   isVenueActivity,
   formatOpeningHoursFromPlaces,
+  ALL_DAY,
   PRICE_LEVEL_MAP,
   VENUE_TYPES
 };

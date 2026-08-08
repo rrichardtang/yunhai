@@ -18,6 +18,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
 
 const { planCity } = require('../src/claude');
+const { ALL_DAY } = require('../src/services/placesEnrich');
 const { extractText, tryParseJsonArray } = require('../src/services/llmJson');
 
 const OUT_DIR = path.join(__dirname, '..', 'data', 'bakeoff');
@@ -154,7 +155,11 @@ function costUsd(modelId, inputTokens, outputTokens) {
   return (inputTokens / 1e6) * price.in + (outputTokens / 1e6) * price.out;
 }
 
-// Rounded to ~11m, the same key planCity dedupes on.
+// Rounded to ~11m. Places collapses distinct venues onto one point often enough
+// that this is not an absolute quality number — three separate Lijiang Old Town
+// restaurants came back on the same coordinate at the same price tier. Every arm
+// plans the same cities through the same Places, so the collapse rate is a shared
+// constant and the metric still ranks arms against each other.
 function distinctVenues(activities) {
   const keys = new Set();
   for (const a of activities) {
@@ -168,7 +173,9 @@ function distinctVenues(activities) {
 
 function summariseOutcomes(outcomes) {
   const isMeal = (o) => String(o.type || '').toLowerCase() === 'meal';
-  const comparable = outcomes.filter((o) => o.llmHours && o.placesHours);
+  // A 24/7 result is Places saying it has no hours for this place, so scoring the
+  // model against it counts a correct window as a miss.
+  const comparable = outcomes.filter((o) => o.llmHours && o.placesHours && o.placesHours !== ALL_DAY);
   return {
     // Only counts activities where the model committed to a venue name. An
     // unstructured activity carries venue_name null by design, so its label
@@ -296,22 +303,27 @@ function report(rows) {
   lines.push('Read `sec/act`, not `sec/city` — a model that under-delivers against `kept/target`');
   lines.push('looks fast for the wrong reason. Sonnet 4.6 baselines at ~6.2 sec/act.');
   lines.push('');
-  lines.push('`distinct%` is unique venues over resolved ones: it catches a model padding to hit');
-  lines.push('the target by selling the same place three times, which `resolved%` scores as a win.');
-  lines.push('`ghost` is the real quality signal: the model named a venue and Google has never');
+  lines.push('`ghost` is the cleanest model signal: the model named a venue and Google has never');
   lines.push('heard of it. Activities the model left venue_name null are excluded — those are');
-  lines.push('unstructured by design. `tooFar` is a real venue beyond the day-trip radius,');
-  lines.push('usually not the model\'s fault.');
-  lines.push('`meal res%` matters on its own: restaurants carry the strictest naming rules and are');
-  lines.push('where the baseline failed. `hours ok%` is how often the model\'s opening hours matched');
-  lines.push('Google — the baseline was 0 for 3 on Pudacuo, inventing evening hours for a park that');
-  lines.push('shuts at 16:30.');
+  lines.push('unstructured by design. `tooFar` is a real venue beyond the day-trip radius, usually');
+  lines.push('not the model\'s fault — read it with the distance, since a hit 460km away is a ghost');
+  lines.push('wearing a real venue\'s name. `meal res%` matters on its own: restaurants carry the');
+  lines.push('strictest naming rules and are where the baseline failed. `hours ok%` skips 24/7');
+  lines.push('Places results, which mean "no hours on file" rather than "open always".');
   lines.push('');
-  lines.push('Decision rule: quality first — `distinct%`, `ghost`, and `meal res%` together, not');
-  lines.push('`resolved%` alone, which sat at 93% for the baseline and has little room to separate');
-  lines.push('the arms. On a quality tie, prefer Sonnet 5 (no prompt re-tuning) and choose the');
-  lines.push('effort rung on `sec/act` and `$/act`. Faster but worse loses: splitting the call is a');
-  lines.push('~3x speed lever available to every arm, so speed is the cheap axis here.');
+  lines.push('`distinct%` catches a model padding to hit the target by selling one place three');
+  lines.push('times. Compare it across arms, never read it as an absolute: Places itself collapses');
+  lines.push('distinct venues onto one point often enough to set a floor no model can clear.');
+  lines.push('');
+  lines.push('No metric here catches a model putting the wrong city\'s venue in a list — Sonnet 4.6');
+  lines.push('offered Shangri-La\'s Dukezong Old Town in Lijiang and Places snapped it to a Lijiang');
+  lines.push('coordinate, so it scored as a clean resolve. That is what the blind read is for.');
+  lines.push('');
+  lines.push('Decision rule: quality first — `ghost`, `meal res%` and `hours ok%`, with `distinct%`');
+  lines.push('as a cross-arm comparison. Not `resolved%`, which sat at 98% on the baseline and');
+  lines.push('cannot separate the arms. On a quality tie, prefer Sonnet 5 (no prompt re-tuning) and');
+  lines.push('choose the effort rung on `sec/act` and `$/act`. Faster but worse loses: splitting the');
+  lines.push('call is a ~3x speed lever available to every arm, so speed is the cheap axis here.');
   lines.push('');
   lines.push(`Per-arm activity lists are in \`${path.relative(process.cwd(), OUT_DIR)}/\` — read a few blind before trusting the table.`);
   if (rows.some((r) => r.cost == null)) lines.push('A missing `$/city` means that model has no confirmed price yet.');
