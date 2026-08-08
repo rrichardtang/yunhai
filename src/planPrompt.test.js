@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { planCity, SYSTEM_PROMPT, SYSTEM_PROMPT_GPT } = require('./claude');
+const { planCity, SYSTEM_PROMPT, SYSTEM_PROMPT_GPT, SYSTEM_PROMPT_GPT_LEAN } = require('./claude');
 const { formatProfileForEnrichment, sliderRating } = require('./services/profilePrompt');
 
 const PROFILE = {
@@ -158,8 +158,40 @@ test('planCity uses SYSTEM_PROMPT unless an override is passed', async () => {
   assert.equal(swapped.prompt, plain.prompt);
 });
 
-test('both prompts still demand a bare JSON array', () => {
-  for (const prompt of [SYSTEM_PROMPT, SYSTEM_PROMPT_GPT]) {
+test('the lean prompt drops the coaching the verbose one added', () => {
+  for (const coaching of [
+    /roughly a third/,                    // a null rate invites nulling good tips to hit it
+    /mornings are quieter/,               // five paraphrases of "crowd timing is not a tip"
+    /departure buffers/,                  // enumerated padding shapes teach the test
+    /national park with four viewpoints/, // worked example of a rule stated beside it
+    /If you catch yourself writing/       // meta-instruction about its own reasoning
+  ]) {
+    assert.match(SYSTEM_PROMPT_GPT, coaching, 'verbose prompt should still carry it');
+    assert.doesNotMatch(SYSTEM_PROMPT_GPT_LEAN, coaching);
+  }
+  assert.ok(SYSTEM_PROMPT_GPT_LEAN.length < SYSTEM_PROMPT.length);
+});
+
+test('the lean prompt keeps what is load-bearing or untested', () => {
+  // Schema is unguessable, the meals rule fixed a contradiction, and the rating
+  // thresholds are the still-unmeasured fix for museums holding at 4 against 2/5.
+  for (const kept of [
+    /1-2 — actively avoid/,
+    /At most ONE such activity for the entire city/,
+    /set opening_hours to null and include it anyway/,
+    /target, not a quota/,
+    /Each venue appears at most once/,
+    /One destination is one activity/,
+    /tour \/ meal \/ sports \/ museum \/ landmark \/ neighborhood \/ shopping/,
+    /must-order dishes/
+  ]) {
+    assert.match(SYSTEM_PROMPT_GPT_LEAN, kept);
+  }
+  assert.doesNotMatch(SYSTEM_PROMPT_GPT_LEAN, /OMIT the restaurant/);
+});
+
+test('all three prompts still demand a bare JSON array', () => {
+  for (const prompt of [SYSTEM_PROMPT, SYSTEM_PROMPT_GPT, SYSTEM_PROMPT_GPT_LEAN]) {
     assert.match(prompt, /Return ONLY the JSON array/);
     assert.match(prompt, /tour \/ meal \/ sports \/ museum \/ landmark \/ neighborhood \/ shopping/);
     assert.match(prompt, /must-order dishes/);
