@@ -9,7 +9,20 @@
 // alias layers are worth writing.
 const fs = require('fs');
 const path = require('path');
-const { normalize } = require('../src/services/placesCache');
+
+// Lives here, not in placesCache: measured against the 222 saved venue names this
+// gained exactly one hit, so production keys on case and whitespace only. Kept so
+// the question stays answerable when the corpus grows or a new path is added.
+const strip = (text) => String(text || '')
+  .normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+function normalize(name, city) {
+  const cityWords = new Set(strip(city).split(' ').filter(Boolean));
+  const words = strip(name).replace(/^the /, '').split(' ').filter(Boolean);
+  while (words.length > 1 && cityWords.has(words[words.length - 1])) words.pop();
+  return words.join(' ');
+}
 
 const OUT_DIR = path.join(__dirname, '..', 'data', 'bakeoff');
 const RESERVED = new Set(['results.json', 'brave-cassette.json']);

@@ -16,29 +16,26 @@ test.after(() => {
 const cache = require('./services/placesCache');
 const details = (lat) => ({ location: { latitude: lat, longitude: 100 }, photoName: null, openingHours: '09:00-17:00' });
 
-test('the same venue matches itself across phrasings', () => {
-  for (const [a, b, city] of [
-    ['Casa Lucio, Madrid', 'casa lucio', 'Madrid'],
-    ['The Rooftop Bistro', 'rooftop bistro', 'Lijiang'],
-    ['Café Central', 'Cafe Central', 'Vienna'],
-    ['Heshu  Restaurant , Lijiang', 'Heshu Restaurant', 'Lijiang']
-  ]) {
-    assert.equal(cache.normalize(a, city), cache.normalize(b, city), `${a} vs ${b}`);
-  }
+test('a venue matches itself across case and spacing', () => {
+  // Deliberately shallow. Aggressive normalisation was built, then measured
+  // against the 222 saved venue names: one extra hit, on one pair, in exchange
+  // for re-keying every existing entry. scripts/cacheHitRate.js keeps the
+  // comparison runnable if the corpus grows.
+  assert.equal(cache.key('Casa Lucio', 'Madrid'), cache.key('  casa lucio  ', 'MADRID'));
+  assert.notEqual(cache.key('Casa Lucio, Madrid', 'Madrid'), cache.key('Casa Lucio', 'Madrid'));
 });
 
 test('distinct venues stay distinct', () => {
-  assert.notEqual(cache.normalize('Compass Cafe', 'Shangri-La'), cache.normalize('Compass Bar', 'Shangri-La'));
-  assert.notEqual(cache.normalize('Mu Family Mansion', 'Lijiang'), cache.normalize('Mu Mansion Garden', 'Lijiang'));
+  assert.notEqual(cache.key('Compass Cafe', 'Shangri-La'), cache.key('Compass Bar', 'Shangri-La'));
 });
 
 test('the same name in two cities does not collide', () => {
   assert.notEqual(cache.key('Central Market', 'Lijiang'), cache.key('Central Market', 'Shangri-La'));
 });
 
-test('a stored venue is readable under a normalised variant', () => {
-  cache.set('Jiu Ge Rice Noodles, Lijiang', 'Lijiang', details(26.8));
-  assert.equal(cache.get('jiu ge rice noodles', 'Lijiang')?.location?.latitude, 26.8);
+test('a stored venue is readable back', () => {
+  cache.set('Jiu Ge Rice Noodles', 'Lijiang', details(26.8));
+  assert.equal(cache.get('  JIU GE RICE NOODLES ', 'Lijiang')?.location?.latitude, 26.8);
 });
 
 test('an alias resolves to the same entry', () => {
