@@ -2,7 +2,7 @@
 // Compares models for planCity on the trip that surfaced the slow-plan report.
 //
 //   node scripts/planCityBakeoff.js [--runs 3] [--arms sonnet-4-6,sonnet-5-medium]
-//                                   [--split N] [--prompt default|gpt]
+//                                   [--split N] [--prompt default|gpt|lean]
 //
 // Needs ANTHROPIC_API_KEY, OPENAI_API_KEY, BRAVE_API_KEY and GOOGLE_MAPS_API_KEY.
 // Without the Maps key every venue lookup short-circuits and the venue-resolution
@@ -18,7 +18,7 @@ const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
 
-const { planCity, SYSTEM_PROMPT_GPT } = require('../src/claude');
+const { planCity, SYSTEM_PROMPT_GPT, SYSTEM_PROMPT_GPT_LEAN } = require('../src/claude');
 const { ALL_DAY } = require('../src/services/placesEnrich');
 const { extractText, tryParseJsonArray } = require('../src/services/llmJson');
 
@@ -385,7 +385,7 @@ async function main() {
 
   // Run the same arms twice, once each way, and the pair isolates the prompt.
   PROMPT_LABEL = args.includes('--prompt') ? String(args[args.indexOf('--prompt') + 1] || 'default') : 'default';
-  const PROMPTS = { default: null, gpt: SYSTEM_PROMPT_GPT };
+  const PROMPTS = { default: null, gpt: SYSTEM_PROMPT_GPT, lean: SYSTEM_PROMPT_GPT_LEAN };
   if (!(PROMPT_LABEL in PROMPTS)) {
     console.error(`Unknown --prompt ${PROMPT_LABEL}. Available: ${Object.keys(PROMPTS).join(', ')}`);
     process.exit(1);
