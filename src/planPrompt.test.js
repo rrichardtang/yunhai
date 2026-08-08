@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { planCity, normalizeActivity, SYSTEM_PROMPT, SYSTEM_PROMPT_GPT, SYSTEM_PROMPT_GPT_LEAN } = require('./claude');
 const { formatProfileForEnrichment, sliderRating } = require('./services/profilePrompt');
+const { parseOpeningHours } = require('./arrangeValidator');
 
 const PROFILE = {
   answers: {
@@ -139,6 +140,36 @@ test('booking type follows cost, not category', () => {
   // Shopping cost is estimated spend, not admission.
   assert.equal(bt('shopping', 30), 'none');
   assert.equal(bt('landmark', null), 'none', 'unknown cost must not invent a booking link');
+});
+
+test('an unstructured activity carries no opening hours', () => {
+  // The blind read caught 11 of 24 Lijiang activities asking for a time their own
+  // hours forbade: a dawn old-town walk at 07:00 stamped 09:00-21:00, a 10-hour
+  // gorge hike at 06:30 stamped 10:00-21:00. The model was right both times — the
+  // window came from arrangeConfig's category default, which is a guess about a
+  // gate. A district has no gate.
+  const hours = (type, venue_name) => normalizeActivity(
+    { name: 'Dayan Canals at Dawn', type, venue_name, duration_hours: 2 }, 'Lijiang'
+  ).timing.opening_hours;
+
+  assert.equal(hours('neighborhood', null), '', 'a district walk is not open 09:00-21:00');
+  assert.equal(hours('sports', null), '', 'a trailhead is not open 10:00-21:00');
+  assert.equal(hours('landmark', 'Wangu Tower, Lijiang'), '09:00-18:00', 'a gated venue keeps its default until Places answers');
+  assert.equal(hours('meal', null), '', 'meals are unchanged — their category default was already empty');
+});
+
+test('empty opening hours mean any time, not no time', () => {
+  // The fix only works because '' is how the scheduler spells unconstrained. If
+  // parseOpeningHours ever narrowed an empty string, every unstructured activity
+  // would silently become unplaceable instead of free.
+  assert.deepEqual(parseOpeningHours(''), [[0, 1440]]);
+  const walk = normalizeActivity(
+    { name: 'Dukezong Dawn Photography Walk', type: 'neighborhood', venue_name: null, suggested_time: '7:00am', duration_hours: 1.3 },
+    'Shangri-La City'
+  );
+  const [[open, close]] = parseOpeningHours(walk.timing.opening_hours);
+  const [h, m] = walk.timing.preferred_time.split(':').map(Number);
+  assert.ok(h * 60 + m >= open && h * 60 + m < close, 'the dawn walk can now be scheduled at dawn');
 });
 
 test('a venue sold twice under two names collapses', async () => {

@@ -304,9 +304,15 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
 
     timing: {
       duration_minutes: parseDurationToMinutes(durationHours),
-      opening_hours: isMealType
-        ? String(raw.opening_hours || '').trim()
-        : String(raw.opening_hours || defaults.openingHours || '').trim(),
+      // A category default is a guess about a gate, so it is only honest for a
+      // place that has one. An unstructured activity — a district walk, a sunset
+      // spot — has no opening hours, and '' is how the scheduler spells "any
+      // time" (parseOpeningHours -> [[0, 1440]]). Giving it neighborhood's
+      // 09:00-21:00 invented a constraint that then blocked the dawn walk the
+      // model asked for.
+      opening_hours: venue_name
+        ? String(raw.opening_hours || defaults.openingHours || '').trim()
+        : String(raw.opening_hours || '').trim(),
       preferred_time,
       fixed: null,
       must_happen_on_day: null
