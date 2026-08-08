@@ -112,11 +112,16 @@ app.get('/debug/bakeoff', requireConfiguredAuth, requireOwner, (req, res) => {
     .sort()
     .map((entry) => `  /debug/bakeoff?file=${entry}`);
 
+  const blindRead = entries.includes('blind-read.md')
+    ? 'Blind read:  /debug/bakeoff?file=blind-read.md'
+    : 'Blind read:  not generated yet — run `node scripts/blindRead.js`';
+
   res.type('text/plain').send([
     report,
     'Raw rows:  /debug/bakeoff?file=results.json',
+    blindRead,
     '',
-    `Activity lists for the blind read (${activityLists.length}):`,
+    `Underlying activity lists (${activityLists.length}):`,
     ...activityLists
   ].join('\n'));
 });
