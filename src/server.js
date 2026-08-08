@@ -95,9 +95,12 @@ app.get('/debug/bakeoff', requireConfiguredAuth, requireOwner, (req, res) => {
 
   // Match against the real directory listing rather than joining the query onto
   // a path, so a traversal attempt simply finds no entry.
+  // "+" in a query string decodes to a space, so an arm label like `gpt-5.6+lean`
+  // arrives here already mangled. Match the decoded form and the raw one.
   const requested = String(req.query.file || '').trim();
+  const forms = [requested, requested.replace(/ /g, '+')];
   if (requested) {
-    const match = entries.find((entry) => entry === requested || entry === `${requested}.json`);
+    const match = entries.find((entry) => forms.some((form) => entry === form || entry === `${form}.json`));
     if (!match) return res.status(404).type('text/plain').send('Unknown file');
     return res
       .type(match.endsWith('.json') ? 'application/json' : 'text/plain')
@@ -110,7 +113,7 @@ app.get('/debug/bakeoff', requireConfiguredAuth, requireOwner, (req, res) => {
   const activityLists = entries
     .filter((entry) => entry.endsWith('.json') && !['results.json', 'brave-cassette.json'].includes(entry))
     .sort()
-    .map((entry) => `  /debug/bakeoff?file=${entry}`);
+    .map((entry) => `  /debug/bakeoff?file=${encodeURIComponent(entry)}`);
 
   const blindRead = entries.includes('blind-read.md')
     ? 'Blind read:  /debug/bakeoff?file=blind-read.md'
