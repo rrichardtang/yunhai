@@ -117,7 +117,9 @@ async function fetchPlaceDetails(name, city, cityCenter = null) {
     const place = data?.places?.[0];
     if (!place) {
       debugLog('places-fetch', `FAIL name="${name}" city="${city}" reason=no_place`);
-      return null;
+      // Distinguished from the null returns above: those are transient (no key,
+      // HTTP error, timeout) and must never be cached or treated as a ghost.
+      return { miss: 'no_place' };
     }
     const tier = PRICE_LEVEL_MAP[place.priceLevel];
     const lat = place.location?.latitude;
@@ -140,6 +142,7 @@ async function fetchPlaceDetails(name, city, cityCenter = null) {
       priceTier: Number.isInteger(tier) ? tier : null,
       openingHours: formatOpeningHoursFromPlaces(place.regularOpeningHours),
       location: place.location || null,
+      displayName: place.displayName?.text || null,
       photoName,
       imageUrl
     };
@@ -227,6 +230,13 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null, o
   // cache at the same instant and fetch it separately — one Shangri-La run spent
   // 10 lookups on 4 venues, each photo hit billed twice over. Sharing the
   // in-flight promise collapses them. The map lives for this call only.
+  // Flagged rather than deleted: a no_place on a named venue is a likely
+  // invention, but deleting on it would empty an itinerary the moment Places has
+  // a bad day. An activity with venue_name null resolved nothing by design and is
+  // not a ghost.
+  const markUnverified = (activity) => {
+    if (activity?.venue_name) activity.unverified = true;
+  };
   const inFlight = new Map();
   const resolveVenue = (name) => {
     if (!inFlight.has(name)) inFlight.set(name, fetchPlaceDetails(name, cityName, cityCenter));
@@ -251,15 +261,30 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null, o
         return;
       }
     }
+    if (cached?.miss) {
+      debugLog('places-fetch', `SKIP name="${lookupName}" city="${cityName}" reason=cached_miss`);
+      markUnverified(activity);
+      report(activity, 'no_place', null);
+      return;
+    }
     const details = await resolveVenue(lookupName);
     if (hasUsefulDetails(details)) {
       report(activity, 'resolved', details);
       applyDetails(activity, details);
-      placesCache.set(lookupName, cityName, details);
+      // Aliasing under Google's own name means the next run resolves any phrasing
+      // it already knows — the cache learns the synonyms instead of us guessing.
+      placesCache.set(lookupName, cityName, details, [details.displayName].filter(Boolean));
     } else if (hasUsefulDetails(cached)) {
       report(activity, 'resolved', cached);
       applyDetails(activity, cached);
     } else {
+      // Only a genuine no_place is cacheable or a ghost. A null here is transient
+      // — missing key, HTTP error, timeout — and freezing that into the cache
+      // would outlive the outage that caused it.
+      if (details?.miss === 'no_place') {
+        placesCache.setMiss(lookupName, cityName);
+        markUnverified(activity);
+      }
       report(activity, details?.rejected === 'too_far' ? 'too_far' : 'no_place', details);
     }
   }));
