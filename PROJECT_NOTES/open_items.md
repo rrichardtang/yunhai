@@ -1,11 +1,5 @@
 # Open Items
 
-## [2026-08-07] Run the planCity model bake-off and decide Sonnet 5 vs GPT-5.6
-**Status:** Pending input (needs a staging run)
-**Description:** The harness has run the Sonnet 4.6 control twice and produced the baseline economics, but no other arm has ever run. `planCity` stays on `claude-sonnet-4-6` until the matrix reports.
-**Context:** decisions [2026-08-07], [2026-08-08]. Baseline: 6.26/6.07 sec per activity, $0.00542/$0.00537 per activity, $0.35 per 2-city trip, all linear in activity count with no fixed overhead. Because splitting the call is a ~3x speed lever against a faster model's ~30%, the decision rests on quality and cost, not speed. Two GPT-5.6 facts are still unconfirmed and either disqualifies it: max output tokens (a 36-activity array is ~12k) and `response_format: {type: "json_schema"}` support, which decides whether the parse-retry can be deleted as `output_config.format` would on Sonnet 5. Sonnet 5 is $3/$15 with an introductory $2/$10 through 2026-08-31 and must be benchmarked above 32768 `max_tokens` because adaptive thinking shares that budget.
-**Next action:** Confirm the staging container is actually running the branch head before trusting any run. Then re-run the unsplit baseline, then A/B `--split 2`, then `--arms gpt-5.6 --runs 1` to settle the output ceiling empirically, then the full matrix. Decide on `distinct%` / `ghost` / `meal res%` first and `sec/act` / `$/act` second; read the per-arm lists blind before trusting the table. A tie goes to Sonnet 5 (model-ID swap vs re-tuning SYSTEM_PROMPT for another family).
-
 ## [2026-08-07] Verify the Setup → Review fixes against live providers
 **Status:** Pending input (needs deploy)
 **Description:** The plan-progress stream, image ladder, transfer-day timing and per-city failure isolation are unit-tested (202/202) and verified against stubs, but no part of this branch has touched a real LLM, Brave, Places or Unsplash.

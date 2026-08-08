@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-08] planCity model bake-off reports: Sonnet 4.6 stays
+
+Branch `claude/guide-me-setup-stuck-mszkyo`. Closes the model question that gated the branch.
+
+- **Result**: Sonnet 4.6 — 66/66 activities against target, 100% grounding, 6.08 sec/act, $0.0054/act. GPT-5.6 (`gpt-5.6-sol`) — 70 activities, 100% grounding, 6.24 sec/act, $0.0083/act, and **zero meals in both cities** plus non-activity filler. Sonnet 5 rejected on analysis (new tokenizer + adaptive thinking ≈ $0.46/trip vs $0.35; intro pricing expires 2026-08-31). Full reasoning in decisions [2026-08-08]. `src/claude.js` unchanged — the production model was never switched.
+- **`src/services/placesEnrich.js`**: concurrent activities at one venue each fetched it separately inside the enrichment `Promise.all` — one Shangri-La run spent 10 live lookups on 4 venues, with every photo hit billed twice. Now share an in-flight promise, scoped per call.
+- **`scripts/planCityBakeoff.js`**: rows are priced on the model the provider reports serving, not the string requested — GPT-5.6 bills per tier and the tiers differ 5x on output price, so the requested string could not attribute cost. Tier rates added; the bare `gpt-5.6` key stays null so an unrecognized tier prints an em dash instead of a wrong number. OpenAI arm sends `max_completion_tokens` so truncation is distinguishable from the model's real ceiling. Meal counts replace a percentage (0/0 rendered as a dash, hiding the run's most important finding).
+- Verified: 224/224 unit tests. Both arms measured live on staging across both cities.
+
 ## [2026-08-08] A 24/7 Places result no longer overwrites the model's opening hours
 
 Branch `claude/guide-me-setup-stuck-mszkyo`. From the first staging run that confirmed the `venue_name` lookup was live.
