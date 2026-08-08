@@ -269,7 +269,7 @@ function report(rows) {
 
   lines.push(`# planCity bake-off — ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`);
   lines.push('');
-  lines.push('| arm | runs | sec/act | sec/city | kept/target | distinct% | resolved% | meal res% | hours ok% | ghost | tooFar | retry% | trunc% | photo% | $/act | $/city |');
+  lines.push('| arm | runs | sec/act | sec/city | kept/target | distinct% | resolved% | meals ok | hours ok% | ghost | tooFar | retry% | trunc% | photo% | $/act | $/city |');
   lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
 
   for (const arm of arms) {
@@ -290,7 +290,7 @@ function report(rows) {
       `${fmt(mean(armRows.map((r) => r.kept)), 0)}/${fmt(mean(armRows.map((r) => r.target)), 0)}`,
       fmt(ratio('distinctVenues', 'resolved'), 0),
       fmt(ratio('resolved', 'kept'), 0),
-      fmt(ratio('mealResolved', 'mealTotal'), 0),
+      `${fmt(mean(armRows.map((r) => r.mealResolved)), 0)}/${fmt(mean(armRows.map((r) => r.mealTotal)), 0)}`,
       fmt(ratio('hoursMatched', 'hoursComparable'), 0),
       fmt(mean(armRows.map((r) => r.ghost)), 1),
       fmt(mean(armRows.map((r) => r.tooFar)), 1),
@@ -311,7 +311,7 @@ function report(rows) {
   lines.push('heard of it. Activities the model left venue_name null are excluded — those are');
   lines.push('unstructured by design. `tooFar` is a real venue beyond the day-trip radius, usually');
   lines.push('not the model\'s fault — read it with the distance, since a hit 460km away is a ghost');
-  lines.push('wearing a real venue\'s name. `meal res%` matters on its own: restaurants carry the');
+  lines.push('wearing a real venue\'s name. `meals ok` is resolved over generated, not a percentage, because a model can also\nproduce no meals at all — a 0/0 that a percentage column would hide behind a dash.\nIt matters on its own: restaurants carry the');
   lines.push('strictest naming rules and are where the baseline failed. `hours ok%` skips 24/7');
   lines.push('Places results, which mean "no hours on file" rather than "open always".');
   lines.push('');
@@ -323,7 +323,7 @@ function report(rows) {
   lines.push('offered Shangri-La\'s Dukezong Old Town in Lijiang and Places snapped it to a Lijiang');
   lines.push('coordinate, so it scored as a clean resolve. That is what the blind read is for.');
   lines.push('');
-  lines.push('Decision rule: quality first — `ghost`, `meal res%` and `hours ok%`, with `distinct%`');
+  lines.push('Decision rule: quality first — `ghost`, `meals ok` and `hours ok%`, with `distinct%`');
   lines.push('as a cross-arm comparison. Not `resolved%`, which sat at 98% on the baseline and');
   lines.push('cannot separate the arms. On a quality tie, prefer Sonnet 5 (no prompt re-tuning) and');
   lines.push('choose the effort rung on `sec/act` and `$/act`. Faster but worse loses: splitting the');
