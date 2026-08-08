@@ -44,18 +44,32 @@ lookups for one venue coalesced.
 - Nothing on this branch has been verified through the UI — the plan stream, image ladder,
   transfer-day timing and per-city failure isolation are unit-tested and proven against the
   `/api/plan` route, but no one has watched a real browser session.
-- `distinct%` sits at 71% for Sonnet 4.6 (47 distinct venues across 66 activities): Dukezong sold
-  six times in one Shangri-La list, Compass Cafe three. That is a real quality ceiling the model
-  decision does not address, and it is prompt work, not model work.
+- **The blind read found a live defect in the kept model's output**: 11 of Sonnet 4.6's 66
+  activities (17%) carry a `preferred_time` outside their own `opening_hours`, and
+  `arrangeScheduler` honours the hours — so a "Napa Lake Sunrise" at 06:30 gets rescheduled to
+  09:00 and the activity's premise is destroyed. Seven of those are `placesEnrich` overwriting the
+  model's hours with a gate or box-office window for `neighborhood`/`tour` activities. See
+  open_items [2026-08-08]; six ranked fixes, all prompt or enrichment, none a model change.
+- `distinct%` is weaker evidence than it looked. It keys on Places coordinates, and the collapse it
+  penalises concentrates in dense-old-town restaurants — which GPT-5.6 produced none of, so its 76%
+  vs Sonnet's 71% partly measures the meals failure rather than padding. GPT also leaves
+  `venue_name` null on 41% of activities (Sonnet 26%), so more of its list is never grounded.
+  The prose shows **both** models padding to hit the count, by different mechanisms.
 - Two rejections rest on analysis, not measurement: Sonnet 5 was never run, and GPT-5.6's cheaper
   tiers were inferred from Sol's result. Both are stated as assumptions in decisions [2026-08-08].
+  One supporting argument in that record — GPT's zero meals — is partly explained by a
+  contradiction in our own prompt (open_items [2026-08-08]). The decision still stands on cost and
+  speed, which are unambiguous.
 - (Carried over) `GOOGLE_MAPS_API_KEY` rotation + `EMAIL_WEBHOOK_SECRET`/`OWNER_USER_ID` env setup
   still pending; memory-layer / arrange-overhaul / grounding keyed verifications still outstanding.
 
 ## Next Actions
-1. A/B `--split 2` against unsplit — the last unmeasured lever, ~3x on wall time (225s → ~75s per
-   city) and the actual fix for the reported complaint. Costs one run.
-2. Decide `PLAN_SPLIT_DAYS` from that run: the speed win against whatever it does to activity mix.
-3. Deploy the branch behind the three queued ones, then walk the post-deploy checklist in
+1. Decide which of the six quality fixes in open_items [2026-08-08] land. The hours-overwrite fix
+   and the meals contradiction are the two with user-visible consequences.
+2. A/B `--split 2` against unsplit — the last unmeasured lever, ~3x on wall time (225s → ~75s per
+   city) and the actual fix for the reported complaint. Costs one run. Worth folding the prompt
+   fixes in first so one run measures both.
+3. Decide `PLAN_SPLIT_DAYS` from that run: the speed win against whatever it does to activity mix.
+4. Deploy the branch behind the three queued ones, then walk the post-deploy checklist in
    open_items [2026-08-07].
-4. Resume the sweep-branch ops follow-ups and the queued keyed verifications.
+5. Resume the sweep-branch ops follow-ups and the queued keyed verifications.

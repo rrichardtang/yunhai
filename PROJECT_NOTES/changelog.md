@@ -4,6 +4,49 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-08] Blind quality read of the bake-off activity lists
+
+Branch `claude/guide-me-setup-stuck-mszkyo`. Read all 136 generated activities (Sonnet 4.6 and
+GPT-5.6 Sol × Lijiang and Shangri-La) through `scripts/blindRead.js`, judging the prose fields the
+metric table cannot reach. What the counters missed:
+
+- **Sonnet 4.6 ships 11 activities (17%) whose `preferred_time` falls outside their own
+  `opening_hours`** — a 20:00 performance at a venue Places closes at 17:00, five sunrise/dawn
+  activities at venues opening 09:00. `arrangeScheduler.js` honours opening hours, so these get
+  silently rescheduled and the activity's premise is destroyed. GPT-5.6 has 2, both departure
+  times on day trips. Cause is mixed: `placesEnrich.applyDetails` overwrites the model's hours with
+  the venue's gate/box-office hours for `neighborhood` and `tour` activities where they describe a
+  different thing. 7 of the 11 are that collision; the rest are the model scheduling before opening.
+- **`SYSTEM_PROMPT` line 38 contradicts line 43**: meals are MANDATORY, but "If actual hours are not
+  in the research, OMIT the restaurant from your output rather than guessing" gives a literal model
+  permission to return none. GPT-5.6 returned 0 meals in both cities against targets of 12 and 10.
+- **GPT-5.6 never returned a `null` insider tip** across 70 activities; ~12 (17%) are crowd-timing
+  restatements of the exact "arrive early" platitude line 34 forbids. Sonnet returned 2 nulls, both
+  on padded venue re-uses — the escape hatch working as designed.
+- **Both models pad to hit the target count, by different mechanisms.** Sonnet re-uses venues
+  (Shangri-La: 7 meals across 4 restaurants, Compass ×3, Xiaocai ×2); GPT decomposes one destination
+  into several activities (Pudacuo ×4, Napa Lake ×4, Balagezong ×3) and adds logistics blocks whose
+  own `why_it_fits` says they are not worth doing (railway-station buffers, Walmart, a botanical
+  garden past flowering season) — ~8 of 70.
+- **Itinerary-level errors no per-activity metric can see:** Sonnet plans a 10-hour day trip *to
+  Shangri-La* inside the Lijiang leg, two days before the traveller moves there for four days, and
+  plans Tiger Leaping Gorge as a full day in both cities. Both models ship activities their own
+  `pitfall` field argues against (Meili Snow Mountain "requires an overnight… otherwise a very
+  rushed day trip"; an 11-hour, $180 Baishuitai run).
+- **Sonnet's insider tips are materially more specific** (CNY prices, named streets and guesthouses,
+  Chinese characters) but carry a matching hallucination risk: Ganden Sumtseling/Songzanlin is
+  priced at 115 CNY in the Shangri-La list and 15 CNY in the Lijiang list, same model, same run.
+  Two tips coach fee avoidance ("fee booths are rarely manned after 8pm"; "guards rarely check
+  return visits the following day").
+- **Correction to the recorded bake-off table:** `distinct%` flattered GPT-5.6 (76% vs 71%). The
+  metric keys on Places coordinates, and the collapse it penalises is concentrated in dense-old-town
+  restaurants — which GPT produced none of. GPT also leaves `venue_name` null on 41% of activities
+  vs Sonnet's 26%, so a larger share of its list is never grounded at all. On padding, the prose is
+  the better evidence than the column, and it shows both models padding.
+
+No code changed. Findings recorded here and as open items; the fixes are `SYSTEM_PROMPT` and
+`placesEnrich.js` changes, not a model change — the model decision [2026-08-08] stands.
+
 ## [2026-08-08] planCity model bake-off reports: Sonnet 4.6 stays
 
 Branch `claude/guide-me-setup-stuck-mszkyo`. Closes the model question that gated the branch.
