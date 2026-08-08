@@ -72,16 +72,43 @@ place. Today they Text Search by that sentence, Places snaps to whatever sounds 
 district-centroid problem that forced the `ALL_DAY` guard — and we pay for a Pro-tier search plus a
 photo call to get a wrong answer and a meaningless "venue photo".
 
-  **Open decision — where their coordinate comes from.** Arrange needs one for commute. Options, in
-  order of preference:
-  - *Minimal field mask:* same Text Search, but request `location` only — a cheaper SKU, and it
-    skips the `/media` call entirely. Keeps coordinates, drops the photo (correctly: these
-    activities should draw from the Unsplash city pool, which is what it is for).
-  - *City centre:* free, but co-locates every district walk, which degrades commute optimisation.
-  - *Geocoding API:* cheaper than Places, but still a call and still a district centroid.
+  **Commute does not need a coordinate.** `distanceMatrix.js:26` builds a commute query as
+  `[activity.name, activity.city].join(', ')`, and `resolveLocationQuery({lat, lng, fallbackText})`
+  falls back to that text when coordinates are missing — Google geocodes "Dayan Back-Lane Walk,
+  Lijiang" for the leg. `arrangeScheduler` touches coordinates in one place only (line 160, meal
+  proximity ordering). So these activities schedule correctly with no coordinate at all.
 
-  Recommended: minimal field mask. It is the smallest change that removes the photo call and the
-  tier cost while preserving what arrange actually needs.
+  **Open decision — the map pin, and only the map pin.** The card's marker is the sole consumer that
+  genuinely needs lat/lng. Options:
+  - *Skip Places entirely, no pin.* Cheapest. The card loses its marker; the activity still
+    schedules and still gets a city-pool image.
+  - *Minimal field mask:* same Text Search requesting `location` only — a cheaper SKU than the
+    current mask, and it skips the `/media` call. Keeps the pin, drops the meaningless "venue
+    photo" (correctly: these should draw from the Unsplash city pool, which is what it is for).
+
+  Recommended: minimal field mask, if a missing marker is a visible regression in the UI. If the
+  card degrades cleanly without one, skip the call and take the full saving.
+
+  **If we keep resolving them, the coordinate must be constrained — today it is not.** The only
+  guards are a 30km `locationBias` (a preference, not a bound) and `CITY_REJECT_RADIUS_KM = 150`,
+  which has never fired: `tooFar` is 0.0 on every run. Inside 150km we accept Places' single top
+  text match unverified, for a query that is prose describing an activity rather than a place name.
+  - *Constrain the place type.* Text Search accepts `includedType`. A `neighborhood` activity should
+    resolve against geographic types, never a restaurant. Biggest accuracy win, no extra cost.
+  - *Make the reject radius type-dependent.* A district walk 100km from the city is certainly wrong;
+    a `tour` at 100km is a legitimate day trip. One flat 150km threshold cannot express that, which
+    is why it catches nothing.
+  - *Use `locationRestriction` rather than `locationBias`* for neighborhood-type activities — a hard
+    bound instead of a preference.
+
+**5. Flag ghost venues rather than deleting them.** Where the model *named* a venue and Google has
+never heard of it (`status === 'no_place' && venueName`, already computed by `summariseOutcomes`),
+mark `unverified: true` — the shape `/api/activity/replace` already uses. Not a delete: `no_place`
+is currently indistinguishable from an HTTP error or timeout, so a Places outage would empty the
+whole itinerary. Deleting only becomes safe once item 4's reason-carrying return exists, and even
+then flagging tells the user something while deleting tells them nothing. Distinct from a null
+`venue_name`, which is a design feature, not a defect — a coordinate check cannot tell those apart,
+but `venue_name` can.
 
 **4. Cache negative results — carefully.** `placesCache.set` runs only on `hasUsefulDetails`, so a
 venue Google has never heard of is re-queried on every run, forever. Cache the miss, but:
