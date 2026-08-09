@@ -1,7 +1,12 @@
 # Open Items
 
-## [2026-08-08] Verify the GPT-5.6 switch on a keyed environment before it reaches users
-**Status:** Pending input (needs deploy)
+## [2026-08-08] Verify the GPT-5.6 switch — now live in production, not pre-deploy
+**Status:** Pending input (already shipped; verify in prod)
+**Update [2026-08-09]:** promoted before this check ran. `origin/main` moved `95ba494..52d3557`, so
+the switch, the opening-hours fix and the notes are live for users. Both env files were confirmed to
+carry `OPENAI_API_KEY` before promotion, which was the failure mode that mattered, but
+`openaiGenerator()` still has not been observed running. Run the checks below against **prod**
+(`travelplanner-prod-travelplanner-1`, `yunhai.io`) rather than staging, which promote reset to main.
 **Description:** `planCity` now runs `gpt-5.6` with `SYSTEM_PROMPT_GPT_LEAN` (decisions
 [2026-08-08]). The arm is well measured through the bake-off harness, but the harness injects its
 own `generate` — so `openaiGenerator()`, the function production actually calls, has never run.
