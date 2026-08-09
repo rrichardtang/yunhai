@@ -8227,11 +8227,22 @@ function syncTripMetaFromInputs() {
 }
 
 const PLAN_PHASES_PER_CITY = 4;
+// Least-advanced first: whichever of these is still running is the one holding
+// the trip up, and it is the only one worth naming.
+const PLAN_PHASE_ORDER = ['start', 'research', 'generating', 'enriching'];
+// User-facing copy, not pipeline names. "Writing activities for Lijiang" read as
+// a debug line that escaped the server.
 const PLAN_PHASE_LABELS = {
-  research: 'Researching',
-  generating: 'Writing activities for',
-  enriching: 'Finding places in'
+  start: 'Getting started on',
+  research: 'Reading up on',
+  generating: 'Choosing what to do in',
+  enriching: 'Pinning down addresses in'
 };
+
+function joinCityNames(names) {
+  if (names.length < 2) return names[0] || '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
 
 async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
   syncTripMetaFromInputs();
@@ -8328,15 +8339,23 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
   // count alone leaves the bar frozen. Count the four observable steps per city
   // the server now reports instead.
   const cityPhase = new Map();
-  const totalSteps = cities.length * PLAN_PHASES_PER_CITY;
 
+  // Cities plan in parallel, so naming each one's own phase built a headline that
+  // grew with the trip ("Writing activities for A · Writing activities for B").
+  // Name the least-advanced phase and list the cities sitting in it instead.
+  //
+  // No step counter: the bar deliberately trickles past the last completed unit
+  // toward the next one (recomputeLoaderCeiling), so printing an exact "step 4 of
+  // 8" beside it just invites the reader to catch it at 61%.
   const renderLoaderStatus = () => {
-    const active = [...cityPhase.entries()]
-      .map(([city, label]) => `${label} ${truncateLocation(city, 20)}`)
-      .join(' · ');
+    const phases = new Set(cityPhase.values());
+    const phase = PLAN_PHASE_ORDER.find((p) => phases.has(p));
+    const waiting = [...cityPhase.entries()]
+      .filter(([, p]) => p === phase)
+      .map(([city]) => truncateLocation(city, 20));
     setLoaderStatus(
-      active || 'Starting planning...',
-      `${completedCities} of ${cities.length} cities · step ${stepsDone} of ${totalSteps}`
+      phase ? `${PLAN_PHASE_LABELS[phase]} ${joinCityNames(waiting)}` : 'Getting started…',
+      completedCities ? `${completedCities} of ${cities.length} cities ready` : ''
     );
   };
 
@@ -8354,13 +8373,15 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
     if (evt.type === 'error') throw new Error(evt.error || 'Failed to plan');
 
     if (evt.type === 'city_start') {
-      cityPhase.set(evt.city, 'Starting');
+      cityPhase.set(evt.city, 'start');
       renderLoaderStatus();
       return;
     }
 
     if (evt.type === 'phase') {
-      cityPhase.set(evt.city, PLAN_PHASE_LABELS[evt.phase] || 'Working on');
+      // An unrecognised phase still advances the bar; it just does not get to
+      // rename the headline, since its position in the order is unknown.
+      if (PLAN_PHASE_LABELS[evt.phase]) cityPhase.set(evt.city, evt.phase);
       advance();
       return;
     }
