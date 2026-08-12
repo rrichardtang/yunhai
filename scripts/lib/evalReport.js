@@ -4,10 +4,20 @@
 // travel back to whoever decides.
 const path = require('path');
 
-// The threshold a judge criterion must clear to count as a regression. It is a
-// starting value, not a measured one: run the same prompt against itself three
-// times and set it above whatever that noise floor turns out to be.
+// The threshold a judge criterion must clear to count as a regression.
+//
+// Plan: 2, consistent with observation — the known-regression run cleared it at
+// profileFit 3-0 while three other criteria stayed inside it.
+//
+// Chat: 4, because a null-change control (identical prompts) produced a 0-3
+// decisive swing on `decisiveness` from sampling alone. A chat reply is two or
+// three sentences, so two samples of it differ enormously in proportion where a
+// twenty-activity list averages out. 4 sits above the one swing observed; it is
+// a floor set from a single run, not a measured noise floor, and with only five
+// chat scenarios it means the judge can rarely fail a run on its own. That is
+// the honest position: chat verdicts lean on the invariants.
 const JUDGE_LOSS_MARGIN = 2;
+const CHAT_JUDGE_LOSS_MARGIN = 4;
 
 // Regression is decided on counts, not on which findings differ. Two runs of a
 // non-deterministic model repeat different restaurants, so a detail-level diff
@@ -45,7 +55,7 @@ function deltaNote({ base, cand, regressed, details }) {
   return `REGRESSED +${cand - base} · ${shown}${more}`;
 }
 
-function verdictFor({ deltas, tally }) {
+function verdictFor({ deltas, tally, margin = JUDGE_LOSS_MARGIN }) {
   const reasons = [];
   const regressions = deltas.filter((d) => d.regressed);
   if (regressions.length) {
@@ -53,11 +63,26 @@ function verdictFor({ deltas, tally }) {
     reasons.push(`${regressions.length} new high-severity invariant finding${regressions.length === 1 ? '' : 's'} (${scenarios.join(', ')})`);
   }
   for (const [criterion, counts] of Object.entries(tally || {})) {
-    if (counts.baseline - counts.candidate >= JUDGE_LOSS_MARGIN) {
+    if (counts.baseline - counts.candidate >= margin) {
       reasons.push(`${criterion} lost ${counts.baseline}–${counts.candidate}`);
     }
   }
   return { status: reasons.length ? 'DEGRADED' : 'PASS', reasons };
+}
+
+// The verdict only fires when the baseline wins, because a candidate winning is
+// not a degradation. That asymmetry hides noise: a large swing the candidate's
+// way is the same evidence of sampling variance as one the baseline's way, and
+// on a null-change run it is the only evidence there is. Reported either way.
+function widestSwing(tally = {}) {
+  let widest = { criterion: null, spread: 0, toward: null };
+  for (const [criterion, counts] of Object.entries(tally)) {
+    const spread = Math.abs(counts.baseline - counts.candidate);
+    if (spread > widest.spread) {
+      widest = { criterion, spread, toward: counts.baseline > counts.candidate ? 'baseline' : 'candidate' };
+    }
+  }
+  return widest;
 }
 
 const cell = (value) => (value == null ? '—' : value);
@@ -71,10 +96,11 @@ function renderReport({
   run = {},
   outDir,
   artifactName = (id) => `eval-${id}-candidate.json`,
-  reportName = 'judge-report.md'
+  reportName = 'judge-report.md',
+  margin = JUDGE_LOSS_MARGIN
 }) {
   const deltas = invariantDeltas(perScenario);
-  const verdict = verdictFor({ deltas, tally });
+  const verdict = verdictFor({ deltas, tally, margin });
   const lines = [];
 
   lines.push(`# ${title} · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`);
@@ -97,13 +123,24 @@ function renderReport({
   lines.push('');
 
   if (tally && Object.keys(tally).length) {
-    lines.push(`## Judge — ${run.judgeModel || 'unknown'}, pairwise, position-swapped`);
+    lines.push(`## Judge — ${run.judgeModel || 'unknown'}, pairwise, position-swapped, margin ${margin}`);
     lines.push('| criterion | base | cand | tie |');
     lines.push('|---|---:|---:|---:|');
     for (const [criterion, counts] of Object.entries(tally)) {
       lines.push(`| ${criterion} | ${counts.baseline} | ${counts.candidate} | ${counts.tie} |`);
     }
     lines.push('');
+    const swing = widestSwing(tally);
+    if (swing.spread) {
+      lines.push(`Widest decisive swing: **${swing.criterion} ${swing.spread} toward ${swing.toward}** (margin ${margin}).`);
+      if (swing.toward === 'candidate' && swing.spread >= margin) {
+        lines.push('That clears the margin in the candidate\'s favour, which the verdict does not fire on —');
+        lines.push('a candidate winning is not a degradation. On a null-change run, read it as the noise');
+        lines.push('floor sitting at or above the margin, and raise the margin rather than trusting a');
+        lines.push('verdict from it.');
+      }
+      lines.push('');
+    }
     lines.push('Only calls that survived the position swap appear as a win. Where the judge picked');
     lines.push('the same slot in both orderings it is counted a tie, because that is bias and not a');
     lines.push('preference.');
@@ -145,4 +182,4 @@ function renderReport({
   return { text: lines.join('\n'), verdict, deltas };
 }
 
-module.exports = { renderReport, verdictFor, invariantDeltas, JUDGE_LOSS_MARGIN };
+module.exports = { renderReport, verdictFor, invariantDeltas, widestSwing, JUDGE_LOSS_MARGIN, CHAT_JUDGE_LOSS_MARGIN };

@@ -22,7 +22,7 @@ const { buildChatSystemPrompt } = require('../src/services/chatPrompt');
 const { runChatChecks } = require('../src/evalChatChecks');
 const { costUsd } = require('./lib/planArm');
 const { anthropicJudge, comparePair, tallyOutcomes, JUDGE_MODELS } = require('./lib/judge');
-const { renderReport } = require('./lib/evalReport');
+const { renderReport, CHAT_JUDGE_LOSS_MARGIN } = require('./lib/evalReport');
 
 const OUT_DIR = path.join(__dirname, '..', 'data', 'bakeoff');
 const SCENARIO_DIR = path.join(__dirname, '..', 'evals', 'scenarios', 'chat');
@@ -86,6 +86,7 @@ async function runArm({ openai, scenario, systemPrompt }) {
     reply,
     signals,
     seconds: (Date.now() - started) / 1000,
+    servedModel: usage.servedModel,
     cost: costUsd(usage.servedModel, usage.inputTokens, usage.outputTokens)
   };
 }
@@ -116,7 +117,11 @@ async function main() {
   console.log(`Scenarios: ${scenarios.map((s) => s.id).join(', ')}\n`);
 
   const perScenario = [];
+  // Unpriced must not render as free. costUsd returns null for a served model
+  // missing from PRICING, and coercing that to 0 reported five scenarios of real
+  // calls as $0.000. The served model is printed so the key can be added.
   let cost = 0;
+  let unpricedModel = null;
 
   for (const scenario of scenarios) {
     const baselinePrompt = buildChatSystemPrompt(scenario.tripContext || {}, scenario.prefSummary || '');
@@ -131,7 +136,10 @@ async function main() {
       runArm({ openai, scenario, systemPrompt: baselinePrompt }),
       runArm({ openai, scenario, systemPrompt: candidatePrompt })
     ]);
-    cost += (baseline.cost || 0) + (candidate.cost || 0);
+    for (const armRun of [baseline, candidate]) {
+      if (armRun.cost == null) unpricedModel = unpricedModel || armRun.servedModel || 'unknown';
+      else cost += armRun.cost;
+    }
 
     const checkArgs = { expect: scenario.expect || {}, searchResults: scenario.searchResults };
     perScenario.push({
@@ -183,9 +191,10 @@ async function main() {
     outDir: OUT_DIR,
     artifactName: (id) => `eval-chat-${id}.json`,
     reportName: 'chat-judge-report.md',
+    margin: CHAT_JUDGE_LOSS_MARGIN,
     run: {
       scenarios: scenarios.length,
-      genCost: `$${cost.toFixed(3)}`,
+      genCost: unpricedModel ? `— (no price for "${unpricedModel}"; add it to PRICING)` : `$${cost.toFixed(3)}`,
       judgeModel: skipJudge ? 'skipped' : judgeModel,
       judgeCost: skipJudge ? '—' : `$${judgeCost.toFixed(3)}`
     }

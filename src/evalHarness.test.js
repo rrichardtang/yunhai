@@ -5,7 +5,7 @@ const os = require('os');
 const path = require('path');
 
 const { resolveSwap, tallyOutcomes, comparePair, buildJudgePrompt, PLAN_CRITERIA } = require('../scripts/lib/judge');
-const { verdictFor, invariantDeltas, JUDGE_LOSS_MARGIN } = require('../scripts/lib/evalReport');
+const { verdictFor, invariantDeltas, widestSwing, JUDGE_LOSS_MARGIN, CHAT_JUDGE_LOSS_MARGIN } = require('../scripts/lib/evalReport');
 const { baselineKey, loadBaseline, saveBaseline, isStale } = require('../scripts/lib/baselineCache');
 const { costUsd, targetActivityCount, distinctVenues, summariseOutcomes } = require('../scripts/lib/planArm');
 
@@ -149,6 +149,25 @@ test('a judge criterion must lose by the margin, not merely lose', () => {
 test('all ties is a PASS — the null-change control must come back clean', () => {
   const allTies = Object.fromEntries(PLAN_CRITERIA.map((c) => [c.id, { baseline: 0, candidate: 0, tie: 5 }]));
   assert.equal(verdictFor({ deltas: [], tally: allTies }).status, 'PASS');
+});
+
+test('the margin is configurable, because chat is noisier than plan', () => {
+  // A chat null-change control produced a 0-3 swing from sampling alone. The
+  // same tally must fail under the plan margin and pass under the chat one.
+  const tally = { decisiveness: { baseline: 3, candidate: 0, tie: 2 } };
+  assert.equal(verdictFor({ deltas: [], tally, margin: JUDGE_LOSS_MARGIN }).status, 'DEGRADED');
+  assert.equal(verdictFor({ deltas: [], tally, margin: CHAT_JUDGE_LOSS_MARGIN }).status, 'PASS');
+});
+
+test('a swing toward the candidate is reported even though it cannot fail a run', () => {
+  // The verdict is one-directional on purpose — a candidate winning is not a
+  // degradation. But on a null-change run that asymmetry hides the noise floor:
+  // 0-3 toward the candidate is the same evidence as 3-0 toward the baseline.
+  const tally = { decisiveness: { baseline: 0, candidate: 3, tie: 2 }, usefulness: { baseline: 1, candidate: 2, tie: 2 } };
+  assert.equal(verdictFor({ deltas: [], tally }).status, 'PASS', 'still not a degradation');
+
+  const swing = widestSwing(tally);
+  assert.deepEqual(swing, { criterion: 'decisiveness', spread: 3, toward: 'candidate' });
 });
 
 // --- the baseline cache ------------------------------------------------------
