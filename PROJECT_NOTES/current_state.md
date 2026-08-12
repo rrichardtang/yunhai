@@ -39,9 +39,17 @@ Arrange is deliberately out of this pass — its LLM call is an inline closure i
 extracting first (open_items [2026-08-12]).
 
 ## Constraints
-- **The harness is uncalibrated.** No control has been run. `JUDGE_LOSS_MARGIN` is a guess (2), not
-  a measured noise floor. Do not read a verdict as evidence until open_items [2026-08-12] step 3
-  passes — a harness that cannot detect the regression we have proof of is worse than none.
+- **The plan harness is calibrated; the chat harness is not.** Layer 1 reproduces the human blind
+  read on the committed fixtures, the null-change control passes, and the known-regression control
+  returns DEGRADED on both layers with the two converging independently — changelog [2026-08-12].
+  `scripts/evalChat.js` has never run against a live model, and the plan side carried four bugs
+  that only a live run exposed.
+- **`JUDGE_LOSS_MARGIN` is still a guess (2).** Consistent with the observed data — the
+  known-regression run cleared it 3-0 on `profileFit` while three other criteria stayed inside it —
+  but not measured. open_items [2026-08-12].
+- **The calibration controls are cheap insurance and found four real bugs.** Anything that changes
+  a check threshold, the rubric, or the judge model should re-run the null-change and
+  known-regression controls; `--judge-only` makes the second nearly free.
 - **Meals may not be planned independently of activities.** A restaurant an hour from any activity
   is not a valid suggestion; it must be near one or on the way between two. Governs Phase 2.
 - **Never prompt for something the pipeline then silently drops, overrides or calls an error.** If
@@ -75,8 +83,8 @@ extracting first (open_items [2026-08-12]).
   still pending; memory-layer / arrange-overhaul / grounding keyed verifications still outstanding.
 
 ## Next Actions
-1. Calibrate the harness — open_items [2026-08-12]. Steps 1 and 2 are free; step 3 is the one that
-   decides whether the harness is worth keeping.
+1. Run the chat eval — open_items [2026-08-12]. Cents, and the plan side proved a live run finds
+   what unit tests cannot.
 2. Verify the GPT-5.6 switch on a keyed environment (open_items [2026-08-08]).
 3. Phase 2: cluster-based meal sourcing, designed in
    `PROJECT_NOTES/plan-deterministic-prompt-split.md`, not started.

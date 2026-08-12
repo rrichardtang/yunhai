@@ -4,6 +4,61 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-12] Eval harness calibrated on a keyed box — four harness bugs found
+
+Ran the controls from open_items [2026-08-12] on staging. The harness is now calibrated for plan;
+chat and the noise floor remain. Total spend ~$3.50.
+
+**Layer 1 against the human adjudication (free).** The four saved 2026-08-08 lists are now committed
+under `evals/fixtures/`. `runChecks` independently reproduces every finding of the blind read: 12
+`tour` activities across both cities against `structuredTours 1/5`, Compass x3 and Xiaocai x2, the
+gorge filed under Shangri-La with venue city Lijiang, the Lijiang-to-Shangri-La day trip, and the
+Meili overnight pitfall — with **0 findings on both cleared `gpt-5.6+lean` lists**. Eight tests pin
+this.
+
+**Null-change control** (`--smoke --candidate lean --refresh-baseline`): returned DEGRADED on first
+run, which by construction is a harness fault. Three causes, all fixed — `selfContradictingPitfall`
+matched the adjectives brutal/punishing/exhausting and flagged pacing advice; `typeMixVsProfile`
+scored meal count against `foodTravel`, which is pipeline-determined and so fired on both arms of
+every run; and the verdict gated on any new finding, so one medium-severity difference between two
+samples of the same prompt failed the run. Re-ran: PASS, 0 findings either arm, 1 call at $0.23
+(the baseline cache working).
+
+**Known-regression control** (`--candidate default`, 9 calls, $2.18): DEGRADED on both layers.
+
+- Invariants: `nightlife-heavy` candidate carries 3 museums against `museumPerson 2/5` and no live
+  performances against `livePerformances 4/5`, neither present on the baseline.
+- Judge: `profileFit` 3-0, clearing the margin. The other three criteria stayed inside it.
+- **The two layers converged independently.** On `nightlife-heavy` the check counted 3 museums
+  against a 2/5 rating and the judge — which sees no checks — wrote that the list "pads the schedule
+  with generic tourist landmarks that don't serve a traveler who rated museumPerson 2".
+- **The split of work held.** `owner-yunnan` had 0 invariant findings on both arms, and the judge
+  still separated them on specificity, tip authenticity and internal coherence with concrete cited
+  examples. The candidate won `internalCoherence` on `budget-tight`, so the judge is discriminating
+  rather than confirming.
+
+**Fourth bug, found by `--judge-only`.** The first known-regression run reported 20 ties out of 20.
+`askJudge` degrades an unparseable response to ties, so a broken judge and an agreeable one rendered
+identically. Instrumented: **6 of 10 calls had returned an empty body.** `MAX_TOKENS` was 2000
+covering reasoning *and* output, so Sonnet 5 comparing two 24-to-35 activity lists spent the budget
+thinking and emitted no text block — only the smallest scenarios had survived, which is why the
+single-scenario runs looked healthy. Raised to 16000; an empty body now reports its `stop_reason`.
+Re-judged for $0.45 with no regeneration: all 10 parsed, and the real result appeared.
+
+**A premise of the control turned out to be wrong.** `--candidate default` was expected to reproduce
+the blind read's tour-mix and repeated-venue defects. It does not: `owner-yunnan` is clean on both
+arms with **zero `tour` activities either side**. Those defects were `claude-sonnet-4-6`'s behaviour,
+not `SYSTEM_PROMPT`'s — the blind read judged a prompt+model pair, and only the prompt was swapped
+here. The control still did its job by catching a real regression in `nightlife-heavy`, but it is a
+weaker test than designed.
+
+New: `--judge-only` re-runs checks and judging over the `eval-*.json` already on disk, generating
+nothing. Rubric wording, criteria and judge model are all cheap to change and regenerating to try
+one is not.
+
+Cost model from decisions [2026-08-12] held: $2.18 over 9 calls is $0.242/call against $0.263
+predicted for ~20-activity lists.
+
 ## [2026-08-12] LLM-as-a-judge prompt-regression harness (plan + chat)
 
 Two commands that answer "did this prompt edit degrade anything else", built on the existing

@@ -1,30 +1,32 @@
 # Open Items
 
-## [2026-08-12] Calibrate the eval harness before trusting a verdict from it
-**Status:** Pending input (needs keys)
-**Description:** The harness is built and unit-tested, but an eval harness is a measuring
-instrument and none of its controls have been run. Four, in priority order, and the first two cost
-nothing.
-**Context:** changelog/decisions [2026-08-12]. `JUDGE_LOSS_MARGIN` in `scripts/lib/evalReport.js`
-is currently a guess (2), not a measured threshold.
-**Next action:**
-1. **(free)** Point `runChecks` at the saved `sonnet-4-6-run1-Shangri-La_City.json` from the 2026-08-08
-   bake-off, if it still exists on the staging box, and confirm it independently reproduces the
-   human read — 12 tours, Compass x3, the Lijiang-city gorge entry. If it does not, the checks are
-   wrong, not the model. **Copy two of those lists into `evals/fixtures/` while doing it** — they
-   live in `data/`, which is gitignored, and they are the only ground truth the harness has.
-2. **(~$0.52)** Null-change control: `node scripts/evalPlan.js --smoke --candidate lean
-   --refresh-baseline`. Expect PASS with judge criteria tied. A DEGRADED here means the harness is
-   measuring its own noise and no verdict should be trusted.
-3. **(~$1.34)** Known-regression control: `--candidate default`. This is the arm the blind read
-   already rejected, so it must return DEGRADED and name the tour-mix and repeated-venue findings.
-   A PASS here means the harness cannot detect the one regression we have proof of — this is the
-   step that decides whether it is worth keeping.
-4. **(~$4)** Noise floor: run the same prompt against itself three times and count how often a
-   criterion wins by chance across 5 scenarios. Set `JUDGE_LOSS_MARGIN` above that number.
-Then check the baseline cache does what it claims: re-run step 3 unchanged and confirm 5 generation
-calls rather than 10, then hand-edit a cached entry's `servedModel` and confirm the next run
-discards it.
+## [2026-08-12] Measure the judge noise floor and set JUDGE_LOSS_MARGIN from data
+**Status:** Deferred (~$4)
+**Description:** The plan harness is calibrated — changelog [2026-08-12] — but
+`JUDGE_LOSS_MARGIN` in `scripts/lib/evalReport.js` is still the guess (2) it started as. The
+known-regression run cleared it at `profileFit` 3-0 and the other three criteria stayed inside it,
+which is consistent with 2 being about right, but that is inference rather than measurement.
+**Context:** Baselines for all five scenarios are now cached, so each repeat costs 5 calls (~$1.34)
+rather than 10.
+**Next action:** `for i in 1 2 3; do node scripts/evalPlan.js --candidate lean; cp
+data/bakeoff/judge-report.md data/bakeoff/noise-$i.md; done` — same prompt both arms, so every
+decisive win is chance. Set the margin above the highest per-criterion win count seen. If a medium
+-severity invariant proves stable across all three, promote it to high rather than loosening the
+gate. While there, confirm cache invalidation: hand-edit a cached entry's `servedModel` and check
+the next run discards it.
+
+## [2026-08-12] Run the chat eval
+**Status:** Pending input (cents, not yet run)
+**Description:** `scripts/evalChat.js` and the five chat scenarios are built and unit-tested but
+have never been run against a live model. The plan harness turned out to carry four bugs that only
+a live run exposed, so assume this one does too.
+**Context:** changelog [2026-08-12]. Watch for the same class of fault: `runChatTurn` uses
+`max_completion_tokens: 700`, which is the chat route's own cap rather than the harness's, but the
+judge path shares `scripts/lib/judge.js` and its 16000 cap.
+**Next action:** `node scripts/evalChat.js`. Expect the Draft answer to come from the website guide,
+zero links on the empty-search case, and a `constraint` reading "Allergic to sushi" with severity
+intact. A `signalCapture` or `signalSoftened` finding on the shipping prompt is a real product bug,
+not a harness bug.
 
 ## [2026-08-12] Wire auto-arrange into the eval harness (phase 2)
 **Status:** Deferred
