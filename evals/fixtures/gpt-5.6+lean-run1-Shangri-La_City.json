@@ -1,0 +1,880 @@
+[
+  {
+    "name": "Morning Walk in Longtan Park",
+    "city": "Shangri-La City",
+    "venue_name": "Longtan Park, Shangri-La",
+    "type": "neighborhood",
+    "location": {
+      "name": "Longtan Park, Shangri-La",
+      "address": "Longtan Park, Shangri-La",
+      "lat": 27.816430999999998,
+      "lng": 99.7164506
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This gentle lakeside circuit provides an easy introduction to Shangri-La's thin air while still delivering trees, water and local morning life. It is central enough to keep the first morning logistically light.",
+    "pitfall": "Even this easy walk can feel tiring at roughly 3,200 meters, so keep the first lap slow.",
+    "booking_advice": "No booking is needed.",
+    "insider_tips": "Use the entrances off Changzheng Avenue rather than approaching through Dukezong; they connect more directly with the modern city center.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBz0ksujRLd_EOFsDxS9jcg_cjrTZaTJ6dZfebCUTTv_uWiNSPt2hMTeQ1Hn0-OnRZnccpowB0qq9ElLUrRKEpJlMahO-cgSHU2V5typsTO4U_TeWe2TLi8MJbSctgYPUWE22PkLsjfQwsDU00=s4800-w800"
+  },
+  {
+    "name": "Shop Shangri-La Second Farmers Market",
+    "city": "Shangri-La City",
+    "venue_name": "Shangri-La Second Farmers Market, Shangri-La",
+    "type": "shopping",
+    "location": {
+      "name": "Shangri-La Second Farmers Market, Shangri-La",
+      "address": "Shangri-La Second Farmers Market, Shangri-La",
+      "lat": 27.8296274,
+      "lng": 99.70460159999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 20,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This is the useful, food-first shopping stop: browse yak cheese, dried chilies, highland barley products, mushrooms and inexpensive local clothing without old-town souvenir markups.",
+    "pitfall": "Fresh cheese and meat products may be difficult or illegal to carry across international borders.",
+    "booking_advice": "No booking is required; carry Alipay or WeChat Pay and some small RMB notes.",
+    "insider_tips": "The market is on Changzheng Avenue opposite the Dashanghui area; compare several dry-goods stalls before buying. Vendors are generally not departure-tax-refund retailers, so assume no tourist VAT refund.",
+    "smarter_alternative": "A large local supermarket is better for sealed, clearly labeled food gifts.",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDE68dutoG0MLcz0kR08t8KaW55cEsu8hgBdrgumSV_E3wP_iTJtNNOO1ivuWnBeiAGkbLe4JT5aTdLQGknf4GFanXcSTz_Y5kSkHWZFSCHfHMzrGU9O_PI9_V0Vx_8L4F7knZUBDPbWg9hnkg=s4800-w800"
+  },
+  {
+    "name": "Browse Tancheng Plaza",
+    "city": "Shangri-La City",
+    "venue_name": "Tancheng Plaza, Shangri-La",
+    "type": "shopping",
+    "location": {
+      "name": "Tancheng Plaza, Shangri-La",
+      "address": "Tancheng Plaza, Shangri-La",
+      "lat": 27.82038,
+      "lng": 99.7048499
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 35,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This is the city's practical choice for contemporary clothes, cosmetics and a speculative check for officially licensed Chinese-language Pokémon cards. Prices on mainstream Chinese brands are generally better than in the tourist lanes of Dukezong.",
+    "pitfall": "Pokémon stock is unreliable and loose cards from unlicensed toy counters carry a counterfeit risk.",
+    "booking_advice": "No booking is needed.",
+    "insider_tips": "Ask specifically for the simplified-Chinese Pokémon TCG, 宝可梦集换式卡牌, and buy sealed products only. Small mall shops are usually not designated departure-tax-refund stores; request a fapiao for any substantial purchase.",
+    "smarter_alternative": "Save serious Pokémon-card shopping for a licensed hobby shop in Kunming rather than forcing a purchase here."
+  },
+  {
+    "name": "Walk to Dabao Temple",
+    "city": "Shangri-La City",
+    "venue_name": "Dabao Temple, Shangri-La",
+    "type": "landmark",
+    "location": {
+      "name": "Dabao Temple, Shangri-La",
+      "address": "Dabao Temple, Shangri-La",
+      "lat": 27.811321,
+      "lng": 99.706572
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 180,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 32,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The quieter temple setting, forested approach and surrounding valley scenery deliver the outdoor and cultural payoff without consuming the headline monastery visit reserved for another day. The excursion feels substantially less packaged than Shangri-La's major scenic areas.",
+    "pitfall": "The approach includes uneven ground at altitude and mobile reception can be patchy.",
+    "booking_advice": "Have the accommodation arrange a round-trip taxi and agree on the waiting charge in writing before leaving.",
+    "insider_tips": "Ask the driver to wait rather than assuming another car will be available at the temple, and carry water because there are few dependable services outside the city.",
+    "smarter_alternative": "Baiji Temple is the easier city-edge substitute if weather or acclimatization makes this excursion unwise.",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCc61pp8l5LwNkxRWNRBSkPUnV85pKXshdQjGYeUTOdgx_tOL5x1sni3svbqWNMfH5zXfui6d0QFNWEc9bWe_Iqx6Px4L5jh5EfFEjWOS01R2ZBEoZITxiRcGnCqR1TDCm3R4p38vZ0s8CjqDw=s4800-w800"
+  },
+  {
+    "name": "Cycle the Napa Lake and Yila Grassland Edge",
+    "city": "Shangri-La City",
+    "venue_name": "Napa Lake Yila Grassland Scenic Area, Shangri-La",
+    "type": "sports",
+    "location": {
+      "name": "Napa Lake Yila Grassland Scenic Area, Shangri-La",
+      "address": "Napa Lake Yila Grassland Scenic Area, Shangri-La",
+      "lat": 27.868571,
+      "lng": 99.671892
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 240,
+      "opening_hours": "10:00-21:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 38,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "A self-directed ride through golden autumn grassland and wetland scenery is the strongest nature activity in this two-day window. It provides real outdoor time without the rigid schedule of a guided excursion.",
+    "pitfall": "Road traffic, free-ranging dogs, wind and altitude make an e-bike safer than a conventional bicycle for many visitors.",
+    "booking_advice": "Arrange an e-bike and one-way taxi through the accommodation the evening before, with battery range confirmed.",
+    "insider_tips": "Follow the quieter western and northern lake-edge roads rather than spending the whole visit at the main Yila Grassland horse-riding entrance. Photograph the bike and battery level before departure, and decline unsolicited horse rides without an agreed total price.",
+    "smarter_alternative": "Use a hired car for the same lake circuit if wind, rain or altitude makes cycling uncomfortable.",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDEK_JKjrB43_taMlvgbOeqpCAcf_FFphSdRRssNnwQWBKM3JFs0zuPhGOBI1RQ93GP70VSZvh0gjMzvchKnxo6Y46_CbucGFs1-CaHJxOdHDO8wiQoS-i8AKLJtx6Fs5kWTwAU_6aooAQQ7oI=s4800-w800"
+  },
+  {
+    "name": "Climb Baiji Temple Hill",
+    "city": "Shangri-La City",
+    "venue_name": "Baiji Temple, Shangri-La",
+    "type": "landmark",
+    "location": {
+      "name": "Baiji Temple, Shangri-La",
+      "address": "Baiji Temple, Shangri-La",
+      "lat": 27.807940000000002,
+      "lng": 99.69928
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 5,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This compact hill climb combines prayer flags, open air and broad views over Dukezong and the surrounding mountains. It is a strong low-cost alternative to another formal cultural attraction.",
+    "pitfall": "The short but steep ascent feels significantly harder at Shangri-La's elevation.",
+    "booking_advice": "No booking is needed; take a taxi to the nearest road access if conserving energy.",
+    "insider_tips": "Continue beyond the first prayer-flag cluster to the upper open ground for the clearer city view, but do not step over prayer flags or religious objects.",
+    "smarter_alternative": "Stay in Longtan Park if dizziness or headache appears after the Napa Lake outing.",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDff4jrLBoYYh2xNxCNtCtoCN-DVUSavciEAght8ss6H2-xUMCW2IGrOU9-yCcHsxVFHFmYpgfdEz3JIHC8bf5jeL7CgUMI6m70UaqPLhGiLn3yu9NNNV_HnX39HQ1StuUMGiZuG4Y4OiJXYKEvUpkMkw=s4800-w800"
+  },
+  {
+    "name": "Shop Cangfang Street for Tibetan Incense and Clothing",
+    "city": "Shangri-La City",
+    "venue_name": "Cangfang Street, Dukezong Ancient City, Shangri-La",
+    "type": "shopping",
+    "location": {
+      "name": "Cangfang Street, Dukezong Ancient City, Shangri-La",
+      "address": "Cangfang Street, Dukezong Ancient City, Shangri-La",
+      "lat": 27.810488,
+      "lng": 99.7086132
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 40,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This named old-town lane is the best fit for comparing Tibetan incense, wool layers and locally styled clothing rather than buying generic souvenirs. Incense directly matches the fragrance interest and packs more easily than bulky handicrafts.",
+    "pitfall": "Claims that an item is antique, pure silver or handmade are not proof of origin or quality.",
+    "booking_advice": "No booking is required, but keep receipts and ask whether sealed incense can be carried on your onward transport.",
+    "insider_tips": "Compare incense by ingredient list and producer address, not by ornate packaging, and favor sealed Yunnan-made products. These independent shops generally cannot process China's departure-tax refund, whose participating retailers should display official signage.",
+    "smarter_alternative": "Buy sealed incense from a large city supermarket if labeling and fixed pricing matter more than atmosphere.",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDNyI-F5iAui2q5H2EUJME3hoaIKlGrm3sDmlNr-DJNWD3WAuAQVByM1mKkyS3J3ZfsnQAg1skWYrJ1w44y7aS42xDiZ2gR02ixF57vusREJl_0oco1xDjcm3lUs5J0dxiBlgSByiuZyPCPHQ=s4800-w800"
+  },
+  {
+    "name": "Turn the Giant Prayer Wheel in Guishan Park",
+    "city": "Shangri-La City",
+    "venue_name": "Guishan Park, Shangri-La",
+    "type": "landmark",
+    "location": {
+      "name": "Guishan Park, Shangri-La",
+      "address": "Guishan Park, Shangri-La",
+      "lat": 27.811189000000002,
+      "lng": 99.706572
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The hilltop park provides an outdoor sunset view across Dukezong plus one genuinely distinctive piece of Tibetan civic life. It is compact enough to fit without turning the day into a monument checklist.",
+    "pitfall": "The staircase is steep and the enormous wheel generally requires several people to move.",
+    "booking_advice": "No booking or ticket is required.",
+    "insider_tips": "Approach from Moonlight Square and circle religious structures clockwise; join others at the wheel rather than trying to force it alone.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjA5hHr8s3fFCRDe4q9Bieau5dx7D7-BUvWjIv-TNnd5dAniUPYGwOILh0Ms9MmCkzJsPHowtja2nUJH1DxCsbrkDAD_IGSftiiO9n0uaxl8lNou-rAqOkNjb56PEp5b2bR-GReWU_qCj77mprwaWbSVWA=s4800-w800"
+  },
+  {
+    "name": "Hike the Pudacuo Lakeshore Trails",
+    "city": "Shangri-La City",
+    "venue_name": "Pudacuo National Park, Shangri-La",
+    "type": "sports",
+    "location": {
+      "name": "Pudacuo National Park, Shangri-La",
+      "address": "Pudacuo National Park, Shangri-La",
+      "lat": 27.8006835,
+      "lng": 99.9071603
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 330,
+      "opening_hours": "07:30-16:30",
+      "preferred_time": "07:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 50,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The boardwalks and forest trails around Shudu Lake deliver the strongest accessible combination of alpine water, woodland and wildlife near the city.",
+    "pitfall": "The compulsory internal buses reduce spontaneity, and the 3,500-meter elevation makes even easy paths tiring.",
+    "booking_advice": "Buy a timed park ticket through the official Pudacuo channel or at the visitor center and arrange an early taxi or bus from central Shangri-La.",
+    "insider_tips": "Get off at the start of the full Shudu Lake boardwalk rather than staying aboard until the busiest photo stop; ask staff which longer sections are open that day.",
+    "smarter_alternative": "Cycle Napa Lake instead if snow, wind or trail closures make Pudacuo a poor value.",
+    "opening_hours": "07:30-16:30",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCFrfjb28C0_gFAe-PXKRVtExRSAV-vJTb5BTd8-EtAJoNbMyGxHSHilMNbrN8VRpXIk-K2YqLcioufVJ7hJvliiGZgfgZMJVdD7u0K_8UdSXyVUO854v4SMjf93aBBfkFfQr_5rSz_SerU=s4800-w800"
+  },
+  {
+    "name": "Explore Dukezong's Back Lanes and Craft Shops",
+    "city": "Shangri-La City",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Explore Dukezong's Back Lanes and Craft Shops",
+      "address": "",
+      "lat": 27.8078181,
+      "lng": 99.70933409999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "",
+      "preferred_time": "16:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Dukezong works best here as an unhurried hunt for wool clothing, Tibetan incense and small workshops rather than as a checklist of monuments.",
+    "pitfall": "The lanes closest to Moonlight Square contain plenty of generic souvenirs sold at inflated prices.",
+    "booking_advice": "No booking is needed.",
+    "insider_tips": "Use Cangfang Street as the spine, then inspect the narrow lanes west of it where workshops are less dominated by tour-group traffic.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Browse Shangri-La Comprehensive Market",
+    "city": "Shangri-La City",
+    "venue_name": "Shangri-La Comprehensive Market, Shangri-La",
+    "type": "shopping",
+    "location": {
+      "name": "Shangri-La Comprehensive Market, Shangri-La",
+      "address": "Shangri-La Comprehensive Market, Shangri-La",
+      "lat": 27.822941,
+      "lng": 99.706203
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": "09:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 25,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This is the useful place to inspect local chiles, dried mushrooms, yak dairy products and practical cold-weather clothing at more grounded prices than the old town.",
+    "pitfall": "Labels are mostly in Chinese and vacuum-packed foods still need customs scrutiny before being taken abroad.",
+    "booking_advice": "No booking is needed; bring mobile payment plus a little cash.",
+    "insider_tips": "Compare the price per 500 grams before buying dried mushrooms, and choose sealed yak products from fixed shops rather than unlabeled tourist bundles.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCSdjxoapUKT4jrVr50aEnxS8LhCnGicW1pD-Oh4L8PXpFB1s3Zv5Q9ZcUmRX06mneIpaKYj-d-jBzc9afj6p51irY4HqlyCx-jYlIfR_nEJ8xHlTSadQwWe-CHx2nABq9Tp3a0k3u91hOjmG4ew6vJ=s4800-w800"
+  },
+  {
+    "name": "Walk the Lamuyangcuo Lake Boardwalk",
+    "city": "Shangri-La City",
+    "venue_name": "Lamuyangcuo Lake, Shangri-La",
+    "type": "neighborhood",
+    "location": {
+      "name": "Lamuyangcuo Lake, Shangri-La",
+      "address": "Lamuyangcuo Lake, Shangri-La",
+      "lat": 27.8553125,
+      "lng": 99.7044581
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 150,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "08:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 25,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The wetland boardwalk emphasizes birdlife, open water and mountain reflections while still providing distant views of Songzanlin's architecture.",
+    "pitfall": "Access procedures and ticket bundling with the wider Songzanlin scenic area can change.",
+    "booking_advice": "Purchase the current scenic-area admission at the official visitor center and confirm the boardwalk entrances operating that day.",
+    "insider_tips": "The western side of the lake gives the classic monastery reflection, while the farther boardwalk sections are better for waterbirds and grazing animals.",
+    "smarter_alternative": "Choose the free Baiji Temple viewpoint if the scenic-area ticket is bundled at a price that no longer suits the visit.",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjD0IcTI3T434u1gfsXAlDZOppKVKDruXFT4OW3GRZKPIRYrk6MQr1n0nqx-JsocM57XSgb05rvgpnF11A0urjO8_hd_KDkW91QJNZcWYEraCCjd8qEnoZolecDyenbN6crNm1fIRKWnP2mkzq0=s4800-w800"
+  },
+  {
+    "name": "Shop Cangfang Street for Tibetan Incense and Wool Clothing",
+    "city": "Shangri-La City",
+    "venue_name": "Dukezong Ancient Town, Shangri-La",
+    "type": "shopping",
+    "location": {
+      "name": "Dukezong Ancient Town, Shangri-La",
+      "address": "Dukezong Ancient Town, Shangri-La",
+      "lat": 27.810488,
+      "lng": 99.7086132
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": "10:15",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 35,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Cangfang Street concentrates Tibetan incense, wool layers and locally styled clothing, directly matching the traveler’s fragrance and clothes interests. It is more relevant here than hunting for the city’s negligible Pokémon-card selection.",
+    "pitfall": "Tourist-facing silver, saffron and medicinal products are frequently overpriced or of uncertain quality.",
+    "booking_advice": "No booking is needed, but carry mobile payment plus a little cash.",
+    "insider_tips": "Compare incense and packaged specialties against a larger supermarket before buying, and ship any knife rather than attempting to carry it through rail or airport security.",
+    "smarter_alternative": "For practical clothing rather than souvenirs, browse the fixed-price shops around Changzheng Avenue.",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBt9IVGZ2gG7uNN2oifeYfnWYj3P_Lled0Od1ihAx-PMwkfnZUfhDcvplizoksT0buPuMD89HNcTi80XybgX37GZPTSkFgGZkuDV8EcOsv8p6BE-8ts2nDLx1shU8dkvE6QRtCiSIRbsSBk3Q=s4800-w800"
+  },
+  {
+    "name": "Cycle the Southern Edge of Napa Lake",
+    "city": "Shangri-La City",
+    "venue_name": "Napahai Nature Reserve, Shangri-La",
+    "type": "sports",
+    "location": {
+      "name": "Napahai Nature Reserve, Shangri-La",
+      "address": "Napahai Nature Reserve, Shangri-La",
+      "lat": 27.808954,
+      "lng": 99.663205
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 150,
+      "opening_hours": "10:00-21:00",
+      "preferred_time": "13:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 28,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "A self-directed ride through autumn grassland, wetlands and grazing country is the day’s strongest match for a nature-first traveler. The flexible out-and-back format avoids both a structured tour and an exhausting full circuit before departure.",
+    "pitfall": "Wind, cold and seasonal flooding can make exposed or unpaved sections unpleasant, so turn back rather than forcing a complete loop.",
+    "booking_advice": "Arrange a ride-hail or taxi to a bicycle-rental point and agree on return transport before setting out.",
+    "insider_tips": "Favor the Jiantang–Yila Grassland side and use an out-and-back route; navigation apps sometimes suggest rough tracks or the busy lake-ring road as if they were equally suitable.",
+    "smarter_alternative": "If wind or flooding rules out cycling, take a short taxi loop with stops along the Yila Grassland side.",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjClgXfJiY7H2E5wqdhOyxyPyHGMgPutx0DxJ5gPYxxaB8pIgBptfVYpe4g5ZPMGXhYa5mCU7G4LWevkvsnTjaH8D-rldjp0Eyf-JIaIg7ZsckexrGG_lBv6rS9z9Oo_FUvgNtzoOyUVjbxJMQ=s4800-w800"
+  },
+  {
+    "name": "Yin Tong Bian Min Xiao Chi",
+    "city": "Shangri-La City",
+    "venue_name": "Yin Tong Bian Min Xiao Chi, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Yin Tong Bian Min Xiao Chi, Shangri-La",
+      "address": "Yin Tong Bian Min Xiao Chi, Shangri-La",
+      "lat": 27.822941,
+      "lng": 99.706203
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 12,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This unpretentious local favorite suits a budget-focused food traveler; order the yak-meat dumplings and a bowl of butter tea. Add chili cautiously because the dumpling broth and condiments can already be heavily seasoned.",
+    "pitfall": "English menus and card payments should not be expected.",
+    "booking_advice": "Walk in for an early lunch and keep the restaurant's Chinese name saved on your phone.",
+    "insider_tips": "Dumplings may be listed by portion rather than individual piece, so confirm the quantity before ordering alone.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCSdjxoapUKT4jrVr50aEnxS8LhCnGicW1pD-Oh4L8PXpFB1s3Zv5Q9ZcUmRX06mneIpaKYj-d-jBzc9afj6p51irY4HqlyCx-jYlIfR_nEJ8xHlTSadQwWe-CHx2nABq9Tp3a0k3u91hOjmG4ew6vJ=s4800-w800"
+  },
+  {
+    "name": "Honghong Smokeless Stone Barbecue",
+    "city": "Shangri-La City",
+    "venue_name": "Honghong Smokeless Stone Barbecue, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Honghong Smokeless Stone Barbecue, Shangri-La",
+      "address": "Honghong Smokeless Stone Barbecue, Shangri-La",
+      "lat": 27.822941,
+      "lng": 99.706203
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 22,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Order the chili-seasoned yak barbecue and grilled highland potatoes for a punchier, more interactive dinner than another generic hotpot. Portions are share-oriented, but staff can usually reduce the order for one diner.",
+    "pitfall": "The stone grill and dining room retain enough heat and aroma to cling to outerwear.",
+    "booking_advice": "Ask the accommodation to call ahead for one seat, especially if dining after 7:00pm.",
+    "insider_tips": "Request a half portion where available and add vegetables early, since dense yak cuts take longer to cook than potatoes or mushrooms.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCSdjxoapUKT4jrVr50aEnxS8LhCnGicW1pD-Oh4L8PXpFB1s3Zv5Q9ZcUmRX06mneIpaKYj-d-jBzc9afj6p51irY4HqlyCx-jYlIfR_nEJ8xHlTSadQwWe-CHx2nABq9Tp3a0k3u91hOjmG4ew6vJ=s4800-w800"
+  },
+  {
+    "name": "A Bu Lu Zi Tibetan Restaurant",
+    "city": "Shangri-La City",
+    "venue_name": "A Bu Lu Zi Tibetan Restaurant, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "A Bu Lu Zi Tibetan Restaurant, Shangri-La",
+      "address": "A Bu Lu Zi Tibetan Restaurant, Shangri-La",
+      "lat": null,
+      "lng": null
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 24,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Order the yak-meat hotpot and highland-barley cake for a substantial recovery lunch centered on recognizable local staples. Ask for the restaurant's hottest house chili on the side rather than accepting a tourist-level spice setting.",
+    "pitfall": "Hotpot portions can be excessive for one person unless a small pot is explicitly requested.",
+    "booking_advice": "Walk in after the lake excursion and request the smallest available hotpot.",
+    "insider_tips": "Confirm whether broth refills and side dishes are included before adding extras, as menus may bundle them differently.",
+    "smarter_alternative": "Choose yak momos and stir-fried seasonal vegetables if no single-person hotpot is available."
+  },
+  {
+    "name": "Songtsam Retreat at Shangri-La Restaurant",
+    "city": "Shangri-La City",
+    "venue_name": "Songtsam Retreat at Shangri-La, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Songtsam Retreat at Shangri-La, Shangri-La",
+      "address": "Songtsam Retreat at Shangri-La, Shangri-La",
+      "lat": 27.858971999999998,
+      "lng": 99.702016
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 120,
+      "opening_hours": "",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 85,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "Use the city's one splurge here for polished regional cooking and order the yak hotpot plus Tibetan fragrant pork. The kitchen and setting offer a more controlled introduction to premium Tibetan-Yunnan ingredients than an anonymous luxury buffet.",
+    "pitfall": "The retreat is outside the central dinner cluster, and menu prices are dramatically higher than local restaurants.",
+    "booking_advice": "Reserve directly at least two days ahead, confirm that outside guests are accepted and request a table rather than a set tour package.",
+    "insider_tips": "Ask at booking whether a small hotpot or tasting-size portion can be prepared for one traveler, and have reception call a return taxi before dessert.",
+    "smarter_alternative": "Compass offers a less expensive central dinner if the restaurant will not seat non-resident guests.",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDpJlcSbOm8enq8o77VbgiLs1AzrPl1fyDdZvw1IMbhiNYumqHcoLRf6xST21OTizgkAe--pz7irpLs5qWrB0eth0kgXGlcYfd0_Hu8-HIaCCYjyNw5Jlbq_QGJyi71Xl38cSIOeyi4LSUOmg=s4800-w800"
+  },
+  {
+    "name": "Akhustonpa Tibetan Restaurant",
+    "city": "Shangri-La City",
+    "venue_name": "Akhustonpa Tibetan Restaurant, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Akhustonpa Tibetan Restaurant, Shangri-La",
+      "address": "Akhustonpa Tibetan Restaurant, Shangri-La",
+      "lat": 27.8109494,
+      "lng": 99.70540629999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "",
+      "preferred_time": "18:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 25,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Order the yak-meat hotpot with the house chile condiment and barley flatbread for a hearty, distinctly local dinner suited to a spice-loving food traveler.",
+    "pitfall": "Hotpot portions can be large for one person, so confirm the smallest available size before ordering.",
+    "booking_advice": "Reserve through the restaurant or ask the accommodation to call for an early dinner table.",
+    "insider_tips": "Add the flatbread after the first round of meat so it absorbs the peppery broth without disintegrating.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAel8AYzHZMQH3z9rGCzX_NMxQZrJFRcGvGEUANG1eU4bFijzsjFuA9qSlVlrGEp_vL9UDWxGXGhV_xsbfYn_ghkYK6175YEUpg_9cNWdvkRjptHiZdxWhB08hyz5Gnz9B7e9bJYytOauLsCw=s4800-w800"
+  },
+  {
+    "name": "Three Brothers Cafe",
+    "city": "Shangri-La City",
+    "venue_name": "Three Brothers Cafe, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Three Brothers Cafe, Shangri-La",
+      "address": "Three Brothers Cafe, Shangri-La",
+      "lat": 27.81263,
+      "lng": 99.70509000000001
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "",
+      "preferred_time": "12:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 18,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The must-orders are stir-fried yak with chiles and Tibetan barley bread, a manageable way for one diner to sample local staples without committing to another large hotpot.",
+    "pitfall": "The central location attracts visitors, so explicitly request the local spice level rather than the automatically softened version.",
+    "booking_advice": "Walk in for lunch or message ahead if visiting with a strict schedule.",
+    "insider_tips": "Pair the stir-fried yak with salty Tibetan milk tea only if curious about the traditional combination; it is very different from sweet milk tea.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjC3chxSXwNWp-WXVDuQQPhY2bRuD1_AzH5BmxwgSkb2E_c3hFGlS7gX8NbQYe7R2ouSfXQyQqlHEbMA_BE7YN6XxJp6TQNPTNO2AO5UWrI5n1d9gPrMtZpHPuyhOgf8pbB389u0kSfGCO7zUg=s4800-w800"
+  },
+  {
+    "name": "Compass",
+    "city": "Shangri-La City",
+    "venue_name": "Compass, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Compass, Shangri-La",
+      "address": "Compass, Shangri-La",
+      "lat": 27.811816300000004,
+      "lng": 99.7055025
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "",
+      "preferred_time": "12:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 25,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Order the yak steak or yak burger followed by the chocolate mousse; it is a worthwhile break from repetitive hotpots while still using a defining local ingredient.",
+    "pitfall": "This is traveler-oriented fusion rather than a deep dive into Tibetan home cooking.",
+    "booking_advice": "Reserve for dinner during the busy October travel period or arrive for an early lunch.",
+    "insider_tips": "Ask how the kitchen recommends cooking the yak because the lean meat becomes tough when taken much beyond medium.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAXEso0Rr1Oj7h0K3vdtBht7alqphe50s3t1x14FE-mB3rpewR9as1SeIZjemby5xF54byIzbiNRbS9mmPXlN7x9aIRyeRPKOpUDal6CR1_N88RdLFd4FBWyBHJwl7oGF24RbGF5bt1j1GdHQ=s4800-w800"
+  },
+  {
+    "name": "Songtsam Lodge Shangri-La Restaurant",
+    "city": "Shangri-La City",
+    "venue_name": "Songtsam Lodge Shangri-La, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Songtsam Lodge Shangri-La, Shangri-La",
+      "address": "Songtsam Lodge Shangri-La, Shangri-La",
+      "lat": 27.858971999999998,
+      "lng": 99.702016
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 120,
+      "opening_hours": "",
+      "preferred_time": "18:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 65,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "Use the city's splurge here for chicken-and-matsutake hotpot and Tibetan fragrant pork, combining polished regional cooking with a striking highland setting.",
+    "pitfall": "The lodge sits outside the most convenient central dining area and outside guests may face limited table availability.",
+    "booking_advice": "Contact Songtsam directly several days ahead to confirm that the restaurant accepts nonresident diners and to reserve the matsutake dish.",
+    "insider_tips": "Request a table with a valley or monastery-facing view and arrange the return taxi before dinner, as cars are less readily available here after dark.",
+    "smarter_alternative": "Choose Akhustonpa Tibetan Restaurant for a more casual, substantially cheaper local feast.",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDpJlcSbOm8enq8o77VbgiLs1AzrPl1fyDdZvw1IMbhiNYumqHcoLRf6xST21OTizgkAe--pz7irpLs5qWrB0eth0kgXGlcYfd0_Hu8-HIaCCYjyNw5Jlbq_QGJyi71Xl38cSIOeyi4LSUOmg=s4800-w800"
+  }
+]

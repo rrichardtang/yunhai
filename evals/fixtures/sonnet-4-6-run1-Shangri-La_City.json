@@ -1,0 +1,1202 @@
+[
+  {
+    "name": "Dukezong Ancient Town Evening Wander",
+    "city": "Shangri-La",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Dukezong Ancient Town Evening Wander",
+      "address": "",
+      "lat": 27.810488,
+      "lng": 99.7086132
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 120,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "18:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The old Tibetan quarter comes alive at dusk with prayer flags, butter lamp smoke, and locals spinning the world's largest prayer wheel — a living introduction to the city on arrival day. It's walkable from most central accommodation and lets you absorb the altitude gently.",
+    "pitfall": "The commercial strip nearest the main gate is heavily tourist-oriented and overpriced; push deeper into the alleys for authenticity.",
+    "booking_advice": "No booking needed — just walk in; the ancient town has no entrance fee.",
+    "insider_tips": "The giant prayer wheel at the top of the hill is best visited between 7–8pm when local Tibetan residents do their evening circuit — far more atmospheric than daytime tourist crowds.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBt9IVGZ2gG7uNN2oifeYfnWYj3P_Lled0Od1ihAx-PMwkfnZUfhDcvplizoksT0buPuMD89HNcTi80XybgX37GZPTSkFgGZkuDV8EcOsv8p6BE-8ts2nDLx1shU8dkvE6QRtCiSIRbsSBk3Q=s4800-w800"
+  },
+  {
+    "name": "Ganden Sumtseling Monastery",
+    "city": "Shangri-La",
+    "venue_name": "Ganden Sumtseling Monastery, Shangri-La",
+    "type": "landmark",
+    "location": {
+      "name": "Ganden Sumtseling Monastery, Shangri-La",
+      "address": "Ganden Sumtseling Monastery, Shangri-La",
+      "lat": 27.816876999999998,
+      "lng": 99.705421
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 150,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": "08:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 18,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The largest Tibetan Buddhist monastery in Yunnan, modeled on the Potala Palace in Lhasa — the gilded rooftops, monk chanting sessions, and panoramic wetland views make it the single most rewarding sight in the region. Go early for the morning puja ritual.",
+    "pitfall": "A golf cart shuttle runs from the gate to the main halls — many tourists take it both ways and miss the best courtyard angles only visible on foot.",
+    "booking_advice": "Buy tickets at the gate (around 115 CNY); no advance booking needed but arrive before 9am to catch monks in session.",
+    "insider_tips": "The monastery's upper floors require a separate inner ticket sold at the main hall — most visitors skip it and miss the best thangka collection and rooftop views over the valley.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDL5CCcoq7s7vD9-9BU6MbnTBv1ZKOfpD12DWotu_v3_B89yyZGeXdihELwYJhpSDB7B0aKIZ2Ftv1jKaDebU42yMIAuehzkEz5CqgVJhhiuqjFB7wQPvvNqf-MVaO8pUEdX4TzefgsgNHPLSjnGQUsCA=s4800-w800"
+  },
+  {
+    "name": "Napa Lake Nature Reserve Walk",
+    "city": "Shangri-La",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Napa Lake Nature Reserve Walk",
+      "address": "",
+      "lat": 27.808954,
+      "lng": 99.663205
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 120,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "15:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 5,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "A high-altitude wetland 8 km from the city centre where yaks graze against a backdrop of snow-dusted mountains — October is peak season as migratory black-necked cranes begin arriving and the grasslands turn gold. The flat boardwalk loop is easy on newly acclimatized legs.",
+    "pitfall": "The lake level drops significantly by late October so don't expect dramatic water reflections — the wildlife and landscape are still excellent.",
+    "booking_advice": "No booking needed; hire a taxi from town (about 30 CNY one-way) and walk back or have the driver wait.",
+    "insider_tips": "The northern edge of the lake (away from the main parking lot) has far fewer visitors and better crane-spotting in October — local birdwatchers congregate there around 4pm.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAoZzcT-_0s6-YNr9DQK6wOzIj9fAKGwtUiJhnWCQc32TKn1LIh03w61BeqdiytygPMoJUlFl5lAXSg9xiTPD8eP2kz8kDbuJnLwTIewB4jYDy1HWVgKEpMDmeSXqXJmtR8EYjXfyOcOaYijQ=s4800-w800"
+  },
+  {
+    "name": "Pudacuo National Park Day Trip",
+    "city": "Shangri-La",
+    "venue_name": "Pudacuo National Park, Shangri-La",
+    "type": "tour",
+    "location": {
+      "name": "Pudacuo National Park, Shangri-La",
+      "address": "Pudacuo National Park, Shangri-La",
+      "lat": 27.8006835,
+      "lng": 99.9071603
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 360,
+      "opening_hours": "07:30-16:30",
+      "preferred_time": "09:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 40,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "China's first national park meeting international standards — two turquoise alpine lakes (Bita and Shudu) surrounded by old-growth fir forest, grazing yaks, and near-zero crowds compared to the city. October brings fiery foliage that rivals anything in autumn.",
+    "pitfall": "The park is mandatory-bus only inside (included in ticket); you cannot hike freely between zones, which frustrates independent walkers.",
+    "booking_advice": "Buy tickets online via the official WeChat mini-program or at the gate (around 258 CNY including shuttle bus); book a day ahead during Golden Week tail end.",
+    "insider_tips": "The Shudu Lake boardwalk in the late afternoon light (after 3pm) is dramatically less crowded than the morning rush when tour groups dominate — take the last internal bus to Bita first, then Shudu on the way back.",
+    "smarter_alternative": null,
+    "opening_hours": "07:30-16:30",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCFrfjb28C0_gFAe-PXKRVtExRSAV-vJTb5BTd8-EtAJoNbMyGxHSHilMNbrN8VRpXIk-K2YqLcioufVJ7hJvliiGZgfgZMJVdD7u0K_8UdSXyVUO854v4SMjf93aBBfkFfQr_5rSz_SerU=s4800-w800"
+  },
+  {
+    "name": "Dukezong Ancient Town Daytime Exploration",
+    "city": "Shangri-La",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Dukezong Ancient Town Daytime Exploration",
+      "address": "",
+      "lat": 27.810488,
+      "lng": 99.7086132
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 120,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The cobblestone lanes look completely different by day — white-walled Tibetan architecture, rooftop terraces with mountain views, and small artisan workshops selling genuine silver and thangka work. A slower morning loop reveals the neighborhood behind the tourist strip.",
+    "pitfall": "The area around the rebuilt (post-2014 fire) main square is heavily commercialized — the authentic blocks are two streets east.",
+    "booking_advice": "No booking needed; best explored on foot with no set route.",
+    "insider_tips": "Much of the old town was destroyed in a 2014 fire and rebuilt — the eastern quadrant near Zhuangjin Lane survived and retains original Tibetan timber-frame construction worth seeking out.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBt9IVGZ2gG7uNN2oifeYfnWYj3P_Lled0Od1ihAx-PMwkfnZUfhDcvplizoksT0buPuMD89HNcTi80XybgX37GZPTSkFgGZkuDV8EcOsv8p6BE-8ts2nDLx1shU8dkvE6QRtCiSIRbsSBk3Q=s4800-w800"
+  },
+  {
+    "name": "Tibetan Folk Dance Show at Dukezong Square",
+    "city": "Shangri-La",
+    "venue_name": "Dukezong Ancient Town, Shangri-La",
+    "type": "tour",
+    "location": {
+      "name": "Dukezong Ancient Town, Shangri-La",
+      "address": "Dukezong Ancient Town, Shangri-La",
+      "lat": 27.810488,
+      "lng": 99.7086132
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "09:00-17:00",
+      "preferred_time": "19:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Every evening locals gather in the main square for a communal Tibetan circle dance (guozhuang) — it's participatory, free, and genuinely local rather than a staged performance. Watching the older Tibetan women lead the dance is worth the trip alone.",
+    "pitfall": "It starts organically when enough people gather and doesn't follow a strict schedule — showing up at 7:30pm is the safe bet.",
+    "booking_advice": "No booking; just show up at the central square of Dukezong at dusk.",
+    "insider_tips": "Locals actively invite tourists to join the outer ring of the dance — jumping in is expected and welcomed, not intrusive.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBt9IVGZ2gG7uNN2oifeYfnWYj3P_Lled0Od1ihAx-PMwkfnZUfhDcvplizoksT0buPuMD89HNcTi80XybgX37GZPTSkFgGZkuDV8EcOsv8p6BE-8ts2nDLx1shU8dkvE6QRtCiSIRbsSBk3Q=s4800-w800"
+  },
+  {
+    "name": "Shangri-La Yak Cheese Shop",
+    "city": "Shangri-La",
+    "venue_name": "Shangri-La Yak Cheese, Shangri-La",
+    "type": "shopping",
+    "location": {
+      "name": "Shangri-La Yak Cheese, Shangri-La",
+      "address": "Shangri-La Yak Cheese, Shangri-La",
+      "lat": 27.822941,
+      "lng": 99.706203
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 30,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 12,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "A rare artisan cheese producer making aged yak milk cheese — a genuine regional specialty you simply cannot find elsewhere and a great edible souvenir that travels well vacuum-packed.",
+    "pitfall": "Stock can run out by afternoon; go in the morning.",
+    "booking_advice": "No booking needed; locate via local map apps as 'MaoNiu NaiLao' (牦牛奶酪).",
+    "insider_tips": "The aged hard cheese is the best value buy — it's significantly cheaper here than in Lijiang or Kunming specialty shops where it gets marked up 40–60%.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCSdjxoapUKT4jrVr50aEnxS8LhCnGicW1pD-Oh4L8PXpFB1s3Zv5Q9ZcUmRX06mneIpaKYj-d-jBzc9afj6p51irY4HqlyCx-jYlIfR_nEJ8xHlTSadQwWe-CHx2nABq9Tp3a0k3u91hOjmG4ew6vJ=s4800-w800"
+  },
+  {
+    "name": "Balagezong Grand Canyon Scenic Area",
+    "city": "Shangri-La",
+    "venue_name": "Balagezong Grand Canyon, Shangri-La",
+    "type": "tour",
+    "location": {
+      "name": "Balagezong Grand Canyon, Shangri-La",
+      "address": "Balagezong Grand Canyon, Shangri-La",
+      "lat": 28.266081999999997,
+      "lng": 99.416226
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 540,
+      "opening_hours": "09:00-17:00",
+      "preferred_time": "07:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "tour",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 55,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "A dramatically undervisited national scenic area at the tri-border of Yunnan, Sichuan, and Tibet — sheer red rock gorges, ancient Tibetan villages clinging to cliffsides, and the Zhalong River roaring below. October keeps crowds light and the sky crystal clear.",
+    "pitfall": "The site is about 100 km from Shangri-La City; the road is winding and the drive takes roughly 2 hours each way — this is a full-day commitment.",
+    "booking_advice": "Book a private driver or join a day tour through your accommodation or a local agency — GetYourGuide and local WeChat travel groups list options around 300–500 CNY per car.",
+    "insider_tips": "Most day tours only do the lower canyon loop; push your driver to include the Zannalong village detour (upper route) for the best canyon overlooks and to see one of the last inhabited traditional Tibetan stone tower villages.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjACCpOFonecCUy5HGQkOY4p3xYvTBqWRLeKzBA9Y2RWokKI6Kz6U8JqfVb9fqJ4Ye6Ulv0lsJADUyy-I_rZgrlH9C7CAYvaOpYOd9UIZb01j7r1KQTqH0MnWCqGJBh-sXaqYuirsxW1gZ_g=s4800-w800"
+  },
+  {
+    "name": "Guishan Park Sunrise Walk",
+    "city": "Shangri-La",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Guishan Park Sunrise Walk",
+      "address": "",
+      "lat": 27.811189000000002,
+      "lng": 99.706572
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "07:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The hilltop park sits directly above Dukezong and offers the best 360-degree panorama over the city, Napa Lake wetlands, and distant snow peaks — sunrise at altitude here is genuinely stunning and requires almost no effort.",
+    "pitfall": "The path up can be slippery after night frost in October — wear proper shoes.",
+    "booking_advice": "No booking; the park is free and the path starts from the northern edge of Dukezong Ancient Town.",
+    "insider_tips": "The giant prayer wheel at the summit is spun by local Tibetan women doing their morning circuit starting around 7am — timing your walk to coincide with them adds a cultural layer most tourists miss entirely.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDKtsxA-RGkK5tBs6AJ542CIoRNg7BPUlktEwwJP6fLn_XWsLJsl-0rdvX8SlNw-FzFHmCCu0zWTKKRYZpB0tNu_apV021CTb6Mo_O5B3Zgm84xh4inoNY5HpxBB6rcPWkLb0NgArYJWF58ZgQ7umYVag=s4800-w800"
+  },
+  {
+    "name": "Shangri-La Old Market (Zhuangjin Market)",
+    "city": "Shangri-La",
+    "venue_name": "Zhuangjin Market, Shangri-La",
+    "type": "shopping",
+    "location": {
+      "name": "Zhuangjin Market, Shangri-La",
+      "address": "Zhuangjin Market, Shangri-La",
+      "lat": 27.8296274,
+      "lng": 99.70460159999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": "08:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 20,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The local produce and goods market where Tibetan farmers trade yak butter, dried mushrooms (including prized matsutake), medicinal herbs, and handmade textiles — this is where Shangri-La's actual economy plays out, not the tourist strip.",
+    "pitfall": "Don't buy 'Tibetan silver' knives here for carry-on — Chinese aviation rules prohibit blades; you'd need to post them home, which is genuinely complicated.",
+    "booking_advice": "No booking needed; most active between 8–11am when farmers arrive from surrounding villages.",
+    "insider_tips": "Dried matsutake mushrooms here sell for a fraction of what they cost in Kunming or Shanghai specialty stores — vacuum-sealed packs travel well and make excellent gifts.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDE68dutoG0MLcz0kR08t8KaW55cEsu8hgBdrgumSV_E3wP_iTJtNNOO1ivuWnBeiAGkbLe4JT5aTdLQGknf4GFanXcSTz_Y5kSkHWZFSCHfHMzrGU9O_PI9_V0Vx_8L4F7knZUBDPbWg9hnkg=s4800-w800"
+  },
+  {
+    "name": "Meili Snow Mountain Viewpoint (Feilai Temple)",
+    "city": "Shangri-La",
+    "venue_name": "Feilai Temple, Deqin",
+    "type": "landmark",
+    "location": {
+      "name": "Feilai Temple, Deqin",
+      "address": "Feilai Temple, Deqin",
+      "lat": 28.42757,
+      "lng": 98.88131
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 600,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": "06:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "tour",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 70,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The classic facing-viewpoint for Kawagebo Peak (6,740m) — one of the most sacred mountains in Tibetan Buddhism and one of the most photogenic peaks in Asia. October sits right in the sweet spot between monsoon cloud and winter closure, with peak clarity.",
+    "pitfall": "Meili is roughly 200 km from Shangri-La City (about 4 hours by road) — this requires an overnight stay in Deqin to see sunrise, otherwise it's a very rushed day trip with no guarantee of clear views.",
+    "booking_advice": "If doing as an overnighter, book accommodation in Deqin or Feilai Si village well in advance via Ctrip/Trip.com — October is high season for this route.",
+    "insider_tips": "The mountain is considered so sacred that no summit attempt has ever succeeded (and none is permitted) — locals light incense at the Feilai Temple facing the peak at dawn; join them for the most authentic experience of Tibetan mountain worship.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDFQCE24FBySGQX68gA3mPwzo_ZES5ykxvx4N_nVwFX9PNFfj_S4fAAe4dop_EX0liT_qhyNm-xzP4kB-_zEfaIwmuYH_qhLOAvamKWnpUlSFBLZh_rSCF-sMP2DYDUVpYGHqFcUPFFSfc7mFRasIa93w=s4800-w800"
+  },
+  {
+    "name": "Tibetan Thangka Painting Workshop",
+    "city": "Shangri-La",
+    "venue_name": "Dukezong Ancient Town, Shangri-La",
+    "type": "tour",
+    "location": {
+      "name": "Dukezong Ancient Town, Shangri-La",
+      "address": "Dukezong Ancient Town, Shangri-La",
+      "lat": 27.810488,
+      "lng": 99.7086132
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 180,
+      "opening_hours": "09:00-17:00",
+      "preferred_time": "14:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "tour",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 35,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "Several small studios in Dukezong run half-day intro workshops where a monk or trained artist guides you through the basic grid system and mineral pigment technique used in traditional thangka painting — a hands-on cultural experience with a tangible takeaway.",
+    "pitfall": "Quality varies wildly between studios — avoid anyone aggressively soliciting from the street; the better workshops are run from studio interiors.",
+    "booking_advice": "Ask your accommodation to recommend a specific studio or book through GetYourGuide which lists vetted operators for this activity.",
+    "insider_tips": "The mineral pigments used in traditional thangka painting (lapis lazuli, malachite, cinnabar) are genuinely expensive — a workshop using real pigments costs more but produces work that's actually meaningful; workshops using acrylics are a tourist shortcut.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBt9IVGZ2gG7uNN2oifeYfnWYj3P_Lled0Od1ihAx-PMwkfnZUfhDcvplizoksT0buPuMD89HNcTi80XybgX37GZPTSkFgGZkuDV8EcOsv8p6BE-8ts2nDLx1shU8dkvE6QRtCiSIRbsSBk3Q=s4800-w800"
+  },
+  {
+    "name": "White Water Terraces (Baishuitai) Day Trip",
+    "city": "Shangri-La",
+    "venue_name": "Baishuitai White Water Terraces, Shangri-La",
+    "type": "tour",
+    "location": {
+      "name": "Baishuitai White Water Terraces, Shangri-La",
+      "address": "Baishuitai White Water Terraces, Shangri-La",
+      "lat": 27.498472,
+      "lng": 100.041131
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 480,
+      "opening_hours": "09:00-17:00",
+      "preferred_time": "07:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "tour",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 40,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "Natural calcium carbonate terraces forming a frozen waterfall of white mineral pools — considered sacred by the Naxi people and far less visited than Huanglong in Sichuan. The landscape is alien and beautiful, and October keeps crowds thin.",
+    "pitfall": "The road from Shangri-La passes through Tiger Leaping Gorge territory and takes about 2 hours each way — combine with a gorge stop to make the drive worthwhile.",
+    "booking_advice": "Hire a private driver for the day (around 400–600 CNY) or join a shared minibus tour via your guesthouse.",
+    "insider_tips": "The terraces are at their whitest and most photogenic in the morning when direct sunlight hits them — arriving after noon means flatter light and muddier colors in the pools.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAw24vc1WYXY2ERB9cEu4XvM255-7JCJT0rJjVT8OkLm_HL31mOL1uNP4Qa5degD-SIvaVpoCz81mcAysujx_ha9UrvQcav4UOi3OZbGBayYR_DZMJoH-vhQHVhxFPWRalvbXks0BfNT8amjmU=s4800-w800"
+  },
+  {
+    "name": "Shangri-La Local Supermarket Souvenir Run",
+    "city": "Shangri-La",
+    "venue_name": "Diqing Supermarket, Shangri-La",
+    "type": "shopping",
+    "location": {
+      "name": "Diqing Supermarket, Shangri-La",
+      "address": "Diqing Supermarket, Shangri-La",
+      "lat": 27.822941,
+      "lng": 99.706203
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 30,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The most reliable place to buy genuine local products at fair prices — dried matsutake and porcini mushrooms, yak jerky, barley wine, and Tibetan herbal goods all sold without tourist markup.",
+    "pitfall": "Ignore vendor recommendations to specific shops inside tourist areas — the supermarket has better quality control at consistently lower prices.",
+    "booking_advice": "No booking needed; open daily and walkable from the old town center.",
+    "insider_tips": "Per local advice, Tibetan silver goods and specialty food items in tourist zone shops are frequently overpriced and lower quality — the supermarket is the known local workaround for the same products.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCSdjxoapUKT4jrVr50aEnxS8LhCnGicW1pD-Oh4L8PXpFB1s3Zv5Q9ZcUmRX06mneIpaKYj-d-jBzc9afj6p51irY4HqlyCx-jYlIfR_nEJ8xHlTSadQwWe-CHx2nABq9Tp3a0k3u91hOjmG4ew6vJ=s4800-w800"
+  },
+  {
+    "name": "Sumtseling Monastery Village Walk",
+    "city": "Shangri-La",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Sumtseling Monastery Village Walk",
+      "address": "",
+      "lat": 27.816876999999998,
+      "lng": 99.705421
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "11:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The village settlement immediately surrounding the monastery has traditional Tibetan farmhouses, butter tea teahouses, and working fields where yaks are still used for plowing — a quiet 40-minute loop that most visitors sprint past on the way to the main gate.",
+    "pitfall": "Locals may invite you in for tea — it's genuine hospitality but butter tea is an acquired taste; it's polite to try at least a sip.",
+    "booking_advice": "No booking; best done as a self-guided loop before or after the monastery visit.",
+    "insider_tips": "The small teahouses around the monastery's western wall serve local barley wine (qingke jiu) and homemade yogurt — unpretentious, cheap, and almost entirely untouched by the tourist economy 200 meters away.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDL5CCcoq7s7vD9-9BU6MbnTBv1ZKOfpD12DWotu_v3_B89yyZGeXdihELwYJhpSDB7B0aKIZ2Ftv1jKaDebU42yMIAuehzkEz5CqgVJhhiuqjFB7wQPvvNqf-MVaO8pUEdX4TzefgsgNHPLSjnGQUsCA=s4800-w800"
+  },
+  {
+    "name": "Dukezong Rooftop Sunset",
+    "city": "Shangri-La",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Dukezong Rooftop Sunset",
+      "address": "",
+      "lat": 27.810488,
+      "lng": 99.7086132
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "17:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 5,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Several guesthouses and tea bars in Dukezong have open rooftop terraces that face west toward the mountains — at 3,300m altitude the sunsets are extraordinary, with alpenglow lingering on the peaks well after the sun drops.",
+    "pitfall": "Temperatures drop sharply after sunset at this altitude in October — bring a proper layer or you'll cut the evening short.",
+    "booking_advice": "No booking needed; find a rooftop café in the old town (many advertise sunset views) and order a tea or local beer.",
+    "insider_tips": "The local barley beer (qingke pijiu) costs about 15 CNY on rooftop terraces and is brewed locally — it's lower alcohol than standard beer (useful at altitude) and has a pleasant malty flavor.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBt9IVGZ2gG7uNN2oifeYfnWYj3P_Lled0Od1ihAx-PMwkfnZUfhDcvplizoksT0buPuMD89HNcTi80XybgX37GZPTSkFgGZkuDV8EcOsv8p6BE-8ts2nDLx1shU8dkvE6QRtCiSIRbsSBk3Q=s4800-w800"
+  },
+  {
+    "name": "Tiger Leaping Gorge Upper Trail Hike",
+    "city": "Shangri-La",
+    "venue_name": "Tiger Leaping Gorge, Lijiang",
+    "type": "sports",
+    "location": {
+      "name": "Tiger Leaping Gorge, Lijiang",
+      "address": "Tiger Leaping Gorge, Lijiang",
+      "lat": 27.18939,
+      "lng": 100.113878
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 600,
+      "opening_hours": "10:00-21:00",
+      "preferred_time": "07:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 50,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "One of the deepest gorges in the world — the upper trail is a 22 km ridge hike with jaw-dropping drops to the Jinsha River below and the Jade Dragon and Haba snow peaks flanking both sides. October weather is ideal: dry, clear, and cool.",
+    "pitfall": "The full upper trail is a full day and requires an overnight at Halfway Guesthouse if doing both days — attempting it as a single long day is brutal; most hikers regret rushing it.",
+    "booking_advice": "Book Halfway Guesthouse directly by phone or WeChat well in advance for October — it fills up fast and is the only comfortable rest point on the upper trail.",
+    "insider_tips": "The upper trail entrance near Qiaotou village charges a separate gorge entry fee (65 CNY) from the lower road — some drivers will try to route you on the lower road only; insist on the upper trail start if you want the proper hiking experience.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjC_cqefvA0yxnnaboiffQseO5-0z5NKsu9zu10W5kEwZ6BenpD2r_yjwutEiraWAoafTPsEyzqICYw0ZKpSlbm-y_CWVMNtBT80qk9PuIiQIpoTj7mCL4SEb3kJRufW-o4UakmTKTckXELi2kU=s4800-w800"
+  },
+  {
+    "name": "Butter Tea Ceremony at Local Teahouse",
+    "city": "Shangri-La",
+    "venue_name": "Dukezong Ancient Town, Shangri-La",
+    "type": "tour",
+    "location": {
+      "name": "Dukezong Ancient Town, Shangri-La",
+      "address": "Dukezong Ancient Town, Shangri-La",
+      "lat": 27.810488,
+      "lng": 99.7086132
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "09:00-17:00",
+      "preferred_time": "15:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 8,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "A guided sit-down introduction to Tibetan butter tea culture in a traditional teahouse — you'll learn the churning process, the salt-and-yak-butter blend, and its significance at altitude (it's a genuine physiological aid for cold and hypoxia, not just a ritual).",
+    "pitfall": "Butter tea is genuinely salty and fatty — most Western palates need two or three cups to adjust; commit to the experience rather than grimacing after the first sip.",
+    "booking_advice": "Several teahouses in Dukezong offer informal sessions; ask your accommodation for a recommendation to avoid tourist-trap performances.",
+    "insider_tips": "The traditional way to drink butter tea is to let the host refill your cup continuously — leaving it empty signals you want more, leaving it full signals you're done; knowing this prevents awkward exchanges.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBt9IVGZ2gG7uNN2oifeYfnWYj3P_Lled0Od1ihAx-PMwkfnZUfhDcvplizoksT0buPuMD89HNcTi80XybgX37GZPTSkFgGZkuDV8EcOsv8p6BE-8ts2nDLx1shU8dkvE6QRtCiSIRbsSBk3Q=s4800-w800"
+  },
+  {
+    "name": "Haba Snow Mountain Village Approach Walk",
+    "city": "Shangri-La",
+    "venue_name": "Haba Village, Shangri-La",
+    "type": "sports",
+    "location": {
+      "name": "Haba Village, Shangri-La",
+      "address": "Haba Village, Shangri-La",
+      "lat": 27.3794599,
+      "lng": 100.13824
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 420,
+      "opening_hours": "10:00-21:00",
+      "preferred_time": "08:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 30,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The approach walk toward Haba Snow Mountain (5,396m) from Haba village is one of the region's best non-technical high-altitude walks — rhododendron and old-growth forest trails lead to stunning mountain meadow views with virtually no other tourists.",
+    "pitfall": "The Haba village trailhead is about 1.5 hours from Shangri-La City by road — factor in transfer time and don't attempt this on a day with other major activities.",
+    "booking_advice": "Hire a private driver from Shangri-La City; no permits needed for the approach trail below the high camp.",
+    "insider_tips": "Haba village has a small family-run guesthouse that serves excellent home-cooked Naxi meals — a lunch stop here is far better value and quality than anything you'd eat near the tourist trailhead.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Evening Bar Crawl in Dukezong",
+    "city": "Shangri-La",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Evening Bar Crawl in Dukezong",
+      "address": "",
+      "lat": 27.810488,
+      "lng": 99.7086132
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 120,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "21:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 15,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "Dukezong's nightlife is a genuine surprise — a cluster of Tibetan-style bars and karaoke cafes attracts a young Chinese domestic crowd creating a lively, unpretentious scene nothing like a typical tourist town after dark.",
+    "pitfall": "Altitude significantly lowers alcohol tolerance — two drinks at 3,300m hits like four at sea level; pace accordingly.",
+    "booking_advice": "No booking needed; the main bar strip is concentrated around the southern entrance of Dukezong Ancient Town.",
+    "insider_tips": "The local barley wine (qingke jiu) is the drink of the region and costs 20–30 CNY per glass in bars — it's lower proof than the yak-milk spirits sometimes offered to tourists, which are deceptively strong.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBt9IVGZ2gG7uNN2oifeYfnWYj3P_Lled0Od1ihAx-PMwkfnZUfhDcvplizoksT0buPuMD89HNcTi80XybgX37GZPTSkFgGZkuDV8EcOsv8p6BE-8ts2nDLx1shU8dkvE6QRtCiSIRbsSBk3Q=s4800-w800"
+  },
+  {
+    "name": "Napa Lake Sunrise",
+    "city": "Shangri-La",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Napa Lake Sunrise",
+      "address": "",
+      "lat": 27.808954,
+      "lng": 99.663205
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "06:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 5,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "At dawn the wetland mist sits low over the water with the snow mountains behind catching first light — the combination of crane silhouettes, grazing yaks, and the light show on the peaks makes this one of the most photogenic moments in Yunnan in October.",
+    "pitfall": "It's cold at 3,260m at dawn in October (often below 0°C) — dress as if you're going skiing, not hiking.",
+    "booking_advice": "Taxi from central Shangri-La takes 15–20 minutes; arrange a driver the night before to ensure an on-time departure.",
+    "insider_tips": "Black-necked cranes (an endangered species) begin their migration into Napa Lake in mid-October — early morning is when they're most active and visible near the northern reed beds.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAoZzcT-_0s6-YNr9DQK6wOzIj9fAKGwtUiJhnWCQc32TKn1LIh03w61BeqdiytygPMoJUlFl5lAXSg9xiTPD8eP2kz8kDbuJnLwTIewB4jYDy1HWVgKEpMDmeSXqXJmtR8EYjXfyOcOaYijQ=s4800-w800"
+  },
+  {
+    "name": "Sumtseling Monastery Second Visit (Golden Hour)",
+    "city": "Shangri-La",
+    "venue_name": "Ganden Sumtseling Monastery, Shangri-La",
+    "type": "landmark",
+    "location": {
+      "name": "Ganden Sumtseling Monastery, Shangri-La",
+      "address": "Ganden Sumtseling Monastery, Shangri-La",
+      "lat": 27.816876999999998,
+      "lng": 99.705421
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": "16:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The monastery glows completely differently in late afternoon light — gilded rooftops catch the setting sun while monks return from afternoon prayers and the outer courtyards empty of day-trippers, giving a more intimate and contemplative experience than the busy morning visit.",
+    "pitfall": "The inner sanctum closes by 5:30pm — don't arrive after 4:30pm if you want access to the main prayer halls.",
+    "booking_advice": "Your original entrance ticket is valid for multiple days — confirm this at the gate on first visit.",
+    "insider_tips": "The monastery ticket (115 CNY) officially covers a single day but guards rarely check return visits the following day — worth confirming when you buy to potentially save the re-entry cost.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDL5CCcoq7s7vD9-9BU6MbnTBv1ZKOfpD12DWotu_v3_B89yyZGeXdihELwYJhpSDB7B0aKIZ2Ftv1jKaDebU42yMIAuehzkEz5CqgVJhhiuqjFB7wQPvvNqf-MVaO8pUEdX4TzefgsgNHPLSjnGQUsCA=s4800-w800"
+  },
+  {
+    "name": "Diqing Tibetan Culture Museum",
+    "city": "Shangri-La",
+    "venue_name": "Diqing Tibetan Culture Museum, Shangri-La",
+    "type": "museum",
+    "location": {
+      "name": "Diqing Tibetan Culture Museum, Shangri-La",
+      "address": "Diqing Tibetan Culture Museum, Shangri-La",
+      "lat": 27.811094999999998,
+      "lng": 99.707324
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "10:00-18:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 5,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "A compact but well-curated regional museum covering Tibetan, Naxi, and Yi minority cultures — useful context for everything else you're seeing in the region, with genuine artifacts including ancient thangkas, ceremonial weapons, and traditional dress.",
+    "pitfall": "English labeling is sparse — the visit is more rewarding if you've already spent a day or two absorbing the culture in person.",
+    "booking_advice": "No advance booking needed; admission is low-cost and walk-in.",
+    "insider_tips": "The museum is largely missed by tour groups who head straight to Sumtseling — visit on a weekday morning for a near-empty experience with full access to the display cases.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCf7Y5TKa12-xGBGJJdyG4-vNqyiG4gqIo_viCwbJPpSOlMx9ybDPA1MeYDdbBnF0vZeKND1w4yaINkWPPUB1tBecQQ7uCVVKGcqTL09Jw6jWLYnfd18EWk4FrQVWRzZUer9WUODAmX765j=s4800-w800"
+  },
+  {
+    "name": "Compass",
+    "city": "Shangri-La",
+    "venue_name": "Compass, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Compass, Shangri-La",
+      "address": "Compass, Shangri-La",
+      "lat": 27.811816300000004,
+      "lng": 99.7055025
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "10:00-22:00",
+      "preferred_time": "20:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 15,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "A well-regarded café-restaurant in Dukezong with a menu that bridges Western comfort food and local Yunnan flavors — the yak burger and homemade bread are must-orders for a first meal at altitude.",
+    "pitfall": "Service can be slow during peak evening hours; factor in extra time.",
+    "booking_advice": "Walk-in friendly but arrive before 7pm on weekends to avoid a wait.",
+    "insider_tips": "Portions are generous and prices are reasonable for the old town area — one of the few spots where locals and travelers genuinely mix.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAXEso0Rr1Oj7h0K3vdtBht7alqphe50s3t1x14FE-mB3rpewR9as1SeIZjemby5xF54byIzbiNRbS9mmPXlN7x9aIRyeRPKOpUDal6CR1_N88RdLFd4FBWyBHJwl7oGF24RbGF5bt1j1GdHQ=s4800-w800"
+  },
+  {
+    "name": "Xiaocai Cafe",
+    "city": "Shangri-La",
+    "venue_name": "Xiaocai Cafe, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Xiaocai Cafe, Shangri-La",
+      "address": "Xiaocai Cafe, Shangri-La",
+      "lat": 27.811925,
+      "lng": 99.70714199999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "10:30-21:00",
+      "preferred_time": "12:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 10,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "A beloved local spot in Dukezong serving proper Tibetan home cooking — the butter tea (po cha) and barley flatbread (tsampa) are essential cultural eating, and the yak stir-fry is reliably excellent.",
+    "pitfall": "The space is small and fills up fast; the menu has limited English.",
+    "booking_advice": "Walk-in only; aim to arrive right at opening to secure a table.",
+    "insider_tips": "Ask for the off-menu yogurt with local honey if the owner is in — it's made from yak milk and not listed anywhere.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjD1_lCpYIDi9xvOxv6vL-gplqxysJtQUabRjb3mNkh_T_0pKsqUzkfa_Qko-OKRqleZnVYMRkA7aVekRP4MENOST7-Ax-3T2KOByy9flH9rjOphzHQqGxXpw1oKtRC8iSJyC5GgBFG7USa69w=s4800-w800"
+  },
+  {
+    "name": "Songtsam Retreat at Shangri-La",
+    "city": "Shangri-La",
+    "venue_name": "Songtsam Retreat at Shangri-La, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Songtsam Retreat at Shangri-La, Shangri-La",
+      "address": "Songtsam Retreat at Shangri-La, Shangri-La",
+      "lat": 27.858971999999998,
+      "lng": 99.702016
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 120,
+      "opening_hours": "12:00-14:00,18:30-21:30",
+      "preferred_time": "19:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 45,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The dining room at this boutique lodge serves the most refined Tibetan-fusion cooking in the region — the slow-braised yak shank and black truffle (local Yunnan variety) dishes are must-orders, and the space is beautifully designed with unobstructed monastery views.",
+    "pitfall": "It's priced at 3x the local average — not an everyday eat, but worth it once as the culinary highlight of the trip.",
+    "booking_advice": "Call or book via their website in advance; non-guests are welcome but tables fill up on weekends.",
+    "insider_tips": "Request a window table on the upper floor when booking — the view toward Sumtseling at dusk from that vantage is exceptional and not guaranteed unless asked.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDpJlcSbOm8enq8o77VbgiLs1AzrPl1fyDdZvw1IMbhiNYumqHcoLRf6xST21OTizgkAe--pz7irpLs5qWrB0eth0kgXGlcYfd0_Hu8-HIaCCYjyNw5Jlbq_QGJyi71Xl38cSIOeyi4LSUOmg=s4800-w800"
+  },
+  {
+    "name": "Chicken and Matsutake Hot Pot at No.10 Cangfang Street",
+    "city": "Shangri-La",
+    "venue_name": "No.10 Cangfang Street Restaurant, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "No.10 Cangfang Street Restaurant, Shangri-La",
+      "address": "No.10 Cangfang Street Restaurant, Shangri-La",
+      "lat": 27.816309999999998,
+      "lng": 99.70513
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "11:00-21:30",
+      "preferred_time": "18:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 20,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "A local institution on Cangfang Street known for two signature dishes: chicken and matsutake mushroom hot pot and the yin-yang yak hot pot — October is peak matsutake season, so the mushrooms are fresh-harvested and at their most aromatic.",
+    "pitfall": "The matsutake hot pot can sell out by early evening during peak mushroom season — arrive early.",
+    "booking_advice": "Walk-in; located at No.10 Cangfang Street, Shangri-La City — ask your hotel to confirm the exact spot as the street is short.",
+    "insider_tips": "October is the tail end of matsutake season in Diqing — restaurants here get fresh daily supply from local foragers, making this a genuine seasonal eating window you cannot replicate elsewhere.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCLm14RycL_s-V7WkpTU0pkWGgtFZ99irQ6UkZ-AWs8Q9HlXE2M06KbbYL_jIlYXrTih80GZ23OwcFm-6f1pRcEAIuSbx2XhlFQASi_TbEiHm2v04tm3An7mSGoYfuNqk7nmGKQomrRvQTv=s4800-w800"
+  },
+  {
+    "name": "Black Mountain Goat Hot Pot",
+    "city": "Shangri-La",
+    "venue_name": "Compass, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Compass, Shangri-La",
+      "address": "Compass, Shangri-La",
+      "lat": 27.811816300000004,
+      "lng": 99.7055025
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "10:00-22:00",
+      "preferred_time": "19:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 18,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Black mountain goat hot pot is one of Shangri-La's signature dishes — Compass does a reliable version alongside their standard menu, and the warming broth is exactly what the body needs after a cold high-altitude day outdoors.",
+    "pitfall": "This is a rich, heavy meal best not paired with an early morning hike the next day.",
+    "booking_advice": "Walk-in friendly; arrive before 7pm to avoid a wait.",
+    "insider_tips": null,
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAXEso0Rr1Oj7h0K3vdtBht7alqphe50s3t1x14FE-mB3rpewR9as1SeIZjemby5xF54byIzbiNRbS9mmPXlN7x9aIRyeRPKOpUDal6CR1_N88RdLFd4FBWyBHJwl7oGF24RbGF5bt1j1GdHQ=s4800-w800"
+  },
+  {
+    "name": "Tibetan Fragrant Pork at Local Restaurant",
+    "city": "Shangri-La",
+    "venue_name": "Xiaocai Cafe, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Xiaocai Cafe, Shangri-La",
+      "address": "Xiaocai Cafe, Shangri-La",
+      "lat": 27.811925,
+      "lng": 99.70714199999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "10:30-21:00",
+      "preferred_time": "18:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 12,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Xiaocai Cafe does a superb version of Tibetan fragrant pork (cured and slow-roasted in local spices) alongside their standard menu — a must-try dish that showcases the Tibetan preservation tradition developed for harsh mountain winters.",
+    "pitfall": "The pork dish can sell out if you arrive late — ask at the door if it's available before being seated.",
+    "booking_advice": "Walk-in; no reservation system.",
+    "insider_tips": null,
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjD1_lCpYIDi9xvOxv6vL-gplqxysJtQUabRjb3mNkh_T_0pKsqUzkfa_Qko-OKRqleZnVYMRkA7aVekRP4MENOST7-Ax-3T2KOByy9flH9rjOphzHQqGxXpw1oKtRC8iSJyC5GgBFG7USa69w=s4800-w800"
+  },
+  {
+    "name": "Pre-Departure Old Town Coffee",
+    "city": "Shangri-La",
+    "venue_name": "Compass, Shangri-La",
+    "type": "meal",
+    "location": {
+      "name": "Compass, Shangri-La",
+      "address": "Compass, Shangri-La",
+      "lat": 27.811816300000004,
+      "lng": 99.7055025
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "10:00-22:00",
+      "preferred_time": "14:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 8,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "A reliable final stop before heading to the airport — the coffee and homemade pastries are the best in town, and the location in Dukezong is walking distance from central accommodation. Order the Yunnan drip coffee and a slice of their chocolate mousse for a solid send-off.",
+    "pitfall": "Shangri-La Deer Park Airport is 5 km from town but the road can slow down with minibus traffic — don't cut the departure margin too fine.",
+    "booking_advice": "Walk-in; no reservation needed.",
+    "insider_tips": "Shangri-La Airport (DIG) has minimal food options airside — eat properly here rather than relying on the terminal.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAXEso0Rr1Oj7h0K3vdtBht7alqphe50s3t1x14FE-mB3rpewR9as1SeIZjemby5xF54byIzbiNRbS9mmPXlN7x9aIRyeRPKOpUDal6CR1_N88RdLFd4FBWyBHJwl7oGF24RbGF5bt1j1GdHQ=s4800-w800"
+  }
+]

@@ -1,0 +1,1112 @@
+[
+  {
+    "name": "Walk Black Dragon Pool and the Mountain-Reflection Shore",
+    "city": "Lijiang",
+    "venue_name": "Black Dragon Pool Park, Lijiang",
+    "type": "neighborhood",
+    "location": {
+      "name": "Black Dragon Pool Park, Lijiang",
+      "address": "Black Dragon Pool Park, Lijiang",
+      "lat": 26.887185,
+      "lng": 100.23342799999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 105,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "09:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 10,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This is an easy nature-first morning with ponds, old pavilions and one of the city's cleanest views toward Jade Dragon Snow Mountain. It delivers scenery without consuming the full day reserved for the mountain itself.",
+    "pitfall": "Clouds often erase the mountain later in the day, and an Old Town maintenance ticket may be requested at the entrance.",
+    "booking_advice": "No advance booking is usually necessary, but carry your passport and allow for holiday-period ticket controls.",
+    "insider_tips": "The classic reflection angle is from the south side near Suocui Bridge rather than directly beside the main gate.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjANtgWBatAz-BrX2CzLvhtTmsWv2vNpalUG_8lnasq0wtM3aKF2SFk7MB-J9AoJ7THVeGHlu_zqyW0a2HNS0WDmOzsmc-jPUOd2K5uFgHYYNQ2XVCQKML6i3q9UucfmFIupfOCLpLNI_Ioyh403-axrOg=s4800-w800"
+  },
+  {
+    "name": "Circle Qingxi Reservoir",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Circle Qingxi Reservoir",
+      "address": "",
+      "lat": 26.900557000000003,
+      "lng": 100.229823
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 5,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This calm waterside circuit adds another dose of mountain scenery without a guide, ticket or punishing climb. It is more local and substantially less theatrical than Lijiang's headline attractions.",
+    "pitfall": "The exposed shoreline can feel cold and windy even when central Lijiang is warm.",
+    "booking_advice": "No booking is required; take a short DiDi from Black Dragon Pool and walk the reservoir independently.",
+    "insider_tips": "Use the east-bank path for the broadest mountain view, then continue to the northwest shore instead of merely stopping at the roadside viewpoint.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Browse Qixing Street Commercial District",
+    "city": "Lijiang",
+    "venue_name": "Qixing Street Commercial District, Lijiang",
+    "type": "shopping",
+    "location": {
+      "name": "Qixing Street Commercial District, Lijiang",
+      "address": "Qixing Street Commercial District, Lijiang",
+      "lat": 26.873978200000003,
+      "lng": 100.2224636
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": "15:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 35,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This is Lijiang's practical central shopping zone for affordable clothes and the best local chance of finding toy or trading-card stock. It is more useful for the traveler's interests than souvenir-heavy Square Street.",
+    "pitfall": "Pokémon inventory is unreliable and loose cards or suspiciously cheap booster boxes may be counterfeit.",
+    "booking_advice": "No booking is required; check larger toy, stationery and hobby counters before small street stalls.",
+    "insider_tips": "Ask specifically for licensed simplified-Chinese 宝可梦 cards and inspect sealed products for official anti-counterfeit labeling. Departure-tax refunds are only possible at participating signed stores with a qualifying same-day invoice, not ordinary small shops.",
+    "smarter_alternative": "Save serious Pokémon-card buying for an official hobby retailer in Kunming if sealed licensed stock is unavailable here.",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBmahnrjH1J4lk7gYND8WkjWuJrjSnlq8YjfwyyDMvUn6ElOb-rZckWpsZU2BP9g6qAsn6INQo8TY_XSDcMyUH6yscUciRStM-FBcjTK0F7vtdCN7hWZ5vlTz9KQMMJXX61cPX-g7CMYo_XhTR-nJDHiw=s4800-w800"
+  },
+  {
+    "name": "Shop Zhongyi Market",
+    "city": "Lijiang",
+    "venue_name": "Zhongyi Market, Lijiang",
+    "type": "shopping",
+    "location": {
+      "name": "Zhongyi Market, Lijiang",
+      "address": "Zhongyi Market, Lijiang",
+      "lat": 26.866146,
+      "lng": 100.235461
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": "17:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 20,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This working market is better than polished souvenir lanes for dried chilies, mushroom products, flower cakes and aromatic local herbs. It doubles as food-scene reconnaissance without turning into another formal meal.",
+    "pitfall": "Wild mushrooms and medicinal products are difficult to assess, so avoid expensive powders or anything lacking sealed labeling.",
+    "booking_advice": "No booking is needed; bring mobile payment and modest cash as backup.",
+    "insider_tips": "The produce and spice sections sit deeper inside than the tourist-facing entrances; compare several stalls before buying dried mushrooms. Market purchases are not eligible for departure-tax refunds.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCfmvRMuiUdOKFyETJCCfx-ku24YSL078uS5eedWCOhZMKT7BBSrHhZCsgIWdaRliIyJGSiHEK6PW0WXwZk0mTP-D6Gl886QkCharNP4JGvDcK0yIqvbSQrYi9b4BPf9ImKgTPHL3aQed4po3of9x6NKA=s4800-w800"
+  },
+  {
+    "name": "Explore Shuhe from Jiuding Longtan to Qinglong Bridge",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Explore Shuhe from Jiuding Longtan to Qinglong Bridge",
+      "address": "",
+      "lat": 26.915079,
+      "lng": 100.207049
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 105,
+      "opening_hours": "",
+      "preferred_time": "08:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 6,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Shuhe offers streams, stone lanes and willow-lined paths with more breathing room than central Lijiang Old Town. The compact route suits an unhurried outdoor morning and requires no guide.",
+    "pitfall": "The central square becomes souvenir-heavy, so wandering without a route can produce a repetitive shopping experience.",
+    "booking_advice": "No booking is required; use a DiDi to Shuhe and begin near Jiuding Longtan.",
+    "insider_tips": "Walk from Jiuding Longtan through Longquan Road to Qinglong Bridge, then exit toward Songyun Village rather than backtracking through the commercial square.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Cycle the Shuhe–Baisha Countryside",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "sports",
+    "location": {
+      "name": "Cycle the Shuhe–Baisha Countryside",
+      "address": "",
+      "lat": 26.95327,
+      "lng": 100.21976
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 150,
+      "opening_hours": "",
+      "preferred_time": "10:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 18,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "A self-guided bicycle ride through fields and Naxi villages puts the emphasis squarely on nature and independent exploration. The terrain is moderate, and the mountain backdrop is excellent when skies are clear.",
+    "pitfall": "E-bikes are common but traffic behavior is unpredictable, so a helmet and conservative speed are non-negotiable.",
+    "booking_advice": "Rent a maintained bicycle or e-bike in Shuhe, photograph its condition and confirm the battery range and return terms in writing.",
+    "insider_tips": "Use the smaller lanes through Longquan and Yulong villages toward Baisha rather than riding the faster S223 road. Pin the rental shop before leaving because similarly named storefronts are easy to confuse.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Baisha Naxi Embroidery Institute",
+    "city": "Lijiang",
+    "venue_name": "Baisha Naxi Embroidery Institute, Lijiang",
+    "type": "shopping",
+    "location": {
+      "name": "Baisha Naxi Embroidery Institute, Lijiang",
+      "address": "Baisha Naxi Embroidery Institute, Lijiang",
+      "lat": 26.954089999999997,
+      "lng": 100.21696
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": "13:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 40,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This is the most relevant local stop for textile-focused shopping, with Naxi embroidery, wearable pieces and craftwork that has more identity than generic Old Town clothing. It also supports a traditional skill without requiring a museum-style visit.",
+    "pitfall": "Hand embroidery costs far more than machine-made lookalikes, so clarify the production method before paying.",
+    "booking_advice": "No reservation is needed for shopping, but confirm opening status by phone or through the accommodation before cycling out.",
+    "insider_tips": "Inspect the reverse of a piece: hand embroidery generally shows less uniform thread paths than machine work. Do not assume a tax refund—ask for the departure-tax-refund sign and a formal fapiao before making a large purchase.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAdKI-P0EyfRbIFBD2hW26NOVUXuFIpCm3s_RBu5_gA1_oRbZW7b0bfC8Zcnhkf5VxrAgWExi1qGyqqYb0bk1yJDf5m6RKTV17t22kTH-fcyilEEu3yXOqH3nSJEEuDjjrW0Mb7lJu2YoRm4A=s4800-w800"
+  },
+  {
+    "name": "Climb to Puji Temple",
+    "city": "Lijiang",
+    "venue_name": "Puji Temple, Lijiang",
+    "type": "landmark",
+    "location": {
+      "name": "Puji Temple, Lijiang",
+      "address": "Puji Temple, Lijiang",
+      "lat": 26.897154,
+      "lng": 100.181686
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 105,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": "16:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 12,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The wooded approach and quiet hillside setting provide a modest hike and a break from commercial old-town lanes. Its understated architecture fits better than adding another indoor cultural attraction.",
+    "pitfall": "Return cars can be slow to accept the pickup, and the stone approach may be slippery after rain.",
+    "booking_advice": "No advance ticket is normally required, but arrange a return DiDi or taxi before walking away from the lower access road.",
+    "insider_tips": "Ask the driver for the lower Puji Temple gate rather than accepting a vague roadside drop; the final pine-lined stone steps are the worthwhile part of the approach.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBkCG048N0OPCf9c8xUjj3qP2CiUGJF-6xyG_oZ7t5H64ekXklN8pRCxQZJI71qhSZ2XHh21Ko4BS9LTTHFEG_MRKRn3r465PrwqbvLYc5pfVs1fE_ESxF964B1g8aHOGhue2AcfS7TxOqF=s4800-w800"
+  },
+  {
+    "name": "Explore Baisha Ancient Town",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Explore Baisha Ancient Town",
+      "address": "",
+      "lat": 26.954483999999997,
+      "lng": 100.21800900000001
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "",
+      "preferred_time": "13:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 8,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Baisha offers old Naxi lanes, mountain views and a calmer atmosphere than central Lijiang, making it a strong outdoor wander without repeating the headline old-town experience.",
+    "pitfall": "The central pedestrian strip is increasingly commercial, so keep exploring beyond the souvenir storefronts.",
+    "booking_advice": "No booking is required; use a DiDi from central Lijiang and enter Baisha Ancient Town as the destination.",
+    "insider_tips": "Walk the narrower lanes extending from Baisha Old Street rather than limiting the visit to the main archway and café strip.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAvBBGYNTORVgzyUPvap8gAr6XUya1Jmrym0BLWFsDkWvyR2Vem2zWDJHBkdNDR4lJnxdP2sA5ARTehsGZHb0FFzRyxnGGZLvHUej5fEk_PzuwFGrVSVSjm7O18hgi-lacg8YSWZgLU69vTK2Q=s4800-w800"
+  },
+  {
+    "name": "Shop Baisha Ancient Town Market",
+    "city": "Lijiang",
+    "venue_name": "Baisha Ancient Town Market, Lijiang",
+    "type": "shopping",
+    "location": {
+      "name": "Baisha Ancient Town Market, Lijiang",
+      "address": "Baisha Ancient Town Market, Lijiang",
+      "lat": 26.954483999999997,
+      "lng": 100.21800900000001
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": "14:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 35,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The market is useful for embroidered clothing, woven textiles, local incense and small Naxi crafts rather than generic luxury shopping.",
+    "pitfall": "Skip supposedly antique silver and gemstone pieces unless provenance and testing matter less to you than appearance.",
+    "booking_advice": "No booking is required, but carry mobile payment plus a little cash for older vendors.",
+    "insider_tips": "Compare embroidered garments at several stalls because machine-made pieces and hand-finished work can look similar at first glance.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAvBBGYNTORVgzyUPvap8gAr6XUya1Jmrym0BLWFsDkWvyR2Vem2zWDJHBkdNDR4lJnxdP2sA5ARTehsGZHb0FFzRyxnGGZLvHUej5fEk_PzuwFGrVSVSjm7O18hgi-lacg8YSWZgLU69vTK2Q=s4800-w800"
+  },
+  {
+    "name": "Walk Through Yuhu Village",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Walk Through Yuhu Village",
+      "address": "",
+      "lat": 27.003114999999998,
+      "lng": 100.201938
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "",
+      "preferred_time": "15:45",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 10,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This stone-built Naxi village sits directly beneath Jade Dragon Snow Mountain and delivers scenery and local architecture without committing to a structured mountain excursion.",
+    "pitfall": "Uneven cobbles and the village’s roughly 2,700-meter elevation reward a slower walking pace.",
+    "booking_advice": "No booking is required; take a DiDi from Baisha and confirm the fare before accepting any informal return ride.",
+    "insider_tips": "Continue through the northern end of the village toward Longnv Lake rather than turning back at the main visitor drop-off.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjB6d2hjjy5MMpr7bxo05RD5k6_etSYJ_BOzzwVxlBuFFuvqo6vm_-bWEkcea1rJcQ8HLmFATY7F3sbZHHQGopmB725sgDn4HMzUZD2vSg0dBmNVKEKphfzSU7Xgj_jPsjgWvxn2vgrhRSkfMQJT6lxE=s4800-w800"
+  },
+  {
+    "name": "Foothill Walk at Longnv Lake",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Foothill Walk at Longnv Lake",
+      "address": "",
+      "lat": 27.013175999999998,
+      "lng": 100.20739499999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 12,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The open grassland, reservoir and close mountain backdrop provide an easy nature outing with more breathing room than Lijiang’s famous scenic complexes.",
+    "pitfall": "Sun and wind are deceptively strong at this elevation, so bring sunscreen, sunglasses and a warm layer.",
+    "booking_advice": "No booking is required; arrange a DiDi return while the mobile signal is stable rather than relying on waiting drivers.",
+    "insider_tips": "Use the footpath along the quieter southern side of the water; horse rides are optional and prices should be agreed before mounting.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Walk the Qingxi Reservoir Shore",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Walk the Qingxi Reservoir Shore",
+      "address": "",
+      "lat": 26.900557000000003,
+      "lng": 100.229823
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 5,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This quiet urban reservoir gives you another open mountain panorama and a relaxed local walking circuit without consuming half the day.",
+    "pitfall": "The exposed shore offers little shelter from October sun or sudden wind.",
+    "booking_advice": "No booking is required; reach the reservoir by DiDi from Black Dragon Pool.",
+    "insider_tips": "The western and northwestern banks generally provide the cleanest sightline toward Jade Dragon Snow Mountain.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Stroll Zhongji Sea Wetland Park",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Stroll Zhongji Sea Wetland Park",
+      "address": "",
+      "lat": 26.862499,
+      "lng": 100.14618399999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 105,
+      "opening_hours": "",
+      "preferred_time": "14:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 6,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The lakeside greenway and wetland vegetation offer an easy, low-cost afternoon outdoors with more local exercise traffic than tour groups.",
+    "pitfall": "Some sections lack shade and facilities, so carry water rather than expecting frequent kiosks.",
+    "booking_advice": "No booking is required; use Zhongji Sea Wetland Park as the DiDi drop-off and return before dark.",
+    "insider_tips": "Follow the waterside greenway rather than the parallel road for the quieter stretch and better wetland views.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Explore Yuhu Village",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Explore Yuhu Village",
+      "address": "",
+      "lat": 27.013886,
+      "lng": 100.214683
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 135,
+      "opening_hours": "",
+      "preferred_time": "08:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 22,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "This stone-built Naxi village delivers mountain scenery and quiet lanes without forcing you into a structured tour. It is a far better fit than another museum or staged cultural show.",
+    "pitfall": "Horse handlers can be persistent, so settle the complete route and price before mounting—or simply decline.",
+    "booking_advice": "Use DiDi from central Lijiang and save the village name 玉湖村 offline because return cars can take time to arrive.",
+    "insider_tips": "Walk beyond the main square into the upper stone lanes toward the former Rock residence area; most casual visitors stop around the parking entrance.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Walk Around Longnv Lake",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Walk Around Longnv Lake",
+      "address": "",
+      "lat": 26.883374,
+      "lng": 100.23344499999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "",
+      "preferred_time": "10:15",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 8,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The open grassland, lake and Jade Dragon Snow Mountain backdrop make this the strongest easy nature stop near Yuhu. Walking independently keeps the experience flexible and unhurried.",
+    "pitfall": "The exposed lakeshore can be cold and intensely sunny even when central Lijiang feels mild.",
+    "booking_advice": "No reservation is needed, but arrange a DiDi or local car onward to Baisha rather than counting on frequent public transport.",
+    "insider_tips": "The quieter northern side of the water gives cleaner mountain views than the horse-concession area nearest the road.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Wander Baisha Ancient Town",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Wander Baisha Ancient Town",
+      "address": "",
+      "lat": 26.954483999999997,
+      "lng": 100.21800900000001
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 105,
+      "opening_hours": "",
+      "preferred_time": "13:15",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 5,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Baisha combines old Naxi lanes, mountain views and small independent workshops in a compact walk. Its slower atmosphere is a much better match than spending another afternoon in central Lijiang's busiest tourist streets.",
+    "pitfall": "The main pedestrian street has become café-heavy, so do not mistake it for the whole village.",
+    "booking_advice": "No booking is required; travel independently and allow extra time for the return journey.",
+    "insider_tips": "Leave the main axis around Sanyuan Village Square and follow the lanes west of Fuguo Temple Road, where everyday courtyards replace souvenir façades.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Browse Flower Horse Street",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "shopping",
+    "location": {
+      "name": "Browse Flower Horse Street",
+      "address": "",
+      "lat": 26.8732395,
+      "lng": 100.23554229999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 45,
+      "opening_hours": "",
+      "preferred_time": "10:15",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 25,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This commercial strip near Black Dragon Pool is useful for comparing tea, Yunnan pantry goods and practical clothing without committing to a dedicated shopping excursion. It also keeps the morning geographically compact.",
+    "pitfall": "Avoid tourist-area silver jewelry and any shop that will not display prices clearly.",
+    "booking_advice": "No booking is needed, and mobile payment is the norm.",
+    "insider_tips": "Packaged goods with printed weight, production date and manufacturer details are a safer purchase than unlabelled medicinal herbs or loose powders.",
+    "smarter_alternative": "For clothing from national chains rather than souvenirs, use a central Lijiang shopping mall instead."
+  },
+  {
+    "name": "Stroll Qingxi Reservoir",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Stroll Qingxi Reservoir",
+      "address": "",
+      "lat": 26.900557000000003,
+      "lng": 100.229823
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "",
+      "preferred_time": "11:15",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 5,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This low-key reservoir offers a flat waterside walk and another broad view toward Jade Dragon Snow Mountain without burning the day on a remote excursion. It is free, outdoors and easy to trim if departure logistics change.",
+    "pitfall": "There is little shade, so sunscreen and a hat matter even in October.",
+    "booking_advice": "Take a short DiDi from Flower Horse Street and set a firm turnaround time for the return to central Lijiang.",
+    "insider_tips": "Use the eastern and northern banks for the most open mountain sightlines; the roadside southern edge is less pleasant for walking.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBsThNyUnxfjjYes9HobQ79Xo_3_FF56Uv-vAq4WZAEi88wjudBhJXZUEbC_zBddPqSMRf2q5MWCa5y2nq-N92CAsO4sbIlBfL813gD4GIlMGg_PU5uG0MIVPISIczOd0_UflbzjcqXwUwLZQ=s4800-w800"
+  },
+  {
+    "name": "Jiu Ge Rice Noodles",
+    "city": "Lijiang",
+    "venue_name": "Jiu Ge Rice Noodles, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "Jiu Ge Rice Noodles, Lijiang",
+      "address": "Jiu Ge Rice Noodles, Lijiang",
+      "lat": 26.87089,
+      "lng": 100.23822
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 45,
+      "opening_hours": "",
+      "preferred_time": "08:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 8,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "A cheap, fast introduction to Yunnan flavors before walking the city. Order the spicy beef rice noodles and a side of fried potatoes with chili.",
+    "pitfall": "The default broth can be mild, so explicitly request extra lajiao if you want real heat.",
+    "booking_advice": "No reservation is needed; ordering and payment are easiest with Alipay translation ready.",
+    "insider_tips": "Search for the Chinese name 九歌米线 if the English pin is inconsistent, and season the bowl from the communal chili and pickled-vegetable station.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBEoFZrM9hu8L3fwrxiLalpWdb8wCnHQlz7HyFayK-X868kDuwx5hoRZRxe-1Q6fjyaGRasHHXKMDK9IsUDyh8rOHAeHsWhabmAfvWS-jAeSahlEu5xdkLr7Ci425F7DBp1ZO0invsJuXSQKZA=s4800-w800"
+  },
+  {
+    "name": "Dian Chu Restaurant · Xiao Guo Ba Naxi Food",
+    "city": "Lijiang",
+    "venue_name": "Dian Chu Restaurant · Xiao Guo Ba Naxi Food, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "Dian Chu Restaurant · Xiao Guo Ba Naxi Food, Lijiang",
+      "address": "Dian Chu Restaurant · Xiao Guo Ba Naxi Food, Lijiang",
+      "lat": 26.874086499999997,
+      "lng": 100.2351019
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "",
+      "preferred_time": "13:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 20,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This is a strong-value place to sample assertive Naxi and Yunnan cooking rather than generic Old Town café food. Order the Naxi-style grilled pork and the small-pot rice with Yunnan ham.",
+    "pitfall": "Several dishes are salty and portions suit sharing, so a solo diner should stop at two dishes.",
+    "booking_advice": "Reserve through Dianping or ask the hotel to call because October holiday spillover can produce lunch queues.",
+    "insider_tips": "Ask for the house chili dip separately; it is hotter and sharper than the seasoning used for most tourist-facing plates.",
+    "smarter_alternative": null,
+    "price_level": 2,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDnHO5fdDQ2F2F4R7vz_FQQJakA9w-mU8fUy03PZ-HtcInE8VvVjC3L7ROO3xQsRVRb5xYDzzWYFG2fqgpy_t7UagffBv1yBLd1Jtd7IX6OC3ij5QbdNuhP-E4cmdcCMtYLhAHiUgvnkJ9dSdk=s4800-w800"
+  },
+  {
+    "name": "A Ma Yi Naxi Food",
+    "city": "Lijiang",
+    "venue_name": "A Ma Yi Naxi Food, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "A Ma Yi Naxi Food, Lijiang",
+      "address": "A Ma Yi Naxi Food, Lijiang",
+      "lat": 26.8709074,
+      "lng": 100.23575079999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 75,
+      "opening_hours": "",
+      "preferred_time": "14:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 20,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This established Naxi restaurant is a dependable choice for a broad local lunch after the morning ride. Order the Naxi baba with savory filling and the spicy chicken with local herbs.",
+    "pitfall": "The menu is broad and tourist-oriented, so stick to Naxi specialties rather than familiar pan-Chinese dishes.",
+    "booking_advice": "Have the accommodation reserve a table or join the Dianping queue before leaving Baisha.",
+    "insider_tips": "Request the savory, not sweet, version of Naxi baba and eat it while hot; it becomes dense as it cools.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Junshan Wild Mushroom Hot Pot",
+    "city": "Lijiang",
+    "venue_name": "Junshan Wild Mushroom Hot Pot, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "Junshan Wild Mushroom Hot Pot, Lijiang",
+      "address": "Junshan Wild Mushroom Hot Pot, Lijiang",
+      "lat": 26.919639999999998,
+      "lng": 100.20342
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 105,
+      "opening_hours": "",
+      "preferred_time": "19:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 55,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Make this the city's splurge: order the black-chicken wild-mushroom hot pot and a plate of fresh boletus if seasonally available. It showcases Yunnan ingredients in a format that rewards a food-focused traveler more than an expensive hotel dining room.",
+    "pitfall": "Wild mushrooms must cook for the full instructed time, and solo diners can easily over-order the large platters.",
+    "booking_advice": "Reserve for dinner and tell the restaurant you are dining alone so it can prepare a smaller pot and sensible mushroom selection.",
+    "insider_tips": "Do not sample mushrooms when they first reach the table; wait until staff explicitly finishes the cooking timer. October is late in the fresh-mushroom season, so choose the best available local varieties rather than insisting on boletus.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "MUYU RUIN RESTAURANT",
+    "city": "Lijiang",
+    "venue_name": "MUYU RUIN RESTAURANT, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "MUYU RUIN RESTAURANT, Lijiang",
+      "address": "MUYU RUIN RESTAURANT, Lijiang",
+      "lat": 26.874086499999997,
+      "lng": 100.2351019
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "",
+      "preferred_time": "19:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 55,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Make this the city’s one splurge meal and order the Naxi cured-pork rib hotpot plus thoroughly cooked porcini stir-fried with fresh chilies.",
+    "pitfall": "Insist that any wild mushrooms remain on the heat for the restaurant’s full recommended cooking time.",
+    "booking_advice": "Reserve a dinner table through Dianping, Meituan or your hotel one to two days ahead.",
+    "insider_tips": "Ask whether smaller portions are available before ordering a hotpot designed for several diners.",
+    "smarter_alternative": null,
+    "price_level": 2,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjChAwBfdC6bOsNgnH3f1KbwZ9lKCYrm6Bt2X0OWciPpeHtc6LLsQJY9v3GNdzpzPtusPLNujro2kjFYoRR__Q-GP8on_9Osp2vsCY0CfvTqLNpx9g3QldZfzwG6Vy6YaYf82AcH6Tp7VLsQJ90=s4800-w800"
+  },
+  {
+    "name": "Spoon Rice Noodle",
+    "city": "Lijiang",
+    "venue_name": "Spoon Rice Noodle, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "Spoon Rice Noodle, Lijiang",
+      "address": "Spoon Rice Noodle, Lijiang",
+      "lat": 26.874086499999997,
+      "lng": 100.2351019
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "",
+      "preferred_time": "12:15",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 12,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This is a budget-friendly lunch centered on Yunnan staples; order the crossing-the-bridge rice noodles and chicken bean jelly with extra chili oil.",
+    "pitfall": "The broth and toppings may arrive separately, so add raw ingredients immediately while the broth is hottest.",
+    "booking_advice": "No reservation is needed, though arriving before the main lunch rush makes solo seating easier.",
+    "insider_tips": "Request extra chili oil and pickled vegetables separately so you can sharpen the flavor without overwhelming the broth.",
+    "smarter_alternative": null,
+    "price_level": 2,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjChAwBfdC6bOsNgnH3f1KbwZ9lKCYrm6Bt2X0OWciPpeHtc6LLsQJY9v3GNdzpzPtusPLNujro2kjFYoRR__Q-GP8on_9Osp2vsCY0CfvTqLNpx9g3QldZfzwG6Vy6YaYf82AcH6Tp7VLsQJ90=s4800-w800"
+  },
+  {
+    "name": "Heshu Restaurant",
+    "city": "Lijiang",
+    "venue_name": "Heshu Restaurant, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "Heshu Restaurant, Lijiang",
+      "address": "Heshu Restaurant, Lijiang",
+      "lat": 26.87164,
+      "lng": 100.23128
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "",
+      "preferred_time": "19:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 28,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Finish with robust local cooking by ordering black-goat hotpot and Naxi baba, adding the restaurant’s hottest chili dip for the spice you want.",
+    "pitfall": "Hotpots are often portioned for groups, so confirm a half portion before ordering as a solo diner.",
+    "booking_advice": "Ask your accommodation to reserve a table or join the Dianping queue before leaving Zhongyi Market.",
+    "insider_tips": "Order the Naxi baba as the starch for the hotpot rather than adding several oversized side dishes.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAu7FINqPJdE1mC6Hd2tUyIIkmT7jlPLgzIljTmmXW83f6SU8HxM7VtYGg-VP9Jk0FeknATop3T-xoEhsww1Ri2iPfv5oPN5VeHeRtySE-5TLElxxsc3BlMpLho_I2vMIjW6G9TO7f3YMD4a5U=s4800-w800"
+  },
+  {
+    "name": "Baisha Flavor Restaurant",
+    "city": "Lijiang",
+    "venue_name": "Baisha Flavor Restaurant, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "Baisha Flavor Restaurant, Lijiang",
+      "address": "Baisha Flavor Restaurant, Lijiang",
+      "lat": 26.95414,
+      "lng": 100.21704
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "",
+      "preferred_time": "12:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 10,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Order the spicy Naxi chickpea jelly and a freshly griddled Naxi baba for a cheap, distinctly local lunch. It suits a food-first traveler better than the village's generic café menus.",
+    "pitfall": "English may be limited and spice levels vary considerably between batches.",
+    "booking_advice": "Walk in for an early lunch and use dish photos or Chinese names—鸡豆凉粉 and 纳西粑粑—when ordering.",
+    "insider_tips": "Ask for the chickpea jelly served cold and spicy rather than pan-fried if you want the sharper vinegar-chili version.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDg3AGwYEzK4dQ89exgZGhirZQnkaidj3oXaiK7AMTlnot0GeS9UccUDYIVvGpUgk73557dj4_QAJk2n8viTM5KGeHh5IoGUwPMiZL3xJDJR2DjVwTXrSiVRV2YNoEdu3zKoLOiP01m9qPipTs=s4800-w800"
+  },
+  {
+    "name": "A Ma Yi Naxi Snacks",
+    "city": "Lijiang",
+    "venue_name": "A Ma Yi Naxi Snacks, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "A Ma Yi Naxi Snacks, Lijiang",
+      "address": "A Ma Yi Naxi Snacks, Lijiang",
+      "lat": 26.8709074,
+      "lng": 100.23575079999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "",
+      "preferred_time": "12:45",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 16,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Order the Naxi barbecue and spicy chickpea jelly for a final compact survey of Lijiang flavors. Prices are sensible enough to balance the previous night's splurge.",
+    "pitfall": "Portions are designed for sharing, so confirm sizes before ordering multiple meat dishes alone.",
+    "booking_advice": "Walk in around noon and allow extra payment time if the restaurant is busy.",
+    "insider_tips": "Ask for the barbecue with extra dry chili on the side, which gives you control without masking the smoky seasoning.",
+    "smarter_alternative": null
+  }
+]

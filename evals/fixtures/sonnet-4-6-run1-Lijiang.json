@@ -1,0 +1,1446 @@
+[
+  {
+    "name": "Lijiang Ancient Town (Dayan)",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Lijiang Ancient Town (Dayan)",
+      "address": "",
+      "lat": 26.874689999999998,
+      "lng": 100.23613999999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 150,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "16:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 12,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The cobblestone alleys, canal-laced streets, and Naxi wooden architecture are genuinely atmospheric and best absorbed by wandering without a plan. October light after Golden Week crowds thin out makes this the ideal arrival-day orientation stroll.",
+    "pitfall": "The very center around Sifang Square gets loud with staged performances and souvenir hawkers — push into the quieter northern and western lanes.",
+    "booking_advice": "No booking needed; pay the 80 CNY Ancient Town maintenance fee at any entry booth.",
+    "insider_tips": "The fee booths are rarely manned after 8pm, and the old town is magical at night with lanterns lit — a good reason to arrive in the evening rather than morning.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCZOk5__E5rMI8a815wQVMbtDo8YmU6NrhZLFHFSIoNB5UEz1gEYtQuidm5zthj84HRkKPGLt_2pk_Ql3YKvflY3V2sEW3usuvaKSw-37xzOW-XiaPz4Z6JdWTY9BcAPQcTQf_-x41m59jEZw=s4800-w800"
+  },
+  {
+    "name": "Mu Family Mansion",
+    "city": "Lijiang",
+    "venue_name": "Mu Family Mansion, Lijiang",
+    "type": "landmark",
+    "location": {
+      "name": "Mu Family Mansion, Lijiang",
+      "address": "Mu Family Mansion, Lijiang",
+      "lat": 26.8693651,
+      "lng": 100.2363403
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": "08:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 8,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This restored Naxi chieftain's palace is the most architecturally interesting single site in old town — terraced garden courtyards, painted beams, and mountain views without the theme-park feel of some other spots. Skip the audio guide and just roam the upper pavilions.",
+    "pitfall": "The lower exhibition halls are dry and forgettable; head straight up to the garden terraces for the views.",
+    "booking_advice": "Buy tickets on-site; no advance booking needed.",
+    "insider_tips": "Arrive right at opening (8:30am) — by 10am tour groups flood the main courtyard and it becomes a photo scrum.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjC0M5ctfj42cvAX7uNlwqGJcBkF7Kf_Msm_WYctSBNdEfBYeDn-ZlqAWaruk91eYb5w3XRFjh1w13E_XsOMoxr8H6HEI019g3G4mGZlWPTEzkzXBrEW0bCOOzs2rU0MbUZwhbAnQqLbCp6m=s4800-w800"
+  },
+  {
+    "name": "Black Dragon Pool (Jade Spring Park)",
+    "city": "Lijiang",
+    "venue_name": "Black Dragon Pool, Lijiang",
+    "type": "landmark",
+    "location": {
+      "name": "Black Dragon Pool, Lijiang",
+      "address": "Black Dragon Pool, Lijiang",
+      "lat": 26.887185,
+      "lng": 100.23342799999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": "08:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The reflected view of Jade Dragon Snow Mountain perfectly mirrored in the pool on a clear October morning is genuinely one of the best free photos in Yunnan — no hype, just works. The park is also a living cultural space where locals do tai chi and Naxi elders gather.",
+    "pitfall": "Cloud cover kills the mountain reflection; October mornings are statistically your clearest window, so don't save this for afternoon.",
+    "booking_advice": "Free entry — just show up.",
+    "insider_tips": "The Dongba Culture Museum inside the park is modest but has the best English-language explanation of Naxi pictographic script you'll find anywhere.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjANtgWBatAz-BrX2CzLvhtTmsWv2vNpalUG_8lnasq0wtM3aKF2SFk7MB-J9AoJ7THVeGHlu_zqyW0a2HNS0WDmOzsmc-jPUOd2K5uFgHYYNQ2XVCQKML6i3q9UucfmFIupfOCLpLNI_Ioyh403-axrOg=s4800-w800"
+  },
+  {
+    "name": "Naxi Ancient Music Performance",
+    "city": "Lijiang",
+    "venue_name": "Naxi Ancient Music Academy, Lijiang",
+    "type": "tour",
+    "location": {
+      "name": "Naxi Ancient Music Academy, Lijiang",
+      "address": "Naxi Ancient Music Academy, Lijiang",
+      "lat": 26.810174999999997,
+      "lng": 100.18503199999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-17:00",
+      "preferred_time": "20:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 23,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The Naxi orchestra performs music using instruments and scores that predate the Ming Dynasty — it's one of the few places on earth where you can hear this living tradition performed by elderly Naxi musicians who have played it their whole lives. Not a tourist show; genuinely old and strange-sounding.",
+    "pitfall": "The emcee's English commentary can drag — sit back, ignore the narration, and just listen to the music itself.",
+    "booking_advice": "Buy tickets at the door on Xinyi Street, Old Town; evening performances typically start around 8pm.",
+    "insider_tips": "Tickets cost around 160 CNY; the ensemble often includes performers in their 70s and 80s who learned from oral tradition — this is a genuinely rare cultural experience that won't exist in a generation.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBUWlqwb8kX6dKdCa4B-nDCBj71CxevNN_y5Yrok9wEqCBZoQuA69A7hAMAb9BAfOJGOnszT7Jco41f_G3zqTUHENseVYBxMzygdFBjxEYovo03DYBymQyF3XNcT0Qch08luG_joma9whP3=s4800-w800"
+  },
+  {
+    "name": "Jade Dragon Snow Mountain (Yulong Xueshan)",
+    "city": "Lijiang",
+    "venue_name": "Jade Dragon Snow Mountain, Lijiang",
+    "type": "landmark",
+    "location": {
+      "name": "Jade Dragon Snow Mountain, Lijiang",
+      "address": "Jade Dragon Snow Mountain, Lijiang",
+      "lat": 27.0983333,
+      "lng": 100.175
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 300,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": "09:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 62,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "At 4,506m, the cable car to the Glacier Park section delivers you into genuinely otherworldly alpine terrain — snow, altitude, and views that are hard to replicate elsewhere in China without serious trekking. October is post-monsoon so skies are reliably clear.",
+    "pitfall": "Altitude sickness is real at the top — go slow, rent oxygen canisters at the base (20 CNY each), and skip this if you had a rough sleep the night before.",
+    "booking_advice": "Book the Glacier Park cable car ticket in advance via the official Yulong Snow Mountain WeChat mini-program or Ctrip — cable car quota fills days ahead, especially early October.",
+    "insider_tips": "The entrance fee (105 CNY) plus the big cable car ticket (310 CNY) are sold separately; the total hits ~415 CNY before any extras — budget accordingly and don't let on-site touts upsell you on shuttle buses you don't need.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBN8TNzfGXLbzsI5VMm26X2jNyiadAY9eYmuI0aoOozFW1ZMsutgAxOPmSxy7w5tikyx4pRWyGgcmbb8gx9VhUEhde7lLNUvcqgagICznetZiF6NwZKngtJA2nLkw-4yRcd4A7KkwSROVLeIA=s4800-w800"
+  },
+  {
+    "name": "Impression Lijiang Show",
+    "city": "Lijiang",
+    "venue_name": "Impression Lijiang, Lijiang",
+    "type": "tour",
+    "location": {
+      "name": "Impression Lijiang, Lijiang",
+      "address": "Impression Lijiang, Lijiang",
+      "lat": 26.873390999999998,
+      "lng": 100.23403900000001
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-17:00",
+      "preferred_time": "11:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "tour",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 45,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Zhang Yimou's outdoor theatrical production uses 500 Naxi, Yi, and Tibetan performers on a natural hillside stage with Jade Dragon Snow Mountain as the backdrop — the scale and choreography are genuinely impressive and the mountain framing is unmatched. Pair with a Jade Dragon Snow Mountain morning for the most efficient day.",
+    "pitfall": "The narrative is thin and the story won't resonate much — go purely for the spectacle and the mountain backdrop, not cultural depth.",
+    "booking_advice": "Book via Ctrip or the official WeChat mini-program at least 3 days ahead; morning show at 10am or 11am is the most popular slot.",
+    "insider_tips": "The seating area is above 3,100m so bring a warm layer even if it was warm in town — it's noticeably colder and windy during the 1-hour show.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjA86IorptumR0xAfshDOXaHx2iQNhYnp7Pfw1DwFDMs1aSlqt4se8hal_FirYFNOweCBLG864dTzPzOsgvAvAFrqQxUsfRwqb_OMLvkhGXqVMq4Bsjryv4HZyLSamAuyubptnXGEGO3Dqtg1g=s4800-w800"
+  },
+  {
+    "name": "Shuhe Ancient Town",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Shuhe Ancient Town",
+      "address": "",
+      "lat": 26.915079,
+      "lng": 100.207049
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 120,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "15:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "Shuhe is Lijiang's quieter, less-commercialized sibling — the canal system is intact, local Naxi families still live here, and there are fewer souvenir stalls per square meter. A 20-minute taxi from central Lijiang drops you somewhere that actually feels like it existed before tourism.",
+    "pitfall": "Shuhe is smaller than Dayan and you can see the main streets in 90 minutes — combine with a nearby activity rather than making it a full-day trip.",
+    "booking_advice": "No booking needed; free entry to the main streets (a separate heritage ticket exists but the main walking areas are accessible without it).",
+    "insider_tips": "The reed-lined walking path along the river on the western edge of Shuhe is virtually unknown to visitors and gives you 20 minutes of genuinely peaceful walking.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBZ5lboSkmACa9ZjTth_sTsaC2cLH3DjdR0pWpffGqupgqQaPYTypvlGaodZFnMysGKont3XZvxotH546rAGmZHEp-ncM6jqxRC0Ye2SOwH-Qca5CWgrf0zY4xBbLTQHIzxXLsIwEZN8SIwOQ=s4800-w736"
+  },
+  {
+    "name": "Tiger Leaping Gorge Trek (Upper Trail)",
+    "city": "Lijiang",
+    "venue_name": "Tiger Leaping Gorge, Lijiang",
+    "type": "sports",
+    "location": {
+      "name": "Tiger Leaping Gorge, Lijiang",
+      "address": "Tiger Leaping Gorge, Lijiang",
+      "lat": 27.18939,
+      "lng": 100.113878
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 480,
+      "opening_hours": "10:00-21:00",
+      "preferred_time": "08:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 22,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "One of the deepest gorges on earth, with the Jinsha River crashing 3,900m below the ridge trail — the full upper trail (22km, 5–6 hours) is a legitimate hike through terraced fields, guesthouses, and cliff-edge paths that earns every view. October is the best trekking month: cooler, clear, post-rainy-season.",
+    "pitfall": "Do not take the paved lower road — it's a scenic drive, not a hike, and misses the entire point; the upper trail is what this is famous for.",
+    "booking_advice": "Take a shared minibus from Lijiang Bus Station (45 CNY, 2.5 hours) to Qiaotou at 8am; no booking needed for the trail itself, just pay the 75 CNY entrance at Qiaotou.",
+    "insider_tips": "Most guesthouses on the trail (Half-Way, Sean's Spring) will let you use their bathroom and buy tea even if you're not staying — the 28 Bends section is the hardest climb but takes under 2 hours and the views from the top are worth every step.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjC_cqefvA0yxnnaboiffQseO5-0z5NKsu9zu10W5kEwZ6BenpD2r_yjwutEiraWAoafTPsEyzqICYw0ZKpSlbm-y_CWVMNtBT80qk9PuIiQIpoTj7mCL4SEb3kJRufW-o4UakmTKTckXELi2kU=s4800-w800"
+  },
+  {
+    "name": "Baisha Village and Frescos",
+    "city": "Lijiang",
+    "venue_name": "Baisha Murals, Lijiang",
+    "type": "landmark",
+    "location": {
+      "name": "Baisha Murals, Lijiang",
+      "address": "Baisha Murals, Lijiang",
+      "lat": 26.95513,
+      "lng": 100.21737
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": "14:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 4,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Baisha is the oldest Naxi settlement in the Lijiang basin, and the 15th-century Dabaoji Palace frescos inside are a genuine cultural relic — Buddhist, Taoist, and Tibetan iconography painted by different hands on the same wall, which is historically bizarre and visually fascinating. The village itself is sleepy and real.",
+    "pitfall": "The village has one famous eccentric 'Doctor Ho' who has been selling herbal tea and photos with tourists for 30 years — charming the first five minutes, a time-sink after that.",
+    "booking_advice": "25 CNY ticket at the fresco compound gate; 20 minutes by taxi from Lijiang old town.",
+    "insider_tips": "Baisha is a logical add-on when visiting Jade Dragon Snow Mountain since it's on the same road north — combine both in one day rather than making separate trips.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDRRQfYsNr_L9r3C1_tUFxM6p-ltiTy_2aM-HLFut9fgpGkiOnuzxRSUUtRftPPA19PvlJxEUI405wH66LBxtYKe-W0BT3CPOaCetyIgM4nGN0QNNUng7V9Ba6QQ61Ym9Ty9zGX5hzT_uhwyQ=s4800-w800"
+  },
+  {
+    "name": "Lashi Lake (Lashihai) Sunrise Birdwatching",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Lashi Lake (Lashihai) Sunrise Birdwatching",
+      "address": "",
+      "lat": 26.895059999999997,
+      "lng": 100.14623999999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 150,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "07:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 18,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "October marks the start of the migratory bird season at Lashihai — a high-altitude wetland reserve 10km from Lijiang where black-necked cranes and bar-headed geese stage on their way south. The sunrise light over the plateau lake is stunning and you'll almost certainly have it to yourself.",
+    "pitfall": "There are no services at the lake edge — bring water, snacks, and a layer since dawn at 2,400m in October is cold.",
+    "booking_advice": "Take a taxi to Lashihai (about 40 CNY from old town) and negotiate a pickup time; entrance fee is around 30 CNY.",
+    "insider_tips": "The horse-ride tours offered at the lake entrance are genuinely enjoyable and cheap (around 80 CNY for a circuit) — the Naxi horsemen know the best birdwatching spots along the western reed beds.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDreriB5zrrFo3SdvAnrBHppeqeHMws0mPMuHSASejuJyZem8rI0T3g0vfQNMYZu2rq7-7kBuYRRlrpbiX4iOEPHBGSkEHwTas3yTfpxESvK2pBA0PaUYExU2BlFxhZOd0u-EjvFpMVuptdBTICkxx1eQ=s4800-w800"
+  },
+  {
+    "name": "Dongba Culture Museum",
+    "city": "Lijiang",
+    "venue_name": "Dongba Culture Museum, Lijiang",
+    "type": "museum",
+    "location": {
+      "name": "Dongba Culture Museum, Lijiang",
+      "address": "Dongba Culture Museum, Lijiang",
+      "lat": 26.8814565,
+      "lng": 100.20970439999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "10:00-18:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 8,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The Naxi Dongba script is the only pictographic writing system still in active use anywhere in the world — this museum explains its cosmology, shamanic rituals, and illustrated manuscripts better than any other site in the region. Small, well-curated, and rarely crowded.",
+    "pitfall": "English signage is patchy in the older galleries; the newer permanent collection section is much better labeled.",
+    "booking_advice": "Located inside Black Dragon Pool park; included with or near the park entry — no separate advance booking needed.",
+    "insider_tips": "The gift shop sells genuinely high-quality Dongba script print art and illustrated books — one of the few places in Lijiang worth actually buying something.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAGbKW39-vIWcNrbn_kBG5kGV5Ntqg5TY0DLRzUOyZiDGY1CmyQVKcpKRUNTNj1qLxsJyX5slzn-MsrbTtFYyECUHvnRDQW0VpLLuxuF3-qpK_i0cmYwKaPqViwvRt097y3OHO-7sGyYo7Iag=s4800-w800"
+  },
+  {
+    "name": "Wangu Tower Sunset",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Wangu Tower Sunset",
+      "address": "",
+      "lat": 26.869239999999998,
+      "lng": 100.2337
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "17:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 8,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The hilltop pavilion above Dayan Ancient Town offers the most complete aerial view of the old town's roofscape and the Jade Dragon Snow Mountain silhouette at dusk — it's the postcard shot and genuinely earns the climb. October evenings are crisp and clear with long golden light.",
+    "pitfall": "The cable car up is convenient but the walk down through the old town alleys after sunset is actually more rewarding — budget 30 extra minutes for the descent.",
+    "booking_advice": "Cable car ticket around 40 CNY return; the pavilion itself has a small entry fee of about 15 CNY.",
+    "insider_tips": "The best position is the upper eastern balcony of the pavilion, not the roof — the roof shot is crowded and the eastern balcony has the mountain directly behind the rooftop panorama.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjB9_ZdT5f3mEj8IErZzfRSjPWzCe4tiW56iFqZrGovbQ9cfF8994H6qutDmZS2OCBBteyd38lVb2UyUrbVP-Pfn8DJc6dg8Ow1dczePyQ43p8MAyzPVWs-UU9XhYas_oI6G761lnjA5gfs4a5sTomCEBA=s4800-w800"
+  },
+  {
+    "name": "Naxi Handcraft Market on Xinyi Street",
+    "city": "Lijiang",
+    "venue_name": "Xinyi Street Old Market Square, Lijiang",
+    "type": "shopping",
+    "location": {
+      "name": "Xinyi Street Old Market Square, Lijiang",
+      "address": "Xinyi Street Old Market Square, Lijiang",
+      "lat": 26.8721,
+      "lng": 100.23397
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": "09:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 30,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The morning market stretch along Xinyi Street in the old town has the highest concentration of genuine Naxi craft sellers — embroidered textiles, beeswax jewelry, hand-printed Dongba paper, and batik fabrics made by Naxi women who bring goods from surrounding villages. Distinct from the tourist tat elsewhere.",
+    "pitfall": "Don't buy silver jewelry from stall vendors — the 'pure silver' claim is almost universally false in tourist areas; stick to textiles and paper goods.",
+    "booking_advice": "No booking; best visited between 8am and 11am before tour groups arrive.",
+    "insider_tips": "Prices here are not fixed — polite bargaining in Mandarin (or even smiling and showing a lower number on your phone calculator) typically yields 30–40% off the opening ask.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCa0WcC_JAzO0p2aMA01UpJWR-6WWTrFxAfKSRFsW19LsHgo4LyQHWS48D008Y_1vqxqUfCIHuEbsGNC_oU3wNKn5nFgIj4FG6lHBIC20Z-IG1nMIMKGiCwsFHNQbEeutZNMeeDvOoOttTTK1k=s4800-w800"
+  },
+  {
+    "name": "Shaxi Ancient Town Day Trip",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Shaxi Ancient Town Day Trip",
+      "address": "",
+      "lat": 26.316613,
+      "lng": 99.851587
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 540,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "08:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 15,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "Shaxi is a two-hour bus ride from Lijiang and is what Lijiang Old Town looked like 20 years ago — the Friday market at Sideng Square is still a functional agricultural market attended by Bai, Yi, and Naxi villagers, not a tourist performance. October Friday markets are particularly lively post-harvest.",
+    "pitfall": "Buses from Lijiang to Shaxi are infrequent — check the Lijiang North Bus Station timetable the day before and plan your return; missing the last bus forces a 200 CNY taxi.",
+    "booking_advice": "Bus from Lijiang to Jianchuan (nearest town to Shaxi) departs Lijiang North Bus Station; no booking needed, buy at the station.",
+    "insider_tips": "Shaxi has a handful of genuinely excellent boutique guesthouses — if you have flexibility, an overnight here beats a rushed day trip and gets you the Friday market plus a quiet Saturday morning.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDGn910PjYkc7jwg7wE85SOOZSWVuzmx8NSUez6Stnu8wD1-AjhMsMfLr0VGSxdPoCylGepmQqKn0tB_B0W92KtCGy23IbOGi92obmqeTZ55W1mzwIlNy3IBH4Xc_Ds--pvnV83XSuqA_LCtA=s4800-w800"
+  },
+  {
+    "name": "Dongba Papermaking Workshop",
+    "city": "Lijiang",
+    "venue_name": "Dongba Paper Workshop, Baisha Village, Lijiang",
+    "type": "tour",
+    "location": {
+      "name": "Dongba Paper Workshop, Baisha Village, Lijiang",
+      "address": "Dongba Paper Workshop, Baisha Village, Lijiang",
+      "lat": 26.8697766,
+      "lng": 100.2368487
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-17:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "tour",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 18,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "In Baisha village, a small family workshop still makes Dongba paper using the traditional process with Wikstroemia bark — you can watch or do a hands-on session producing your own sheet of paper using 1,000-year-old technique. Quiet, tactile, and genuinely obscure.",
+    "pitfall": "The workshop doesn't have a fixed schedule; call ahead (ask your guesthouse to call) or simply show up — it's a family home and they're usually working.",
+    "booking_advice": "Ask your accommodation to arrange or book through a local tour operator in Lijiang old town; the session is 80–150 CNY per person.",
+    "insider_tips": "Combine this with the Baisha Frescos visit since both are in Baisha — a taxi from Lijiang covers both in a half-day without backtracking.",
+    "smarter_alternative": null
+  },
+  {
+    "name": "Lijiang Old Town Night Wander",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Lijiang Old Town Night Wander",
+      "address": "",
+      "lat": 26.8718026,
+      "lng": 100.2358502
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "00:00-23:59",
+      "preferred_time": "21:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "After dinner the main party bars on Bar Street get loud, but the back alleys of Dayan go genuinely quiet by 9:30pm — lanterns reflect in the canals, cats own the cobblestones, and it feels like a different place entirely from the daytime crowds. October evenings are cool and clear.",
+    "pitfall": "Don't end up on Bar Street (Jiuyi Street) unless you want a very loud, touristy bar scene — it exists but it's not what makes this special.",
+    "booking_advice": "Free; no booking needed.",
+    "insider_tips": "The stretch of canal behind the Mu Family Mansion heading northwest toward the Baima Dragon Pool is the prettiest and quietest night walk in the old town.",
+    "smarter_alternative": null,
+    "opening_hours": "00:00-23:59",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCsp9hjVyYfN0tFDn_JI5LSAu7ZOcPYcZr4E2eRN86w_MvFKDhL8tGrNeY74jlZ3v6GM6iP3BA63JqBRmYJBK59zO7u1uDwXf7xd_WVl5BVF0_hDC8V7yVdm-1yy0uItsBNAJu1oI7j_RTdww=s4800-w700"
+  },
+  {
+    "name": "Wenhai Eco-Village Trek",
+    "city": "Lijiang",
+    "venue_name": "Wenhai Village, Lijiang",
+    "type": "sports",
+    "location": {
+      "name": "Wenhai Village, Lijiang",
+      "address": "Wenhai Village, Lijiang",
+      "lat": 26.8718026,
+      "lng": 100.2358502
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 420,
+      "opening_hours": "00:00-23:59",
+      "preferred_time": "08:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "tour",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 35,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "Wenhai is a remote Naxi village at 3,100m on the slopes of Jade Dragon Snow Mountain accessible only by a 2-hour trail from the road — a seasonal lake forms here in autumn and the views across the plateau back toward Lijiang are exceptional. October is peak season for the lake being full.",
+    "pitfall": "The trail is unmarked in sections; hire a local guide from Wenhai Ecolodge (they coordinate trekkers) or go with a small group.",
+    "booking_advice": "Contact Wenhai Ecolodge via email or WeChat in advance to arrange a guide (around 200 CNY per group); the lodge also serves meals.",
+    "insider_tips": "The Wenhai Ecolodge is community-run by the village and staying overnight funds conservation directly — if your schedule allows, an overnight here is one of the most authentic experiences in the Lijiang area.",
+    "smarter_alternative": null,
+    "opening_hours": "00:00-23:59",
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCsp9hjVyYfN0tFDn_JI5LSAu7ZOcPYcZr4E2eRN86w_MvFKDhL8tGrNeY74jlZ3v6GM6iP3BA63JqBRmYJBK59zO7u1uDwXf7xd_WVl5BVF0_hDC8V7yVdm-1yy0uItsBNAJu1oI7j_RTdww=s4800-w700"
+  },
+  {
+    "name": "Yunnan Pu'er Tea Tasting at an Old Town Tea House",
+    "city": "Lijiang",
+    "venue_name": "Camellia Tea House, Lijiang",
+    "type": "tour",
+    "location": {
+      "name": "Camellia Tea House, Lijiang",
+      "address": "Camellia Tea House, Lijiang",
+      "lat": 26.873504999999998,
+      "lng": 100.23682
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-17:00",
+      "preferred_time": "15:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "tour",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 12,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Yunnan is the birthplace of pu'er tea and a structured tasting session with an experienced tea master covers raw versus aged cakes, the fermenting process, and pouring ritual in a way that reframes what tea even means. This is one of the few things to 'learn' in Lijiang that sticks with you.",
+    "pitfall": "Many tea houses in old town use the tasting as a hard sales session — choose a venue with a fixed tasting fee (50–80 CNY) to ensure they're invested in education, not upsell.",
+    "booking_advice": "Walk into Camellia Tea House on Qiyi Street or ask your guesthouse to recommend a reputable tea ceremony host with English capability.",
+    "insider_tips": "Aged pu'er cake prices in Yunnan are genuinely lower than anywhere outside the province — if you enjoy a specific tea during the tasting, buying here is legitimately good value compared to specialty shops in Beijing or Shanghai.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDpM5zLQLNTixbgkMsn3gRwUQjNI6DNPMnN55rdI17IOO9wcwMkVvxJOyiRXdTMaXum_zMrI480z6TDg8_WVI8PdOxFxzSgkFkPFlIgMwIOZEBja2v2OuQ5Mxb2_qQQAuEZzVN4Ew5AwQWmmjgW87bA=s4800-w800"
+  },
+  {
+    "name": "Lijiang to Shangri-La Scenic Drive (Day Trip)",
+    "city": "Lijiang",
+    "venue_name": "Shangri-La Old Town (Dukezong), Lijiang",
+    "type": "tour",
+    "location": {
+      "name": "Shangri-La Old Town (Dukezong), Lijiang",
+      "address": "Shangri-La Old Town (Dukezong), Lijiang",
+      "lat": 26.8667274,
+      "lng": 100.2320491
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 600,
+      "opening_hours": "09:00-17:00",
+      "preferred_time": "07:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "tour",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 50,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The 3-hour drive north from Lijiang to Shangri-La passes through gorge country and climbs to 3,200m — Dukezong Old Town has the largest Tibetan prayer wheel on earth and the high-altitude monastery light in October is extraordinary. A day trip is feasible and punchier than committing to a Shangri-La overnight.",
+    "pitfall": "Altitude hits hard in Shangri-La (3,200m versus Lijiang's 2,400m) — move slowly your first 2 hours there and skip the temptation to rush between sites.",
+    "booking_advice": "Book a day-trip van through your guesthouse or a Lijiang tour operator for around 250–350 CNY per person shared, or hire a private car for 600–800 CNY total.",
+    "insider_tips": "Songzanlin Monastery (15 CNY entry) on the edge of Shangri-La is the most impressive Tibetan monastery in Yunnan and worth prioritizing over the rebuilt old town, which suffered a fire in 2014.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjB5fC97nhORO_ysk1P4v5cufKSojDKXjNrxentDD8ya0QcH15uZWVW8bCdFVXJ2dHfMc_s-DC-rOx9dQ-1IYFCUWYvq3FqzzgxGezb4cpiPEim3KznOV9WZxihwa5BwOgaHtLJfBN8Uedphfg=s4800-w800"
+  },
+  {
+    "name": "Lijiang Old Town Morning Tai Chi Watch",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Lijiang Old Town Morning Tai Chi Watch",
+      "address": "",
+      "lat": 26.8667274,
+      "lng": 100.2320491
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "07:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Every morning between 7–8am, Naxi elders gather in the courtyard squares of the old town for tai chi, fan dancing, and group exercise — it's an entirely local scene that costs nothing to watch and gives you a window into daily life before the tourist day begins. Bring a coffee from a nearby cafe and just sit.",
+    "pitfall": "Don't photograph the elders close-up without a smile and gesture of consent — most are happy to be photographed but a telephoto approach from behind feels intrusive.",
+    "booking_advice": "Free; just be in the old town by 7am.",
+    "insider_tips": "The largest gathering is usually in the square just west of Sifang Market — ask any local for 'Sifang Guangchang' and walk 50m west.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjB5fC97nhORO_ysk1P4v5cufKSojDKXjNrxentDD8ya0QcH15uZWVW8bCdFVXJ2dHfMc_s-DC-rOx9dQ-1IYFCUWYvq3FqzzgxGezb4cpiPEim3KznOV9WZxihwa5BwOgaHtLJfBN8Uedphfg=s4800-w800"
+  },
+  {
+    "name": "Blue Moon Valley (Jade Dragon Snow Mountain)",
+    "city": "Lijiang",
+    "venue_name": "Blue Moon Valley, Lijiang",
+    "type": "landmark",
+    "location": {
+      "name": "Blue Moon Valley, Lijiang",
+      "address": "Blue Moon Valley, Lijiang",
+      "lat": 27.125833,
+      "lng": 100.244686
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": "13:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The meltwater lakes at the base of Jade Dragon Snow Mountain shift through turquoise, teal, and deep blue depending on light — the boardwalk through the series of pools is one of the most photogenic short walks in Yunnan and takes only 90 minutes. Combine with the Glacier Park cable car on the same day.",
+    "pitfall": "The electric shuttle buses between zones inside the snow mountain scenic area cost extra and the wait times waste more time than the ride saves — factor this into your day plan.",
+    "booking_advice": "Included in the broader Jade Dragon Snow Mountain scenic area ticket; the 310 CNY cable car ticket covers entry to the valley too.",
+    "insider_tips": "The color of the lakes is most intense at midday when the sun is overhead and the glacial milk refracts the light — don't rush here in early morning.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBEfZqgu1fA8IUvGfnDqcdtdpRQWt9eqNlWMd5jjT-p1xWD7WE0l7NxeBZJWXk_54KzhW5w6l3dbhA3uFfl0mrGejxXpiQ1S6XnJWnkf84vZRiHkMAtWqc3CCy2bgNzJ9hXeNtUalz9cvZX=s4800-w540"
+  },
+  {
+    "name": "Lijiang Departure Morning Walk",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Lijiang Departure Morning Walk",
+      "address": "",
+      "lat": 26.811664999999998,
+      "lng": 100.25222099999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "08:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 0,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "A quiet final loop through the northern old town lanes before heading to the airport — the canal-side flagstone path from Lion Hill down to the Baima Dragon Pool is under 2km and can be walked in 45 minutes without a plan. The canal is clearest and most reflective in early morning.",
+    "pitfall": "Don't stray too far from the old town center on departure day — Lijiang Airport is 25km from town and the taxi takes 35–40 minutes in traffic.",
+    "booking_advice": "Free; book your airport taxi the night before and confirm a pickup time that gives you 90 minutes before flight departure.",
+    "insider_tips": "Order a final bowl of Lijiang baba (rice cake flatbread) from any street stall in the old town for under 10 CNY — it's the most honest local breakfast and a good last taste of Yunnan.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDgPTESuMyU7ED9iEW7d4CH7eNpj28aUF2dngpxoirXcUDne_9aRwpNY3EMlDEWPVlDmERIAgHR7iWam3WsqUwFztDATmwCMEVCGkNyQBiPo8xEh6bGX_6TwXTwi6FU7e5QHzBHri-S-uPoUSU=s4800-w800"
+  },
+  {
+    "name": "Yunnan Ethnic Textile Market, Lijiang",
+    "city": "Lijiang",
+    "venue_name": "Lijiang Ethnic Handicraft Market, Lijiang",
+    "type": "shopping",
+    "location": {
+      "name": "Lijiang Ethnic Handicraft Market, Lijiang",
+      "address": "Lijiang Ethnic Handicraft Market, Lijiang",
+      "lat": 26.866146,
+      "lng": 100.235461
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "10:00-20:00",
+      "preferred_time": "09:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 40,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The covered handicraft market near the old town entrance carries the best selection of Yunnan ethnic textiles — Yi batik, Naxi embroidery, and Tibetan wool goods — at prices that are genuinely lower than what you'd pay at any curated boutique in Kunming or Chengdu. Good for last-day gifting.",
+    "pitfall": "Machine-made 'ethnic' fabric is everywhere; the tell is perfectly uniform dyeing — genuine batik always has slight variation in the indigo.",
+    "booking_advice": "No booking needed; located near the Xingwen Lane entrance to Dayan Ancient Town.",
+    "insider_tips": "Prices in the morning before tour groups arrive tend to be lower because vendors want to make their first sale of the day — the Chinese superstition around the 'first customer' often gets you a better deal.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCfmvRMuiUdOKFyETJCCfx-ku24YSL078uS5eedWCOhZMKT7BBSrHhZCsgIWdaRliIyJGSiHEK6PW0WXwZk0mTP-D6Gl886QkCharNP4JGvDcK0yIqvbSQrYi9b4BPf9ImKgTPHL3aQed4po3of9x6NKA=s4800-w800"
+  },
+  {
+    "name": "Yak Meadow (Jade Dragon Snow Mountain)",
+    "city": "Lijiang",
+    "venue_name": "Yak Meadow, Jade Dragon Snow Mountain, Lijiang",
+    "type": "landmark",
+    "location": {
+      "name": "Yak Meadow, Jade Dragon Snow Mountain, Lijiang",
+      "address": "Yak Meadow, Jade Dragon Snow Mountain, Lijiang",
+      "lat": 27.127642,
+      "lng": 100.219758
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 120,
+      "opening_hours": "09:00-18:00",
+      "preferred_time": null,
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 10,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The Yak Meadow cable car delivers you to an alpine pasture at 3,500m where actual yaks graze against the snow peaks — far fewer visitors come here than the Glacier Park section, so you get the mountain in something approaching solitude. October grasses turn golden and the contrast with the white peaks is exceptional.",
+    "pitfall": "The Yak Meadow cable car ticket is sold separately from the Glacier Park cable car — budget an additional 55 CNY and check operating hours as it sometimes closes for maintenance.",
+    "booking_advice": "Purchase on-site at the Yak Meadow cable car station within the scenic area; no advance booking required for this section.",
+    "insider_tips": "If the Glacier Park cable car is sold out (common in early October), Yak Meadow is a worthy alternative with a different but equally impressive perspective of the mountain.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBREstCgAqA6IBoXePXpj9wdaoJOS6rsLvYYPBZlf6_KJmwdO_UXBSifDJ4qYZhG4aUJE-5og5FP1a7BqBTEHu0iaZ86TLluQWZu0BhIPcvDUoqUaxDXDeul18hph9VdMpAXZmkcrFIwhgtT7E=s4800-w800"
+  },
+  {
+    "name": "Lijiang Street Food Circuit",
+    "city": "Lijiang",
+    "venue_name": null,
+    "type": "neighborhood",
+    "location": {
+      "name": "Lijiang Street Food Circuit",
+      "address": "",
+      "lat": 26.866146,
+      "lng": 100.235461
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "18:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "none",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 8,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "The evening street food stalls on and around Mishi Lane (米市巷) in the old town offer the most concentrated hit of Yunnan snacks in one circuit — fried baba (米糕), grilled corn, spiced tofu skewers, and the famous Yunnan fried potatoes (炸洋芋) with chili salt. Budget 30–50 CNY and taste everything.",
+    "pitfall": "The stalls toward the tourist-facing end of Sifang Square charge 2–3x the price of the same items 100m further down the lane — walk past the square before stopping.",
+    "booking_advice": "No booking; best between 6pm and 9pm when stalls are fully set up.",
+    "insider_tips": "The fried potato stall that has the longest local queue (usually near the north end of Mishi Lane) is the reference version in Lijiang — order with the full chili and cumin blend, not just salt.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCfmvRMuiUdOKFyETJCCfx-ku24YSL078uS5eedWCOhZMKT7BBSrHhZCsgIWdaRliIyJGSiHEK6PW0WXwZk0mTP-D6Gl886QkCharNP4JGvDcK0yIqvbSQrYi9b4BPf9ImKgTPHL3aQed4po3of9x6NKA=s4800-w800"
+  },
+  {
+    "name": "Jade Dragon Snow Mountain Scenic Area Bus Loop",
+    "city": "Lijiang",
+    "venue_name": "Jade Dragon Snow Mountain Scenic Area, Lijiang",
+    "type": "tour",
+    "location": {
+      "name": "Jade Dragon Snow Mountain Scenic Area, Lijiang",
+      "address": "Jade Dragon Snow Mountain Scenic Area, Lijiang",
+      "lat": 27.127642,
+      "lng": 100.219758
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 240,
+      "opening_hours": "09:00-17:00",
+      "preferred_time": "09:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "attraction",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 16,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "The official scenic area operates a loop bus connecting the cable cars, Blue Moon Valley, Yak Meadow, and the Spruce Meadow (Yunshan Ping) — riding the full loop gives you a comprehensive overview of what's accessible and helps decide what to revisit. October light makes each stop visually worthwhile.",
+    "pitfall": "The shuttle bus timings between zones are infrequent (30–40 minute gaps) — pick up a bus schedule at the main gate and plan your zone sequence before you start, otherwise you'll waste 45 minutes waiting.",
+    "booking_advice": "Included in the scenic area entry; no advance booking for the buses, just buy the gate ticket (105 CNY) and board.",
+    "insider_tips": "Spruce Meadow (云杉坪) is reached by a chairlift rather than a cable car and is far less visited than the glacier section — the forest and meadow at 3,240m has a genuinely haunting, moss-draped atmosphere distinct from the high-altitude sections.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBREstCgAqA6IBoXePXpj9wdaoJOS6rsLvYYPBZlf6_KJmwdO_UXBSifDJ4qYZhG4aUJE-5og5FP1a7BqBTEHu0iaZ86TLluQWZu0BhIPcvDUoqUaxDXDeul18hph9VdMpAXZmkcrFIwhgtT7E=s4800-w800"
+  },
+  {
+    "name": "Jiu Ge Rice Noodles",
+    "city": "Lijiang",
+    "venue_name": "Jiu Ge Rice Noodles, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "Jiu Ge Rice Noodles, Lijiang",
+      "address": "Jiu Ge Rice Noodles, Lijiang",
+      "lat": 26.87089,
+      "lng": 100.23822
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "08:00-21:00",
+      "preferred_time": "12:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 4,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "This is the local go-to for Yunnan-style rice noodles — the braised pork rice noodle bowl and the dry-tossed version with chili oil and pickled vegetables are both standout. No-frills, cheap, and genuinely what locals eat.",
+    "pitfall": "No English menu — point at what the table next to you is eating or show the Chinese name on your phone: 卷粉 (juǎn fěn) for rice rolls or 米线 (mǐ xiàn) for noodle soup.",
+    "booking_advice": "Walk-in only; arrive before 12:30pm or after 1:30pm to avoid the peak lunch queue.",
+    "insider_tips": "A full bowl with toppings costs under 20 CNY — one of the best value meals in the old town by a wide margin.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBEoFZrM9hu8L3fwrxiLalpWdb8wCnHQlz7HyFayK-X868kDuwx5hoRZRxe-1Q6fjyaGRasHHXKMDK9IsUDyh8rOHAeHsWhabmAfvWS-jAeSahlEu5xdkLr7Ci425F7DBp1ZO0invsJuXSQKZA=s4800-w800"
+  },
+  {
+    "name": "Spoon Rice Noodle",
+    "city": "Lijiang",
+    "venue_name": "Spoon Rice Noodle, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "Spoon Rice Noodle, Lijiang",
+      "address": "Spoon Rice Noodle, Lijiang",
+      "lat": 26.874086499999997,
+      "lng": 100.2351019
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 60,
+      "opening_hours": "09:00-21:00",
+      "preferred_time": "12:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 8,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "A well-regarded Yunnan snack spot known for its crossing-the-bridge noodles (过桥米线) served with a parade of condiments — the mushroom and ham version is the must-order, and the rich broth made from local black chicken is what sets it apart from generic noodle shops.",
+    "pitfall": "The crossing-the-bridge format means you cook the ingredients yourself in a hot pot of broth — ask for a demonstration if it's your first time so you don't overcook the thin-sliced meat.",
+    "booking_advice": "Walk-in only; popular with both locals and visitors so arrive at opening or mid-afternoon.",
+    "insider_tips": "Order the premium set (高档套餐) rather than the standard version — the ingredient quality jump is significant and the price difference is only about 15 CNY.",
+    "smarter_alternative": null,
+    "price_level": 2,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjChAwBfdC6bOsNgnH3f1KbwZ9lKCYrm6Bt2X0OWciPpeHtc6LLsQJY9v3GNdzpzPtusPLNujro2kjFYoRR__Q-GP8on_9Osp2vsCY0CfvTqLNpx9g3QldZfzwG6Vy6YaYf82AcH6Tp7VLsQJ90=s4800-w800"
+  },
+  {
+    "name": "The Rooftop Bistro & Bar Lijiang",
+    "city": "Lijiang",
+    "venue_name": "The Rooftop Bistro & Bar Lijiang, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "The Rooftop Bistro & Bar Lijiang, Lijiang",
+      "address": "The Rooftop Bistro & Bar Lijiang, Lijiang",
+      "lat": 26.874086499999997,
+      "lng": 100.2351019
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "11:00-22:00",
+      "preferred_time": "18:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 22,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Perched on top of a guesthouse with unobstructed views of Jade Dragon Snow Mountain, this spot serves a solid mix of Western comfort food and Yunnan fusion dishes — the Yunnan mushroom pizza and the goat cheese flatbread are the must-orders for something different after days of noodles.",
+    "pitfall": "The kitchen runs slow when full — order drinks first and treat the food wait as built-in sunset-watching time rather than getting frustrated.",
+    "booking_advice": "Walk-in but arrive by 5:30pm to secure a window table for the mountain view at sunset.",
+    "insider_tips": "The cocktail list leans on Yunnan ingredients like rose petal liqueur and local baijiu infusions — worth trying at least one over a standard beer.",
+    "smarter_alternative": null,
+    "price_level": 2,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjChAwBfdC6bOsNgnH3f1KbwZ9lKCYrm6Bt2X0OWciPpeHtc6LLsQJY9v3GNdzpzPtusPLNujro2kjFYoRR__Q-GP8on_9Osp2vsCY0CfvTqLNpx9g3QldZfzwG6Vy6YaYf82AcH6Tp7VLsQJ90=s4800-w800"
+  },
+  {
+    "name": "Heshu Restaurant",
+    "city": "Lijiang",
+    "venue_name": "Heshu Restaurant, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "Heshu Restaurant, Lijiang",
+      "address": "Heshu Restaurant, Lijiang",
+      "lat": 26.87164,
+      "lng": 100.23128
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "11:00-14:00,17:30-21:30",
+      "preferred_time": "19:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 25,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "One of Lijiang's most respected traditional Yunnan restaurants, Heshu is known for its stone pot fish (石锅鱼) — a clay pot of Jinsha river fish cooked over a flame with wild herbs and local chili — and its wild mushroom stir-fry using foraged boletus from the surrounding mountains.",
+    "pitfall": "The stone pot fish takes 25–30 minutes to cook; order it immediately when seated and fill the wait with the cold starter plates.",
+    "booking_advice": "Call ahead or have your guesthouse make a reservation for evening sittings, especially Friday through Sunday.",
+    "insider_tips": "Ask the server which mushrooms are in season that week — in October, matsutake (松茸) occasionally appears on the specials board and is worth ordering even at the premium price.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjAu7FINqPJdE1mC6Hd2tUyIIkmT7jlPLgzIljTmmXW83f6SU8HxM7VtYGg-VP9Jk0FeknATop3T-xoEhsww1Ri2iPfv5oPN5VeHeRtySE-5TLElxxsc3BlMpLho_I2vMIjW6G9TO7f3YMD4a5U=s4800-w800"
+  },
+  {
+    "name": "Muyu Ruin Restaurant",
+    "city": "Lijiang",
+    "venue_name": "Muyu Ruin Restaurant, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "Muyu Ruin Restaurant, Lijiang",
+      "address": "Muyu Ruin Restaurant, Lijiang",
+      "lat": 26.874086499999997,
+      "lng": 100.2351019
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 120,
+      "opening_hours": "11:30-14:30,17:30-22:00",
+      "preferred_time": "19:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 30,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "Set in the ruins of a Naxi courtyard house with exposed timber beams and moss-covered stone walls, this is the most atmospheric restaurant in Lijiang — the slow-braised black chicken with local herbs and the Naxi-style preserved pork with wild vegetables are the dishes to order here.",
+    "pitfall": "The romantic setting and Instagram reputation mean it draws a younger crowd who treat it more as a photo stop than a meal — book a table in the inner courtyard away from the main entrance to get the best atmosphere.",
+    "booking_advice": "Reservation strongly recommended for dinner; book via WeChat or ask your guesthouse to call ahead the morning of your visit.",
+    "insider_tips": "The owner-chef sources directly from Naxi village farmers on a weekly rotation — if you ask, they'll often tell you exactly which village the vegetables came from that day.",
+    "smarter_alternative": null,
+    "price_level": 2,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjChAwBfdC6bOsNgnH3f1KbwZ9lKCYrm6Bt2X0OWciPpeHtc6LLsQJY9v3GNdzpzPtusPLNujro2kjFYoRR__Q-GP8on_9Osp2vsCY0CfvTqLNpx9g3QldZfzwG6Vy6YaYf82AcH6Tp7VLsQJ90=s4800-w800"
+  },
+  {
+    "name": "SaKura Restaurant",
+    "city": "Lijiang",
+    "venue_name": "SaKura Restaurant, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "SaKura Restaurant, Lijiang",
+      "address": "SaKura Restaurant, Lijiang",
+      "lat": 26.8704748,
+      "lng": 100.23653259999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "10:00-22:00",
+      "preferred_time": "12:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 18,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "A well-reviewed spot in the old town popular with both travelers and expat residents for its reliable Yunnan cuisine — the crossing-the-bridge noodles set and the dry-fried Yunnan goat cheese (炸乳饼) are the signature plates worth ordering.",
+    "pitfall": "The menu has a large section of pan-Asian dishes catering to tourist preferences — stick to the Yunnan column for the best quality.",
+    "booking_advice": "Walk-in usually fine for lunch; dinner benefits from a same-day reservation via phone.",
+    "insider_tips": "Yunnan goat cheese (rubing/乳饼) fried in chili and mint is one of the most unique dishes in Chinese regional cooking and this is one of the better preparations in Lijiang — don't skip it.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjC3qRXa-hWqViMl6KPrEFZ-ERmvbWJTbm0UUYPRsMF-wy2CPgE68q08L5LGkBeppu9MXM9_UXylIwJCosCyqrjVJFJvLP-uLFIxpH87qDypiUV_PrUxJvg5snYh58i9TvRw6lJ9LvIPbrYSbCwmMW6tQA=s4800-w800"
+  },
+  {
+    "name": "The Master of Lijiang",
+    "city": "Lijiang",
+    "venue_name": "The Master of Lijiang, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "The Master of Lijiang, Lijiang",
+      "address": "The Master of Lijiang, Lijiang",
+      "lat": 26.86581,
+      "lng": 100.23091
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 120,
+      "opening_hours": "11:30-14:00,18:00-22:00",
+      "preferred_time": "19:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 40,
+      "type": "per_person"
+    },
+    "dedicated_time_block": true,
+    "why_it_fits": "A refined Yunnan tasting-menu style restaurant where the chef builds the meal around seasonal local produce — the Yunnan ham and boletus mushroom steamed rice and the black chicken mushroom hot pot are signature dishes that showcase the depth of local ingredients.",
+    "pitfall": "This is a slower, multi-course experience — don't book it for a night when you have a show or a fixed downstream commitment.",
+    "booking_advice": "Reservation required; book 1–2 days ahead via WeChat or through your guesthouse, especially for tables of 4 or more.",
+    "insider_tips": "The wine pairing is overpriced and not the focus — the set menu with local Yunnan rice wine (小锅酒) is a more authentic and significantly cheaper accompaniment.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjCHv4bWrBUwQzJkazmjfpt_zHgrunTfgxNKzw08Vks5tPCWX2jIvaz-3EUZd_NdSSG6OlnMYkTq0P3kZGhEwStSc5HN0tYXCQccNTq9O58a2Lg1sIoBXdaEbZRzVgwEqgXnsPZBgnUY3mGW4H6p16OAhA=s4800-w800"
+  },
+  {
+    "name": "Dreamer Salmon Restaurant",
+    "city": "Lijiang",
+    "venue_name": "Dreamer Salmon Restaurant, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "Dreamer Salmon Restaurant, Lijiang",
+      "address": "Dreamer Salmon Restaurant, Lijiang",
+      "lat": 26.886833,
+      "lng": 100.227603
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "10:30-21:30",
+      "preferred_time": "12:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 28,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "Lijiang has a surprisingly excellent salmon scene due to cold mountain water fish farms nearby — this is the city's most-cited specialist for it, and the sashimi-style raw salmon with Yunnan dipping sauce and the hot-smoked salmon with wild herbs are the standout preparations.",
+    "pitfall": "Salmon here is not cheap by local standards — expect to pay more than a standard Yunnan meal, but the quality of mountain-raised cold-water fish justifies it.",
+    "booking_advice": "Reservation recommended for dinner; walk-in typically fine for lunch.",
+    "insider_tips": "The cold-water salmon from Lijiang's mountain tributaries has noticeably more fat marbling than farmed Norwegian salmon — worth trying even if you eat salmon regularly at home.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjBsBV38Zl2_N8o9Y2JyGqwV4ANMa4ju-reRm1LiMT47AC_L8IJXgn49awIWw6T1eSuZCeh3oHJsVnE1bzRZ3BMKtw_WciT0i346wvZ_oUwLyNDXruFbTmjxE1nelRpm0jyKIMhtchF1rSEdTSY=s4800-w800"
+  },
+  {
+    "name": "Xunwei Private Kitchen (寻味私房菜)",
+    "city": "Lijiang",
+    "venue_name": "寻味私房菜, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "寻味私房菜, Lijiang",
+      "address": "寻味私房菜, Lijiang",
+      "lat": 26.871209999999998,
+      "lng": 100.23912
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "11:00-14:00,17:30-21:00",
+      "preferred_time": "19:00",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 20,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "A beloved homestyle Yunnan restaurant in the old town known for warm, unfussy cooking — the braised pork belly with Yunnan preserved vegetables and the wild mushroom egg scramble are the crowd favorites and taste exactly like what a Naxi grandmother would cook.",
+    "pitfall": "The space is small (8–10 tables maximum) and it fills fast on weekends — a reservation is effectively mandatory for dinner.",
+    "booking_advice": "Book by WeChat the morning of your visit; your guesthouse can help if you don't have a Chinese phone number.",
+    "insider_tips": "This is one of the few restaurants in the old town where the daily specials (家常菜) reflect what was at the market that morning — always ask what's special before ordering from the menu.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDa0FHZgMxZ5Ud1TfhlYb8LFFLw0DtZjCaA0cjK3z-VMH6ZeTqCswA_ZjVM5gg6QGRTHPMmj3j5Rm_jnuHgt6vTghbMIf8pq4YcssJJ7oJNbvH5OUz64WjLpuX_XE568N1q6q6wGb1YjBfS4pmtZimH=s4800-w800"
+  },
+  {
+    "name": "Stone Pot Fish Restaurant",
+    "city": "Lijiang",
+    "venue_name": "Stone Pot Fish Restaurant, Lijiang",
+    "type": "meal",
+    "location": {
+      "name": "Stone Pot Fish Restaurant, Lijiang",
+      "address": "Stone Pot Fish Restaurant, Lijiang",
+      "lat": 26.86102,
+      "lng": 100.22708999999999
+    },
+    "tags": [],
+    "timing": {
+      "duration_minutes": 90,
+      "opening_hours": "11:00-14:30,17:00-21:30",
+      "preferred_time": "18:30",
+      "fixed": null,
+      "must_happen_on_day": null
+    },
+    "experience": {
+      "intensity": "medium",
+      "is_highlight": false
+    },
+    "booking": {
+      "type": "restaurant",
+      "links": [],
+      "reference": null
+    },
+    "cost": {
+      "estimated_usd": 22,
+      "type": "per_person"
+    },
+    "dedicated_time_block": false,
+    "why_it_fits": "One of the most iconically Lijiang eating experiences — stone pot fish (石锅鱼) is a Naxi specialty where river fish is cooked in a carved stone vessel over live flame with Yunnan herbs and chili; the broth after the fish is eaten is poured over rice for a second course. The crispy fish skin and the chili-herb broth are the highlights.",
+    "pitfall": "The fumes from the chili oil at your table can be intense — sit near an open window or the door if you're sensitive to spice vapors.",
+    "booking_advice": "Walk-in or call ahead; evenings from Friday to Sunday tend to be full.",
+    "insider_tips": "Order the Jinsha River trout version rather than standard carp if it's available — the local trout has firmer flesh that holds up better in the stone pot cooking.",
+    "smarter_alternative": null,
+    "imageUrl": "https://lh3.googleusercontent.com/place-photos/AG9NLjDFiL-wdSAQqnpEOWyHfLRIzlQeSJS84LxCNQa1fM3M1D00J58L62HotHy5L2HcSBLoXw92BN-5OnE-l0kZAPnib_bDiTOB5UT-jmwt_dbh3kyzwFhK3Qdyy1omtC-Egxz7sS_6lMuO4Blg=s4800-w800"
+  }
+]
