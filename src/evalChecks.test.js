@@ -138,16 +138,38 @@ test('a cross-city day trip to a city the traveler moves to later', () => {
 });
 
 test('an activity whose own pitfall argues against doing it', () => {
-  // Both real: Meili Snow Mountain "requires an overnight stay in Deqin", and
-  // the gorge entry whose pitfall calls the single-day version brutal.
+  // Both pitfalls are the real text from the saved Sonnet list.
   const list = [
     act('Meili Snow Mountain', { pitfall: 'Requires an overnight stay in Deqin to see sunrise.' }),
-    act('Tiger Leaping Gorge', { pitfall: 'The single-day version is brutal.' }),
+    act('Tiger Leaping Gorge', { pitfall: 'The full upper trail is a full day and requires an overnight at Halfway Guesthouse if doing both days — attempting it as a single long day is brutal; most hikers regret rushing it.' }),
     act('Songzanlin Monastery', { pitfall: 'Arrive before 10am to avoid tour buses.' })
   ];
   const findings = selfContradictingPitfall(list);
   assert.deepEqual(findings.map((f) => f.names[0]), ['Meili Snow Mountain', 'Tiger Leaping Gorge']);
   assert.match(findings[0].detail, /needs an overnight stay/);
+});
+
+test('pacing advice is not a feasibility objection', () => {
+  // The null-change control flagged "Give the Kunsthistorisches Museum a Proper
+  // Half-Day" because its pitfall called the visit exhausting. That is advice on
+  // how to do it, not an argument against doing it, and matching the adjective
+  // cost nothing to catch — both real cases say "overnight" outright.
+  assert.deepEqual(selfContradictingPitfall([
+    act('Kunsthistorisches Museum', { pitfall: 'Trying to see every gallery in one visit is exhausting; pick two wings.' }),
+    act('Schonbrunn', { pitfall: 'The queue at midday is brutal — go at opening.' })
+  ]), []);
+});
+
+test('meal count is not scored against the food rating', () => {
+  // Meal count is set by the pipeline, not the profile: the prompt targets two
+  // per day and applyMealPoolCap enforces a floor. Scoring six meals as
+  // over-delivery for a foodTravel 2/5 traveler flagged every list ever made.
+  const foodIndifferent = { answers: { foodTravel: 2, museumPerson: 5, structuredTours: 3 } };
+  const list = [
+    ...Array.from({ length: 6 }, (_, i) => act(`Meal ${i}`, { type: 'meal', venue_name: `Restaurant ${i}` })),
+    act('Kunsthistorisches', { type: 'museum' })
+  ];
+  assert.deepEqual(typeMixVsProfile(list, foodIndifferent), []);
 });
 
 test('zero meals for a 6-day stay is high severity, not an empty column', () => {

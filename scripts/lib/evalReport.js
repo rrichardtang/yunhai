@@ -13,6 +13,14 @@ const JUDGE_LOSS_MARGIN = 2;
 // non-deterministic model repeat different restaurants, so a detail-level diff
 // would call every lateral move a regression — and a harness that cries wolf
 // gets switched off. The details ride along only to say what to go look at.
+//
+// Only high-severity findings gate the verdict. The null-change control proved
+// why: two runs of the *same* prompt differed by one medium finding and the run
+// reported DEGRADED. Medium findings — a non-meal venue used twice, a pitfall
+// that mentions an overnight — are judgement calls that vary between samples.
+// They are printed, because they are worth reading; they do not decide.
+const countHigh = (checks, check) => checks.findings.filter((f) => f.check === check && f.severity === 'high').length;
+
 function invariantDeltas(perScenario) {
   const deltas = [];
   for (const row of perScenario) {
@@ -20,18 +28,21 @@ function invariantDeltas(perScenario) {
     for (const check of checks) {
       const base = row.baselineChecks.byCheck[check] || 0;
       const cand = row.candidateChecks.byCheck[check] || 0;
+      const baseHigh = countHigh(row.baselineChecks, check);
+      const candHigh = countHigh(row.candidateChecks, check);
       const details = row.candidateChecks.findings.filter((f) => f.check === check).map((f) => f.detail);
-      deltas.push({ scenario: row.scenario, check, base, cand, regressed: cand > base, details });
+      deltas.push({ scenario: row.scenario, check, base, cand, baseHigh, candHigh, regressed: candHigh > baseHigh, details });
     }
   }
   return deltas;
 }
 
 function deltaNote({ base, cand, regressed, details }) {
-  if (!regressed) return cand === 0 ? 'clean' : 'held';
+  if (cand === 0) return 'clean';
+  if (!regressed) return cand > base ? `+${cand - base} advisory · ${details.slice(0, 1).join('')}` : 'held';
   const shown = details.slice(0, 2).join('; ');
   const more = details.length > 2 ? ` (+${details.length - 2} more)` : '';
-  return `+${cand - base} · ${shown}${more}`;
+  return `REGRESSED +${cand - base} · ${shown}${more}`;
 }
 
 function verdictFor({ deltas, tally }) {
@@ -39,7 +50,7 @@ function verdictFor({ deltas, tally }) {
   const regressions = deltas.filter((d) => d.regressed);
   if (regressions.length) {
     const scenarios = [...new Set(regressions.map((r) => r.scenario))];
-    reasons.push(`${regressions.length} new invariant finding${regressions.length === 1 ? '' : 's'} (${scenarios.join(', ')})`);
+    reasons.push(`${regressions.length} new high-severity invariant finding${regressions.length === 1 ? '' : 's'} (${scenarios.join(', ')})`);
   }
   for (const [criterion, counts] of Object.entries(tally || {})) {
     if (counts.baseline - counts.candidate >= JUDGE_LOSS_MARGIN) {
@@ -79,6 +90,9 @@ function renderReport({
     lines.push(`| ${d.scenario} | ${d.check} | ${d.base} | ${d.cand} | ${deltaNote(d)} |`);
   }
   if (!deltas.length) lines.push('| — | no findings on either arm | 0 | 0 | |');
+  lines.push('');
+  lines.push('Only high-severity findings decide the verdict. Medium ones are marked advisory —');
+  lines.push('they vary between two runs of the same prompt, so gating on them reports noise.');
   lines.push('');
 
   if (tally && Object.keys(tally).length) {

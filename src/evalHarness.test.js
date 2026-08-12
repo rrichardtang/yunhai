@@ -82,26 +82,33 @@ test('tallyOutcomes counts wins per criterion across scenarios', () => {
 
 // --- the verdict rule --------------------------------------------------------
 
-const row = (scenario, base, cand) => ({
-  scenario,
-  baselineChecks: { byCheck: base, findings: [] },
-  candidateChecks: { byCheck: cand, findings: [{ check: Object.keys(cand)[0], detail: 'detail' }] }
-});
+const findings = (check, count, severity) => Array.from({ length: count }, () => ({ check, severity, detail: `${check} detail` }));
+const arm = (check, count, severity) => ({ byCheck: count ? { [check]: count } : {}, findings: findings(check, count, severity) });
+const row = (scenario, base, cand) => ({ scenario, baselineChecks: base, candidateChecks: cand });
 
-test('a new invariant finding on the candidate is a regression', () => {
-  const deltas = invariantDeltas([row('museum-lover', {}, { typeMixVsProfile: 1 })]);
+test('a new high-severity finding on the candidate is a regression', () => {
+  const deltas = invariantDeltas([row('museum-lover', arm('typeMixVsProfile', 0), arm('typeMixVsProfile', 1, 'high'))]);
   const verdict = verdictFor({ deltas, tally: {} });
   assert.equal(verdict.status, 'DEGRADED');
-  assert.match(verdict.reasons[0], /1 new invariant finding \(museum-lover\)/);
+  assert.match(verdict.reasons[0], /1 new high-severity invariant finding \(museum-lover\)/);
+});
+
+test('a new MEDIUM finding is advisory, not a regression', () => {
+  // The null-change control failed on exactly this: two runs of the same prompt
+  // differed by one medium finding and the harness reported DEGRADED.
+  const deltas = invariantDeltas([row('museum-lover', arm('selfContradictingPitfall', 0), arm('selfContradictingPitfall', 1, 'medium'))]);
+  assert.equal(verdictFor({ deltas, tally: {} }).status, 'PASS');
+  assert.equal(deltas[0].regressed, false);
+  assert.equal(deltas[0].cand, 1, 'still counted and printed');
 });
 
 test('a finding present on both arms is not a regression', () => {
-  const deltas = invariantDeltas([row('owner-yunnan', { mealCoverage: 1 }, { mealCoverage: 1 })]);
+  const deltas = invariantDeltas([row('owner-yunnan', arm('mealCoverage', 1, 'high'), arm('mealCoverage', 1, 'high'))]);
   assert.equal(verdictFor({ deltas, tally: {} }).status, 'PASS');
 });
 
 test('the candidate FIXING a finding is not a regression', () => {
-  const deltas = invariantDeltas([row('owner-yunnan', { repeatedVenues: 3 }, { repeatedVenues: 0 })]);
+  const deltas = invariantDeltas([row('owner-yunnan', arm('repeatedVenues', 3, 'high'), arm('repeatedVenues', 0))]);
   assert.equal(verdictFor({ deltas, tally: {} }).status, 'PASS');
 });
 

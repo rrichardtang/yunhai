@@ -11,11 +11,16 @@ const { shortCity } = require('./services/imageQuery');
 // filterInvalidTypes drops anything typed that way and a bar crawl arrives as
 // some other type. Those two axes match on wording instead; the rest map to a
 // real type and are counted exactly.
+//
+// `foodTravel` is deliberately absent. Meal count is set by the pipeline, not by
+// the profile — the prompt targets two per day and applyMealPoolCap enforces a
+// floor — so a traveler who rates food 2/5 still eats three days of lunches and
+// dinners, and scoring that as over-delivery flagged every list ever produced.
+// mealCoverage owns meals.
 const PROFILE_AXES = [
   { key: 'structuredTours', label: 'guided tours', type: 'tour' },
   { key: 'museumPerson', label: 'museums', type: 'museum' },
   { key: 'shoppingPerson', label: 'shopping', type: 'shopping' },
-  { key: 'foodTravel', label: 'meals', type: 'meal' },
   { key: 'nightlifeBars', label: 'nightlife', pattern: /\b(bar|bars|pub|pubs|club|clubbing|nightlife|night-life|cocktail|crawl|speakeasy)\b/i },
   { key: 'livePerformances', label: 'live performances', pattern: /\b(show|performance|concert|theatre|theater|opera|recital|cabaret|live music)\b/i }
 ];
@@ -23,12 +28,16 @@ const PROFILE_AXES = [
 // The pitfall arguing against its own activity. SYSTEM_PROMPT_GPT_LEAN carries
 // "Drop any activity whose own pitfall argues against doing it" — this is the
 // check that notices if that line ever stops working.
+// Structural feasibility objections only. An earlier version also matched the
+// adjectives brutal/punishing/exhausting, which flagged "a proper half-day here
+// is exhausting" on a museum — pacing advice, not an argument against going. It
+// caught nothing the structural rules miss: both real cases (Meili, Tiger
+// Leaping Gorge) say "overnight" outright.
 const PITFALL_CONTRADICTIONS = [
   { pattern: /\bovernight\b/i, why: 'needs an overnight stay' },
   { pattern: /requires?\s+(a\s+|an\s+)?(second|extra|additional)\s+day/i, why: 'needs a second day' },
   { pattern: /not\s+(feasible|possible|realistic|doable|advisable)\s+(in|as)\s+(one|a\s+single)\s+day/i, why: 'not doable in a day' },
-  { pattern: /\b(multi-day|two-day|2-day|three-day|3-day)\b/i, why: 'is a multi-day trip' },
-  { pattern: /\b(brutal|punishing|gruelling|grueling|exhausting)\b/i, why: 'is described as punishing' }
+  { pattern: /\b(multi-day|two-day|2-day|three-day|3-day)\b/i, why: 'is a multi-day trip' }
 ];
 
 const typeOf = (activity) => String(activity?.type || '').trim().toLowerCase();
