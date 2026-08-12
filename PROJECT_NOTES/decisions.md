@@ -52,6 +52,39 @@ arithmetic says 33 → 18 activities saves only ~17%, because the fixed per-call
 baseline's age and served model so the residual is visible rather than assumed, and the
 known-regression control is meant to be re-run with `--refresh-baseline` before shipping.
 
+## [2026-08-12] Only high-severity invariants gate the verdict — the null-change control's finding
+
+**Decision:** A new *high*-severity invariant finding on the candidate makes a run DEGRADED. Medium
+findings are printed and marked advisory. A single-scenario run carries a printed caveat that it is
+a plumbing check rather than evidence.
+
+**Reasoning:** The null-change control (candidate prompt identical to baseline) returned DEGRADED on
+its first run, which by construction is a harness fault. Three causes, all real:
+`selfContradictingPitfall` matched the adjectives brutal/punishing/exhausting and flagged a museum
+whose pitfall called a full day exhausting — pacing advice, not a feasibility objection;
+`typeMixVsProfile` scored meal count against `foodTravel`, which is pipeline-determined rather than
+profile-determined and so fired on both arms of every run; and the verdict gated on *any* new
+finding, so one medium-severity difference between two samples of the same prompt was enough to
+fail. `planCity` was checked and cleared — `src/claude.js:541` is `systemPrompt ||
+SYSTEM_PROMPT_GPT_LEAN`, so the two arms are byte-identical.
+
+**Alternatives rejected:** Gating on total finding count with a numeric tolerance (a magic number
+with no principle behind it). Requiring a check to regress across ≥2 scenarios (statistically
+sound, but `--smoke` runs one). Dropping medium findings entirely (they are worth reading; a
+non-meal venue used three times is real padding even when it is not a regression).
+
+**Tradeoffs:** A candidate that adds many medium findings and no high ones passes. Accepted for now
+because medium findings demonstrably vary between samples of the same prompt, and a harness that
+reports noise gets switched off. If the noise-floor measurement shows a medium check is stable
+across repeated same-prompt runs, promote it to high rather than loosening the gate.
+
+**Known caveat, not yet addressed:** the baseline cache freezes one particular sample as the
+reference. An above-average cached draw makes every later candidate look worse. Across five
+scenarios this washes out; on `--smoke` it does not, which is what the printed single-scenario
+caveat is for. Two null-change runs scored baseline 4, candidate 0 on decisive criteria — p≈0.125
+at n=4, so not evidence of bias, but the thing to watch if the pattern persists over the full
+corpus.
+
 ## [2026-08-12] Countable defects belong in code, not in the judge
 
 **Decision:** Two layers. Anything a `for` loop can decide is a deterministic check in

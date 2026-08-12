@@ -107,6 +107,14 @@ function renderReport({
     lines.push('the same slot in both orderings it is counted a tie, because that is bias and not a');
     lines.push('preference.');
     lines.push('');
+    if (perScenario.length === 1) {
+      lines.push('**One scenario — read this as a plumbing check, not as evidence.** Four criterion');
+      lines.push('comparisons cannot separate a real difference from sampling noise, and a cached');
+      lines.push('baseline freezes one particular draw: if that draw was an above-average sample,');
+      lines.push('every candidate is measured against an unusually strong opponent. Run the full');
+      lines.push('corpus before believing a judge column.');
+      lines.push('');
+    }
     if (judgeNotes.length) {
       lines.push('### Where it turned');
       for (const note of judgeNotes) lines.push(`- **${note.criterion}** · ${note.scenario} — ${note.winner} won: ${note.reason}`);
