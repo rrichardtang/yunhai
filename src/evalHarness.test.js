@@ -79,6 +79,16 @@ test('unparseable judge output is counted, so it cannot pass as agreement', asyn
   assert.equal(workingRun.outcome.profileFit.winner, 'tie');
 });
 
+test('an empty response names the token cap rather than reporting a parse failure', async () => {
+  // What actually happened: the cap covers reasoning as well as output, the
+  // judge spent all of it thinking about two long lists, and extractText
+  // returned ''. "Could not parse" pointed at the wrong fix.
+  const starved = async () => ({ text: '', stopReason: 'max_tokens', inputTokens: 9000, outputTokens: 2000 });
+  const run = await comparePair({ call: starved, context: 'c', baseline: [], candidate: [] });
+  assert.equal(run.unparsed, 2);
+  assert.match(run.unparsedHead, /empty response, stop_reason=max_tokens/);
+});
+
 test('the judge prompt names every criterion and offers tie as an answer', () => {
   const prompt = buildJudgePrompt({ criteria: PLAN_CRITERIA, context: 'ctx', first: [], second: [] });
   for (const criterion of PLAN_CRITERIA) assert.ok(prompt.includes(criterion.id), `${criterion.id} in prompt`);

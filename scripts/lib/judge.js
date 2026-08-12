@@ -16,7 +16,14 @@ const { tryParseJsonObject, extractText } = require('../../src/services/llmJson'
 const { renderActivity } = require('../blindRead');
 
 const JUDGE_MODELS = { sonnet: 'claude-sonnet-5', opus: 'claude-opus-5' };
-const MAX_TOKENS = 2000;
+
+// The answer is four short objects, but the cap covers reasoning as well as
+// output. At 2000 the judge spent the whole budget thinking about two 24-to-35
+// activity lists and emitted no text block at all — extractText returned '',
+// which the parser read as a tie and reported as agreement. Six of ten calls in
+// the first known-regression run died that way, and only the smallest scenarios
+// survived. Sized for the reasoning, not for the answer.
+const MAX_TOKENS = 16000;
 
 // Only what Layer 1 cannot count. Anything a `for` loop can decide belongs in
 // src/evalChecks.js, where it is exact and free.
@@ -63,6 +70,7 @@ function anthropicJudge(model) {
     });
     return {
       text: extractText(response.content),
+      stopReason: response.stop_reason,
       servedModel: response.model,
       inputTokens: response.usage?.input_tokens || 0,
       outputTokens: response.usage?.output_tokens || 0
@@ -86,7 +94,13 @@ async function askJudge({ call, criteria, context, first, second }) {
     verdicts[criterion.id] = { winner, reason: String(raw.reason || '').trim() };
   }
   const recognised = parsed && criteria.some((c) => ['A', 'B', 'tie'].includes((parsed[c.id] || {}).winner));
-  return { verdicts, parsed: Boolean(recognised), head: result.text.slice(0, 200), usage: result };
+  // Name the mechanism rather than the symptom: an empty body after a max_tokens
+  // stop is a budget that reasoning consumed, which is a different fix from a
+  // model that answered in prose.
+  const head = result.text.trim()
+    ? result.text.trim().slice(0, 200)
+    : `(empty response, stop_reason=${result.stopReason || 'unknown'} — raise MAX_TOKENS if this is max_tokens)`;
+  return { verdicts, parsed: Boolean(recognised), head, usage: result };
 }
 
 // Round 1 puts the baseline in slot A, round 2 puts the candidate there. The
