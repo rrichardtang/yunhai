@@ -114,33 +114,63 @@ function repeatedVenues(activities) {
 // Sonnet filed Tiger Leaping Gorge under Shangri-La with venue city Lijiang, and
 // Places snapped it to a plausible coordinate — so it scored as a clean resolve
 // and no existing column saw it.
-function venueCityMismatch(activities, scenarioCity) {
-  const expected = shortCity(scenarioCity).toLowerCase();
+// Two ways this goes wrong, and the second is the one that actually happened:
+// the gorge entry declared city "Shangri-La" while its venue_name read "Tiger
+// Leaping Gorge, Lijiang". Reading a.city alone sees nothing. The venue text is
+// only compared against the trip's own other cities, so a trailing province or
+// country in an address cannot masquerade as a mismatch.
+function venueCityMismatch(activities, scenarioCity, otherCities = []) {
+  const expected = cityStem(scenarioCity);
   if (!expected) return [];
 
-  return activities
-    .filter((a) => {
-      const declared = shortCity(a?.city).toLowerCase();
-      return declared && declared !== expected;
-    })
-    .map((a) => ({
-      check: 'venueCityMismatch',
-      severity: 'high',
-      detail: `"${a.name}" is filed under ${shortCity(a.city)}, list is ${shortCity(scenarioCity)}`,
-      names: [a.name]
-    }));
+  const foreignCities = otherCities
+    .map((entry) => ({ name: shortCity(entry?.name || entry), stem: cityStem(entry?.name || entry), pattern: cityNamePattern(entry?.name || entry) }))
+    .filter((c) => c.pattern && c.stem && c.stem !== expected);
+
+  const findings = [];
+  for (const activity of activities) {
+    const declared = cityStem(activity?.city);
+    if (declared && declared !== expected) {
+      findings.push({
+        check: 'venueCityMismatch',
+        severity: 'high',
+        detail: `"${activity.name}" is filed under ${shortCity(activity.city)}, list is ${shortCity(scenarioCity)}`,
+        names: [activity.name]
+      });
+      continue;
+    }
+
+    const venueText = `${activity?.venue_name || ''} ${activity?.location?.address || ''}`;
+    const foreign = foreignCities.find((c) => c.pattern.test(venueText));
+    if (foreign) {
+      findings.push({
+        check: 'venueCityMismatch',
+        severity: 'high',
+        detail: `"${activity.name}" is filed under ${shortCity(scenarioCity)} but its venue is in ${foreign.name}`,
+        names: [activity.name]
+      });
+    }
+  }
+  return findings;
 }
 
 const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // A city's own name is rarely how an activity spells it: the trip carries
 // "Shangri-La City, Diqing Tibetan Autonomous Prefecture, Yunnan, China" and the
-// activity says "Shangri-La". Match the short form and its bare stem.
+// activity writes "Shangri-La". Comparing the full short names called 29 of 30
+// activities a city mismatch and buried the one real one, so every comparison
+// here runs on the bare stem.
+const ADMIN_SUFFIX = /\s+(City|Prefecture|Province|Municipality|Metropolitan Area)$/i;
+
+function cityStem(cityName) {
+  return shortCity(cityName).replace(ADMIN_SUFFIX, '').trim().toLowerCase();
+}
+
 function cityNamePattern(cityName) {
   const short = shortCity(cityName);
   if (!short) return null;
-  const stem = short.replace(/\s+(City|Prefecture|Province|Municipality)$/i, '');
-  const variants = [...new Set([short, stem])].map(escapeRegex);
+  const variants = [...new Set([short, short.replace(ADMIN_SUFFIX, '')])].map(escapeRegex);
   return new RegExp(`\\b(${variants.join('|')})\\b`, 'i');
 }
 
@@ -207,7 +237,7 @@ function runChecks(activities = [], scenario = {}) {
   const findings = [
     ...typeMixVsProfile(activities, scenario.profile),
     ...repeatedVenues(activities),
-    ...venueCityMismatch(activities, city.name),
+    ...venueCityMismatch(activities, city.name, scenario.otherCities),
     ...crossCityDayTrips(activities, scenario.otherCities),
     ...selfContradictingPitfall(activities),
     ...mealCoverage(activities, stayDays(city))

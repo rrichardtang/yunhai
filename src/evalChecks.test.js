@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
 const {
   runChecks,
   typeMixVsProfile,
@@ -179,6 +181,104 @@ test('runChecks over a whole scenario reports each defect once, keyed by check',
   assert.equal(byCheck.selfContradictingPitfall, 1);
   assert.ok(byCheck.typeMixVsProfile >= 1);
   assert.equal(total, Object.values(byCheck).reduce((a, b) => a + b, 0));
+});
+
+// --- against the real 2026-08-08 lists, not synthetic shapes -----------------
+//
+// evals/fixtures/ holds the four saved lists the human blind read adjudicated:
+// the Sonnet 4.6 arm it rejected and the gpt-5.6+lean arm it cleared, both
+// cities. These are the only ground truth the harness has, and the tests below
+// assert that the checks independently reproduce what the human concluded. A
+// synthetic fixture cannot do this job — I would write it to match the check.
+const fixture = (name) => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'evals', 'fixtures', name), 'utf8'));
+
+const YUNNAN_PROFILE = {
+  answers: {
+    pace: 3, foodTravel: 5, outdoorNature: 5, shoppingPerson: 4,
+    museumPerson: 2, livePerformances: 2, structuredTours: 1, nightlifeBars: 1
+  }
+};
+const LIJIANG = { name: 'Lijiang, Yunnan, China', startDate: '2026-10-08', endDate: '2026-10-13' };
+const SHANGRI_LA = { name: 'Shangri-La City, Diqing Tibetan Autonomous Prefecture, Yunnan, China', startDate: '2026-10-13', endDate: '2026-10-17' };
+const leg = (city, other) => ({ city, otherCities: [{ name: other.name }], profile: YUNNAN_PROFILE });
+
+test('the checks clear the lean arm on both cities, as the blind read did', () => {
+  // "gpt-5.6+lean has none of these" — changelog [2026-08-08]. Any finding here
+  // is a false positive, and false positives are what get a harness switched off.
+  for (const [file, scenario] of [
+    ['gpt-5.6+lean-run1-Shangri-La_City.json', leg(SHANGRI_LA, LIJIANG)],
+    ['gpt-5.6+lean-run1-Lijiang.json', leg(LIJIANG, SHANGRI_LA)]
+  ]) {
+    const { findings } = runChecks(fixture(file), scenario);
+    assert.deepEqual(findings.map((f) => `${f.check}: ${f.detail}`), [], file);
+  }
+});
+
+test('the checks reproduce the blind read\'s 12 tours against structuredTours 1/5', () => {
+  // The read counted 12 across 66 activities in both cities.
+  const perCity = [
+    typeMixVsProfile(fixture('sonnet-4-6-run1-Shangri-La_City.json'), YUNNAN_PROFILE),
+    typeMixVsProfile(fixture('sonnet-4-6-run1-Lijiang.json'), YUNNAN_PROFILE)
+  ].map((findings) => findings.find((f) => f.detail.includes('structuredTours')));
+
+  assert.ok(perCity.every(Boolean), 'both cities flag the tour mix');
+  const total = perCity.reduce((sum, f) => sum + f.names.length, 0);
+  assert.equal(total, 12);
+});
+
+test('the checks reproduce Compass x3 and Xiaocai x2 in Shangri-La', () => {
+  const findings = repeatedVenues(fixture('sonnet-4-6-run1-Shangri-La_City.json'));
+  const meals = findings.filter((f) => f.severity === 'high').map((f) => f.detail);
+  assert.equal(meals.length, 2);
+  assert.ok(meals.some((d) => /"Compass, Shangri-La" used 3x \(3 of them meals\)/.test(d)), meals.join(' | '));
+  assert.ok(meals.some((d) => /"Xiaocai Cafe, Shangri-La" used 2x \(2 of them meals\)/.test(d)), meals.join(' | '));
+});
+
+test('the gorge is caught by its venue city, not its declared city', () => {
+  // The defect the read named: filed under Shangri-La, venue_name reads
+  // "Tiger Leaping Gorge, Lijiang". Reading activity.city alone sees nothing
+  // here — it says Shangri-La, which is correct for the leg.
+  const activities = fixture('sonnet-4-6-run1-Shangri-La_City.json');
+  const gorge = activities.find((a) => /Tiger Leaping/i.test(a.name));
+  assert.equal(gorge.city, 'Shangri-La', 'the declared city is not the tell');
+  assert.match(gorge.venue_name, /Lijiang/, 'the venue is');
+
+  const findings = venueCityMismatch(activities, SHANGRI_LA.name, [{ name: LIJIANG.name }]);
+  assert.equal(findings.length, 1);
+  assert.match(findings[0].detail, /Tiger Leaping Gorge.*its venue is in Lijiang/);
+});
+
+test('"Shangri-La" filed under "Shangri-La City" is not a mismatch', () => {
+  // Comparing full short names flagged 29 of 30 activities and buried the one
+  // real finding. Every comparison runs on the bare administrative stem.
+  const activities = fixture('sonnet-4-6-run1-Shangri-La_City.json');
+  const declaredMismatches = venueCityMismatch(activities, SHANGRI_LA.name, [])
+    .filter((f) => /is filed under/.test(f.detail) && /list is/.test(f.detail));
+  assert.deepEqual(declaredMismatches, []);
+});
+
+test('the cross-city day trip is caught in the Lijiang list', () => {
+  const findings = crossCityDayTrips(fixture('sonnet-4-6-run1-Lijiang.json'), [{ name: SHANGRI_LA.name }]);
+  assert.equal(findings.length, 1);
+  assert.deepEqual(findings[0].names, ['Lijiang to Shangri-La Scenic Drive (Day Trip)']);
+});
+
+test('the Meili entry is caught by its own pitfall', () => {
+  const findings = selfContradictingPitfall(fixture('sonnet-4-6-run1-Shangri-La_City.json'));
+  assert.ok(findings.some((f) => /Meili Snow Mountain/.test(f.names[0]) && /overnight/.test(f.detail)));
+});
+
+test('the rejected arm outscores the cleared arm on every city', () => {
+  // The single assertion the whole harness rests on: the arm a human rejected
+  // must produce more findings than the arm the same human cleared.
+  for (const [bad, good, scenario] of [
+    ['sonnet-4-6-run1-Shangri-La_City.json', 'gpt-5.6+lean-run1-Shangri-La_City.json', leg(SHANGRI_LA, LIJIANG)],
+    ['sonnet-4-6-run1-Lijiang.json', 'gpt-5.6+lean-run1-Lijiang.json', leg(LIJIANG, SHANGRI_LA)]
+  ]) {
+    const rejected = runChecks(fixture(bad), scenario).total;
+    const cleared = runChecks(fixture(good), scenario).total;
+    assert.ok(rejected > cleared, `${bad} (${rejected}) must outscore ${good} (${cleared})`);
+  }
 });
 
 test('a clean list produces no findings at all', () => {
