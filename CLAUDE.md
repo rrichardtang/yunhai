@@ -16,15 +16,36 @@ Do not ask the user whether to read the notes — just do it.
 
 ## Commands
 
+**Before handing the owner any command to run, state these two preconditions.** Both have already
+cost a round trip once.
+
+1. **Working directory:**
+   `/docker/openclaw-fbdq/data/.openclaw/workspace-sherlock/projects/travelplanner-staging`
+   This is the tree with the API keys and the saved `data/bakeoff/` artifacts. There is a second
+   checkout at `projects/travelplanner` that has neither.
+2. **Node 22 on the host.** `npm test` passes a glob to `node --test`, and glob support in the test
+   runner landed in Node 21 — an older Node fails confusingly rather than reporting its version.
+   `apt install npm` pulls a Node too old; use NodeSource
+   (`curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt install -y nodejs`).
+
 ```bash
 npm start          # Run the server (node src/server.js, port 3457)
-npm test           # Run all tests (node --test src/*.test.js)
+npm test           # Run all tests (node --test "src/**/*.test.js")
 ```
 
 To run a single test file:
 ```bash
 node --test src/tripHealth.test.js
 ```
+
+Prompt-regression harness (see `scripts/evalPlan.js` header for flags):
+```bash
+node scripts/evalPlan.js --smoke --candidate lean --refresh-baseline   # null-change control
+node scripts/evalPlan.js --candidate default                            # known-regression control
+node scripts/evalChat.js                                                # chat, cents
+```
+These read keys via `dotenv` from the **current working directory**, so a `.env` must exist in the
+tree you run from — `/docker/travelplanner/.env` is not picked up automatically.
 
 Local setup:
 ```bash
