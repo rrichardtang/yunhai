@@ -119,10 +119,20 @@ app.get('/debug/bakeoff', requireConfiguredAuth, requireOwner, (req, res) => {
     ? 'Blind read:  /debug/bakeoff?file=blind-read.md'
     : 'Blind read:  not generated yet — run `node scripts/blindRead.js`';
 
+  // Prompt-regression verdicts from scripts/evalPlan.js and scripts/evalChat.js.
+  // Named separately from report.md so a bake-off and an eval can coexist here.
+  const evalReports = [
+    ['judge-report.md', 'Prompt eval:', 'node scripts/evalPlan.js --candidate <prompt>'],
+    ['chat-judge-report.md', 'Chat eval:', 'node scripts/evalChat.js']
+  ].map(([file, label, how]) => (entries.includes(file)
+    ? `${label}  /debug/bakeoff?file=${file}`
+    : `${label}  not run yet — \`${how}\``));
+
   res.type('text/plain').send([
     report,
     'Raw rows:  /debug/bakeoff?file=results.json',
     blindRead,
+    ...evalReports,
     '',
     `Underlying activity lists (${activityLists.length}):`,
     ...activityLists

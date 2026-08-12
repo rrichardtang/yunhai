@@ -4,6 +4,52 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-12] LLM-as-a-judge prompt-regression harness (plan + chat)
+
+Two commands that answer "did this prompt edit degrade anything else", built on the existing
+bake-off rather than beside it. 316/316 pass (was 273); everything below is keyless except the
+runners themselves.
+
+**Layer 1 — deterministic invariants, no LLM.**
+- `src/evalChecks.js`: `typeMixVsProfile`, `repeatedVenues`, `venueCityMismatch`,
+  `crossCityDayTrips`, `selfContradictingPitfall`, `mealCoverage`. Every one encodes a defect the
+  2026-08-08 blind read found by hand; five of that read's six findings were countable and nothing
+  was counting them.
+- `src/evalChatChecks.js`: markdown violations, invented links, sentence cap, signal capture and
+  signal softening (an allergy downgraded to "avoids" is invisible in the reply text).
+- `src/evalChecks.test.js`, `src/evalChatChecks.test.js`: 19 tests fixtured on the real historical
+  failures — 12 tours vs `structuredTours 1/5`, Compass x3, the Lijiang-city gorge entry, the
+  cross-city drive, the Meili overnight pitfall.
+
+**Layer 2 — blind pairwise judge with position swap.**
+- `scripts/lib/judge.js`: each pair is judged twice with the slots flipped; a criterion scores a win
+  only when the same *content* wins from both slots, and the same *slot* winning twice is recorded
+  as a tie. Defaults to `claude-sonnet-5` (`--judge opus` to escalate), cross-family from the
+  GPT-5.6 planner and GPT-5.4-mini concierge. An unparseable judge reply degrades to ties.
+
+**Runners and corpus.**
+- `scripts/evalPlan.js`, `scripts/evalChat.js` (`npm run eval:plan` / `eval:chat`), flags
+  `--candidate --scenarios --smoke --refresh-baseline --judge --no-judge`.
+- `evals/scenarios/plan/*.json` — 5 committed profiles chosen to oppose each other:
+  `owner-yunnan` (comparability, keeps its real 6-day dates and second city), `museum-lover`
+  (over-correction; also the `--smoke` scenario), `family-kids`, `budget-tight`, `nightlife-heavy`.
+- `evals/scenarios/chat/*.json` — 5 cases: the Draft mis-inference, an empty search result set, the
+  allergy signal, an itinerary-answerable question, and format discipline.
+- `scripts/lib/baselineCache.js`: the baseline half is cached on
+  `(scenario, prompt hash, model id)` and self-invalidates when `servedModel` changes.
+
+**Shared with the bake-off rather than copied.** `installBraveCassette` moved to
+`scripts/lib/braveCassette.js`; `PRICING`, `costUsd`, `instrument`, `openaiArm`, `anthropicArm`,
+`targetActivityCount`, `distinctVenues`, `summariseOutcomes` moved to `scripts/lib/planArm.js`.
+`planCityBakeoff.js` now requires both and is otherwise unchanged. Those functions had no tests
+before the move and now have five.
+
+- `scripts/blindRead.js`: exports `renderActivity`, so the judge reads exactly what a human blind
+  read sees.
+- `src/server.js`: `/debug/bakeoff` lists `judge-report.md` and `chat-judge-report.md`, naming the
+  command to produce each when absent. Eval artifacts use an `eval-` prefix, which does not match
+  `blindRead.loadRuns`' `<arm>-run<N>-<city>.json` pattern, so the two tools ignore each other.
+
 ## [2026-08-08] Production planning switched to GPT-5.6
 
 `planCity` now defaults to `gpt-5.6` with `SYSTEM_PROMPT_GPT_LEAN`, one call per city

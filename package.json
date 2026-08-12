@@ -5,7 +5,9 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test \"src/**/*.test.js\""
+    "test": "node --test \"src/**/*.test.js\"",
+    "eval:plan": "node scripts/evalPlan.js",
+    "eval:chat": "node scripts/evalChat.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

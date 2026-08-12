@@ -1,0 +1,32 @@
+{
+  "id": "museum-lover",
+  "label": "The inverse of the owner profile — museums and performances at 5/5",
+  "catches": "Over-correction. SYSTEM_PROMPT_GPT_LEAN's measured win was suppressing tours and museums for a traveler who rated them 1/5. The failure a future prompt edit is most likely to introduce is making that suppression unconditional, and this is the only scenario that would notice. Used alone by --smoke for that reason.",
+  "city": {
+    "name": "Vienna, Austria",
+    "startDate": "2026-09-14",
+    "endDate": "2026-09-16",
+    "leaveTime": "18:00",
+    "latitude": 48.2082,
+    "longitude": 16.3738,
+    "accommodation": { "address": "" }
+  },
+  "otherCities": [],
+  "numTravelers": 2,
+  "numChildren": 0,
+  "profile": {
+    "answers": {
+      "pace": 3,
+      "foodTravel": 2,
+      "outdoorNature": 2,
+      "shoppingPerson": 2,
+      "museumPerson": 5,
+      "livePerformances": 5,
+      "structuredTours": 4,
+      "nightlifeBars": 2,
+      "shoppingInterests": "",
+      "budgetStyle": "Comfortable spending on culture; indifferent to food cost"
+    },
+    "aboutMe": "Art history background. Travels for museums, classical concerts and opera, and will happily spend a full day inside one collection. Guided tours with a specialist are a highlight, not a chore. Food is fuel between exhibitions."
+  }
+}

@@ -106,4 +106,4 @@ if (require.main === module) {
   console.log(`${runs.length} list(s) → ${path.relative(process.cwd(), dest)}`);
 }
 
-module.exports = { buildReport, loadRuns, labelFor };
+module.exports = { buildReport, loadRuns, labelFor, renderActivity };

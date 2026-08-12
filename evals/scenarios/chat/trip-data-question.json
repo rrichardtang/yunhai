@@ -1,0 +1,35 @@
+{
+  "id": "trip-data-question",
+  "label": "Answerable from the itinerary already in the prompt",
+  "catches": "Needless searching and context blindness. The cost and booking state are both in the schedule block, so a correct answer needs no web search at all — an edit that makes the model reach for the tool anyway burns Brave quota against a 2000/month free tier.",
+  "message": "how much is the Songzanlin visit and have I booked it yet?",
+  "searchResults": "1. Songzanlin Monastery — https://example-travel.test/songzanlin",
+  "prefSummary": "",
+  "tripContext": {
+    "tripName": "Yunnan",
+    "step": "review",
+    "cities": [
+      { "name": "Shangri-La City, Yunnan, China", "startDate": "2026-10-13", "endDate": "2026-10-17", "leaveTime": "18:00", "accommodation": { "address": "Dukezong Old Town" } }
+    ],
+    "scheduledByDay": [
+      {
+        "date": "2026-10-14",
+        "city": "Shangri-La City",
+        "activities": [
+          {
+            "time": "09:30",
+            "name": "Songzanlin Monastery",
+            "type": "landmark",
+            "durationMin": 150,
+            "location": "Songzanlin, Shangri-La",
+            "costUsd": 16,
+            "costType": "per_person",
+            "whyItFits": "The largest Tibetan monastery in Yunnan, walkable in a morning.",
+            "booking": { "type": "attraction", "reference": null }
+          }
+        ]
+      }
+    ]
+  },
+  "expect": { "maxSentences": 3 }
+}

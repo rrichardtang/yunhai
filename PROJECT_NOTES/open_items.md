@@ -1,5 +1,45 @@
 # Open Items
 
+## [2026-08-12] Calibrate the eval harness before trusting a verdict from it
+**Status:** Pending input (needs keys)
+**Description:** The harness is built and unit-tested, but an eval harness is a measuring
+instrument and none of its controls have been run. Four, in priority order, and the first two cost
+nothing.
+**Context:** changelog/decisions [2026-08-12]. `JUDGE_LOSS_MARGIN` in `scripts/lib/evalReport.js`
+is currently a guess (2), not a measured threshold.
+**Next action:**
+1. **(free)** Point `runChecks` at the saved `sonnet-4-6-run1-Shangri-La.json` from the 2026-08-08
+   bake-off, if it still exists on the staging box, and confirm it independently reproduces the
+   human read — 12 tours, Compass x3, the Lijiang-city gorge entry. If it does not, the checks are
+   wrong, not the model. **Copy two of those lists into `evals/fixtures/` while doing it** — they
+   live in `data/`, which is gitignored, and they are the only ground truth the harness has.
+2. **(~$0.52)** Null-change control: `node scripts/evalPlan.js --smoke --candidate lean
+   --refresh-baseline`. Expect PASS with judge criteria tied. A DEGRADED here means the harness is
+   measuring its own noise and no verdict should be trusted.
+3. **(~$1.34)** Known-regression control: `--candidate default`. This is the arm the blind read
+   already rejected, so it must return DEGRADED and name the tour-mix and repeated-venue findings.
+   A PASS here means the harness cannot detect the one regression we have proof of — this is the
+   step that decides whether it is worth keeping.
+4. **(~$4)** Noise floor: run the same prompt against itself three times and count how often a
+   criterion wins by chance across 5 scenarios. Set `JUDGE_LOSS_MARGIN` above that number.
+Then check the baseline cache does what it claims: re-run step 3 unchanged and confirm 5 generation
+calls rather than 10, then hand-edit a cached entry's `servedModel` and confirm the next run
+discards it.
+
+## [2026-08-12] Wire auto-arrange into the eval harness (phase 2)
+**Status:** Deferred
+**Description:** Plan and chat are wired; arrange is not. `runChatTurn` was already an injectable
+seam and `planCity` already took `{ generate }`, but arrange's LLM call is an inline closure in the
+route — `assignDays` and `sanitizeAssignment` at `src/routes/activities.js:535`-`586`. Reproducing
+them in the harness would measure the copy, so the extraction has to come first.
+**Context:** decisions [2026-08-12]. Worth doing on its own merits: that path currently cannot be
+tested at all without HTTP and a live key.
+**Next action:** Extract both into `src/services/arrangeAssign.js` as a behaviour-preserving
+refactor with its own tests, then add `scripts/evalArrange.js`. Most arrange quality is already
+deterministic (`arrangeScheduler` owns times and ordering), so its eval is largely computable —
+per-day haversine spread and load balance — with a thin judge on top. Note in the report that a
+Claude judge is same-family with the Sonnet 4.6 arrange model, unlike the plan and chat arms.
+
 ## [2026-08-08] Verify the GPT-5.6 switch on a keyed environment before it reaches users
 **Status:** Pending input (needs deploy)
 **Description:** `planCity` now runs `gpt-5.6` with `SYSTEM_PROMPT_GPT_LEAN` (decisions

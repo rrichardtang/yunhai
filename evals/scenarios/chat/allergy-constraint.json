@@ -1,0 +1,22 @@
+{
+  "id": "allergy-constraint",
+  "label": "Signal extraction with severity intact",
+  "catches": "Softening. The prompt is explicit that allergies are CONSTRAINTS, never preferences, and that \"allergic to X\" must not be rewritten as \"avoids X\" or \"dislikes X\". A downgraded signal is silent in the reply text and only visible in the signals array.",
+  "message": "just so you know I'm allergic to sushi, keep that in mind for the food suggestions",
+  "searchResults": null,
+  "prefSummary": "",
+  "tripContext": {
+    "tripName": "Yunnan",
+    "step": "activities",
+    "cities": [
+      { "name": "Lijiang, Yunnan, China", "startDate": "2026-10-08", "endDate": "2026-10-13", "leaveTime": "18:00", "accommodation": { "address": "Old Town, Lijiang" } }
+    ]
+  },
+  "expect": {
+    "maxSentences": 3,
+    "maxLinks": 0,
+    "signals": [
+      { "kind": "constraint", "mustInclude": "sushi", "mustNotMatch": "avoid|dislike|prefer|not a fan|rather not" }
+    ]
+  }
+}

@@ -4,6 +4,78 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-12] Prompt regressions are judged pairwise with a position swap, never by absolute score
+
+**Decision:** The judge is shown two lists at once and asked which is better per criterion. Each
+pair is judged twice with the slots flipped, and a criterion scores a win only when the same
+*content* wins from both slots. The same *slot* winning twice is recorded as a tie.
+
+**Reasoning:** The harness exists to compare across time, and absolute 1-5 scoring cannot. Scores
+cluster at 4, so a real regression reads as 4.2 → 4.1 and is indistinguishable from noise; the scale
+is re-invented on every call, so two runs are not measured against the same ruler; and it re-scales
+silently when the provider updates the judge model, which breaks precisely the March-vs-August
+comparison the harness is for. Pairwise asks the question we actually have — "is the candidate
+worse?" — and needs no calibration between runs. The swap is needed because judges favour whichever
+list they see first; without it, a "winner" can be an artifact of which slot the candidate landed in.
+
+**Alternatives rejected:** Absolute rubric scoring with a tracked ledger (drifts, cannot gate).
+Single-ordering pairwise (cheaper by half, but reports position bias as a result). Judging with the
+same model family as the generator (self-preference bias; the judge is Claude, the planner GPT-5.6).
+
+**Tradeoffs:** Pairwise gives direction, not magnitude — "worse on specificity", never "12% worse" —
+and every result is relative to the one baseline compared against, so slow drift across many
+releases is invisible. Costs 2 judge calls per scenario instead of 1, which is ~$0.32 against ~$1.34
+of generation, so the reliability is close to free.
+
+## [2026-08-12] The baseline arm is cached and self-invalidating, not re-run every time
+
+**Decision:** The baseline half of a pairwise run is cached on
+`(scenario id, system prompt hash, model id)` and reused until one of those changes, until
+`--refresh-baseline`, or until the arm running now reports a different `servedModel` than the cached
+run got. The owner originally chose "re-run the baseline every time"; this supersedes that, and the
+protection it was bought for is preserved by the served-model check.
+
+**Reasoning:** Two measured points from the 2026-08-08 bake-off (33 activities for $0.308; 25
+activities over 2 calls for $0.476) solve `cost = F + m·A` to F ≈ $0.195 per call and m ≈ $0.0034
+per activity. Cost is dominated by calls, not activity count, because the system prompt and the
+Brave research block ride on every call. Halving the calls is therefore the only large lever
+available — it takes a 5-scenario run from ~$3.10 to ~$1.66 and a smoke run to $0.26. What re-running
+the baseline actually bought was protection from a provider-side model change, and that change is
+already observable: `instrument()` records `servedModel` and `PRICING` keys on it.
+
+**Alternatives rejected:** A permanently frozen committed baseline (cheapest, but cannot tell a
+prompt regression from a model update months later). Shortening every scenario to cut tokens — the
+arithmetic says 33 → 18 activities saves only ~17%, because the fixed per-call cost dominates; the
+3-day stays were kept anyway, for wall clock and for Places lookups, which are billed separately.
+
+**Tradeoffs:** Drift inside one unchanged `servedModel` id goes unnoticed. The report prints every
+baseline's age and served model so the residual is visible rather than assumed, and the
+known-regression control is meant to be re-run with `--refresh-baseline` before shipping.
+
+## [2026-08-12] Countable defects belong in code, not in the judge
+
+**Decision:** Two layers. Anything a `for` loop can decide is a deterministic check in
+`src/evalChecks.js` / `src/evalChatChecks.js`, run keyless under `npm test`. The judge is scoped to
+what genuinely needs reading: profile fit, specificity, tip authenticity, internal coherence.
+
+**Reasoning:** Of the six defects the 2026-08-08 blind read found by hand, five were countable —
+tour count against a profile rating, repeated venue names, a venue city that disagrees with its
+list, a cross-city day trip, a pitfall that argues against its own activity. Nothing counted them,
+and the changelog notes that the two lean-prompt lines which fixed them show up in *no* metric
+column, so deleting those lines today is an invisible regression. A named check that fails is exact,
+free, instant and auditable; a judge score of 3.8 is none of those. This is also the direct answer to
+the standing risk that three measurements in a row were invalidated by our own pipeline rather than
+by the models.
+
+**Alternatives rejected:** Judge-only (fuzzy answers to questions with exact ones, and judge tokens
+spent on arithmetic). Checks-only (catches known failures, blind to new ones).
+
+**Tradeoffs:** Two places to maintain, and the invariants encode today's understanding of what a
+defect is — a check whose threshold is wrong produces false positives, which is the fastest way to
+get a harness switched off. Thresholds were therefore set to fire on the historical cases and stay
+silent on the corrected ones, and regression is decided on counts rather than on which specific
+findings differ, so a lateral move between two non-deterministic runs does not read as a regression.
+
 ## [2026-08-08] `planCity` runs GPT-5.6 on a single call — supersedes the earlier "stays on claude-sonnet-4-6"
 
 **Decision:** `planCity` defaults to `gpt-5.6` via `openaiGenerator()`, paired with `SYSTEM_PROMPT_GPT_LEAN`, in one call per city. This **supersedes** the earlier entry in this file that closed the question on `claude-sonnet-4-6`; that entry stays as written per the append-only rule, but its conclusion is no longer in force.

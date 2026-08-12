@@ -1,0 +1,32 @@
+{
+  "id": "budget-tight",
+  "label": "Hard budget ceiling, no splurge allowance",
+  "catches": "Cost drift. The owner profile permits one splurge meal per city, so it cannot detect a prompt edit that raises suggested costs across the board. This one has no splurge clause at all.",
+  "city": {
+    "name": "Mexico City, Mexico",
+    "startDate": "2026-09-28",
+    "endDate": "2026-09-30",
+    "leaveTime": "18:00",
+    "latitude": 19.4326,
+    "longitude": -99.1332,
+    "accommodation": { "address": "" }
+  },
+  "otherCities": [],
+  "numTravelers": 1,
+  "numChildren": 0,
+  "profile": {
+    "answers": {
+      "pace": 4,
+      "foodTravel": 5,
+      "outdoorNature": 3,
+      "shoppingPerson": 1,
+      "museumPerson": 3,
+      "livePerformances": 2,
+      "structuredTours": 1,
+      "nightlifeBars": 3,
+      "shoppingInterests": "",
+      "budgetStyle": "Strict daily cap. Street food and free public sights only; no paid tours, no splurge meals, nothing over $15 a head"
+    },
+    "aboutMe": "Backpacking on a fixed daily budget. Eats where locals queue, walks everywhere, and treats any paid admission as a real decision. Would rather see four free things than one ticketed one."
+  }
+}

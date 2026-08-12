@@ -74,6 +74,36 @@ test('an arm label containing "+" is reachable from the listing', async () => {
   fs.rmSync(path.join(OUT_DIR, name));
 });
 
+test('the eval verdicts are listed once written, and named as commands before', async () => {
+  const before = await request(appAs('user_owner')).get('/debug/bakeoff');
+  assert.match(before.text, /Prompt eval:\s+not run yet — `node scripts\/evalPlan\.js/);
+  assert.match(before.text, /Chat eval:\s+not run yet — `node scripts\/evalChat\.js`/);
+
+  fs.writeFileSync(path.join(OUT_DIR, 'judge-report.md'), '# Prompt eval\n\nVERDICT: DEGRADED\n');
+  const after = await request(appAs('user_owner')).get('/debug/bakeoff');
+  assert.match(after.text, /Prompt eval:\s+\/debug\/bakeoff\?file=judge-report\.md/);
+
+  const served = await request(appAs('user_owner')).get('/debug/bakeoff?file=judge-report.md');
+  assert.equal(served.status, 200);
+  assert.match(served.text, /VERDICT: DEGRADED/);
+  fs.rmSync(path.join(OUT_DIR, 'judge-report.md'));
+});
+
+test('eval activity lists do not collide with the blind read\'s run files', async () => {
+  // blindRead.loadRuns matches `<arm>-run<N>-<city>.json`; an eval list is named
+  // `eval-<scenario>-candidate.json` precisely so the two tools ignore each other.
+  const { loadRuns } = require('../scripts/blindRead');
+  const name = 'eval-museum-lover-candidate.json';
+  fs.writeFileSync(path.join(OUT_DIR, name), JSON.stringify([{ name: 'Belvedere' }]));
+
+  assert.equal(loadRuns(OUT_DIR).some((r) => r.arm.startsWith('eval-')), false);
+
+  const res = await request(appAs('user_owner')).get(`/debug/bakeoff?file=${name}`);
+  assert.equal(res.status, 200, 'but it is still reachable directly');
+  assert.match(res.text, /Belvedere/);
+  fs.rmSync(path.join(OUT_DIR, name));
+});
+
 test('a non-owner cannot read bake-off results', async () => {
   const res = await request(appAs('user_someone_else')).get('/debug/bakeoff');
   assert.equal(res.status, 403);

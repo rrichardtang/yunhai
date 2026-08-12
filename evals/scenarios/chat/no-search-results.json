@@ -1,0 +1,16 @@
+{
+  "id": "no-search-results",
+  "label": "Bucket A where the search comes back empty",
+  "catches": "Invented URLs. The prompt forbids placeholder hosts and bare domains outright, and an empty search result set is the condition that tempts one. Zero links is the only correct answer here.",
+  "message": "any good late-night noodle places near where I'm staying?",
+  "searchResults": "",
+  "prefSummary": "",
+  "tripContext": {
+    "tripName": "Yunnan",
+    "step": "review",
+    "cities": [
+      { "name": "Lijiang, Yunnan, China", "startDate": "2026-10-08", "endDate": "2026-10-13", "leaveTime": "18:00", "accommodation": { "address": "Guanyi Street, Old Town, Lijiang", "lat": 26.8721, "lng": 100.2299 } }
+    ]
+  },
+  "expect": { "maxSentences": 3, "maxLinks": 0 }
+}

@@ -1,0 +1,32 @@
+{
+  "id": "nightlife-heavy",
+  "label": "Nightlife at 5/5 and a non-stop pace",
+  "catches": "The inverse of the bar-crawl defect. The 2026-08-08 read faulted Sonnet for an Evening Bar Crawl against nightlifeBars 1/5; a prompt edit that over-learns that lesson would starve this traveler, and typeMixVsProfile's under-delivery arm fires here.",
+  "city": {
+    "name": "Berlin, Germany",
+    "startDate": "2026-10-05",
+    "endDate": "2026-10-07",
+    "leaveTime": "18:00",
+    "latitude": 52.52,
+    "longitude": 13.405,
+    "accommodation": { "address": "" }
+  },
+  "otherCities": [],
+  "numTravelers": 2,
+  "numChildren": 0,
+  "profile": {
+    "answers": {
+      "pace": 5,
+      "foodTravel": 4,
+      "outdoorNature": 1,
+      "shoppingPerson": 3,
+      "museumPerson": 2,
+      "livePerformances": 4,
+      "structuredTours": 1,
+      "nightlifeBars": 5,
+      "shoppingInterests": "records, vintage clothing",
+      "budgetStyle": "Spends freely on going out, saves on daytime"
+    },
+    "aboutMe": "Here for the music. Wants the bars, the clubs and the live venues locals actually use, plus enough daytime to justify staying awake. Starts late, finishes later. Not interested in nature or guided anything."
+  }
+}

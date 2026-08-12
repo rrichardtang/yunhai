@@ -1,0 +1,16 @@
+{
+  "id": "app-draft-button",
+  "label": "Bucket B — the documented mis-inference",
+  "catches": "The chat prompt names \"Draft\" explicitly as the example of a feature whose English meaning misleads: it is an auto-schedule trigger, not \"save a draft of edits\". An edit that weakens the Bucket B routing or trims the website guide shows up here first.",
+  "message": "what does the Draft button actually do?",
+  "searchResults": null,
+  "prefSummary": "",
+  "tripContext": {
+    "tripName": "Yunnan",
+    "step": "arrange",
+    "cities": [
+      { "name": "Lijiang, Yunnan, China", "startDate": "2026-10-08", "endDate": "2026-10-13", "leaveTime": "18:00", "accommodation": { "address": "Old Town, Lijiang" } }
+    ]
+  },
+  "expect": { "maxSentences": 3, "maxLinks": 0 }
+}

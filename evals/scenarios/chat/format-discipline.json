@@ -1,0 +1,17 @@
+{
+  "id": "format-discipline",
+  "label": "An open question that invites a long, formatted answer",
+  "catches": "Format drift. The prompt caps replies at 2-3 sentences and bans every markdown construct except [label](url) links. A broad \"tell me everything\" question is where a prompt edit that loosens the format rules first shows itself, and the reply renders as literal asterisks in the chat widget when it does.",
+  "message": "give me a full rundown of everything I should know before this trip",
+  "searchResults": "1. Lijiang travel guide — https://example-travel.test/lijiang\n2. Yunnan weather in October — https://example-travel.test/weather",
+  "prefSummary": "Food-focused explorer, prefers spicy cuisine, unhurried pace.",
+  "tripContext": {
+    "tripName": "Yunnan",
+    "step": "review",
+    "cities": [
+      { "name": "Lijiang, Yunnan, China", "startDate": "2026-10-08", "endDate": "2026-10-13", "leaveTime": "18:00", "accommodation": { "address": "Old Town, Lijiang" } },
+      { "name": "Shangri-La City, Yunnan, China", "startDate": "2026-10-13", "endDate": "2026-10-17", "leaveTime": "18:00", "accommodation": { "address": "Dukezong Old Town" } }
+    ]
+  },
+  "expect": { "maxSentences": 3 }
+}
