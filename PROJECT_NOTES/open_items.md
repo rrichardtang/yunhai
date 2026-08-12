@@ -8,7 +8,7 @@ nothing.
 **Context:** changelog/decisions [2026-08-12]. `JUDGE_LOSS_MARGIN` in `scripts/lib/evalReport.js`
 is currently a guess (2), not a measured threshold.
 **Next action:**
-1. **(free)** Point `runChecks` at the saved `sonnet-4-6-run1-Shangri-La.json` from the 2026-08-08
+1. **(free)** Point `runChecks` at the saved `sonnet-4-6-run1-Shangri-La_City.json` from the 2026-08-08
    bake-off, if it still exists on the staging box, and confirm it independently reproduces the
    human read — 12 tours, Compass x3, the Lijiang-city gorge entry. If it does not, the checks are
    wrong, not the model. **Copy two of those lists into `evals/fixtures/` while doing it** — they
