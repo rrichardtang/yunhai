@@ -133,7 +133,35 @@ async function main() {
   let generationCost = 0;
   let generationCalls = 0;
 
+  // Re-judge the artifacts already on disk. Rubric wording, criteria and judge
+  // model are all cheap to change; regenerating to try one is not.
+  const judgeOnly = args.includes('--judge-only');
+  const savedArm = (scenarioId, armName) => {
+    const file = path.join(OUT_DIR, `eval-${scenarioId}-${armName}.json`);
+    if (!fs.existsSync(file)) {
+      console.error(`--judge-only needs ${path.basename(file)}; run without it first.`);
+      process.exit(1);
+    }
+    return { activities: JSON.parse(fs.readFileSync(file, 'utf8')), source: 'from disk' };
+  };
+
   for (const scenario of scenarios) {
+    if (judgeOnly) {
+      const baseline = savedArm(scenario.id, 'baseline');
+      const candidateRun = savedArm(scenario.id, 'candidate');
+      perScenario.push({
+        scenario: scenario.id,
+        definition: scenario,
+        baseline,
+        candidate: candidateRun,
+        baselineChecks: runChecks(baseline.activities, scenario),
+        candidateChecks: runChecks(candidateRun.activities, scenario),
+        target: targetActivityCount(scenario.city, scenario.profile)
+      });
+      console.log(`  ${scenario.id}: ${candidateRun.activities.length} activities from disk`);
+      continue;
+    }
+
     process.stdout.write(`  ${scenario.id}: candidate ... `);
     const candidateRun = await generate(scenario, candidate.text);
     generationCalls += 1;
@@ -163,25 +191,31 @@ async function main() {
   let tally = {};
   const judgeNotes = [];
   let judgeCost = 0;
+  let judgeHealth = null;
 
   if (!skipJudge) {
     console.log(`\nJudging (${judgeModel}, 2 orderings per scenario) ...`);
     const call = anthropicJudge(judgeModel);
     const outcomes = [];
+    const health = { unparsed: 0, calls: 0, head: null };
     for (const row of perScenario) {
-      const { outcome, usage } = await comparePair({
+      const { outcome, usage, unparsed, unparsedHead } = await comparePair({
         call,
         context: judgeContext(row.definition),
         baseline: row.baseline.activities,
         candidate: row.candidate.activities
       });
       outcomes.push({ outcome });
+      health.calls += 2;
+      health.unparsed += unparsed;
+      health.head = health.head || unparsedHead;
       judgeCost += costUsd(usage.servedModel || judgeModel, usage.inputTokens, usage.outputTokens) || 0;
       for (const [criterion, result] of Object.entries(outcome)) {
         if (result.winner !== 'tie') judgeNotes.push({ criterion, scenario: row.scenario, winner: result.winner, reason: result.reason });
       }
     }
     tally = tallyOutcomes(outcomes);
+    judgeHealth = health;
   }
 
   const { text } = renderReport({
@@ -189,11 +223,12 @@ async function main() {
     perScenario,
     tally,
     judgeNotes,
+    judgeHealth,
     outDir: OUT_DIR,
     run: {
       scenarios: scenarios.length,
-      genCalls: generationCalls,
-      genCost: `$${generationCost.toFixed(2)}`,
+      genCalls: judgeOnly ? 'judge-only, lists from disk' : generationCalls,
+      genCost: judgeOnly ? '$0.00' : `$${generationCost.toFixed(2)}`,
       judgeModel: skipJudge ? 'skipped' : judgeModel,
       judgeCost: skipJudge ? '—' : `$${judgeCost.toFixed(2)}`,
       cassette: `${cassetteSize()} Brave entries replayed`

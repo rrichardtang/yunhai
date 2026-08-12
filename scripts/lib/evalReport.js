@@ -67,6 +67,7 @@ function renderReport({
   perScenario,
   tally,
   judgeNotes = [],
+  judgeHealth = null,
   run = {},
   outDir,
   artifactName = (id) => `eval-${id}-candidate.json`,
@@ -107,6 +108,13 @@ function renderReport({
     lines.push('the same slot in both orderings it is counted a tie, because that is bias and not a');
     lines.push('preference.');
     lines.push('');
+    if (judgeHealth) {
+      const { unparsed, calls, head } = judgeHealth;
+      lines.push(unparsed
+        ? `⚠️  **${unparsed} of ${calls} judge calls returned output this harness could not parse**, and each one contributes ties to every criterion above. Treat the tie counts as unreliable until this is fixed. First unparsed response began: \`${String(head).replace(/\s+/g, ' ').slice(0, 120)}\``
+        : `All ${calls} judge calls parsed cleanly, so the ties above are the judge's actual answer and not a parsing failure.`);
+      lines.push('');
+    }
     if (perScenario.length === 1) {
       lines.push('**One scenario — read this as a plumbing check, not as evidence.** Four criterion');
       lines.push('comparisons cannot separate a real difference from sampling noise, and a cached');

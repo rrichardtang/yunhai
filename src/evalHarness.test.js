@@ -65,6 +65,20 @@ test('an unparseable judge response degrades to ties, never to a winner', async 
   }
 });
 
+test('unparseable judge output is counted, so it cannot pass as agreement', async () => {
+  // Degrading to ties is safe for the verdict but makes a broken judge look
+  // identical to an agreeable one — a run of all ties could be either.
+  const broken = async () => ({ text: 'I cannot decide.', inputTokens: 1, outputTokens: 1 });
+  const brokenRun = await comparePair({ call: broken, context: 'c', baseline: [], candidate: [] });
+  assert.equal(brokenRun.unparsed, 2, 'both orderings failed to parse');
+  assert.match(brokenRun.unparsedHead, /I cannot decide/);
+
+  const working = async () => ({ text: '{"profileFit":{"winner":"tie","reason":"even"}}', inputTokens: 1, outputTokens: 1 });
+  const workingRun = await comparePair({ call: working, criteria: [PLAN_CRITERIA[0]], context: 'c', baseline: [], candidate: [] });
+  assert.equal(workingRun.unparsed, 0, 'a genuine tie is not an unparsed response');
+  assert.equal(workingRun.outcome.profileFit.winner, 'tie');
+});
+
 test('the judge prompt names every criterion and offers tie as an answer', () => {
   const prompt = buildJudgePrompt({ criteria: PLAN_CRITERIA, context: 'ctx', first: [], second: [] });
   for (const criterion of PLAN_CRITERIA) assert.ok(prompt.includes(criterion.id), `${criterion.id} in prompt`);

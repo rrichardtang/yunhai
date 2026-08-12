@@ -72,16 +72,21 @@ function anthropicJudge(model) {
   return call;
 }
 
+// An unparseable response degrades to ties, which is safe for the verdict but
+// makes a broken judge indistinguishable from an agreeable one — a run that
+// returned all ties could mean either. `unparsed` is counted and reported so the
+// two can be told apart.
 async function askJudge({ call, criteria, context, first, second }) {
   const result = await call(buildJudgePrompt({ criteria, context, first, second }));
-  const parsed = tryParseJsonObject(result.text) || {};
+  const parsed = tryParseJsonObject(result.text);
   const verdicts = {};
   for (const criterion of criteria) {
-    const raw = parsed[criterion.id] || {};
+    const raw = (parsed || {})[criterion.id] || {};
     const winner = ['A', 'B', 'tie'].includes(raw.winner) ? raw.winner : 'tie';
     verdicts[criterion.id] = { winner, reason: String(raw.reason || '').trim() };
   }
-  return { verdicts, usage: result };
+  const recognised = parsed && criteria.some((c) => ['A', 'B', 'tie'].includes((parsed[c.id] || {}).winner));
+  return { verdicts, parsed: Boolean(recognised), head: result.text.slice(0, 200), usage: result };
 }
 
 // Round 1 puts the baseline in slot A, round 2 puts the candidate there. The
@@ -111,8 +116,11 @@ async function comparePair({ call, criteria = PLAN_CRITERIA, context, baseline, 
   for (const criterion of criteria) {
     outcome[criterion.id] = resolveSwap(one.verdicts[criterion.id], two.verdicts[criterion.id]);
   }
+  const unparsed = [one, two].filter((round) => !round.parsed);
   return {
     outcome,
+    unparsed: unparsed.length,
+    unparsedHead: unparsed[0]?.head || null,
     usage: {
       inputTokens: one.usage.inputTokens + two.usage.inputTokens,
       outputTokens: one.usage.outputTokens + two.usage.outputTokens,
