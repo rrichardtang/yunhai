@@ -50,17 +50,34 @@ test('12 tours against structuredTours 1/5 is caught; zero tours is not', () => 
   assert.equal(clean, undefined);
 });
 
-test('an Evening Bar Crawl against nightlifeBars 1/5 is caught by wording', () => {
+test('a single Evening Bar Crawl against nightlifeBars 1/5 is caught', () => {
   // filterInvalidTypes drops type:nightlife, so a bar crawl always arrives typed
-  // as something else. Matching the type alone would never have seen this one.
+  // as something else — matching the type alone would never see it. It also has
+  // to fire on ONE hit: the blind read faulted exactly one bar crawl in 30
+  // activities, and a count threshold of 3 missed the finding entirely.
   const list = [
-    act('Evening Bar Crawl', { type: 'neighborhood' }),
-    act('Old Town Pub Route', { type: 'neighborhood' }),
-    ...Array.from({ length: 10 }, (_, i) => act(`Sight ${i}`))
+    act('Evening Bar Crawl in Dukezong', { type: 'neighborhood' }),
+    ...Array.from({ length: 29 }, (_, i) => act(`Sight ${i}`))
   ];
   const hit = typeMixVsProfile(list, OWNER_PROFILE).find((f) => f.detail.includes('nightlifeBars'));
-  assert.ok(hit);
-  assert.deepEqual(hit.names, ['Evening Bar Crawl', 'Old Town Pub Route']);
+  assert.ok(hit, 'one named bar crawl for a bars-1/5 traveler is the contradiction itself');
+  assert.deepEqual(hit.names, ['Evening Bar Crawl in Dukezong']);
+});
+
+test('a restaurant with "Bar" in its name is not a night out', () => {
+  // "The Rooftop Bistro & Bar Lijiang" is type:meal. Flagging it would
+  // contradict the human, who faulted only the bar crawl. And scanning
+  // why_it_fits as well as the name matched "Lashi Lake Sunrise Birdwatching"
+  // as nightlife, because its rationale prose mentions a bar.
+  const list = [
+    act('The Rooftop Bistro & Bar Lijiang', { type: 'meal', venue_name: 'The Rooftop Bistro & Bar' }),
+    act('Lashi Lake Sunrise Birdwatching', { type: 'landmark', why_it_fits: 'Skip the bar scene for a dawn paddle instead.' }),
+    ...Array.from({ length: 20 }, (_, i) => act(`Sight ${i}`))
+  ];
+  assert.equal(
+    typeMixVsProfile(list, OWNER_PROFILE).find((f) => f.detail.includes('nightlifeBars')),
+    undefined
+  );
 });
 
 test('the over-correction case: a 5/5 museum traveler getting no museums', () => {

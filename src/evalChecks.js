@@ -43,6 +43,14 @@ const PITFALL_CONTRADICTIONS = [
 const typeOf = (activity) => String(activity?.type || '').trim().toLowerCase();
 const textOf = (activity) => `${activity?.name || ''} ${activity?.venue_name || ''} ${activity?.why_it_fits || ''}`;
 
+// Keyword axes read the name and venue only. Scanning why_it_fits as well
+// matched "Lashi Lake Sunrise Birdwatching" and "Dukezong Rooftop Sunset" as
+// nightlife, because the rationale prose mentions a bar. Meals are excluded for
+// the same reason: "The Rooftop Bistro & Bar Lijiang" is type:meal, a place to
+// eat rather than a night out, and flagging it would contradict a human who
+// only ever faulted the Evening Bar Crawl.
+const labelOf = (activity) => `${activity?.name || ''} ${activity?.venue_name || ''}`;
+
 function normalizeVenue(activity) {
   const raw = String(activity?.venue_name || '').trim();
   if (!raw) return '';
@@ -58,7 +66,8 @@ function ratingFor(profile, key) {
 }
 
 function matchesAxis(activity, axis) {
-  return axis.type ? typeOf(activity) === axis.type : axis.pattern.test(textOf(activity));
+  if (axis.type) return typeOf(activity) === axis.type;
+  return typeOf(activity) !== 'meal' && axis.pattern.test(labelOf(activity));
 }
 
 // A 1 is "actively dislikes"; a 2 is "not fussed". The blind read separates
@@ -67,7 +76,13 @@ function matchesAxis(activity, axis) {
 // never the problem. A single threshold cannot honour both — at 10% of the list
 // the museum case fired at exactly 4 and contradicted the human label on a
 // held-out arm. A 2 therefore has to clear a higher bar than a 1.
-function overThresholdFor(rating, listSize) {
+// Keyword axes at a 1 fire on a single hit. A category count tolerates one
+// instance — one museum for a museums-2/5 traveler is nothing — but an activity
+// whose own name says "Bar Crawl", planned for someone who rated bars 1/5, is
+// the contradiction itself, and it is the one blind-read finding a count-based
+// threshold missed entirely.
+function overThresholdFor(rating, listSize, axis) {
+  if (axis?.pattern && rating === 1) return 1;
   const share = rating === 1 ? 0.1 : 0.12;
   const floor = rating === 1 ? 2 : 3;
   return Math.max(floor, Math.ceil(listSize * share));
@@ -83,7 +98,7 @@ function typeMixVsProfile(activities, profile) {
     const rating = ratingFor(profile, axis.key);
     if (rating === null) continue;
     const matched = activities.filter((a) => matchesAxis(a, axis));
-    const overThreshold = overThresholdFor(rating, activities.length);
+    const overThreshold = overThresholdFor(rating, activities.length, axis);
 
     if (rating <= 2 && matched.length >= overThreshold) {
       findings.push({
