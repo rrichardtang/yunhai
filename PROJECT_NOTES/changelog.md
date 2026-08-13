@@ -4,6 +4,55 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-13] Chat eval calibrated — a rubric conflict was manufacturing the noise
+
+Three null-change runs of `scripts/evalChat.js` (identical prompt both arms, ~$0.03 each).
+
+**Invariants passed clean on all three**, both arms, five scenarios — including the allergy case
+capturing "Allergic to sushi" as a `constraint` with severity intact every time. The shipping chat
+prompt is behaving, verified rather than assumed.
+
+**The judge was not.** Run 1 returned a 0-3 decisive swing on `decisiveness` with both arms on the
+same prompt, and reported PASS only because the verdict is one-directional — it fires when the
+*baseline* wins by the margin, so the same magnitude the other way is silent. That put
+`JUDGE_LOSS_MARGIN` 2 below the chat noise floor.
+
+The cause turned out to be the rubric, not sampling. `decisiveness` read "commits to a concrete
+answer instead of hedging", which directly opposed `correctness`: both runs scored the identical
+sentence as a virtue under one and a vice under the other ("honestly notes the results were generic"
+vs "spends effort caveating that sources were generic"). Every hedge-or-commit tradeoff produced one
+win each way. Reworded so correctness dominates — a decisive answer only counts when its evidence
+supports it.
+
+| run | correctness | decisiveness | usefulness | widest swing |
+|---|---|---|---|---:|
+| 1 (old rubric) | 1-1 | **0-3** | 1-2 | 3 |
+| 2 (old rubric) | 0-1 | 1-1 | 0-1 | 1 |
+| 3 (fixed rubric) | 1-1 | 1-1 | 1-1 | **0** |
+
+Run 3's criteria also agree with each other per scenario for the first time — all three to the
+candidate on `format-discipline`, all three to the baseline on `trip-data-question`. Much of what
+looked like sampling noise was rubric incoherence.
+
+`CHAT_JUDGE_LOSS_MARGIN` is 4 regardless, above the largest swing seen. With five scenarios that
+means the chat judge can rarely fail a run alone; chat verdicts lean on the invariants.
+
+**Two reporting bugs fixed by the same runs.** `genCost` printed `$0.000` for five scenarios of real
+calls — `costUsd` returns null for a served model missing from `PRICING` and the caller coerced it
+to 0. Unpriced now names the served model, which immediately identified `gpt-5.4-mini-2026-03-17`;
+`costUsd` now falls back to the longest matching prefix so a dated snapshot inherits its base price,
+while `gpt-5.6` keeps its deliberate null and the tier keys still win over the bare one. The widest
+decisive swing is now printed even at zero, since on a null-change run that number is the
+measurement.
+
+**Settled from the code, not opinion.** The judge twice disagreed with itself about
+`trip-data-question`. `bookingStatus()` in `src/services/chatPrompt.js` renders a null reference as
+"needs booking via <type>", so "not booked yet" is correct and the judge's `correctness` call
+against it was wrong. Chat scenarios gained `replyMustMatch`/`replyMustNotMatch` and the scenario
+asserts the $16 figure. The booking state is deliberately not asserted yet — a generous "not booked"
+pattern still risks a high-severity false positive, and the scenario carries a note to write the
+pattern against the saved replies first.
+
 ## [2026-08-12] Eval harness calibrated on a keyed box — four harness bugs found
 
 Ran the controls from open_items [2026-08-12] on staging. The harness is now calibrated for plan;

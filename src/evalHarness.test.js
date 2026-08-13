@@ -260,6 +260,17 @@ test('the smoke scenario named by evalPlan.js exists in the corpus', () => {
 test('cost is null for a model with no confirmed price, not zero', () => {
   assert.equal(costUsd('gpt-5.6', 1e6, 1e6), null);
   assert.equal(costUsd('claude-sonnet-4-6', 1e6, 1e6), 18);
+  assert.equal(costUsd('totally-unknown', 1e6, 1e6), null);
+});
+
+test('a dated snapshot inherits its base model price without breaking the tiers', () => {
+  // A run served `gpt-5.4-mini-2026-03-17` and priced as free, because the table
+  // only held `gpt-5.4-mini`. Longest-prefix match fixes that — but `gpt-5.6` is
+  // deliberately null so an unidentified tier prints an em dash rather than a
+  // wrong number, and the tier keys must still win over the bare one.
+  assert.equal(costUsd('gpt-5.4-mini-2026-03-17', 1e6, 1e6), costUsd('gpt-5.4-mini', 1e6, 1e6));
+  assert.equal(costUsd('gpt-5.6-sol', 1e6, 1e6), 35, 'the tier keeps its own price');
+  assert.equal(costUsd('gpt-5.6-2026-01-01', 1e6, 1e6), null, 'a dated bare model is still an unknown tier');
 });
 
 test('the activity target scales with pace and stay length', () => {

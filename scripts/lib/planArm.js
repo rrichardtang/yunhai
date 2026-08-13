@@ -26,8 +26,21 @@ const PRICING = {
   'gpt-5.4-mini': { in: 0.25, out: 2 }
 };
 
+// Providers serve dated snapshots — a run reported `gpt-5.4-mini-2026-03-17`
+// and priced as free because the table only held `gpt-5.4-mini`. Exact match
+// first, then the longest matching prefix, so a snapshot inherits its base
+// model's price while `gpt-5.6` keeps its deliberate null: an unidentified tier
+// still prints an em dash rather than a wrong number.
+function priceFor(modelId) {
+  if (modelId in PRICING) return PRICING[modelId];
+  const prefix = Object.keys(PRICING)
+    .filter((key) => String(modelId).startsWith(key))
+    .sort((a, b) => b.length - a.length)[0];
+  return prefix ? PRICING[prefix] : null;
+}
+
 function costUsd(modelId, inputTokens, outputTokens) {
-  const price = PRICING[modelId];
+  const price = priceFor(modelId);
   if (!price) return null;
   return (inputTokens / 1e6) * price.in + (outputTokens / 1e6) * price.out;
 }

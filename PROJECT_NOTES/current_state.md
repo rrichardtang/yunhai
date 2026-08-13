@@ -1,10 +1,11 @@
 # Current State
 
-_Last updated: 2026-08-12_
+_Last updated: 2026-08-13_
 
 ## Objective
 Two branches are in flight. `claude/yunhai-llm-judge-harness-xgl14a` adds the prompt-regression
-harness (built, unit-tested, **uncalibrated**). Ahead of it, the GPT-5.6 planning switch on
+harness, now built and **calibrated on a keyed box for both plan and chat**. Ahead of it, the
+GPT-5.6 planning switch on
 `claude/guide-me-setup-stuck-mszkyo` still needs its keyed verification, then deploy behind the
 three queued branches (`claude/yunhai-url-endpoints-t6a3ja`,
 `claude/budget-optimization-loading-screens-4hc6a3`, `claude/codebase-review-sweep-2z6t4h`).
@@ -23,7 +24,8 @@ not to degrade the others. Two layers, decisions [2026-08-12]:
 
 Runners are `npm run eval:plan` / `eval:chat` over a committed 5-profile corpus in
 `evals/scenarios/`. Verdicts land in `data/bakeoff/judge-report.md` and are served by the existing
-owner-gated `/debug/bakeoff`. 316/316 tests pass.
+owner-gated `/debug/bakeoff`. 333/333 tests pass. `--judge-only` re-judges the saved lists without
+generating, which is how a rubric or judge-model change gets iterated for the judge cost alone.
 
 Cost, derived from the two measured points in changelog [2026-08-08] (F ≈ $0.195 per call,
 m ≈ $0.0034 per activity — calls dominate, not activity count):
@@ -39,14 +41,20 @@ Arrange is deliberately out of this pass — its LLM call is an inline closure i
 extracting first (open_items [2026-08-12]).
 
 ## Constraints
-- **The plan harness is calibrated; the chat harness is not.** Layer 1 reproduces the human blind
-  read on the committed fixtures, the null-change control passes, and the known-regression control
-  returns DEGRADED on both layers with the two converging independently — changelog [2026-08-12].
-  `scripts/evalChat.js` has never run against a live model, and the plan side carried four bugs
-  that only a live run exposed.
-- **`JUDGE_LOSS_MARGIN` is still a guess (2).** Consistent with the observed data — the
-  known-regression run cleared it 3-0 on `profileFit` while three other criteria stayed inside it —
-  but not measured. open_items [2026-08-12].
+- **Both plan and chat are calibrated.** Plan: Layer 1 reproduces the human blind read on the
+  committed fixtures, the null-change control passes, and the known-regression control returns
+  DEGRADED on both layers with the two converging independently (changelog [2026-08-12]). Chat:
+  invariants clean across three null-change runs, and the judge's noise dropped to a widest swing of
+  0 once a rubric conflict between `correctness` and `decisiveness` was removed (changelog
+  [2026-08-13]).
+- **Trust the invariants over the judge.** Layer 1 is validated against a human adjudication and
+  reproduces it exactly. The judge has been wrong at least once on a knowable fact — it faulted a
+  correct decisive reply about booking state for not hedging — so where the pipeline's own rendering
+  settles a question, assert it rather than judging it.
+- **`JUDGE_LOSS_MARGIN` is 2 for plan and 4 for chat, neither measured.** Plan's is consistent with
+  observation (the known-regression run cleared it 3-0 on `profileFit` while three other criteria
+  stayed inside). Chat's sits above the largest swing seen across three null-change runs (3, 1, 0).
+  Both are floors set from single observations. open_items [2026-08-12].
 - **The calibration controls are cheap insurance and found four real bugs.** Anything that changes
   a check threshold, the rubric, or the judge model should re-run the null-change and
   known-regression controls; `--judge-only` makes the second nearly free.
@@ -67,9 +75,9 @@ extracting first (open_items [2026-08-12]).
   harness from the staging tree.
 
 ## Risks
-- **The historical bake-off lists are the harness's only ground truth, and they live in `data/`,
-  which is gitignored.** If the staging box is rebuilt they are gone and the known-regression
-  control loses its reference. Copy two into `evals/fixtures/` at the first opportunity.
+- **The judge is the weaker layer and has been wrong on a knowable fact.** Its rubric wording
+  materially changes its output — removing the `correctness`/`decisiveness` conflict took the chat
+  noise from a swing of 3 to 0. Treat a judge column as a pointer to go read, not as a result.
 - **Three measurements in a row were invalidated by bugs in our own pipeline, not the models.** The
   invariant layer is the direct response, but it inherits the same exposure: a check with a wrong
   threshold produces confident false positives, which is the fastest way to get a harness switched
@@ -83,10 +91,9 @@ extracting first (open_items [2026-08-12]).
   still pending; memory-layer / arrange-overhaul / grounding keyed verifications still outstanding.
 
 ## Next Actions
-1. Run the chat eval — open_items [2026-08-12]. Cents, and the plan side proved a live run finds
-   what unit tests cannot.
-2. Verify the GPT-5.6 switch on a keyed environment (open_items [2026-08-08]).
-3. Phase 2: cluster-based meal sourcing, designed in
+1. Verify the GPT-5.6 switch on a keyed environment (open_items [2026-08-08]). This is now the
+   oldest thing blocking the deploy queue.
+2. Phase 2: cluster-based meal sourcing, designed in
    `PROJECT_NOTES/plan-deterministic-prompt-split.md`, not started.
-4. Deploy behind the three queued branches, then walk the post-deploy checklist in
+3. Deploy behind the three queued branches, then walk the post-deploy checklist in
    open_items [2026-08-07].

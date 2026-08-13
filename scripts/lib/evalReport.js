@@ -130,8 +130,13 @@ function renderReport({
       lines.push(`| ${criterion} | ${counts.baseline} | ${counts.candidate} | ${counts.tie} |`);
     }
     lines.push('');
+    // Printed even at zero: on a null-change run the swing IS the measurement,
+    // and "no criterion separated the arms" is the result worth recording.
     const swing = widestSwing(tally);
-    if (swing.spread) {
+    if (!swing.spread) {
+      lines.push(`Widest decisive swing: **0** — no criterion separated the arms (margin ${margin}).`);
+      lines.push('');
+    } else {
       lines.push(`Widest decisive swing: **${swing.criterion} ${swing.spread} toward ${swing.toward}** (margin ${margin}).`);
       if (swing.toward === 'candidate' && swing.spread >= margin) {
         lines.push('That clears the margin in the candidate\'s favour, which the verdict does not fire on —');

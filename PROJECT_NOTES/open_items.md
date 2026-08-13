@@ -15,18 +15,20 @@ decisive win is chance. Set the margin above the highest per-criterion win count
 gate. While there, confirm cache invalidation: hand-edit a cached entry's `servedModel` and check
 the next run discards it.
 
-## [2026-08-12] Run the chat eval
-**Status:** Pending input (cents, not yet run)
-**Description:** `scripts/evalChat.js` and the five chat scenarios are built and unit-tested but
-have never been run against a live model. The plan harness turned out to carry four bugs that only
-a live run exposed, so assume this one does too.
-**Context:** changelog [2026-08-12]. Watch for the same class of fault: `runChatTurn` uses
-`max_completion_tokens: 700`, which is the chat route's own cap rather than the harness's, but the
-judge path shares `scripts/lib/judge.js` and its 16000 cap.
-**Next action:** `node scripts/evalChat.js`. Expect the Draft answer to come from the website guide,
-zero links on the empty-search case, and a `constraint` reading "Allergic to sushi" with severity
-intact. A `signalCapture` or `signalSoftened` finding on the shipping prompt is a real product bug,
-not a harness bug.
+## [2026-08-13] Assert the booking state in the chat trip-data scenario
+**Status:** Deferred (free)
+**Description:** `bookingStatus()` renders a null reference as "needs booking via <type>", so
+whether Songzanlin is booked is a knowable fact rather than a matter of taste — and the judge got
+it backwards once, faulting the correct decisive reply for not hedging. The scenario asserts the
+$16 figure but not the booking state, because a generous "not booked" pattern risks a
+high-severity false positive on an unusual phrasing and this branch has already produced three of
+those.
+**Context:** changelog [2026-08-13]. `evals/scenarios/chat/trip-data-question.json` carries a
+`notYetAsserted` note; `replyMustMatch`/`replyMustNotMatch` are already wired.
+**Next action:** Read both saved replies —
+`node -e 'const r=require("./data/bakeoff/eval-chat-trip-data-question.json"); console.log(r.baseline.reply, "\n---\n", r.candidate.reply)'` — then write `replyMustMatch` against the
+phrasing correct answers actually use, and re-run `node scripts/evalChat.js` (~$0.03) to confirm no
+false positive.
 
 ## [2026-08-12] Wire auto-arrange into the eval harness (phase 2)
 **Status:** Deferred
