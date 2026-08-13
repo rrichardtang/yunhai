@@ -248,6 +248,29 @@ test('the checks reproduce the blind read\'s 12 tours against structuredTours 1/
   assert.equal(total, 12);
 });
 
+test('a 2/5 rating clears a higher bar than a 1/5 — the held-out museum case', () => {
+  // The blind read rejected 6 tours in 36 against structuredTours 1/5 and
+  // accepted 4 museums in 38 against museumPerson 2/5, saying museums were
+  // never the problem. One threshold cannot honour both: at 10% of the list the
+  // museum case fired at exactly 4 and contradicted the label on a held-out arm.
+  const fill = (n, overrides) => Array.from({ length: n }, (_, i) => act(`Item ${i}`, overrides));
+
+  const museums = [...fill(4, { type: 'museum' }), ...fill(34, { type: 'neighborhood' })];
+  assert.deepEqual(
+    typeMixVsProfile(museums, { answers: { museumPerson: 2 } }),
+    [],
+    '4 museums in 38 against a 2/5 must stay silent — the human accepted it'
+  );
+
+  const tours = [...fill(6, { type: 'tour' }), ...fill(30, { type: 'neighborhood' })];
+  const hit = typeMixVsProfile(tours, { answers: { structuredTours: 1 } });
+  assert.equal(hit.length, 1, '6 tours in 36 against a 1/5 must fire — the human rejected it');
+
+  // The boundary still has to catch a genuinely museum-heavy list for a 2/5.
+  const heavy = [...fill(6, { type: 'museum' }), ...fill(18, { type: 'neighborhood' })];
+  assert.equal(typeMixVsProfile(heavy, { answers: { museumPerson: 2 } }).length, 1);
+});
+
 test('the checks reproduce Compass x3 and Xiaocai x2 in Shangri-La', () => {
   const findings = repeatedVenues(fixture('sonnet-4-6-run1-Shangri-La_City.json'));
   const meals = findings.filter((f) => f.severity === 'high').map((f) => f.detail);

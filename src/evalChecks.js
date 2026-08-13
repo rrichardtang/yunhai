@@ -61,17 +61,29 @@ function matchesAxis(activity, axis) {
   return axis.type ? typeOf(activity) === axis.type : axis.pattern.test(textOf(activity));
 }
 
+// A 1 is "actively dislikes"; a 2 is "not fussed". The blind read separates
+// them: it rejected 6 tours in 36 against structuredTours 1/5, and accepted 4
+// museums in 38 against museumPerson 2/5, saying outright that museums were
+// never the problem. A single threshold cannot honour both — at 10% of the list
+// the museum case fired at exactly 4 and contradicted the human label on a
+// held-out arm. A 2 therefore has to clear a higher bar than a 1.
+function overThresholdFor(rating, listSize) {
+  const share = rating === 1 ? 0.1 : 0.12;
+  const floor = rating === 1 ? 2 : 3;
+  return Math.max(floor, Math.ceil(listSize * share));
+}
+
 // Symmetric on purpose. Suppressing tours for a 1/5 traveler was the lean
 // prompt's win, so the failure mode a future edit is most likely to introduce is
 // suppressing them for everyone — which only an under-delivery arm can see.
 function typeMixVsProfile(activities, profile) {
-  const overThreshold = Math.max(2, Math.ceil(activities.length * 0.1));
   const findings = [];
 
   for (const axis of PROFILE_AXES) {
     const rating = ratingFor(profile, axis.key);
     if (rating === null) continue;
     const matched = activities.filter((a) => matchesAxis(a, axis));
+    const overThreshold = overThresholdFor(rating, activities.length);
 
     if (rating <= 2 && matched.length >= overThreshold) {
       findings.push({

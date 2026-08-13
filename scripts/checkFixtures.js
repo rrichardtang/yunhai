@@ -42,6 +42,15 @@ const HUMAN_VERDICT = {
 
 const TUNED_ON = new Set(['sonnet-4-6', 'gpt-5.6+lean']);
 
+// These two arms were generated at 05:50-06:05 on 2026-08-08, before the 17:53
+// fix to applyMealPoolCap, which was deleting every meal that arrived without
+// opening hours — "all 12 of GPT-5.6's Lijiang restaurants" per the changelog.
+// Their 0-meal lists record our own pipeline bug, and the human read was scoped
+// to activity selection rather than meal coverage, so mealCoverage has no valid
+// label on them. The check is right; the ground truth is contaminated for it.
+const NO_MEAL_LABEL = new Set(['gpt-5.6', 'gpt-5.6+gpt']);
+const scorable = (arm, finding) => !(NO_MEAL_LABEL.has(arm) && finding.check === 'mealCoverage');
+
 function parseName(file) {
   const match = path.basename(file).match(/^(.*)-run(\d+)-(.*)\.json$/);
   if (!match) return null;
@@ -72,14 +81,18 @@ function main() {
 
     const activities = JSON.parse(fs.readFileSync(file, 'utf8'));
     const { findings } = runChecks(activities, scenario);
-    const high = findings.filter((f) => f.severity === 'high');
+    const scored = findings.filter((f) => scorable(parsed.arm, f));
+    const high = scored.filter((f) => f.severity === 'high');
     rows.push({ ...parsed, count: activities.length, findings, high: high.length });
 
     const heldOut = TUNED_ON.has(parsed.arm) ? '' : '   [HELD OUT — no check was tuned on this arm]';
-    console.log(`\n=== ${parsed.arm} / ${parsed.city} — ${activities.length} activities, ${findings.length} findings (${high.length} high)${heldOut}`);
+    console.log(`\n=== ${parsed.arm} / ${parsed.city} — ${activities.length} activities, ${scored.length} scorable findings (${high.length} high)${heldOut}`);
     console.log(`    human read: ${HUMAN_VERDICT[parsed.arm] || 'not adjudicated'}`);
-    for (const f of findings) console.log(`    [${f.severity}] ${f.check}: ${f.detail}`);
-    if (!findings.length) console.log('    (clean)');
+    for (const f of findings) {
+      const note = scorable(parsed.arm, f) ? '' : '  (unlabelled — predates the applyMealPoolCap fix)';
+      console.log(`    [${f.severity}] ${f.check}: ${f.detail}${note}`);
+    }
+    if (!scored.length) console.log('    (no scorable findings)');
   }
 
   const heldOut = rows.filter((r) => !TUNED_ON.has(r.arm));
