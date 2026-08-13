@@ -27,9 +27,15 @@ const { renderReport, CHAT_JUDGE_LOSS_MARGIN } = require('./lib/evalReport');
 const OUT_DIR = path.join(__dirname, '..', 'data', 'bakeoff');
 const SCENARIO_DIR = path.join(__dirname, '..', 'evals', 'scenarios', 'chat');
 
+// `decisiveness` originally read "commits to a concrete answer instead of
+// hedging". Two null-change runs scored the identical sentence as a virtue under
+// correctness ("honestly notes the results were generic") and a vice under
+// decisiveness ("spends effort caveating"), so every hedge-or-commit tradeoff
+// produced one win each way and manufactured noise. Correctness now dominates:
+// overstating is penalised by both criteria rather than rewarded by one.
 const CHAT_CRITERIA = [
   { id: 'correctness', ask: 'Which reply is factually right about this trip and this app, given the itinerary and the website guide the assistant was shown?' },
-  { id: 'decisiveness', ask: 'Which reply commits to a concrete answer instead of hedging or listing options?' },
+  { id: 'decisiveness', ask: 'Which reply commits to a concrete answer that its evidence actually supports? Hedging where the itinerary or guide is clear is worse; asserting what they do not show is worse still.' },
   { id: 'usefulness', ask: 'Which reply would actually help this traveler take their next step?' }
 ];
 

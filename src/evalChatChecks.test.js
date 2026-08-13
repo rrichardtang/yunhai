@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { runChatChecks, sentenceCount, markdownViolations, inventedLinks, signalFindings } = require('./evalChatChecks');
+const { runChatChecks, sentenceCount, markdownViolations, inventedLinks, signalFindings, replyContentFindings } = require('./evalChatChecks');
 
 test('markdown the prompt forbids is caught; a link is not', () => {
   assert.equal(markdownViolations('Try **Compass** tonight.').length, 1);
@@ -73,6 +73,23 @@ test('a long formatted reply with an invented link fires every relevant check', 
   assert.ok(result.byCheck.markdown);
   assert.ok(result.byCheck.inventedLink);
   assert.ok(result.byCheck.replyLength);
+});
+
+test('a fact the itinerary makes knowable is asserted, not left to the judge', () => {
+  // bookingStatus() renders a null reference as "needs booking via <type>", so
+  // the booking state is not a matter of taste — and the judge got it backwards
+  // once, faulting the correct decisive reply for not hedging.
+  const expect = { replyMustMatch: ['\\$ ?16'], replyMustNotMatch: ['\\balready booked\\b'] };
+
+  assert.deepEqual(replyContentFindings('Songzanlin is listed at $16 per person and still needs booking.', expect), []);
+
+  const missing = replyContentFindings('Songzanlin is on your list for Tuesday morning.', expect);
+  assert.equal(missing.length, 1);
+  assert.match(missing[0].detail, /never states/);
+
+  const wrong = replyContentFindings('Songzanlin costs $16 and is already booked.', expect);
+  assert.equal(wrong.length, 1);
+  assert.equal(wrong[0].check, 'replyContradictsTrip');
 });
 
 test('a reply that failed to parse as JSON is reported, not scored as clean', () => {

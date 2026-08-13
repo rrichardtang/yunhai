@@ -75,11 +75,32 @@ function signalFindings(signals = [], expected = []) {
   return findings;
 }
 
+// Where the prompt's own rendering makes an answer knowable, assert it rather
+// than asking the judge. bookingStatus() renders a null reference as "needs
+// booking via <type>", so "already booked" is flatly wrong — and the judge got
+// that one backwards, faulting the correct reply for not hedging.
+function replyContentFindings(reply, expect) {
+  const findings = [];
+  const text = String(reply || '');
+  for (const pattern of expect.replyMustNotMatch || []) {
+    if (new RegExp(pattern, 'i').test(text)) {
+      findings.push({ check: 'replyContradictsTrip', severity: 'high', detail: `reply matches /${pattern}/, which the itinerary contradicts` });
+    }
+  }
+  for (const pattern of expect.replyMustMatch || []) {
+    if (!new RegExp(pattern, 'i').test(text)) {
+      findings.push({ check: 'replyMissingFact', severity: 'high', detail: `reply never states /${pattern}/, which the itinerary gives` });
+    }
+  }
+  return findings;
+}
+
 function runChatChecks({ reply, signals = [], expect = {}, searchResults = null }) {
   const findings = [
     ...markdownViolations(reply),
     ...inventedLinks(reply, searchResults),
-    ...signalFindings(signals, expect.signals)
+    ...signalFindings(signals, expect.signals),
+    ...replyContentFindings(reply, expect)
   ];
 
   const sentences = sentenceCount(reply);
@@ -101,4 +122,4 @@ function runChatChecks({ reply, signals = [], expect = {}, searchResults = null 
   return { findings, byCheck, total: findings.length, sentences, links };
 }
 
-module.exports = { runChatChecks, sentenceCount, markdownViolations, inventedLinks, signalFindings, linksIn };
+module.exports = { runChatChecks, sentenceCount, markdownViolations, inventedLinks, signalFindings, replyContentFindings, linksIn };

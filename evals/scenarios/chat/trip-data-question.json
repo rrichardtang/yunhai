@@ -31,5 +31,9 @@
       }
     ]
   },
-  "expect": { "maxSentences": 3 }
+  "expect": {
+    "maxSentences": 3,
+    "replyMustMatch": ["\\$ ?16"]
+  },
+  "notYetAsserted": "The booking state is knowable too — bookingStatus() renders a null reference as 'needs booking via attraction', so a reply claiming it is booked is flatly wrong and the judge got that backwards once. Not asserted yet because a generous 'not booked' pattern still risks a high-severity false positive on an unusual phrasing. Read the saved replies in data/bakeoff/eval-chat-trip-data-question.json, then add the pattern that matches what correct answers actually say."
 }
