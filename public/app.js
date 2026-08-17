@@ -59,6 +59,7 @@ const state = {
   viewMode: 'planning',
   arrangeConfig: null,
   arrangeUnplaced: {},
+  arrangedSignatures: {},
   arrangeUnplacedPanelOpen: false,
   lastPlannedFingerprint: null,
   authReady: false,
@@ -2369,14 +2370,13 @@ async function goToNextStep(fromStep = state.step) {
   if (fromStep === 2) {
     const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
     if (!approved.length) return;
-    const previousDays = state.days;
     state.days = expandDays(state.cities);
     state.arrangeCity = state.days[0]?.city || null;
     approved.forEach((a) => {
       state.placements[a.id] = state.placements[a.id] || { dayId: null, time: parseTimeTo24(actPreferredTime(a) || typeToTime(a.type)) };
     });
     setStep(3);
-    maybeAutoArrangeCities(previousDays);
+    maybeAutoArrangeCities();
     return;
   }
 
@@ -6621,11 +6621,26 @@ function cityDayKey(days, city) {
   return days.filter((d) => cityMatches(d.city, city)).map((d) => d.id).sort().join('|');
 }
 
-function citiesNeedingArrange(previousDays) {
+function cityIsScheduled(city) {
+  return state.activities.some(
+    (a) => state.reviewed[a.id]?.approved && cityMatches(a.city, city) && state.placements[a.id]?.dayId
+  );
+}
+
+function citiesNeedingArrange() {
   return getArrangeCities()
     .map((g) => g.city)
-    .filter((city) => cityDayKey(previousDays, city) !== cityDayKey(state.days, city))
-    .filter((city) => state.activities.some((a) => state.reviewed[a.id]?.approved && cityMatches(a.city, city)));
+    .filter((city) => state.activities.some((a) => state.reviewed[a.id]?.approved && cityMatches(a.city, city)))
+    .filter((city) => {
+      const recorded = state.arrangedSignatures[city];
+      if (recorded !== undefined) return recorded !== cityDayKey(state.days, city);
+      // No record: either a trip arranged before this was tracked, or a city the user arranged by
+      // hand. Adopt what is on the board rather than rebuilding on top of their work. A city with
+      // nothing scheduled is the genuinely new one.
+      if (!cityIsScheduled(city)) return true;
+      state.arrangedSignatures[city] = cityDayKey(state.days, city);
+      return false;
+    });
 }
 
 async function autoArrangeCities(cities) {
@@ -6638,8 +6653,8 @@ async function autoArrangeCities(cities) {
   renderArrange();
 }
 
-function maybeAutoArrangeCities(previousDays) {
-  const cities = citiesNeedingArrange(previousDays);
+function maybeAutoArrangeCities() {
+  const cities = citiesNeedingArrange();
   if (!cities.length) return;
   if (state.schedulingPrefs?._userConfirmed) {
     autoArrangeCities(cities);
@@ -6772,6 +6787,7 @@ async function autoArrangeActiveCity(opts = {}) {
       if (day) state.placements[entry.activity.id] = { dayId: day.id, time: entry.time, endTime: entry.endTime || null };
     }
     state.arrangeUnplaced[activeCity] = [];
+    state.arrangedSignatures[activeCity] = cityDayKey(state.days, activeCity);
     const activeDayIds = activeDays.map((d) => d.id);
     await updateCommutesForCityDays(activeDayIds);
     renderArrange();
@@ -6907,6 +6923,7 @@ async function autoArrangeActiveCity(opts = {}) {
       })
       .filter(Boolean);
     state.arrangeUnplaced[activeCity] = unplacedItems;
+    state.arrangedSignatures[activeCity] = cityDayKey(state.days, activeCity);
   } catch (e) {
     showErrorBanner(e?.message || 'Failed to arrange activities.');
   }
@@ -8225,6 +8242,7 @@ function hydrateLoadedItinerary(itinerary) {
   state.activities = (itinerary.activities || []).map((a) => normalizeActivityMetadata(a));
   state.reviewed = itinerary.reviewed || {};
   state.placements = itinerary.placements || {};
+  state.arrangedSignatures = itinerary.arrangedSignatures || {};
   state.commutes = normalizeCommuteStateMap(itinerary.commutes || {});
   state.schedulingPrefs = itinerary.schedulingPrefs
     ? saveSchedulingPrefs(itinerary.schedulingPrefs)
@@ -8325,6 +8343,7 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
     state.activities = [];
     state.reviewed = {};
     state.placements = {};
+    state.arrangedSignatures = {};
   }
 
   const lockedForApi = {};
@@ -8504,6 +8523,7 @@ async function generateItinerary() {
     days: byDay,
     activities: state.activities,
     placements: state.placements,
+    arrangedSignatures: state.arrangedSignatures,
     reviewed: state.reviewed,
     bookingChecklist: {
       checklist: state.bookingChecklist,
@@ -9068,6 +9088,7 @@ function saveSnapshot() {
     travels: state.travels,
     activities: state.activities,
     placements: state.placements,
+    arrangedSignatures: state.arrangedSignatures,
     commutes: state.commutes,
     reviewed: state.reviewed,
     tripName: state.tripName,
@@ -9098,6 +9119,7 @@ function saveSnapshot() {
         travels: state.travels,
         activities: state.activities,
         placements: state.placements,
+        arrangedSignatures: state.arrangedSignatures,
         commutes: state.commutes,
         reviewed: state.reviewed,
         days: state.days,
@@ -9123,6 +9145,7 @@ function resetToFresh() {
   state.reviewed = {};
   state.days = [];
   state.placements = {};
+  state.arrangedSignatures = {};
   state.itinerary = null;
   state.currentItineraryId = null;
   state.commutes = {};
@@ -9157,6 +9180,7 @@ function hydrateFromSnapshot(snapshot) {
   hydrateTravelIntoCities();
   state.activities = snapshot.activities || [];
   state.placements = snapshot.placements || {};
+  state.arrangedSignatures = snapshot.arrangedSignatures || {};
   state.commutes = normalizeCommuteStateMap(snapshot.commutes || {});
   state.reviewed = snapshot.reviewed || {};
   const snapshotDays = Array.isArray(snapshot.days) ? snapshot.days : [];
@@ -9735,6 +9759,7 @@ function clearPlannedResultsKeepSetup() {
   state.reviewed = {};
   state.days = [];
   state.placements = {};
+  state.arrangedSignatures = {};
   state.itinerary = null;
   state.currentItineraryId = null;
   state.commutes = {};
