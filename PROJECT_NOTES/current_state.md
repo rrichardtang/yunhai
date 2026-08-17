@@ -10,9 +10,10 @@ branches (`claude/yunhai-url-endpoints-t6a3ja`, `claude/budget-optimization-load
 `claude/codebase-review-sweep-2z6t4h`).
 
 A second, independent branch is now also queued: `claude/auto-open-scheduling-modal-jmbjem` makes the
-Arrange step build its own first draft and deletes the Draft button (decisions [2026-08-17]). It
-touches only the frontend and the concierge guide — no planning or arrange logic — so it does not
-interact with the GPT-5.6 verification and can deploy in any order relative to it.
+Arrange step build its own first draft, deletes the Draft button, and reschedules only the cities
+whose day range actually moved (decisions [2026-08-17], both entries). It touches the frontend, the
+concierge guide, and the client half of the arrange call — no server planning or scheduling logic —
+so it does not interact with the GPT-5.6 verification and can deploy in any order relative to it.
 
 ## Active Workstream
 The branch fixed the reported "stuck" plan, then found three bugs underneath it that each
