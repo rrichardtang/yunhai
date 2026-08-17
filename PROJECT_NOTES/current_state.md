@@ -1,6 +1,6 @@
 # Current State
 
-_Last updated: 2026-08-08_
+_Last updated: 2026-08-17_
 
 ## Objective
 Ship branch `claude/guide-me-setup-stuck-mszkyo`. Both open decisions are settled — `planCity` runs
@@ -8,6 +8,11 @@ a single `gpt-5.6` call, `PLAN_SPLIT_DAYS` stays unset — so what remains is a 
 then deploy behind the three queued
 branches (`claude/yunhai-url-endpoints-t6a3ja`, `claude/budget-optimization-loading-screens-4hc6a3`,
 `claude/codebase-review-sweep-2z6t4h`).
+
+A second, independent branch is now also queued: `claude/auto-open-scheduling-modal-jmbjem` makes the
+Arrange step build its own first draft and deletes the Draft button (decisions [2026-08-17]). It
+touches only the frontend and the concierge guide — no planning or arrange logic — so it does not
+interact with the GPT-5.6 verification and can deploy in any order relative to it.
 
 ## Active Workstream
 The branch fixed the reported "stuck" plan, then found three bugs underneath it that each
@@ -76,6 +81,8 @@ on two of our own bugs. Cost per activity rises ~1.7x, the one column Sonnet sti
 1. Verify the GPT-5.6 switch on a keyed environment (open_items [2026-08-08]). The arm is well
    measured, but `openaiGenerator()` — the function production actually calls — has never run,
    because the bake-off injects its own `generate`.
+1b. Watch the first keyed run of the Arrange auto-draft (open_items [2026-08-17]) — the trigger is
+   browser-verified, but it now fires an `/api/arrange` call without a click behind it.
 2. Phase 2: cluster-based meal sourcing, so restaurants are drawn near or between activity clusters
    rather than planned independently. Designed in `PROJECT_NOTES/plan-deterministic-prompt-split.md`,
    not started.

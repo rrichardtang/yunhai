@@ -1,5 +1,21 @@
 # Open Items
 
+## [2026-08-17] Watch the first keyed run of the Arrange auto-draft
+**Status:** Pending input (needs deploy)
+**Description:** Entering Arrange now fires `/api/arrange` with no click behind it
+(decisions [2026-08-17]). The trigger itself is verified in headless Chromium against the real
+`planner.html` — all six gate cases, no page errors — but every one of those runs stubbed
+`autoArrangeActiveCity`, so the automatic path has never reached a live Claude arrange call.
+**Context:** changelog [2026-08-17]. Branch `claude/auto-open-scheduling-modal-jmbjem`. The arrange
+call is unchanged from what the Draft button invoked; what is new is that it can start while the
+user is still reading the step, and that it can start once per city as they navigate.
+**Next action:** On a keyed env, plan a two-city trip and walk Review → Arrange: (1) wizard appears
+unprompted, Save → loader → days populate; (2) back to Review and forward again → no modal, no
+re-arrange, schedule intact; (3) switch to city 2 → arranges silently; (4) dismiss the wizard with X
+on a fresh trip → board stays empty and no arrange request is sent. Then check
+`GET /api/admin/arrange-stats` for a jump in runs-per-trip — one automatic call per city is the
+intended cost, more than that means the gate is leaking.
+
 ## [2026-08-08] Verify the GPT-5.6 switch on a keyed environment before it reaches users
 **Status:** Pending input (needs deploy)
 **Description:** `planCity` now runs `gpt-5.6` with `SYSTEM_PROMPT_GPT_LEAN` (decisions
