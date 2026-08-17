@@ -11,6 +11,7 @@ logs/
 .augment
 .claude/*
 !.claude/settings.json
+!.claude/agents/
 .cline
 .github/copilot*
 .kilocode

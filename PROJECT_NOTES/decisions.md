@@ -4,6 +4,36 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-17] Pushes are gated on a review receipt keyed to HEAD
+
+**Decision:** A `pre-push-reviewer` subagent lives in `.claude/agents/`, and a PreToolUse hook
+(`scripts/prePushReview.js`) blocks `git push` until `.claude/pre-push-review.json` records the sha
+being pushed. `--record` writes the receipt. The subagent has no `Edit`/`Write` tools.
+
+**Reasoning:** A subagent definition is a capability, not a behavior — nothing makes it fire. Only a
+hook runs on an event, because the harness executes hooks while an instruction in CLAUDE.md is
+something the model may or may not honor under pressure. Keying the receipt on HEAD rather than on
+the session makes the unit of review a code state: amend or add a commit and the gate re-opens,
+which is the property that matters, since the risk is pushing code nobody looked at. Withholding
+edit tools from the reviewer is what keeps "flag, don't fix" true — a reviewer that can edit will
+eventually edit, and then nobody has reviewed the edit.
+
+**Alternatives rejected:** A `type: "agent"` hook, which the harness runs automatically with no
+receipt and no cooperation needed — genuinely stronger enforcement, but it cannot be pipe-tested
+before shipping, defaults to a small model, and reviews with far less context than a subagent
+invoked in-session. Worth revisiting if the receipt is routinely recorded without a review. A
+`git` `pre-push` hook in `.git/hooks/` — not version-controlled and invisible to teammates. An
+instruction in CLAUDE.md — cannot enforce anything. Narrowing the hook with `"if": "Bash(git
+push*)"` to avoid a node spawn per Bash call — it matches on the command prefix, so
+`cd x && git push` would silently not fire it, and a guard that fails silently is worse than none.
+
+**Tradeoffs:** The gate is honest-effort: nothing stops `--record` being run without a review, and
+the hook fails open if the script crashes (a non-2 exit is a non-blocking error). It also costs a
+node spawn on every Bash call, and it checks the *project's* HEAD, so a push aimed at a different
+repo via `cd` is judged against the wrong sha — it errs toward blocking, which is the safe side.
+
+---
+
 ## [2026-08-17] Dirty-city arrange: the day-id set is the signature — supersedes the placements-based gate
 
 **Decision:** Entering Arrange re-arranges exactly those cities whose day-id set changed since the
