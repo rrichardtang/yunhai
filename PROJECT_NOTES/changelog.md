@@ -4,6 +4,31 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-17] Fix: auto-arrange never fired — the baseline was clobbered before it was read
+
+Reported from real use: adding Osaka to an existing Japan trip and moving to Arrange fired nothing,
+and the Osaka tab was empty. The defect was not Osaka-specific — auto-arrange had **never** fired in
+real use, including on fresh trips (decisions [2026-08-17] "recorded, not inferred").
+
+- Cause: `citiesNeedingArrange` took its baseline from `state.days`, on the assumption that
+  `state.days` is only rebuilt at the Review→Arrange transition. `public/app.js` has a `change`
+  listener on `#activitiesGrid` that rebuilds it on **every activity approval**, and approving is
+  mandatory before the transition is allowed, so the baseline always equalled the value it was about
+  to be compared against. The dirty set was therefore always empty.
+- Fix: `state.arrangedSignatures` — a per-city record written *only* by `autoArrangeActiveCity`
+  (both the normal path and the all-locked early return), holding `cityDayKey` at the moment that
+  city was arranged. `citiesNeedingArrange()` reads that record instead of an inferred baseline, so
+  unrelated `expandDays` recomputation cannot forge it.
+- A city with no record but existing placements adopts the current signature and is left alone —
+  this covers trips arranged before the field existed and cities arranged by hand, neither of which
+  should be rebuilt. No record and nothing scheduled means genuinely new, which is the Osaka case.
+- Persisted alongside `placements` in all three write paths and both hydration paths, and cleared
+  wherever placements are cleared. `src/itineraryStore.js` spreads `...payload`, so no server change.
+- Harness rebuilt: it now dispatches the real `#activitiesGrid` change event and drives the real
+  `goToNextStep(2)` instead of hand-building state and calling the helper directly. Run against the
+  pre-fix code it reports 5 failures — every arranging scenario returns `[]` — which is the proof
+  the previous harness never had. 8/8 pass after the fix; 280/280 unit tests; no page errors.
+
 ## [2026-08-17] Pre-push review subagent and the hook that makes it run
 
 Code reaching a branch had only ever been reviewed by the model that wrote it (decisions

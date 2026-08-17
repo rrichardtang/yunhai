@@ -4,6 +4,44 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-17] The arrange baseline is recorded, not inferred — supersedes "the day-id set is the signature"
+
+**Decision:** `state.arrangedSignatures[city]` holds `cityDayKey` as of the moment that city was
+arranged, written only by `autoArrangeActiveCity`. `citiesNeedingArrange()` compares against that
+record. A city with no record but existing placements adopts the current signature and is treated as
+clean; no record and nothing scheduled means it needs arranging.
+
+**Reasoning:** The previous entry got the *signal* right — a city's day-id set captures extend,
+shrink, shift and rename in one comparison — and the *source* wrong. It read the baseline from
+`state.days`, reasoning that nothing else overwrites it. Something else did: a `change` listener on
+`#activitiesGrid` rebuilds `state.days` on every activity approval, and approving is a precondition
+of the transition, so the baseline was always already equal to its comparand and the feature never
+fired even once. The general rule this buys: **a value that unrelated code recomputes cannot serve
+as a baseline.** A baseline has to be written by the operation whose effect it describes, which is
+what makes it authoritative — everything else is a guess that happens to be right until it isn't.
+This is the same shape as the other bugs in this file: a value that still passes every guard while
+no longer meaning what the guard assumes.
+
+**Alternatives rejected:** Deriving dirtiness from placements alone (a city needs arranging if it has
+unplaced approved activities, or placements pointing at dead days) — needs no new state and handles
+the new-city and shift cases, but cannot see a city extended by a day when nothing became unplaced,
+which is one of the three required rules. Freezing `state.days` into a second field at the
+transition — same clobbering exposure, just moved. Making the `#activitiesGrid` handler stop
+rebuilding `state.days` — narrower, but it leaves the next reader of `state.days` exposed to the
+same assumption.
+
+**Tradeoffs:** A new persisted field on snapshots and itineraries, cleared in three reset paths — a
+signature outliving a placements wipe would mark an unscheduled city clean, the same bug in a new
+costume. The adopt-on-first-sight branch means a pre-existing trip's day-range change made *before*
+this shipped is not detected: the city is adopted at its current dates. That is the conservative
+direction (never rebuild over existing work) and it self-corrects on the next arrange.
+
+**What it changed about verification:** the original harness hand-built `state` and called
+`maybeAutoArrangeCities` directly, so all eight cases passed against a sequence the app never
+performs. The rule now is that a UI-behavior harness drives the real entry point and dispatches the
+real events, and is proven against the unfixed code before being trusted — this one reports 5
+failures there.
+
 ## [2026-08-17] Pushes are gated on a review receipt keyed to HEAD
 
 **Decision:** A `pre-push-reviewer` subagent lives in `.claude/agents/`, and a PreToolUse hook
