@@ -4,6 +4,31 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-17] Pre-push review subagent and the hook that makes it run
+
+Code reaching a branch had only ever been reviewed by the model that wrote it (decisions
+[2026-08-17] "pre-push review gate").
+
+- `.claude/agents/pre-push-reviewer.md`: new project subagent. Establishes its own review range
+  (`@{u}..HEAD`, falling back to `main..HEAD`), ranks correctness findings above behavior-preserving
+  simplifications, and requires a concrete failure scenario per finding. Granted `Read, Grep, Glob,
+  Bash` and deliberately **not** `Edit`/`Write`, so "flag, don't fix" is structural.
+- `scripts/prePushReview.js`: PreToolUse hook on Bash. Blocks `git push` unless
+  `.claude/pre-push-review.json` records the current HEAD sha; `--record` writes that receipt.
+  Keying on HEAD means a new commit re-opens the gate. Follows `checkPractices.js` — stdin payload,
+  exit 2 with a stderr message, pure functions exported for tests.
+- `.claude/settings.json`: `PreToolUse` block added alongside the existing `PostToolUse` one.
+- `.gitignore`: `!.claude/agents/` added. Without it `.claude/*` left the subagent untracked, so it
+  would have vanished with the container and never reached anyone else.
+- `src/prePushReview.test.js`: 6 tests. One caught a real gap during development — `git -C /repo
+  push` slipped past the original regex because `-C` takes a separate value argument, which replaced
+  the regex with a token scan that resolves the first non-flag token after `git`.
+- `CLAUDE.md`: Engineering Practices now documents both hooks and the `--record` escape hatch.
+- 279/279 tests pass. Hook verified by pipe-test across push/non-push/compound/quoted-mention
+  payloads and by `jq -e` against both hook blocks in the merged settings file.
+
+---
+
 ## [2026-08-17] Arrange reschedules only the cities whose day range actually moved
 
 Replaces the placements-based gate shipped earlier the same day (decisions [2026-08-17] "dirty-city

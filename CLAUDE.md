@@ -112,6 +112,12 @@ One of them is mechanically enforced: `scripts/checkPractices.js` runs as a Post
 placeholder stub. The rest are judgement calls, so the enforcement is self-audit: before
 presenting code, re-read it against this list and fix what violates rather than explaining it.
 
+A second hook gates the way out: `scripts/prePushReview.js` runs as a PreToolUse hook on Bash and
+blocks `git push` until the **`pre-push-reviewer`** subagent (`.claude/agents/`) has reviewed the
+exact commit being pushed. Run it over the range the block names, act on what it finds, then
+`node scripts/prePushReview.js --record`. The receipt is keyed on HEAD, so a new commit re-opens the
+gate. Recording without a review is for pushes that carry no code (notes, docs) — say so when you do.
+
 ### Code Quality
 - Simplify hard-to-read blocks; no overly complex logic
 - No unnecessary comments — use descriptive names instead
