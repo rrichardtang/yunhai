@@ -2369,13 +2369,14 @@ async function goToNextStep(fromStep = state.step) {
   if (fromStep === 2) {
     const approved = state.activities.filter((a) => state.reviewed[a.id]?.approved);
     if (!approved.length) return;
+    const previousDays = state.days;
     state.days = expandDays(state.cities);
     state.arrangeCity = state.days[0]?.city || null;
     approved.forEach((a) => {
       state.placements[a.id] = state.placements[a.id] || { dayId: null, time: parseTimeTo24(actPreferredTime(a) || typeToTime(a.type)) };
     });
     setStep(3);
-    maybeAutoArrangeCity();
+    maybeAutoArrangeCities(previousDays);
     return;
   }
 
@@ -5175,7 +5176,6 @@ function renderArrangeCityNav(cityGroups) {
   const switchCity = (city) => {
     state.arrangeCity = city;
     renderArrange();
-    maybeAutoArrangeCity();
   };
 
   els.arrangeCityNav.querySelectorAll('[data-city-tab]').forEach((btn) => {
@@ -6613,23 +6613,42 @@ function openFinalizeModal() {
   modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 }
 
-function cityHasSchedule(city) {
-  return state.activities.some(
-    (a) => state.reviewed[a.id]?.approved && cityMatches(a.city, city) && state.placements[a.id]?.dayId
-  );
+// expandDays keys day ids on city name + date, so a city's day-id set is the signature its
+// schedule was built against: extending a city appends ids and leaves its neighbours untouched,
+// while shifting, shrinking or renaming rewrites them. Comparing the set before and after the
+// rebuild is what tells us which cities actually moved.
+function cityDayKey(days, city) {
+  return days.filter((d) => cityMatches(d.city, city)).map((d) => d.id).sort().join('|');
 }
 
-function maybeAutoArrangeCity() {
-  const city = state.arrangeCity;
-  if (!city || cityHasSchedule(city)) return;
+function citiesNeedingArrange(previousDays) {
+  return getArrangeCities()
+    .map((g) => g.city)
+    .filter((city) => cityDayKey(previousDays, city) !== cityDayKey(state.days, city))
+    .filter((city) => state.activities.some((a) => state.reviewed[a.id]?.approved && cityMatches(a.city, city)));
+}
+
+async function autoArrangeCities(cities) {
+  const viewing = state.arrangeCity;
+  for (const city of cities) {
+    state.arrangeCity = city;
+    await autoArrangeActiveCity({ auto: true });
+  }
+  state.arrangeCity = viewing;
+  renderArrange();
+}
+
+function maybeAutoArrangeCities(previousDays) {
+  const cities = citiesNeedingArrange(previousDays);
+  if (!cities.length) return;
   if (state.schedulingPrefs?._userConfirmed) {
-    autoArrangeActiveCity();
+    autoArrangeCities(cities);
     return;
   }
   openSchedulingWizard(state.schedulingPrefs, {
     onSave: (saved) => {
       saveSchedulingPrefs(saved);
-      autoArrangeActiveCity();
+      autoArrangeCities(cities);
     }
   });
 }
@@ -6655,7 +6674,7 @@ async function autoArrangeActiveCity(opts = {}) {
   const flexible = allApprovedInCity.filter((a) => !lockedIds.has(String(a.id)));
 
   const hasExistingPlacements = allApprovedInCity.some((a) => state.placements[a.id]?.dayId);
-  if (!finalize && hasExistingPlacements) {
+  if (!finalize && !opts.auto && hasExistingPlacements) {
     const confirmed = await showConfirmDialog('Replace arrangement?', 'This will replace your current schedule for this city.', 'Replace');
     if (!confirmed) return;
   }
@@ -6846,6 +6865,14 @@ async function autoArrangeActiveCity(opts = {}) {
     setLoaderStatus('Building your schedule…');
 
     const dateToDay = Object.fromEntries(activeDays.map((d) => [d.date, d]));
+
+    // The response is authoritative for every flexible activity in this city. Dropping their old
+    // placements first means a day that no longer exists can't leave one stranded on a dead dayId,
+    // where it renders in no column and is excluded from the unplaced list for being "placed".
+    flexible.forEach((a) => {
+      state.placements[a.id] = { dayId: null, time: state.placements[a.id]?.time || null };
+    });
+
     for (const [id, placement] of Object.entries(placements || {})) {
       const day = dateToDay[placement.date];
       if (day) {

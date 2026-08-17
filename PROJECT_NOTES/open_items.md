@@ -1,20 +1,33 @@
 # Open Items
 
-## [2026-08-17] Watch the first keyed run of the Arrange auto-draft
+## [2026-08-17] Watch the first keyed run of the dirty-city Arrange
 **Status:** Pending input (needs deploy)
-**Description:** Entering Arrange now fires `/api/arrange` with no click behind it
-(decisions [2026-08-17]). The trigger itself is verified in headless Chromium against the real
-`planner.html` — all six gate cases, no page errors — but every one of those runs stubbed
-`autoArrangeActiveCity`, so the automatic path has never reached a live Claude arrange call.
-**Context:** changelog [2026-08-17]. Branch `claude/auto-open-scheduling-modal-jmbjem`. The arrange
-call is unchanged from what the Draft button invoked; what is new is that it can start while the
-user is still reading the step, and that it can start once per city as they navigate.
+**Description:** Entering Arrange now fires `/api/arrange` with no click behind it, once per changed
+city, sequentially (decisions [2026-08-17] "dirty-city arrange"). The dirty-set logic is verified in
+headless Chromium against the real `planner.html` — nine cases, no page errors — but those runs
+stubbed `autoArrangeActiveCity`, so the automatic path has never reached a live Claude arrange call.
+The placement-clearing change was exercised through the real function but against a canned response.
+**Context:** changelog [2026-08-17]. Branch `claude/auto-open-scheduling-modal-jmbjem`.
 **Next action:** On a keyed env, plan a two-city trip and walk Review → Arrange: (1) wizard appears
-unprompted, Save → loader → days populate; (2) back to Review and forward again → no modal, no
-re-arrange, schedule intact; (3) switch to city 2 → arranges silently; (4) dismiss the wizard with X
-on a fresh trip → board stays empty and no arrange request is sent. Then check
-`GET /api/admin/arrange-stats` for a jump in runs-per-trip — one automatic call per city is the
-intended cost, more than that means the gate is leaking.
+unprompted, Save → both cities arrange back-to-back → days populate in both; (2) back to Review and
+forward again → nothing re-arranges, schedule intact; (3) extend city B by a day in Setup, decline
+regeneration, return to Arrange → **only** B re-arranges and A is untouched; (4) shift city A so B's
+dates move → both re-arrange. Watch loader pacing across the sequential calls — that is the part
+only real latency can judge. Then check `GET /api/admin/arrange-stats`: one call per *changed* city
+per visit is the intended cost.
+
+## [2026-08-17] City deletion leaks its activities into budget and saved itineraries
+**Status:** Deferred
+**Description:** The remove-city handler (`public/app.js`, `[data-remove-city]`) only filters
+`state.cities`. Activities for the deleted city, plus their `reviewed` and `placements` entries, are
+never pruned, and partial regeneration will not catch them either because the deleted city is not in
+`regenSet`. They keep counting in `renderBudgetTracker` (which sums all approved activities
+regardless of city) and are POSTed to the server by `generateItinerary`, whose payload sends the
+full `state.activities` and `state.placements`.
+**Context:** Found while tracing the city-drift question that led to decisions [2026-08-17]
+"dirty-city arrange". Out of scope for that change, which only governs which cities get rescheduled.
+**Next action:** Prune activities/reviewed/placements/commutes for a city when it is removed, reusing
+the id-sweep `planTrip` already performs for regenerated cities.
 
 ## [2026-08-08] Verify the GPT-5.6 switch on a keyed environment before it reaches users
 **Status:** Pending input (needs deploy)

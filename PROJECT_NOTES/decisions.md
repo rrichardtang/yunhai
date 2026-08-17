@@ -4,6 +4,40 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-17] Dirty-city arrange: the day-id set is the signature — supersedes the placements-based gate
+
+**Decision:** Entering Arrange re-arranges exactly those cities whose day-id set changed since the
+placements were built, comparing `state.days` captured before `expandDays` overwrites it against the
+rebuilt value. This **supersedes** the `cityHasSchedule` gate decided earlier the same day (that
+entry stands per the append-only rule; its conclusion no longer holds). `autoArrangeActiveCity` also
+clears a city's flexible placements before applying a response, and skips the replace-confirm when
+invoked automatically.
+
+**Reasoning:** `expandDays` keys day ids on city name + date. That makes the day-id set a free,
+exact signature of everything that should trigger a reschedule: extending a city appends ids and
+leaves its neighbours byte-identical, while shifting, shrinking or renaming rewrites them. Measured
+directly — extending a 10-day city by one day leaves 10/10 old ids valid, shifting the window by two
+leaves 8/10, renaming leaves 0/10. So "reschedule only the city the user touched" and "reschedule
+every city a date change cascaded into" are the same comparison, not two rules. The previous gate
+asked "does this city have placements?", which cannot distinguish a curated schedule from one whose
+days moved underneath it, and read a stale dayId as proof of being scheduled.
+
+**Alternatives rejected:** A persisted per-city signature (`state.arrangedSignatures`, or a field on
+each city) — needs plumbing through the snapshot, the itinerary payload and both hydration paths,
+and storing it on the city object would have leaked into `step1Fingerprint` and spuriously triggered
+the regenerate dialog. Deriving the baseline from the placements themselves — cannot tell "a day was
+added" from "the scheduler left that day empty", so rule 2 would never fire. Keeping the lazy
+per-city-on-first-visit trigger — a user who never opens city B's tab would reach step 4 with B
+unscheduled, which rule 3 forbids.
+
+**Tradeoffs:** All changed cities are arranged sequentially on entry, so a fresh 3-city trip makes
+three arrange calls back-to-back behind the loader before the board is usable, and the loader
+flickers between cities. Accepted: it guarantees a consistent board before step 4, which lazy
+scheduling cannot. An unexpected throw inside one city's arrange still aborts the remaining ones —
+the realistic failure (a non-ok API response) is caught internally and banners per city.
+
+---
+
 ## [2026-08-17] Arrange builds its own first draft; the Draft button is removed
 
 **Decision:** Entering Arrange with nothing scheduled opens the Schedule Preferences wizard and, on

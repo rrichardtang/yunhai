@@ -4,6 +4,36 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-17] Arrange reschedules only the cities whose day range actually moved
+
+Replaces the placements-based gate shipped earlier the same day (decisions [2026-08-17] "dirty-city
+arrange"). Entering Arrange now re-arranges exactly the set of cities whose day-id set differs from
+the one the current placements were built against.
+
+- `public/app.js`: `cityHasSchedule()` / `maybeAutoArrangeCity()` replaced by `cityDayKey()`,
+  `citiesNeedingArrange()`, `autoArrangeCities()` and `maybeAutoArrangeCities(previousDays)`.
+  `goToNextStep`'s `fromStep === 2` branch captures `state.days` into `previousDays` before
+  `expandDays` overwrites it, and passes it through. No new persisted state: `state.days` is already
+  saved in snapshots and itineraries and is only rewritten at this transition, so it is the baseline.
+- `citiesNeedingArrange` also skips cities with no approved activities, so a changed city with
+  nothing to place never fires an LLM call.
+- `public/app.js`: the per-city-switch trigger added earlier is removed — every changed city is
+  handled on entry, so switching tabs no longer schedules anything.
+- `public/app.js`: `autoArrangeActiveCity` accepts `opts.auto`, which skips the "Replace
+  arrangement?" confirm (an automatic run must not prompt), and now clears every flexible activity's
+  placement before applying the server response. Without that, an activity the response does not
+  place kept a dayId pointing at a day that no longer exists — rendering in no column and excluded
+  from the unplaced list for being "placed", i.e. invisible.
+- Verified in headless Chromium against the real `planner.html`, no page errors: fresh run arranges
+  both cities; no-change arranges none; adding a day to city B arranges B only; shifting both cities
+  arranges both; shrinking city A arranges A only; rename arranges the renamed city; a newly added
+  city arranges alone; a changed city with no approved activities arranges nothing; the wizard still
+  gates the first run. Separately, a shrink driven through the real `autoArrangeActiveCity` with a
+  canned response left 0 activities stranded (was 3) and surfaced the unplaced two in staging.
+  273/273 unit tests pass.
+
+---
+
 ## [2026-08-17] Arrange drafts itself on entry; Draft button removed
 
 Moving Review → Arrange now asks for schedule preferences and builds the schedule, so the step no
