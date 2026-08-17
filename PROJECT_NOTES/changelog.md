@@ -24,6 +24,16 @@ real use, including on fresh trips (decisions [2026-08-17] "recorded, not inferr
   should be rebuilt. No record and nothing scheduled means genuinely new, which is the Osaka case.
 - Persisted alongside `placements` in all three write paths and both hydration paths, and cleared
   wherever placements are cleared. `src/itineraryStore.js` spreads `...payload`, so no server change.
+- Two follow-up defects found by the `pre-push-reviewer` subagent on its first real run, both fixed
+  before push: (1) `cityIsScheduled` tested `dayId` for truthiness rather than membership in
+  `state.days`, so a city holding placements for dates the trip no longer covers adopted a signature
+  and was marked clean permanently, with its activities rendering in no day column and no unplaced
+  list — the exact "still truthy, no longer valid" shape the reviewer's own rubric names; (2) the
+  signature reset landed only in `planTrip`'s full re-plan branch, so partial regeneration deleted a
+  city's placements while its signature survived, marking a regenerated city clean while it held
+  nothing. Also applied its two behavior-preserving cleanups: reuse `activeDays` rather than
+  re-walking `state.days`, and lift the adoption write out of a `.filter()` predicate.
+- Harness now 11 scenarios, including one per finding above.
 - Harness rebuilt: it now dispatches the real `#activitiesGrid` change event and drives the real
   `goToNextStep(2)` instead of hand-building state and calling the helper directly. Run against the
   pre-fix code it reports 5 failures — every arranging scenario returns `[]` — which is the proof

@@ -6621,26 +6621,29 @@ function cityDayKey(days, city) {
   return days.filter((d) => cityMatches(d.city, city)).map((d) => d.id).sort().join('|');
 }
 
+// Membership in the current day set, not truthiness: a placement left over from a date the trip no
+// longer covers is still a non-empty string, and counting it as a schedule would adopt a signature
+// for a city whose activities render nowhere at all.
 function cityIsScheduled(city) {
+  const liveDayIds = new Set(state.days.filter((d) => cityMatches(d.city, city)).map((d) => d.id));
   return state.activities.some(
-    (a) => state.reviewed[a.id]?.approved && cityMatches(a.city, city) && state.placements[a.id]?.dayId
+    (a) => state.reviewed[a.id]?.approved && cityMatches(a.city, city) && liveDayIds.has(state.placements[a.id]?.dayId)
   );
 }
 
 function citiesNeedingArrange() {
-  return getArrangeCities()
+  const candidates = getArrangeCities()
     .map((g) => g.city)
-    .filter((city) => state.activities.some((a) => state.reviewed[a.id]?.approved && cityMatches(a.city, city)))
-    .filter((city) => {
-      const recorded = state.arrangedSignatures[city];
-      if (recorded !== undefined) return recorded !== cityDayKey(state.days, city);
-      // No record: either a trip arranged before this was tracked, or a city the user arranged by
-      // hand. Adopt what is on the board rather than rebuilding on top of their work. A city with
-      // nothing scheduled is the genuinely new one.
-      if (!cityIsScheduled(city)) return true;
-      state.arrangedSignatures[city] = cityDayKey(state.days, city);
-      return false;
-    });
+    .filter((city) => state.activities.some((a) => state.reviewed[a.id]?.approved && cityMatches(a.city, city)));
+
+  // A city with no record is either a trip arranged before this was tracked or one the user
+  // arranged by hand. Adopt what is really on the board rather than rebuilding over their work;
+  // a city with nothing on it keeps no record and is picked up as needing arranging below.
+  candidates
+    .filter((city) => state.arrangedSignatures[city] === undefined && cityIsScheduled(city))
+    .forEach((city) => { state.arrangedSignatures[city] = cityDayKey(state.days, city); });
+
+  return candidates.filter((city) => state.arrangedSignatures[city] !== cityDayKey(state.days, city));
 }
 
 async function autoArrangeCities(cities) {
@@ -6787,7 +6790,7 @@ async function autoArrangeActiveCity(opts = {}) {
       if (day) state.placements[entry.activity.id] = { dayId: day.id, time: entry.time, endTime: entry.endTime || null };
     }
     state.arrangeUnplaced[activeCity] = [];
-    state.arrangedSignatures[activeCity] = cityDayKey(state.days, activeCity);
+    state.arrangedSignatures[activeCity] = cityDayKey(activeDays, activeCity);
     const activeDayIds = activeDays.map((d) => d.id);
     await updateCommutesForCityDays(activeDayIds);
     renderArrange();
@@ -6923,7 +6926,7 @@ async function autoArrangeActiveCity(opts = {}) {
       })
       .filter(Boolean);
     state.arrangeUnplaced[activeCity] = unplacedItems;
-    state.arrangedSignatures[activeCity] = cityDayKey(state.days, activeCity);
+    state.arrangedSignatures[activeCity] = cityDayKey(activeDays, activeCity);
   } catch (e) {
     showErrorBanner(e?.message || 'Failed to arrange activities.');
   }
@@ -8333,6 +8336,7 @@ async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
       delete state.reviewed[id];
       delete state.placements[id];
     });
+    regenSet.forEach((city) => { delete state.arrangedSignatures[city]; });
     Object.keys(state.commutes || {}).forEach((key) => {
       const [from, to] = key.split('->');
       if (removedIds.has(from) || removedIds.has(to)) delete state.commutes[key];
