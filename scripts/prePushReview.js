@@ -30,8 +30,12 @@ function firstGitSubcommand(segment) {
 
 // Split on the operators that chain commands so `cd x && git push` is still seen as a push. A
 // narrower prefix check reads fine and fails silently, which is the worst property for a guard.
+// Quoted spans go first: without that, splitting cuts through a string that merely contains
+// "&& git push" and blocks a command that never pushes. A guard that cries wolf gets switched off,
+// taking the real check with it.
 function isPushCommand(command) {
   return String(command || '')
+    .replace(/'[^']*'|"[^"]*"/g, ' ')
     .split(/&&|\|\||;|\||\n/)
     .some((segment) => firstGitSubcommand(segment) === 'push');
 }
