@@ -32,10 +32,19 @@ test('leaves every other command alone', () => {
     // switched off, taking the real check with it.
     'echo "run git push when ready"',
     'grep -r "git push" docs/',
+    // Chaining operators inside a quoted string must not be split on: this exact shape blocked a
+    // command that never pushed, because the split exposed the tail as its own segment.
+    "node -e \"const cases=['a && git push origin main']\"",
+    'echo "deploy: build && git push"',
     ''
   ]) {
     assert.equal(isPushCommand(command), false, command);
   }
+});
+
+test('still sees a real push that carries quoted arguments', () => {
+  assert.equal(isPushCommand('git push origin "main"'), true);
+  assert.equal(isPushCommand('cd "/my dir" && git push'), true);
 });
 
 test('handles a missing or malformed command without throwing', () => {

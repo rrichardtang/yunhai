@@ -20,12 +20,19 @@ Code reaching a branch had only ever been reviewed by the model that wrote it (d
 - `.claude/settings.json`: `PreToolUse` block added alongside the existing `PostToolUse` one.
 - `.gitignore`: `!.claude/agents/` added. Without it `.claude/*` left the subagent untracked, so it
   would have vanished with the container and never reached anyone else.
-- `src/prePushReview.test.js`: 6 tests. One caught a real gap during development — `git -C /repo
-  push` slipped past the original regex because `-C` takes a separate value argument, which replaced
-  the regex with a token scan that resolves the first non-flag token after `git`.
+- `src/prePushReview.test.js`: 7 tests, which caught two real defects during development.
+  `git -C /repo push` slipped past the original regex because `-C` takes a separate value argument —
+  replaced by a token scan that resolves the first non-flag token after `git`. Then dogfooding the
+  live hook produced a false positive: splitting on `&&` cut through a *quoted* string containing
+  "&& git push", blocking a command that never pushed. Quoted spans are now stripped before
+  splitting, which is the same "must not cry wolf" constraint `checkPractices.js` is built around.
 - `CLAUDE.md`: Engineering Practices now documents both hooks and the `--record` escape hatch.
-- 279/279 tests pass. Hook verified by pipe-test across push/non-push/compound/quoted-mention
-  payloads and by `jq -e` against both hook blocks in the merged settings file.
+- 280/280 tests pass. The hook was verified live — it blocked an actual `git push` of this very
+  change — plus pipe-tests across push/non-push/compound/quoted-mention payloads, a 14-case
+  adversarial sweep of the detector, and `jq -e` against both hook blocks in the merged settings.
+- Known limits, accepted: the subagent registry and hook config load at session start, so both take
+  effect in the *next* session; `bash -c "git push"` is not detected; and the check reads the
+  project's HEAD, so a push aimed at another repo via `cd` is judged against the wrong sha.
 
 ---
 
