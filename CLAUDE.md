@@ -117,6 +117,8 @@ blocks `git push` until the **`pre-push-reviewer`** subagent (`.claude/agents/`)
 exact commit being pushed. Run it over the range the block names, act on what it finds, then
 `node scripts/prePushReview.js --record`. The receipt is keyed on HEAD, so a new commit re-opens the
 gate. Recording without a review is for pushes that carry no code (notes, docs) — say so when you do.
+Record and push as two separate commands: the hook inspects the whole command string before any of
+it runs, so `--record && git push` is blocked before the record half executes.
 
 ### Code Quality
 - Simplify hard-to-read blocks; no overly complex logic
