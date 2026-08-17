@@ -160,7 +160,6 @@ const els = {
   learnedPrefsTags: document.getElementById('learnedPrefsTags'),
   profileEditBtn: document.getElementById('profileEditBtn'),
 
-  autoArrangeBtn: document.getElementById('autoArrangeBtn'),
   schedulingWizardBtn: document.getElementById('schedulingWizardBtn'),
   finalizeArrangeBtn: document.getElementById('finalizeArrangeBtn'),
   myTripsPanel: document.getElementById('myTripsPanel'),
@@ -2376,6 +2375,7 @@ async function goToNextStep(fromStep = state.step) {
       state.placements[a.id] = state.placements[a.id] || { dayId: null, time: parseTimeTo24(actPreferredTime(a) || typeToTime(a.type)) };
     });
     setStep(3);
+    maybeAutoArrangeCity();
     return;
   }
 
@@ -5172,21 +5172,22 @@ function renderArrangeCityNav(cityGroups) {
     <button type="button" class="icon-btn nav-primary arrange-city-arrow" data-city-next title="Next city" ${activeIndex >= cityGroups.length - 1 ? 'disabled' : ''} aria-label="Next city"><i class="ph-bold ph-arrow-right" aria-hidden="true"></i></button>
   `;
 
+  const switchCity = (city) => {
+    state.arrangeCity = city;
+    renderArrange();
+    maybeAutoArrangeCity();
+  };
+
   els.arrangeCityNav.querySelectorAll('[data-city-tab]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.arrangeCity = btn.dataset.cityTab;
-      renderArrange();
-    });
+    btn.addEventListener('click', () => switchCity(btn.dataset.cityTab));
   });
   els.arrangeCityNav.querySelector('[data-city-prev]')?.addEventListener('click', () => {
     if (activeIndex <= 0) return;
-    state.arrangeCity = cityGroups[activeIndex - 1].city;
-    renderArrange();
+    switchCity(cityGroups[activeIndex - 1].city);
   });
   els.arrangeCityNav.querySelector('[data-city-next]')?.addEventListener('click', () => {
     if (activeIndex >= cityGroups.length - 1) return;
-    state.arrangeCity = cityGroups[activeIndex + 1].city;
-    renderArrange();
+    switchCity(cityGroups[activeIndex + 1].city);
   });
 }
 
@@ -6612,6 +6613,27 @@ function openFinalizeModal() {
   modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 }
 
+function cityHasSchedule(city) {
+  return state.activities.some(
+    (a) => state.reviewed[a.id]?.approved && cityMatches(a.city, city) && state.placements[a.id]?.dayId
+  );
+}
+
+function maybeAutoArrangeCity() {
+  const city = state.arrangeCity;
+  if (!city || cityHasSchedule(city)) return;
+  if (state.schedulingPrefs?._userConfirmed) {
+    autoArrangeActiveCity();
+    return;
+  }
+  openSchedulingWizard(state.schedulingPrefs, {
+    onSave: (saved) => {
+      saveSchedulingPrefs(saved);
+      autoArrangeActiveCity();
+    }
+  });
+}
+
 async function autoArrangeActiveCity(opts = {}) {
   const finalize = Boolean(opts.finalize);
   const lockedSet = Array.isArray(opts.lockedSet) ? opts.lockedSet : [];
@@ -6737,7 +6759,6 @@ async function autoArrangeActiveCity(opts = {}) {
     return;
   }
 
-  els.autoArrangeBtn.disabled = true;
   showLoader({
     title: finalize ? `Finalizing ${activeCity}` : `Arranging ${activeCity}`,
     status: 'Computing commutes…',
@@ -6861,8 +6882,6 @@ async function autoArrangeActiveCity(opts = {}) {
     state.arrangeUnplaced[activeCity] = unplacedItems;
   } catch (e) {
     showErrorBanner(e?.message || 'Failed to arrange activities.');
-  } finally {
-    els.autoArrangeBtn.disabled = false;
   }
 
   try {
@@ -8550,7 +8569,7 @@ const STEP_SUGGESTED_QUESTIONS = {
     { icon: 'ph-arrows-left-right', text: "What happens when I approve or decline an activity?" }
   ],
   'arranging schedule': [
-    { icon: 'ph-magic-wand', text: "What's the difference between Draft and Finalize?" },
+    { icon: 'ph-magic-wand', text: "What does Finalize do?" },
     { icon: 'ph-train', text: "How long does it actually take to get from Shibuya to Asakusa?" },
     { icon: 'ph-stack', text: "How many activities is too many for one day in Tokyo?" }
   ],
@@ -9758,18 +9777,6 @@ els.reviewSortFilter?.addEventListener('change', (e) => {
 els.approveVisibleBtn?.addEventListener('click', () => applyVerdictToVisibleActivities(true));
 
 document.querySelectorAll('.save-progress-btn').forEach((btn) => btn.addEventListener('click', saveSnapshot));
-els.autoArrangeBtn?.addEventListener('click', () => {
-  if (!state.schedulingPrefs?._userConfirmed) {
-    openSchedulingWizard(state.schedulingPrefs, {
-      onSave: (saved) => {
-        saveSchedulingPrefs(saved);
-        autoArrangeActiveCity();
-      }
-    });
-    return;
-  }
-  autoArrangeActiveCity();
-});
 els.schedulingWizardBtn?.addEventListener('click', () => {
   openSchedulingWizard(state.schedulingPrefs, {
     onSave: (saved) => { saveSchedulingPrefs(saved); }

@@ -4,6 +4,39 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-17] Arrange drafts itself on entry; Draft button removed
+
+Moving Review → Arrange now asks for schedule preferences and builds the schedule, so the step no
+longer opens as an empty board the user has to know how to fill (decisions [2026-08-17]).
+
+- `public/app.js`: new `cityHasSchedule()` / `maybeAutoArrangeCity()` beside
+  `autoArrangeActiveCity`. `maybeAutoArrangeCity` is the old `#autoArrangeBtn` handler plus a gate —
+  it returns if the active city already has an activity carrying a `placements[id].dayId`, opens the
+  wizard when `_userConfirmed` is false, and otherwise arranges directly. Called from
+  `goToNextStep`'s `fromStep === 2` branch after `setStep(3)`, and from the three city-switch
+  handlers in `renderArrangeCityNav` (now routed through one `switchCity` helper) so each city
+  drafts on first visit.
+- `public/app.js` / `public/planner.html`: `#autoArrangeBtn` deleted — markup, `els` entry, click
+  handler, and the two unguarded `els.autoArrangeBtn.disabled` writes inside `autoArrangeActiveCity`
+  that would have thrown once the element was gone.
+- `public/planner.html`: `#schedulingWizardBtn` relabelled "Schedule" → "Schedule preferences",
+  icon `ph-calendar-dots` → `ph-sliders-horizontal`. The id is unchanged, so
+  `public/js/landing-reel.js:871` still drives it.
+- `public/styles.css`: `#step3 .arrange-actions` gains `flex-wrap: wrap` +
+  `justify-content: flex-end` and `.auto-arrange-btn` gains `white-space: nowrap`, so the longer
+  label stays on one line and the row breaks onto two rows at ≤360px instead of wrapping text
+  inside a fixed 36px pill.
+- `src/services/websiteGuide.md`, `src/services/chatPrompt.js`, `public/app.js` chat suggestion:
+  the Draft entry is replaced by a description of the automatic build; both chatPrompt rules that
+  used "Draft" as the example of a misleading button name now use "Finalize" and
+  "Schedule preferences".
+- Verified in headless Chromium against the real `planner.html`: all six gate cases
+  (unconfirmed→modal, save→arrange, confirmed→arrange direct, already-scheduled→no-op,
+  second-city→arrange, dismiss→no-op), no page errors, and header layout measured at 320/360/390/
+  768/1280px with no horizontal overflow. 273/273 unit tests pass.
+
+---
+
 ## [2026-08-08] Production planning switched to GPT-5.6
 
 `planCity` now defaults to `gpt-5.6` with `SYSTEM_PROMPT_GPT_LEAN`, one call per city

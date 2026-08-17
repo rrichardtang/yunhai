@@ -4,6 +4,41 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-17] Arrange builds its own first draft; the Draft button is removed
+
+**Decision:** Entering Arrange with nothing scheduled opens the Schedule Preferences wizard and, on
+Save, runs auto-arrange for that city. The `Draft` button is deleted. The wizard button stays as the
+way back into preferences and is relabelled "Schedule preferences" with a sliders icon. The gate is
+"no approved activity in this city has a `placements[id].dayId`" and it also fires on first visit to
+each subsequent city.
+
+**Reasoning:** Auto-arrange was already what nearly every user wanted first, but it sat behind a
+button whose label taught nothing — opaque enough that `chatPrompt.js` carried a standing rule
+warning the concierge not to read "Draft" as "save a draft of edits". A step that builds its own
+first draft removes both the dead end and the vocabulary problem. Gating on placements rather than
+on `state.itinerary` is what makes it safe to run unprompted: it is exactly the condition "this
+board is empty", so a hand-built or restored schedule is never overwritten, and the pre-existing
+"Replace arrangement?" confirm inside `autoArrangeActiveCity` becomes unreachable from this path
+rather than firing at someone who never asked for a rebuild.
+
+**Alternatives rejected:** Keeping Draft as a manual re-run — it reintroduces the label that caused
+the confusion, and Finalize already covers deliberate rebuilds. Arranging every city in one pass on
+entry — n sequential LLM calls behind one loader before the user has looked at anything, where
+first-visit-per-city spreads the same work across the navigation the user was going to do anyway.
+Gating on `state.itinerary === null` — it would still clobber a hand-built board belonging to anyone
+who had not yet reached step 4. Leaving the button labelled "Schedule" — it is a verb for the action
+that now happens automatically, so it read as "do it again" rather than "view settings".
+
+**Tradeoffs:** With Draft gone, the only manual arrange trigger is Finalize, which `updateFinalizeBtn`
+keeps disabled unless the trip has a verified booking or a fixed-time activity — so a user who
+dismisses the wizard with X, or who wants a fresh shuffle of an already-built city, has no button for
+it and must drag by hand. Accepted because the automatic path covers the common case and the escape
+hatch (dismiss → arrange manually) is deliberate; revisit if users ask for a re-draft. Changing
+preferences after a city is built also does not rebuild it, which is the conservative choice but may
+read as the setting having no effect.
+
+---
+
 ## [2026-08-08] `planCity` runs GPT-5.6 on a single call — supersedes the earlier "stays on claude-sonnet-4-6"
 
 **Decision:** `planCity` defaults to `gpt-5.6` via `openaiGenerator()`, paired with `SYSTEM_PROMPT_GPT_LEAN`, in one call per city. This **supersedes** the earlier entry in this file that closed the question on `claude-sonnet-4-6`; that entry stays as written per the append-only rule, but its conclusion is no longer in force.

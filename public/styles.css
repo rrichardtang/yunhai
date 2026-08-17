@@ -4227,11 +4227,12 @@ select.gm-inp {
    ===================================================== */
 
 #step3 .panel__head { align-items: flex-start; margin-bottom: 14px; }
-#step3 .arrange-actions { display: inline-flex; gap: 8px; }
+#step3 .arrange-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 #step3 .arrange-actions .auto-arrange-btn {
   height: 36px; padding: 0 16px;
   border-radius: var(--r-pill);
   font-size: 13px; font-weight: 500;
+  white-space: nowrap;
   display: inline-flex; align-items: center; gap: 8px;
   letter-spacing: -0.005em;
   border: 1px solid var(--hair-strong);
