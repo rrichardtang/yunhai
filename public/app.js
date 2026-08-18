@@ -2322,9 +2322,9 @@ async function goToNextStep(fromStep = state.step) {
 
     const hasExistingActivities = Array.isArray(state.activities) && state.activities.length > 0;
     const hasReviewedState = state.reviewed && typeof state.reviewed === 'object';
-    const step1Changed = state.lastPlannedFingerprint && state.lastPlannedFingerprint !== step1Fingerprint();
+    const changedCities = citiesChangedSincePlan();
 
-    if (hasExistingActivities && hasReviewedState && !step1Changed) {
+    if (hasExistingActivities && hasReviewedState && !changedCities.length) {
       syncTripMetaFromInputs();
       setStep(2);
       return;
@@ -2332,8 +2332,8 @@ async function goToNextStep(fromStep = state.step) {
 
     let citiesToRegenerate = null;
     let lockedByCity = {};
-    if (hasExistingActivities && step1Changed) {
-      const result = await showRegenerateConfirmDialog();
+    if (hasExistingActivities && changedCities.length) {
+      const result = await showRegenerateConfirmDialog(changedCities);
       if (!result) {
         syncTripMetaFromInputs();
         setStep(2);
@@ -8303,20 +8303,7 @@ const PLAN_PHASE_LABELS = {
 async function planTrip(citiesToRegenerate = null, lockedByCity = {}) {
   syncTripMetaFromInputs();
   syncLegacyTravelsFromCities();
-  const allCities = state.cities.map(({name,startDate,endDate,leaveTime,notes,accommodation,travelEntry,logistics,latitude,longitude}) => ({
-    name,
-    startDate,
-    endDate,
-    leaveTime,
-    notes,
-    // Validated before planning, and the server's only location anchor when no
-    // accommodation address has been entered yet.
-    latitude,
-    longitude,
-    logistics: logistics ? JSON.parse(JSON.stringify(logistics)) : null,
-    accommodation: accommodation ? { ...accommodation } : null,
-    travelEntry: travelEntry ? { ...travelEntry } : null
-  }));
+  const allCities = state.cities.map(cityPlanningInputs);
   const travels = state.travels.map((travel) => ({ ...travel }));
 
   // When regenerating only specific cities, keep existing activities for unselected cities
@@ -8920,7 +8907,7 @@ function getSnapshot() {
   return persist.loadJson(SNAPSHOT_KEY, null);
 }
 
-function showRegenerateConfirmDialog() {
+function showRegenerateConfirmDialog(changedCities = null) {
   return new Promise((resolve) => {
     const existing = document.getElementById('regenerateConfirmDialog');
     if (existing) existing.remove();
@@ -9036,7 +9023,7 @@ function showRegenerateConfirmDialog() {
       });
     }
 
-    renderPhase1();
+    renderPhase1(changedCities);
   });
 }
 
@@ -9069,6 +9056,47 @@ function showConfirmDialog(title, message, confirmLabel = 'Confirm') {
     dialog.querySelector('#confirmNo').addEventListener('click', () => cleanup(false));
     dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(false); });
   });
+}
+
+// The fields the planner actually consumes: both the request payload and the definition of what
+// counts as a change worth regenerating for. Anything omitted here — id, detailsExpanded, any future
+// UI flag — must never cost the user their activities.
+function cityPlanningInputs({ name, startDate, endDate, leaveTime, notes, accommodation, travelEntry, logistics, latitude, longitude }) {
+  return {
+    name,
+    startDate,
+    endDate,
+    leaveTime,
+    notes,
+    // Validated before planning, and the server's only location anchor when no
+    // accommodation address has been entered yet.
+    latitude,
+    longitude,
+    logistics: logistics ? JSON.parse(JSON.stringify(logistics)) : null,
+    accommodation: accommodation ? { ...accommodation } : null,
+    travelEntry: travelEntry ? { ...travelEntry } : null
+  };
+}
+
+// Which cities the user actually changed since the trip was last planned. The previous city list is
+// already inside lastPlannedFingerprint, so this needs no new state.
+function citiesChangedSincePlan() {
+  if (!state.lastPlannedFingerprint) return [];
+  const names = state.cities.map((c) => c.name);
+  let previous = null;
+  try { previous = JSON.parse(state.lastPlannedFingerprint); } catch { return names; }
+
+  const current = JSON.parse(step1Fingerprint());
+  const tripLevelChanged = ['budget', 'travelers', 'children'].some((key) => previous[key] !== current[key])
+    || JSON.stringify(previous.travels) !== JSON.stringify(current.travels);
+  // Budget, party size and travel legs feed every city's plan, so a partial regeneration would be
+  // incoherent — everything is in scope.
+  if (tripLevelChanged) return names;
+
+  const planned = new Map((previous.cities || []).map((c) => [c.name, JSON.stringify(cityPlanningInputs(c))]));
+  return state.cities
+    .filter((c) => planned.get(c.name) !== JSON.stringify(cityPlanningInputs(c)))
+    .map((c) => c.name);
 }
 
 function step1Fingerprint() {

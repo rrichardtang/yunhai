@@ -4,6 +4,31 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-17] Regenerate only the cities the user actually changed
+
+The regenerate dialog pre-checked every city, so adding one city and clicking through deleted the
+activities and placements for cities the user never touched — the trap behind the Osaka report
+(decisions [2026-08-17] "changed set from the existing fingerprint").
+
+- `public/app.js`: `cityPlanningInputs(city)` extracted from `planTrip`'s payload destructure and
+  reused by it, so the request payload and the change detector are one definition. `id`,
+  `detailsExpanded` and any future UI flag are excluded by construction.
+- `citiesChangedSincePlan()` derives the changed set from `state.lastPlannedFingerprint`, which
+  already contains the previous city list — no new persisted state. Trip-level changes (budget,
+  travelers, children, travels) return every city, since those feed every city's plan.
+- `goToNextStep` decides from that set: empty means nothing planning-relevant changed and it goes
+  straight to Review; otherwise the dialog opens with exactly those cities pre-checked.
+- Fixed two pre-existing defects found while building the verification for this:
+  `detailsExpanded` is pure UI state living on the city object, so expanding a city card marked the
+  trip changed and offered to delete every activity; and `normalizeCoordinate(null)` returned **0**
+  because `Number(null)` is 0, so an unset coordinate became a real location off West Africa, passed
+  every `Number.isFinite()` gate meant to catch "not resolved yet", and made normalization
+  non-idempotent (null on the first pass, 0 on the second) — which is what made a bare re-render
+  look like a user edit.
+- New `regen.js` harness, 5 scenarios, driving the real `goToNextStep(1)` and reading the actual
+  checkbox state. Proven against the unfixed code first: 3 failures. 280/280 unit tests; the 11
+  arrange scenarios and the stale-placement check still pass.
+
 ## [2026-08-17] Fix: auto-arrange never fired — the baseline was clobbered before it was read
 
 Reported from real use: adding Osaka to an existing Japan trip and moving to Arrange fired nothing,
