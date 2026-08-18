@@ -5,6 +5,20 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 ---
 
 ## [2026-08-17] Regenerate only the cities the user actually changed
+  - Two regressions the reviewer caught before push, both reproduced and then fixed: keying the
+    lookup on city **name** collapsed a repeat-visit trip (Tokyo → Kyoto → Tokyo), so the first leg
+    never matched and reported as changed on every Continue with **zero edits** — bypassing the
+    skip-to-Review shortcut and pre-checking both legs for deletion. And **deleting** a city
+    produced no entry at all, so the trip went straight to Review with no prompt, leaving the
+    removed city's activities orphaned and unmentioned; the old coarse boolean at least opened the
+    dialog. Matching is now by city `id`, with a removed city putting the whole trip in scope.
+  - Also applied: `step1Fingerprint` split into `step1Snapshot()` + a stringify wrapper, so the
+    trip-level values are read without serialising every city twice; dead `= null` defaults and the
+    now-unreachable `!prevSelected ||` arm dropped from the dialog.
+  - Corrected two overclaims the reviewer flagged in these notes: the harness described below is a
+    scratch tool, not a repo artifact, and "a field added to the payload is automatically a trigger"
+    holds only for per-city fields (`profile` is in the request but not the fingerprint).
+
 
 The regenerate dialog pre-checked every city, so adding one city and clicking through deleted the
 activities and placements for cities the user never touched — the trap behind the Osaka report
@@ -25,9 +39,12 @@ activities and placements for cities the user never touched — the trap behind 
   every `Number.isFinite()` gate meant to catch "not resolved yet", and made normalization
   non-idempotent (null on the first pass, 0 on the second) — which is what made a bare re-render
   look like a user edit.
-- New `regen.js` harness, 5 scenarios, driving the real `goToNextStep(1)` and reading the actual
-  checkbox state. Proven against the unfixed code first: 3 failures. 280/280 unit tests; the 11
-  arrange scenarios and the stale-placement check still pass.
+- The comparison logic lives in `shared/cityChanges.js` (`cityPlanningInputs`, `changedCityNames`)
+  so it is testable in the repo's own suite rather than only through a browser: `src/cityChanges.test.js`,
+  10 cases. Browser-level checks ran through a throwaway Playwright harness driving the real
+  `goToNextStep(1)` and reading actual checkbox state, proven against the unfixed code first (3
+  failures) — that harness is scratch, not a repo artifact, and is not what guards this going
+  forward; the unit tests are.
 
 ## [2026-08-17] Fix: auto-arrange never fired — the baseline was clobbered before it was read
 

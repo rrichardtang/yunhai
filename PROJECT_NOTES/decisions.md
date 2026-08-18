@@ -15,8 +15,11 @@ does not open at all when the set is empty.
 regenerating everything and quietly destroyed curation the user never asked to touch. The previous
 city list is already inside the fingerprint, so the finer-grained answer needs no new state — the
 information was there, only the question was too coarse. Tying the definition of "planning input" to
-the request payload means the two cannot drift: a field the server never sees can never cost a user
-their activities, and a field added to the payload is automatically a regeneration trigger.
+the per-city request payload means those two cannot drift: a field the server never sees can never
+cost a user their activities, and a per-city field added to the payload automatically becomes a
+regeneration trigger. This does not extend to the rest of the request — `profile` materially shapes
+generated activities and is not in the fingerprint at all, so changing it still triggers nothing.
+That gap is pre-existing, not closed here.
 
 **Alternatives rejected:** A per-city fingerprint recorded at plan time — more state to persist,
 reset and keep in sync, for information already available. Comparing whole city objects — that is

@@ -8907,7 +8907,7 @@ function getSnapshot() {
   return persist.loadJson(SNAPSHOT_KEY, null);
 }
 
-function showRegenerateConfirmDialog(changedCities = null) {
+function showRegenerateConfirmDialog(changedCities) {
   return new Promise((resolve) => {
     const existing = document.getElementById('regenerateConfirmDialog');
     if (existing) existing.remove();
@@ -8932,11 +8932,11 @@ function showRegenerateConfirmDialog(changedCities = null) {
 
     dialog.addEventListener('click', (e) => { if (e.target === dialog) cleanup(null); });
 
-    function renderPhase1(prevSelected = null) {
+    function renderPhase1(prevSelected) {
       const cityCheckboxes = allCityNames.map((name, i) => `
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
           <input type="checkbox" class="regen-city-cb" data-index="${i}"
-            ${!prevSelected || prevSelected.includes(name) ? 'checked' : ''}
+            ${prevSelected.includes(name) ? 'checked' : ''}
             style="width:16px;height:16px;cursor:pointer">
           <span>${esc(name)}</span>
         </label>`).join('');
@@ -9058,53 +9058,25 @@ function showConfirmDialog(title, message, confirmLabel = 'Confirm') {
   });
 }
 
-// The fields the planner actually consumes: both the request payload and the definition of what
-// counts as a change worth regenerating for. Anything omitted here — id, detailsExpanded, any future
-// UI flag — must never cost the user their activities.
-function cityPlanningInputs({ name, startDate, endDate, leaveTime, notes, accommodation, travelEntry, logistics, latitude, longitude }) {
-  return {
-    name,
-    startDate,
-    endDate,
-    leaveTime,
-    notes,
-    // Validated before planning, and the server's only location anchor when no
-    // accommodation address has been entered yet.
-    latitude,
-    longitude,
-    logistics: logistics ? JSON.parse(JSON.stringify(logistics)) : null,
-    accommodation: accommodation ? { ...accommodation } : null,
-    travelEntry: travelEntry ? { ...travelEntry } : null
-  };
-}
+// cityPlanningInputs, changedCityNames provided by /shared/cityChanges.js
 
-// Which cities the user actually changed since the trip was last planned. The previous city list is
-// already inside lastPlannedFingerprint, so this needs no new state.
 function citiesChangedSincePlan() {
   if (!state.lastPlannedFingerprint) return [];
-  const names = state.cities.map((c) => c.name);
-  let previous = null;
-  try { previous = JSON.parse(state.lastPlannedFingerprint); } catch { return names; }
-
-  const current = JSON.parse(step1Fingerprint());
-  const tripLevelChanged = ['budget', 'travelers', 'children'].some((key) => previous[key] !== current[key])
-    || JSON.stringify(previous.travels) !== JSON.stringify(current.travels);
-  // Budget, party size and travel legs feed every city's plan, so a partial regeneration would be
-  // incoherent — everything is in scope.
-  if (tripLevelChanged) return names;
-
-  const planned = new Map((previous.cities || []).map((c) => [c.name, JSON.stringify(cityPlanningInputs(c))]));
-  return state.cities
-    .filter((c) => planned.get(c.name) !== JSON.stringify(cityPlanningInputs(c)))
-    .map((c) => c.name);
+  let planned = null;
+  try { planned = JSON.parse(state.lastPlannedFingerprint); } catch { planned = null; }
+  return changedCityNames(planned, step1Snapshot());
 }
 
-function step1Fingerprint() {
+function step1Snapshot() {
   const budgetVal = parseFloat(els.tripBudget?.value);
   const budget = Number.isFinite(budgetVal) && budgetVal > 0 ? budgetVal : null;
   const travelers = Math.max(1, parseInt(els.numTravelers?.value, 10) || 1);
   const children = Math.max(0, parseInt(els.numChildren?.value, 10) || 0);
-  return JSON.stringify({ cities: state.cities, travels: state.travels, budget, travelers, children });
+  return { cities: state.cities, travels: state.travels, budget, travelers, children };
+}
+
+function step1Fingerprint() {
+  return JSON.stringify(step1Snapshot());
 }
 
 function clearSnapshot() {
