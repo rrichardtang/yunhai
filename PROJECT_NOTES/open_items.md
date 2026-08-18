@@ -16,6 +16,22 @@ dates move → both re-arrange. Watch loader pacing across the sequential calls 
 only real latency can judge. Then check `GET /api/admin/arrange-stats`: one call per *changed* city
 per visit is the intended cost.
 
+## [2026-08-18] Itinerary mode renders activities for cities that are gone
+**Status:** Deferred
+**Description:** The zero-city guard covers the four interactive exits from Setup, all of which go
+through `setStep`. Itinerary mode does not: `setViewMode('itinerary')` (topbar toggle) shows
+`itineraryModeView` without a step transition, and `renderItineraryMode` builds `cityOrder` from
+`state.cities` but then appends any payload row whose city is missing from it
+(`public/app.js:7900-7904`). With every city removed, that renders the orphaned activities as a
+schedule.
+**Context:** Found while enumerating non-`setStep` paths for the sixth `pre-push-reviewer` round.
+Deliberately not fixed there: the append-unknown-city fallback looks intentional (execution mode is
+meant to survive setup drift), so guarding it would remove behavior someone chose, and the view is
+pre-existing and untouched by this branch.
+**Next action:** Decide whether execution mode should tolerate cities the trip no longer has. If
+not, filter rows to `state.cities` there; if so, leave it and rely on the deletion-prune item above
+to stop orphans existing in the first place.
+
 ## [2026-08-18] Regeneration is still name-keyed, so repeat-visit trips lose the wrong leg
 **Status:** Deferred
 **Description:** `changedCityNames` now matches cities by `id`, so a Tokyo → Kyoto → Tokyo trip where
