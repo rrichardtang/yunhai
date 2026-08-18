@@ -1064,6 +1064,18 @@ function stepFromPath() {
   return index === -1 ? 1 : index + 1;
 }
 
+// Every interactive way out of Setup goes through this. With no cities there is nothing to plan and
+// nothing to review: the regenerate dialog builds its checkboxes from state.cities, so an empty list
+// renders a modal with no rows whose every exit resolves null — which reads as "user declined" and
+// lands on Review showing activities for cities that are gone. maxStep is monotonic and is never
+// lowered when cities are removed, so the step chips and browser history need the same check the
+// Next button does.
+function canLeaveSetup() {
+  if (state.cities.length) return true;
+  showErrorBanner('Add at least one city to continue.');
+  return false;
+}
+
 let _stepTransitionLock = false;
 function setStep(n, { pushHistory = true } = {}) {
   if (_stepTransitionLock) return;
@@ -1100,6 +1112,7 @@ function setStep(n, { pushHistory = true } = {}) {
 window.addEventListener('popstate', (e) => {
   if (!e.state?.spa) return;
   const step = e.state.step;
+  if (step > 1 && !canLeaveSetup()) return;
   if (step >= 1 && step <= els.panels.length) {
     setStep(step, { pushHistory: false });
   }
@@ -2320,13 +2333,7 @@ async function goToNextStep(fromStep = state.step) {
   if (fromStep === 1) {
     if (state.isPlanning) return;
 
-    // Nothing to plan and nothing to review. Without this the regenerate dialog builds its
-    // checkboxes from an empty state.cities, and every way out of that empty modal resolves null —
-    // which reads as "user declined" and lands on Review showing activities for cities that are gone.
-    if (!state.cities.length) {
-      showErrorBanner('Add at least one city to continue.');
-      return;
-    }
+    if (!canLeaveSetup()) return;
 
     const hasExistingActivities = Array.isArray(state.activities) && state.activities.length > 0;
     const hasReviewedState = state.reviewed && typeof state.reviewed === 'object';
@@ -10235,6 +10242,7 @@ els.steps.forEach((el, i) => {
   el.addEventListener('click', () => {
     const target = i + 1;
     if (target === state.step || target > state.maxStep) return;
+    if (target > 1 && !canLeaveSetup()) return;
     setStep(target);
   });
 });

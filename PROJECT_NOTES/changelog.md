@@ -4,6 +4,30 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-18] All three interactive exits from Setup enforce the zero-city guard
+Fifth `pre-push-reviewer` pass. It found the Next-button guard closed only one of the entrances:
+`state.maxStep` is monotonic (raised in `setStep`, reset only by `resetToFresh`/`initEmbedMode`) and
+is never lowered when cities are removed, so the step chips still reached Review. Tracing the rest
+of the transitions found a third entrance the review did not mention: the `popstate` handler, i.e.
+browser back/forward.
+
+- `public/app.js`: guard extracted as `canLeaveSetup()` next to `setStep`, and applied at all three
+  interactive exits — `goToNextStep(fromStep === 1)`, the step-chip click handler, and `popstate`.
+  Not applied inside `setStep` itself: programmatic `setStep(4)` serves the read-only share and
+  embed views, which must keep working.
+- Harness: `chipToReview` and `browserForwardToReview` scenarios added (7 → 9). Both confirmed
+  failing against the guard-less code.
+- Harness bug fixed while confirming that: `browserForwardToReview` initially passed pre-fix because
+  the preceding scenario's `setStep` leaves `_stepTransitionLock` held until the next frame, which
+  swallowed the popstate transition. `navigateFromSetup` now waits a frame first. Isolated, the
+  scenario failed pre-fix as expected — the in-suite pass was for the wrong reason.
+- Checked and rejected the review's other finding: it argued a stored zero-city itinerary (which the
+  pre-fix bug could persist — the server stores `cities: itinerary.cities || []` with no floor) would
+  be stranded, since `hydrateLoadedItinerary` never raises `maxStep`, and that recovery "discards the
+  loaded activities". Measured instead: the user is blocked with the banner, and adding a city then
+  declining regeneration lands on Review with every activity and approval intact and no plan call.
+  No data loss and no dead end, so the guard was left unscoped.
+
 ## [2026-08-18] Continue no longer advances from Setup with zero cities
 Fourth `pre-push-reviewer` pass, on the fix below. It found the fix incomplete: naming the removed
 cities makes the dialog *open*, but `showRegenerateConfirmDialog` builds its checkboxes from
