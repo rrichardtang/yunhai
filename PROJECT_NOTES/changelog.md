@@ -4,6 +4,25 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-18] Snapshot restore respects the zero-city guard
+Seventh `pre-push-reviewer` pass returned no blocking findings and confirmed the four-exit
+enumeration complete — it independently verified that no `.panel`/`.step-panel` class is toggled
+outside `setStep`, that the boot path clamps to `maxStep` (never rehydrated, so a direct visit to
+`/plan/review` resolves to step 1), and that cities can only be emptied from step 1.
+
+Two of its non-blocking notes were acted on:
+
+- `public/app.js`: `hydrateFromSnapshot` now clamps to step 1 when the restored snapshot has no
+  cities. The review questioned the `|| 3` default on a missing `currentStep` and could not confirm
+  that state was reachable; the reachable case is adjacent and needs no legacy data — `saveSnapshot`
+  writes `currentStep: state.step` on every save, so a pre-fix user who deleted every city and
+  landed on Review has a snapshot with `currentStep >= 2` and `cities: []`, and "Resume draft"
+  restored it straight past Setup. The `|| 3` default is left alone: it only fires for snapshots
+  that predate the field, and lowering it would move a legitimate legacy resume off Arrange.
+- The Trip Health popover now closes on a blocked click. Leaving it open behind the error banner
+  read as if the click did nothing.
+- Harness: `resumeDraftWithNoCities` scenario added (10 → 11), confirmed failing before the clamp.
+
 ## [2026-08-18] Fourth exit from Setup: the Trip Health badge
 Sixth `pre-push-reviewer` pass, on the commit below. It found a fourth interactive entrance the
 previous round's enumeration missed.

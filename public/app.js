@@ -9226,7 +9226,10 @@ function hydrateFromSnapshot(snapshot) {
   if (els.numChildren) els.numChildren.value = state.numChildren;
   renderCities();
 
-  const targetStep = Math.min(snapshot.currentStep || 3, 4);
+  // A snapshot saved before the zero-city guard existed can hold currentStep >= 2 with no cities,
+  // which is the one restore path that reaches a step the four interactive guards protect.
+  const savedStep = Math.min(snapshot.currentStep || 3, 4);
+  const targetStep = state.cities.length ? savedStep : 1;
   if (targetStep >= 2) renderActivities();
   if (targetStep >= 3) renderArrange();
   if (targetStep >= 4) renderItinerary();
@@ -10210,8 +10213,10 @@ document.getElementById('addActivityModal')?.addEventListener('click', (e) => {
 els.openTripHealthReviewBtn?.addEventListener('click', () => {
   // The badge that opens this gates on `currentItineraryId || activities.length`, and removing a
   // city clears neither — so it stays visible and clickable from Setup after the last city is gone.
-  if (!canLeaveSetup()) return;
+  // The popover closes either way: a click that leaves it open behind an error banner reads as if
+  // nothing happened.
   els.tripHealthPopover?.classList.add('hidden');
+  if (!canLeaveSetup()) return;
   setStep(4);
   requestAnimationFrame(() => {
     document.getElementById('tripHealthSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
