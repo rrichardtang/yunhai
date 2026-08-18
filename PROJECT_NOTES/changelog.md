@@ -4,6 +4,21 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-18] Continue no longer advances from Setup with zero cities
+Fourth `pre-push-reviewer` pass, on the fix below. It found the fix incomplete: naming the removed
+cities makes the dialog *open*, but `showRegenerateConfirmDialog` builds its checkboxes from
+`state.cities`, which is empty once every city is gone. The modal rendered with no rows, and Cancel,
+backdrop-click and Next-with-nothing-checked all resolve `null`, which `goToNextStep` reads as
+"user declined" → `setStep(2)` with activities for cities that no longer exist. Same end state as
+before, behind an unactionable dialog.
+
+- `public/app.js`: `goToNextStep(fromStep === 1)` returns early with "Add at least one city to
+  continue." when `state.cities` is empty. There is nothing to plan and nothing to review, so the
+  step should not advance at all — this closes the empty-modal path and the fresh-trip-with-no-cities
+  path in one guard, ahead of any change detection.
+- Harness: `removeOneCity` and `removeAllCities` scenarios added (5 → 7). `removeAllCities` confirmed
+  failing without the guard (`dialog=true checked=[]`) before the guard was kept.
+
 ## [2026-08-18] Whole-trip regeneration scope no longer collapses to "nothing changed"
 Third `pre-push-reviewer` pass on `c207e6a`; one correctness finding, fixed and pinned.
 
