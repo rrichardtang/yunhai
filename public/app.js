@@ -2320,6 +2320,14 @@ async function goToNextStep(fromStep = state.step) {
   if (fromStep === 1) {
     if (state.isPlanning) return;
 
+    // Nothing to plan and nothing to review. Without this the regenerate dialog builds its
+    // checkboxes from an empty state.cities, and every way out of that empty modal resolves null —
+    // which reads as "user declined" and lands on Review showing activities for cities that are gone.
+    if (!state.cities.length) {
+      showErrorBanner('Add at least one city to continue.');
+      return;
+    }
+
     const hasExistingActivities = Array.isArray(state.activities) && state.activities.length > 0;
     const hasReviewedState = state.reviewed && typeof state.reviewed === 'object';
     const changedCities = citiesChangedSincePlan();
