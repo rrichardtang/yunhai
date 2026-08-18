@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// PreToolUse hook: holds `git push` until the pre-push-reviewer subagent has looked at the exact
+// PreToolUse hook: holds `git push` until the felix-the-fixer subagent has looked at the exact
 // code being pushed. The receipt is keyed on HEAD, so a new commit invalidates it automatically —
 // what gets reviewed is a code state, not a session.
 //
@@ -79,7 +79,7 @@ function main(payload) {
 
   process.stderr.write(
     `Push blocked: ${headSha.slice(0, 8) || 'HEAD'} has not been reviewed.\n` +
-    `Run the pre-push-reviewer subagent over ${range}, act on anything it finds, then record it:\n` +
+    `Run the felix-the-fixer subagent over ${range}, act on anything it finds, then record it:\n` +
     '  node scripts/prePushReview.js --record\n' +
     'Record without a review only when the push carries no code (notes, docs) — and say so.\n'
   );

@@ -4,6 +4,67 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-18] `caveman` + `bob-the-builder`/`felix-the-fixer` are global config, synced via a dotfiles repo, not vendored into GuideMe
+
+**Decision:** The `caveman` skill (https://github.com/JuliusBrussee/caveman), the renamed
+code-review subagent `felix-the-fixer` (was `pre-push-reviewer`), and a new coding subagent
+`bob-the-builder` now live in a separate repo, `rrichardtang/claude-config`, synced into
+`~/.claude/` by a `SessionStart` hook (`scripts/syncClaudeConfig.sh`) rather than committed
+directly under GuideMe's `.claude/`. Of `caveman`'s three upstream install tiers (plain skill
+file / native plugin / full proxy+CLI+MCP), only the plain skill file
+(`skills/caveman/SKILL.md`, MIT-licensed, self-contained) was vendored — the plugin route needs
+a global `claude plugin marketplace add` step and Node hook scripts, and the full route pulls in
+BSL-1.1-licensed engine code and a background daemon, neither appropriate here. The Engineering
+Practices rules (Code Quality / Output Efficiency / Structure) moved out of GuideMe's `CLAUDE.md`
+into `bob-the-builder`'s instructions, since they were never actually GuideMe-specific.
+`felix-the-fixer` judges its simplification findings against that same copy instead of
+duplicating it. `caveman` is off by default for the main/interactive agent everywhere (its own
+trigger phrases are already the "on" switch); `bob-the-builder` and `felix-the-fixer` turn it on
+for themselves. The two subagents can optionally run a capped, opt-in coding↔review loop (3
+rounds of `bob-the-builder` → `felix-the-fixer`, then stop and ask rather than loop a 4th time),
+documented in the dotfiles repo's `CLAUDE.md` (synced to `~/.claude/CLAUDE.md`) since it has to
+be readable by the orchestrating main agent in *any* repo, not just this one. Both subagents are
+deliberately kept ignorant of GuideMe's `PROJECT_NOTES/` convention — only this main agent reads
+and writes it; the subagents work from context handed to them and keep their own smaller
+`.claude/agent-notes/{bob,felix}.md` logs instead.
+
+**Reasoning:** This session runs in an ephemeral remote container tied to GuideMe's environment —
+anything written directly to `~/.claude/` here does not survive the container being reclaimed.
+Verified against current Claude Code docs that `~/.claude/CLAUDE.md`, `~/.claude/agents/*.md`,
+and `~/.claude/skills/*/SKILL.md` all load in every session across every project, and that a
+`SessionStart` hook in a project's own `.claude/settings.json` can run an arbitrary shell command
+before the agent starts working. Git is the only thing in this environment that reliably
+persists, so making the config genuinely reusable across future repos (not just GuideMe) means
+storing it in its own repo and having each project that wants it carry a small sync hook — rather
+than writing it once into a container that will eventually be thrown away, or duplicating
+GuideMe-specific practices text into subagents meant to work anywhere.
+
+**Alternatives rejected:** Writing `bob-the-builder`/`felix-the-fixer`/`caveman` directly into
+GuideMe's `.claude/agents/` and `.claude/skills/` — works for this repo only, contradicts the
+explicit "any future repo" requirement, and would need to be hand-copied into every new project
+anyway. The native `caveman` plugin route (`claude plugin marketplace add`) — a global CLI install
+outside this session's reach, and brings Node hook scripts this setup doesn't need. Vendoring
+`caveman`'s full proxy/CLI/MCP install — BSL-1.1 engine code plus a background daemon for a
+capability (input-token compression) not asked for here. Keeping Engineering Practices duplicated
+in both GuideMe's `CLAUDE.md` and `bob-the-builder` — rejected for drift risk; single source of
+truth in `bob-the-builder` instead. Having `bob-the-builder`/`felix-the-fixer` read
+`PROJECT_NOTES/` directly — rejected both because it's a GuideMe-specific convention these
+generic subagents shouldn't assume, and because the user wanted an explicit main-agent-only
+ownership boundary on that directory.
+
+**Tradeoffs:** `rrichardtang/claude-config` must be reachable by a plain `git clone` (no
+credentials) from inside a `SessionStart` hook for the sync to work unattended in a fresh
+session — the created repo needs to be public for that to hold, since it was created private by
+default; contains no secrets, so this is a formality, but flagged for confirmation rather than
+silently changed. `syncClaudeConfig.sh` fails soft (warns, exits 0) on any network/clone/install
+failure so a bad sync degrades to "no update this session" rather than blocking the container —
+the cost is that a broken sync can go unnoticed unless someone reads stderr. Every *new* future
+repo still needs the same small `SessionStart` hook added once by hand (or copy-pasted from
+GuideMe's `.claude/settings.json` + `scripts/syncClaudeConfig.sh`) — this is not zero-touch
+across repos, just low-touch. The loop's 3-round cap is a stated default, not a measured number.
+
+---
+
 ## [2026-08-17] The changed-city set comes from the existing fingerprint, and `planTrip`'s payload defines "planning input"
 
 **Decision:** `citiesChangedSincePlan()` derives which cities changed by parsing

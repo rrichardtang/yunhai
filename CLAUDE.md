@@ -103,44 +103,32 @@ Uses Node.js built-in `node:test` — no Jest or external runner. Tests live alo
 
 ## Engineering Practices
 
-These rules are always active during any code generation, editing, or refactoring — they are
-not opt-in and not something to defer. Reinforce them when output turns verbose, redundant, or
-structurally complex.
+The practice rules themselves (Code Quality, Output Efficiency, Structure) live in the globally
+synced **`bob-the-builder`** subagent's instructions, not here — read them there
+(`~/.claude/agents/bob-the-builder.md`, synced from `rrichardtang/claude-config`) when writing
+code directly in this repo outside the coding↔review loop. They're portable across repos rather
+than GuideMe-specific, so this is the one canonical copy; nothing here duplicates it.
 
-One of them is mechanically enforced: `scripts/checkPractices.js` runs as a PostToolUse hook
-(`.claude/settings.json`) and fails any Edit/Write that leaves a TODO/FIXME/XXX/HACK marker or
-placeholder stub. The rest are judgement calls, so the enforcement is self-audit: before
-presenting code, re-read it against this list and fix what violates rather than explaining it.
+Two things stay repo-specific and mechanically enforced regardless of which agent is editing:
 
-A second hook gates the way out: `scripts/prePushReview.js` runs as a PreToolUse hook on Bash and
-blocks `git push` until the **`pre-push-reviewer`** subagent (`.claude/agents/`) has reviewed the
+`scripts/checkPractices.js` runs as a PostToolUse hook (`.claude/settings.json`) and fails any
+Edit/Write that leaves a TODO/FIXME/XXX/HACK marker or placeholder stub.
+
+`scripts/prePushReview.js` runs as a PreToolUse hook on Bash and blocks `git push` until the
+**`felix-the-fixer`** subagent (globally synced, same as `bob-the-builder`) has reviewed the
 exact commit being pushed. Run it over the range the block names, act on what it finds, then
 `node scripts/prePushReview.js --record`. The receipt is keyed on HEAD, so a new commit re-opens the
 gate. Recording without a review is for pushes that carry no code (notes, docs) — say so when you do.
 Record and push as two separate commands: the hook inspects the whole command string before any of
 it runs, so `--record && git push` is blocked before the record half executes.
 
-### Code Quality
-- Simplify hard-to-read blocks; no overly complex logic
-- No unnecessary comments — use descriptive names instead
-- No defensive boilerplate (excessive null checks, try/catch wrappers) unless the context demands it
-- Keep functions small and single-purpose
-- Never re-derive a value that is already available
-- No dead code, placeholder stubs, or TODO markers unless explicitly requested
-
-### Output Efficiency
-- Never repeat code that already exists — reference or import it instead
-- When editing a file, output only the changed lines with enough surrounding context for an unambiguous match
-- Prefer single focused edits over rewriting entire files
-
-### Structure
-- Prefer flat over nested — deep nesting is a signal to refactor
-- Group related logic together; separate unrelated concerns into distinct functions or modules
-- Keep module interfaces narrow — expose only what consumers need
-
-If generated code violates any rule above, self-correct before presenting it. If a tradeoff is required, state it and recommend the cleaner option.
-
 ## Project Notes Maintenance
+
+`PROJECT_NOTES/` is read and written by this main agent only. `bob-the-builder` and
+`felix-the-fixer` never read or write it directly — pull the task-relevant slice into what you
+send them instead, and decide what graduates back into these files once they report a completed
+round. They keep their own smaller, role-scoped logs at `.claude/agent-notes/bob.md` and
+`.claude/agent-notes/felix.md` for things future rounds of that specific role should know.
 
 `PROJECT_NOTES/` contains four living files with strict ownership — content lives in exactly one file:
 

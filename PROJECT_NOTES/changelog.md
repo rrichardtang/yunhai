@@ -4,6 +4,29 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-18] `pre-push-reviewer` renamed to `felix-the-fixer`; Engineering Practices moved to a global `bob-the-builder` subagent
+- `.claude/agents/pre-push-reviewer.md` deleted from GuideMe — superseded by `felix-the-fixer`,
+  now defined in the separate `rrichardtang/claude-config` repo and synced into `~/.claude/`.
+- `CLAUDE.md`: Engineering Practices section trimmed to the two repo-specific mechanically-enforced
+  hooks (`checkPractices.js`, `prePushReview.js`); the Code Quality/Output Efficiency/Structure
+  rule lists moved to `bob-the-builder`'s instructions (portable, not GuideMe-specific). Reviewer
+  references renamed to `felix-the-fixer`. Added an explicit `PROJECT_NOTES/` ownership line under
+  Project Notes Maintenance: only the main agent reads/writes it, `bob-the-builder`/
+  `felix-the-fixer` never do.
+- `scripts/prePushReview.js`: blocked-push message renamed `pre-push-reviewer` → `felix-the-fixer`
+  (string only, no logic change).
+- New `scripts/syncClaudeConfig.sh` + a `SessionStart` hook in `.claude/settings.json`: clones/pulls
+  `rrichardtang/claude-config` and runs its `install.sh` at the start of every session, to
+  materialize `~/.claude/skills/caveman`, `~/.claude/agents/{bob-the-builder,felix-the-fixer}.md`,
+  and `~/.claude/CLAUDE.md`. Fails soft (warns to stderr, exits 0) if the clone/pull/install fails.
+  Verified standalone against an empty target repo: clones, finds no `install.sh` yet, warns, exits 0.
+- **Not yet done:** the `rrichardtang/claude-config` repo exists (created by the user — this
+  session's GitHub integration can't create repos itself, 403 on account-wide repo creation) but
+  is still empty; this session doesn't yet have push access to it (an `add_repo` grant is pending).
+  `skills/caveman/SKILL.md`, `agents/bob-the-builder.md`, `agents/felix-the-fixer.md`, `CLAUDE.md`,
+  `install.sh`, and `README.md` are drafted and verified locally, ready to push once access is
+  granted. See decisions [2026-08-18].
+
 ## [2026-08-18] Snapshot restore respects the zero-city guard
 Seventh `pre-push-reviewer` pass returned no blocking findings and confirmed the four-exit
 enumeration complete — it independently verified that no `.panel`/`.step-panel` class is toggled
