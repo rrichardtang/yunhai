@@ -27,20 +27,24 @@
   //
   // Returning every name is the "regenerate everything is the only coherent answer" signal, used
   // when a trip-level input moved, when a city was removed (its activities are orphaned and the
-  // user needs to be told), or when identity is unavailable to match on.
+  // user needs to be told), or when identity is unavailable to match on. That set spans both
+  // snapshots: removing the last city leaves no current names, and an empty result is the caller's
+  // "nothing changed" signal — it would wave the orphaned activities through without a prompt.
   function changedCityNames(planned, current) {
-    const names = current.cities.map((c) => c.name);
-    if (!planned) return names;
+    const currentNames = current.cities.map((c) => c.name);
+    if (!planned) return currentNames;
+
+    const plannedCities = planned.cities || [];
+    const wholeTrip = [...new Set([...plannedCities.map((c) => c.name), ...currentNames])];
 
     const tripLevelChanged = ['budget', 'travelers', 'children'].some((key) => planned[key] !== current[key])
       || JSON.stringify(planned.travels) !== JSON.stringify(current.travels);
-    if (tripLevelChanged) return names;
+    if (tripLevelChanged) return wholeTrip;
 
-    const plannedCities = planned.cities || [];
-    if (plannedCities.some((c) => !c.id) || current.cities.some((c) => !c.id)) return names;
+    if (plannedCities.some((c) => !c.id) || current.cities.some((c) => !c.id)) return wholeTrip;
 
     const currentIds = new Set(current.cities.map((c) => c.id));
-    if (plannedCities.some((c) => !currentIds.has(c.id))) return names;
+    if (plannedCities.some((c) => !currentIds.has(c.id))) return wholeTrip;
 
     const before = new Map(plannedCities.map((c) => [c.id, JSON.stringify(cityPlanningInputs(c))]));
     return current.cities

@@ -4,6 +4,24 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-18] Whole-trip regeneration scope no longer collapses to "nothing changed"
+Third `pre-push-reviewer` pass on `c207e6a`; one correctness finding, fixed and pinned.
+
+- `shared/cityChanges.js`: the "regenerate everything" branches returned the *current* city names,
+  which is `[]` when the change was removing cities. Nothing stops the user removing the last city
+  (`public/app.js` `[data-remove-city]` has no floor), and an empty result is the caller's
+  "nothing changed" signal — `goToNextStep` took the fast path to Review with activities for cities
+  that no longer existed, no dialog. Whole-trip scope is now the union of the planned and current
+  names, so a removal always reports non-empty and names the city that went. Extra names are inert
+  downstream: `renderPhase1` builds checkboxes from `state.cities`.
+- `public/app.js`: dropped the `try/catch` around `JSON.parse(state.lastPlannedFingerprint)` —
+  the value is assigned only from `step1Fingerprint()` at three sites and never round-trips through
+  storage or the server, so the parse cannot throw (CLAUDE.md, no defensive boilerplate). The
+  round-trip itself is kept and commented: `step1Snapshot()` returns live references into
+  `state.cities`, so the stringify at plan time is what freezes the snapshot.
+- `src/cityChanges.test.js`: 3 removal/scope cases added (suite 290 → 292), each confirmed to fail
+  against the pre-fix implementation before being kept.
+
 ## [2026-08-17] Regenerate only the cities the user actually changed
   - Two regressions the reviewer caught before push, both reproduced and then fixed: keying the
     lookup on city **name** collapsed a repeat-visit trip (Tokyo → Kyoto → Tokyo), so the first leg

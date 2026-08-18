@@ -42,7 +42,18 @@ test('editing one leg of a repeat-visit trip still reports that city', () => {
 
 test('removing a city puts the whole trip in scope rather than passing silently', () => {
   // The removed city's activities are still in state and now orphaned; the user has to be told.
-  assert.deepEqual(changedCityNames(snap([TOKYO, KYOTO]), snap([TOKYO])), ['Tokyo']);
+  assert.deepEqual(changedCityNames(snap([TOKYO, KYOTO]), snap([TOKYO])), ['Tokyo', 'Kyoto']);
+});
+
+test('removing every city still reports a change', () => {
+  // Nothing stops the user removing the last city. Scoping "everything" to the cities that remain
+  // makes the answer empty, which the caller reads as "nothing changed" and waves straight through
+  // to Review with activities for cities that no longer exist.
+  assert.deepEqual(changedCityNames(snap([TOKYO, KYOTO]), snap([])), ['Tokyo', 'Kyoto']);
+});
+
+test('whole-trip scope spans both snapshots when a city is swapped out', () => {
+  assert.deepEqual(changedCityNames(snap([TOKYO, KYOTO]), snap([TOKYO, NARA])), ['Tokyo', 'Kyoto', 'Nara']);
 });
 
 test('trip-level inputs put every city in scope', () => {

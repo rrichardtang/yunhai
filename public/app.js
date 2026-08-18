@@ -9060,11 +9060,12 @@ function showConfirmDialog(title, message, confirmLabel = 'Confirm') {
 
 // cityPlanningInputs, changedCityNames provided by /shared/cityChanges.js
 
+// Parsing the stored fingerprint back is load-bearing, not a formality: step1Snapshot returns live
+// references into state.cities, so the stringify at plan time is what froze a copy that later edits
+// cannot reach through.
 function citiesChangedSincePlan() {
   if (!state.lastPlannedFingerprint) return [];
-  let planned = null;
-  try { planned = JSON.parse(state.lastPlannedFingerprint); } catch { planned = null; }
-  return changedCityNames(planned, step1Snapshot());
+  return changedCityNames(JSON.parse(state.lastPlannedFingerprint), step1Snapshot());
 }
 
 function step1Snapshot() {
