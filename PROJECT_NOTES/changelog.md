@@ -4,6 +4,26 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-18] Fourth exit from Setup: the Trip Health badge
+Sixth `pre-push-reviewer` pass, on the commit below. It found a fourth interactive entrance the
+previous round's enumeration missed.
+
+- `public/app.js`: `openTripHealthReviewBtn`'s click handler calls `setStep(4)` from the topbar,
+  which sits outside the step panels and so is clickable from Setup. Its badge gates on
+  `state.currentItineraryId || state.activities.length` (`renderTripHealthBadge`) — removing a city
+  clears neither, so the badge stays visible and live after the last city is gone. `canLeaveSetup()`
+  now guards it too; all four interactive exits are enumerated in the helper's comment.
+- Harness: `tripHealthBadgeToStep4` scenario added (9 → 10), confirmed failing against the
+  three-entrance version.
+- Reviewer's second finding accepted as-is, not fixed: a blocked `popstate` leaves the address bar
+  showing the step the user tried to reach. It self-heals — nothing compares `state.step` to
+  `history.state`, `maxStep` is never persisted so a reload lands on step 1 and `replaceState`
+  rewrites the URL, and the next pushed navigation truncates the forward entries. Re-pushing on
+  every blocked Back would trap the user in the app, which is worse than a stale URL.
+- Reviewer's read-only-share concern checked and found unreachable: it depends on a persisted
+  itinerary whose `cities` is not an array, but the server write path normalizes
+  `cities: itinerary.cities || []` on every save, so the field is always an array.
+
 ## [2026-08-18] All three interactive exits from Setup enforce the zero-city guard
 Fifth `pre-push-reviewer` pass. It found the Next-button guard closed only one of the entrances:
 `state.maxStep` is monotonic (raised in `setStep`, reset only by `resetToFresh`/`initEmbedMode`) and
