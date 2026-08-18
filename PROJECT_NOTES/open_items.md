@@ -16,6 +16,16 @@ dates move → both re-arrange. Watch loader pacing across the sequential calls 
 only real latency can judge. Then check `GET /api/admin/arrange-stats`: one call per *changed* city
 per visit is the intended cost.
 
+## [2026-08-18] My Trips labels a zero-city draft with a step it will not resume to
+**Status:** Deferred
+**Description:** The draft row renders `Step ${snapshot.currentStep || 3}` (`public/app.js:9264`),
+but `hydrateFromSnapshot` now clamps a snapshot with no cities to step 1, so the label advertises a
+step the resume deliberately refuses. Cosmetic only — no functional effect.
+**Context:** Raised by `pre-push-reviewer` on b71b998 and explicitly assessed as fine to leave.
+Deferred rather than opening another review round for a label string. Only visible for a zero-city
+draft, which is itself the corrupt state the clamp exists to contain.
+**Next action:** Clamp the row's displayed step the same way when next touching `collectMyTrips`.
+
 ## [2026-08-18] Itinerary mode renders activities for cities that are gone
 **Status:** Deferred
 **Description:** The zero-city guard covers the four interactive exits from Setup, all of which go
