@@ -1064,7 +1064,8 @@ function stepFromPath() {
   return index === -1 ? 1 : index + 1;
 }
 
-// Every interactive way out of Setup goes through this. With no cities there is nothing to plan and
+// Every interactive way out of Setup goes through this: the Next button, the step chips, browser
+// back/forward, and the Trip Health badge in the topbar. With no cities there is nothing to plan and
 // nothing to review: the regenerate dialog builds its checkboxes from state.cities, so an empty list
 // renders a modal with no rows whose every exit resolves null — which reads as "user declined" and
 // lands on Review showing activities for cities that are gone. maxStep is monotonic and is never
@@ -10207,6 +10208,9 @@ document.getElementById('addActivityModal')?.addEventListener('click', (e) => {
   if (e.target === document.getElementById('addActivityModal')) closeAddActivityModal();
 });
 els.openTripHealthReviewBtn?.addEventListener('click', () => {
+  // The badge that opens this gates on `currentItineraryId || activities.length`, and removing a
+  // city clears neither — so it stays visible and clickable from Setup after the last city is gone.
+  if (!canLeaveSetup()) return;
   els.tripHealthPopover?.classList.add('hidden');
   setStep(4);
   requestAnimationFrame(() => {
