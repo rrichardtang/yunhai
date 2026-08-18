@@ -4,6 +4,35 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-17] The changed-city set comes from the existing fingerprint, and `planTrip`'s payload defines "planning input"
+
+**Decision:** `citiesChangedSincePlan()` derives which cities changed by parsing
+`state.lastPlannedFingerprint`, comparing each city through `cityPlanningInputs` — the projection
+`planTrip` already used to build its request payload. The regenerate dialog pre-checks that set, and
+does not open at all when the set is empty.
+
+**Reasoning:** The dialog knew *that* something changed but not *what*, so it defaulted to
+regenerating everything and quietly destroyed curation the user never asked to touch. The previous
+city list is already inside the fingerprint, so the finer-grained answer needs no new state — the
+information was there, only the question was too coarse. Tying the definition of "planning input" to
+the request payload means the two cannot drift: a field the server never sees can never cost a user
+their activities, and a field added to the payload is automatically a regeneration trigger.
+
+**Alternatives rejected:** A per-city fingerprint recorded at plan time — more state to persist,
+reset and keep in sync, for information already available. Comparing whole city objects — that is
+today's behavior, and it is what let `detailsExpanded` (a chevron toggle) present as a trip change.
+
+**Tradeoffs:** The comparison is only as good as the projection, so a genuinely planning-relevant
+field left out of `cityPlanningInputs` would silently stop triggering regeneration. Keeping it as the
+literal source of `planTrip`'s payload is what keeps that honest. Trip-level changes still regenerate
+everything, which is coarse but correct — budget and party size change every city's plan.
+
+**What building the verification turned up:** two pre-existing bugs, neither visible from the
+feature's own code. `normalizeCoordinate(null)` returned 0, making normalization non-idempotent and
+letting an unresolved coordinate pass validation as a real location; and `detailsExpanded` on the
+city object made a UI toggle look like a planning change. Both were only found because the harness
+asserted on a bare re-render with no mutation at all — worth keeping as a habit.
+
 ## [2026-08-17] The arrange baseline is recorded, not inferred — supersedes "the day-id set is the signature"
 
 **Decision:** `state.arrangedSignatures[city]` holds `cityDayKey` as of the moment that city was

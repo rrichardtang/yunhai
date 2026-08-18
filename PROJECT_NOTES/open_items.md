@@ -1,18 +1,5 @@
 # Open Items
 
-## [2026-08-17] The regenerate dialog pre-checks every city
-**Status:** Deferred
-**Description:** `showRegenerateConfirmDialog` calls `renderPhase1()` with no argument, so
-`prevSelected` is null and every city renders `checked`. Changing one city's dates and clicking
-through therefore regenerates *all* of them, deleting activities and placements for cities the user
-never touched. Surfaced while diagnosing the Osaka report: a user who adds a city and accepts the
-defaults loses the curation on their other cities.
-**Context:** `public/app.js`, `showRegenerateConfirmDialog`. Unchanged by the auto-arrange fix —
-those cities come back with no placements, so they are correctly seen as needing arranging; the
-problem is that their activities were discarded in the first place.
-**Next action:** Default the checkboxes to only the cities whose setup actually changed, leaving the
-rest opt-in.
-
 ## [2026-08-17] Watch the first keyed run of the dirty-city Arrange
 **Status:** Pending input (needs deploy)
 **Description:** Entering Arrange now fires `/api/arrange` with no click behind it, once per changed
