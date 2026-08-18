@@ -5,9 +5,11 @@
   const normalizeCity = (str = '') => String(str).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 
   function normalizeCoordinate(value) {
-    // Number(null) and Number('') are both 0, so an unset coordinate would normalize to a real
-    // location off West Africa — and pass every Number.isFinite() gate meant to catch "not resolved
-    // yet". It also made normalization non-idempotent: null on the first pass, 0 on the second.
+    // Number(null) and Number('') are both 0, so an unset coordinate normalized to a real location
+    // off West Africa, and passed the Number.isFinite() gates on this side meant to catch "not
+    // resolved yet". It also made normalization non-idempotent: null on the first pass, 0 on the
+    // second, which made a bare re-render look like a user edit. Server-side callers that run
+    // Number() on their own input are unaffected and still need their own guard.
     if (value === null || value === undefined || value === '') return null;
     const num = Number(value);
     return Number.isFinite(num) ? num : null;
