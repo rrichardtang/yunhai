@@ -16,6 +16,26 @@ dates move → both re-arrange. Watch loader pacing across the sequential calls 
 only real latency can judge. Then check `GET /api/admin/arrange-stats`: one call per *changed* city
 per visit is the intended cost.
 
+## [2026-08-18] Regeneration is still name-keyed, so repeat-visit trips lose the wrong leg
+**Status:** Deferred
+**Description:** `changedCityNames` now matches cities by `id`, so a Tokyo → Kyoto → Tokyo trip where
+only leg 2 moved correctly reports `['Tokyo']`. Everything downstream of that answer is still keyed
+on the *name*: `renderPhase1`'s `prevSelected.includes(name)` pre-checks **both** Tokyo rows, and
+`planTrip` then regenerates both (`regenSet.has(c.name)`) and deletes every activity whose
+`a.city === 'Tokyo'`. Editing the second leg therefore still costs the user the first leg's
+activities — the detection half of that regression is fixed and tested, the user-visible half is not.
+**Context:** Found by `pre-push-reviewer` on `c207e6a`; `src/cityChanges.test.js` pins detection
+only. Same root cause as the id-keying fix, one layer further out.
+**Related, smaller:** `tripLevelChanged` treats `state.travels` as a trip-level input, but
+`state.travels` is derived from `cities[0].travelEntry` (`syncLegacyTravelsFromCities`), which the
+per-city diff already covers — so editing the *first* city's arrival escalates every city into
+scope. Dropping the term is not behavior-preserving (`hydrateLoadedItinerary` sets `state.travels`
+from `itinerary.travels` independently, so the two can legitimately diverge), which is why it was
+left alone.
+**Next action:** Give activities a city id (or resolve `regenSet` to ids at selection time) so
+`renderPhase1` and `planTrip` can distinguish two legs of the same city. Extend
+`src/cityChanges.test.js` with a regeneration-side case once they can.
+
 ## [2026-08-17] City deletion leaks its activities into budget and saved itineraries
 **Status:** Deferred
 **Description:** The remove-city handler (`public/app.js`, `[data-remove-city]`) only filters
