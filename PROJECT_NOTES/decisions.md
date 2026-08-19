@@ -4,6 +4,47 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-19] The push-gate reviewer is `felix-the-fixer`, not a project-local `pre-push-reviewer` — supersedes "Pushes are gated on a review receipt keyed to HEAD"
+
+**Decision:** `.claude/agents/pre-push-reviewer.md` is deleted. `scripts/prePushReview.js` and
+`CLAUDE.md` now name `felix-the-fixer` (synced from `rrichardtang/claude-config` via the
+`SessionStart` hook, decisions above) as the subagent that must review a commit before the push
+gate's receipt can be recorded. The gate mechanism itself — a `PreToolUse` hook blocking `git
+push` until `.claude/pre-push-review.json` records the current HEAD sha — is unchanged.
+
+**Reasoning:** `pre-push-reviewer` and `felix-the-fixer` are the same job stated twice: reviews a
+diff for correctness bugs and behavior-preserving simplifications, reports findings, never edits
+(no `Edit`/`Write` tools on either). The only reason `pre-push-reviewer` existed as a project-
+local agent was that no equivalent was available globally yet. Once the `claude-config` sync hook
+made `felix-the-fixer` available in every session, keeping both was pure duplication — two agent
+definitions to keep in sync, and a maintainer or future session picking the wrong one. The hook
+script never invoked the agent programmatically (it only checks for a receipt file and prints the
+agent's name in its blocked-push message), so retargeting the message and deleting the redundant
+file is the entire change; no hook logic moves.
+
+**Alternatives rejected:** Keeping both agents (`pre-push-reviewer` for this repo,
+`felix-the-fixer` for others) — no behavioral difference between them justified the duplication,
+and it invites drift if one is edited and not the other. Deleting the push-gate requirement
+entirely — explicitly rejected by the user; the gate is documented as load-bearing (changelog
+[2026-08-18] "Risks": five straight rounds each found a distinct shipping bug), and this repo's
+own `felix-the-fixer` review of the hook-sync commit above (decisions [2026-08-19]) is a live
+demonstration of the same value it always had, just under the new name.
+
+**Tradeoffs:** `felix-the-fixer` is a generic, repo-agnostic agent (per `claude-config`'s design,
+it works from context handed to it rather than assuming a project's own conventions) where
+`pre-push-reviewer` was hand-written for this repo's specific exclusions and review range. In
+practice the two were already byte-for-byte equivalent on those points — `felix-the-fixer`'s own
+instructions already say to exclude a `PROJECT_NOTES/`-style directory the same way as `*.md`, and
+to fall back from `@{u}` to the repo's default branch — so nothing was lost here. A repo whose
+review needs diverge further from the generic template would need to either accept
+`felix-the-fixer`'s judgment calls as-is or reintroduce a project-local override; that tradeoff is
+deliberately accepted for now rather than pre-solved.
+
+**Historical note:** Past `changelog.md`/`open_items.md` entries that attribute specific findings
+to "`pre-push-reviewer`" (b71b998, c207e6a, and others) are left untouched — they record what
+actually reviewed that code at the time, and rewriting them to say `felix-the-fixer` would
+misstate history the append-only convention exists to preserve.
+
 ## [2026-08-19] `bob-the-builder`/`felix-the-fixer` sync on session start; the loop itself stays opt-in
 
 **Decision:** A `SessionStart` hook (`.claude/hooks/session-start.sh`, registered in
