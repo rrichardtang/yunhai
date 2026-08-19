@@ -4,6 +4,19 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-19] Push-gate reviewer retargeted from pre-push-reviewer to felix-the-fixer
+- `.claude/agents/pre-push-reviewer.md`: deleted — redundant with `felix-the-fixer`, now synced
+  every session (previous entry below). Same tools (no `Edit`/`Write`), same job.
+- `scripts/prePushReview.js`: header comment and blocked-push message now name `felix-the-fixer`.
+  No change to the gate mechanism itself (still a HEAD-keyed receipt in
+  `.claude/pre-push-review.json`) — the script never invoked the agent programmatically, only
+  referenced its name in output.
+- `CLAUDE.md`: Engineering Practices section updated to name `felix-the-fixer` and note it is
+  synced from `claude-config`, not a project-local agent.
+- `PROJECT_NOTES/current_state.md`: one stale mechanism reference corrected. Historical
+  attributions in `changelog.md`/`open_items.md` naming `pre-push-reviewer` on specific past
+  commits are left as written (decisions [2026-08-19]).
+
 ## [2026-08-19] SessionStart hook syncs bob-the-builder/felix-the-fixer from claude-config
 - `.claude/hooks/session-start.sh` (new): clones/pulls `rrichardtang/claude-config` to
   `~/.cache/claude-config` and runs its `install.sh`, syncing `bob-the-builder`,

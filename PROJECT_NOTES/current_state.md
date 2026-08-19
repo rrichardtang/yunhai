@@ -18,7 +18,7 @@ so it does not interact with the GPT-5.6 verification and can deploy in any orde
 That branch also now carries the regenerate-scope work that came out of the Osaka report: the
 dialog pre-checks only the cities whose planning inputs actually changed, matched by city `id`, and
 Setup refuses to advance with zero cities at all three interactive exits. Five commits, unpushed,
-gated behind `pre-push-reviewer` (below).
+gated behind the push-review hook (below) — reviewer is now `felix-the-fixer`.
 
 ## Active Workstream
 The branch fixed the reported "stuck" plan, then found three bugs underneath it that each
