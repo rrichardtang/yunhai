@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-19] Project-local copy of the 7 new skills, so they show up in the `/` menu
+- `.claude/skills/{thermo-nuclear-code-quality-review,wayfinder,grill-with-docs,grilling,
+  domain-modeling,research,prototype}/`: committed verbatim, copied from the versions just pushed
+  to `rrichardtang/claude-config`. Confirmed not gitignored (`git check-ignore` returns nothing).
+- `.gitignore`: added `!.claude/skills/` alongside the existing `.claude/*` exceptions.
+- Reason: a cloud session's `/` autocomplete doesn't read `~/.claude/skills/` (the global sync
+  target) at all — only account-enabled skills and skills committed to the repo's own
+  `.claude/skills/` (decisions [2026-08-19]).
+
 ## [2026-08-19] Push-gate reviewer retargeted from pre-push-reviewer to felix-the-fixer
 - `.claude/agents/pre-push-reviewer.md`: deleted — redundant with `felix-the-fixer`, now synced
   every session (previous entry below). Same tools (no `Edit`/`Write`), same job.

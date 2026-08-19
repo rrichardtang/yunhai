@@ -4,6 +4,35 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-19] New skills also get a project-local copy in `.claude/skills/`, alongside the global `claude-config` copy
+
+**Decision:** The 7 skills added to `rrichardtang/claude-config` (`thermo-nuclear-code-quality-review`,
+`wayfinder`, `grill-with-docs`, `grilling`, `domain-modeling`, `research`, `prototype`) are also
+committed verbatim into `GuideMe/.claude/skills/`. `.gitignore` gained `!.claude/skills/` to let
+them through the existing `.claude/*` ignore.
+
+**Reasoning:** Installing a skill only into `~/.claude/skills/` (via the `SessionStart` sync hook)
+makes it available to the backend agent's `Skill` tool, but per Claude Code's own docs, a cloud
+session's user-facing `/` autocomplete does **not** read `~/.claude/skills/` at all — it reads (a)
+skills enabled on the user's claude.ai account, and (b) skills committed to the cloned repo's own
+`.claude/skills/`. The user asked why `/wayfinder` wasn't appearing as an autosuggestion; the
+global-only install was the answer. Committing the same content into this repo's `.claude/skills/`
+is the documented path to make it show up.
+
+**Alternatives rejected:** Relying on claude.ai's account-level skill settings instead — untested
+whether that surface supports adding an arbitrary custom/GitHub-sourced skill, so it wasn't offered
+as the primary fix. Dropping the global `claude-config` copy in favor of only the project-local one
+— would lose availability in every *other* project wired to `claude-config`, which was the explicit
+point of installing there in the first place (decisions [2026-08-19] earlier entries).
+
+**Tradeoffs:** Two copies of the same content now exist — `claude-config`'s `skills/` (synced to
+`~/.claude/skills/` every session, every project) and this repo's `.claude/skills/` (this project
+only). They are hand-synced, not linked: an edit to one does not propagate to the other, so they can
+drift. Accepted because Claude Code's own cloud-session/local-CLI split leaves no single distribution
+path that covers both "available everywhere" and "shows up in this repo's `/` menu" — the product
+doesn't currently offer one. Revisit if a symlink or plugin-based mechanism removes the need to
+maintain two copies.
+
 ## [2026-08-19] The push-gate reviewer is `felix-the-fixer`, not a project-local `pre-push-reviewer` — supersedes "Pushes are gated on a review receipt keyed to HEAD"
 
 **Decision:** `.claude/agents/pre-push-reviewer.md` is deleted. `scripts/prePushReview.js` and
