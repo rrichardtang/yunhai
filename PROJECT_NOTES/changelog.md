@@ -4,6 +4,18 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-19] SessionStart hook syncs bob-the-builder/felix-the-fixer from claude-config
+- `.claude/hooks/session-start.sh` (new): clones/pulls `rrichardtang/claude-config` to
+  `~/.cache/claude-config` and runs its `install.sh`, syncing `bob-the-builder`,
+  `felix-the-fixer`, and the `caveman` skill into `~/.claude/`. Validated both the fresh-clone and
+  pull-and-reinstall paths; confirmed `~/.claude/agents/*.md`, `~/.claude/skills/caveman/`, and the
+  managed block in `~/.claude/CLAUDE.md` land correctly.
+- `.claude/settings.json`: registered the hook under a new `SessionStart` block, alongside the
+  existing `PreToolUse`/`PostToolUse` hooks.
+- `.claude/agent-notes/README.md` (new): documents the `bob.md`/`felix.md` per-repo notes
+  convention (decisions [2026-08-19]); the files themselves are created on first noteworthy entry
+  by each agent.
+
 ## [2026-08-18] Snapshot restore respects the zero-city guard
 Seventh `pre-push-reviewer` pass returned no blocking findings and confirmed the four-exit
 enumeration complete — it independently verified that no `.panel`/`.step-panel` class is toggled

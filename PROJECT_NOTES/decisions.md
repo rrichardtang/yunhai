@@ -4,6 +4,74 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-19] `bob-the-builder`/`felix-the-fixer` sync on session start; the loop itself stays opt-in
+
+**Decision:** A `SessionStart` hook (`.claude/hooks/session-start.sh`, registered in
+`.claude/settings.json`) clones/pulls `rrichardtang/claude-config` and runs its `install.sh` at
+the start of every session, syncing `bob-the-builder`, `felix-the-fixer`, and the `caveman` skill
+into `~/.claude/`. This makes the agents *available* every session. It does not spawn them —
+running the bob/felix review loop stays opt-in, exactly as `claude-config`'s own synced
+`CLAUDE.md` specifies ("only run it when explicitly asked to, after a plan has been approved").
+Each role's running notes live at `.claude/agent-notes/bob.md` / `felix.md`, committed to this
+repo (not `~/.claude/`), so they are project-scoped: a session on a different project reads and
+writes that project's own copy, never this one's.
+
+**Reasoning:** The user initially asked for these subagents to be force-spawned on every session
+start with cross-session-persisted notes. Investigating `claude-config` showed both halves of
+that ask were already answered by its existing design, just not the way it was phrased: the repo
+documents itself as install-only (the sync hook makes agents available; nothing in it invokes
+them), and its `CLAUDE.md` explicitly gates the bob/felix loop as opt-in — most tasks are handled
+directly, and the loop is for when a plan is approved and the user wants an implement/review back-
+and-forth. Force-spawning on every start would contradict that documented protocol for no
+benefit: an idle session with no task has nothing for Bob to build or Felix to review. Notes
+"persisting across sessions" was resolved by clarifying scope with the user: per-repo
+`.claude/agent-notes/` files, one pair per project, already give durable per-project logs without
+any risk of one project's notes leaking into another's session.
+
+**Alternatives rejected:** Actually invoking bob-the-builder/felix-the-fixer as part of session
+bootstrap regardless of whether there's a pending task — asked about directly via
+`AskUserQuestion`, user chose install-only. A single shared notes file — would mix unrelated
+projects' learnings in a way the user flagged as not making sense, and contradicts
+`claude-config`'s own per-repo notes-boundary design.
+
+**Tradeoffs:** The hook adds a git clone/pull (and the two-agent + one-skill file copy) to every
+session's startup, unconditionally, even on sessions that never touch bob/felix. `install.sh`
+overwrites `~/.claude/agents/{bob-the-builder,felix-the-fixer}.md` and
+`~/.claude/skills/caveman/` wholesale and merges a marked block into `~/.claude/CLAUDE.md` — safe
+to re-run, but it means `~/.claude/` state for those paths is no longer something this session
+can locally customize without it being clobbered next start. The hook tracks `claude-config`'s
+`main` branch by ref rather than a pinned commit, so a push to that repo changes what every
+GuideMe session runs at its next start with no diff or confirmation in this repo — that is the
+explicit design in `claude-config`'s own README ("push and every session picks it up next
+start"), and pinning to a SHA would defeat it, but it does mean this repo's trust boundary
+extends to whatever `rrichardtang/claude-config` becomes. Acceptable because both repos share an
+owner; revisit if `claude-config` ever gains outside contributors.
+
+`pre-push-reviewer` additionally caught two real bugs in the first draft of the hook script,
+fixed before push: `pull --ff-only` left a stale cache permanently stuck (a force-push or
+interrupted prior run made the branch unreachable, and the re-clone path was gated on the cache
+*not* existing) — replaced with `fetch` + `reset --hard FETCH_HEAD`, which self-heals. And the
+clone step took the repo's default branch while the update step hardcoded `origin main`, which
+would only diverge — and only break — after the cache already existed; the clone now also pins
+`--branch main`. It also flagged the hook invocation depending on the git-tracked exec bit
+(`git status` showed it unset in the working tree despite `100755` in the commit) — fixed by
+invoking `bash "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"` from `settings.json` instead
+of the bare path, and by scoping the `SessionStart` matcher to `startup|resume` so `compact`/
+`clear` don't re-run a network fetch mid-session. A second review round caught two more: the
+update path fetched from the cache's own `origin` remote rather than `$CONFIG_REPO`, so a stale
+or unrelated pre-existing cache at `~/.cache/claude-config` would silently keep syncing from
+whatever URL it already pointed at — now fetches `$CONFIG_REPO` explicitly. And the script's own
+comment undersold its effect ("available this session") when `install.sh`'s writes to
+`~/.claude/` are user-global and outlive the session, applying to every project on the machine —
+comment corrected; confirmed it does not touch `~/.claude/settings.json`, so it cannot clobber
+this repo's own hook wiring. A third round found the comment's write enumeration still missing
+the `~/.claude/CLAUDE.md` merge (the largest-reach of the three writes) — added — and a real
+concurrency gap: two sessions starting on the same machine at once both operate on the shared
+`~/.cache/claude-config`, which could race a `git reset --hard`/`rm -rf` against a concurrent
+`install.sh` read. Fixed with an `flock` around the whole sync-and-install block, keyed on
+`${CONFIG_CACHE}.lock`; verified two hook invocations launched simultaneously both complete
+cleanly (serialized, not raced).
+
 ## [2026-08-17] The changed-city set comes from the existing fingerprint, and `planTrip`'s payload defines "planning input"
 
 **Decision:** `citiesChangedSincePlan()` derives which cities changed by parsing

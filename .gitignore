@@ -12,6 +12,8 @@ logs/
 .claude/*
 !.claude/settings.json
 !.claude/agents/
+!.claude/hooks/
+!.claude/agent-notes/
 .cline
 .github/copilot*
 .kilocode
