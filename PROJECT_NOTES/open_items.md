@@ -1,5 +1,26 @@
 # Open Items
 
+## [2026-08-19] Move `claude-config-seed/` into the real `claude-config` repo
+**Status:** Blocked (session cannot push to that repo)
+**Description:** The `caveman` skill, the `bob-the-builder`/`felix-the-fixer` definitions, the
+user-level `CLAUDE.md` and `install.sh` are staged at `claude-config-seed/` in this repo instead
+of in `rrichardtang/claude-config`, where `scripts/syncClaudeConfig.sh` expects them. Until they
+are moved, the SessionStart hook clones the (near-empty) config repo, finds no `install.sh`, warns
+to stderr and exits 0 — so the global agents/skill do **not** appear in new sessions.
+**Context:** The authoring session could not push there. The git proxy refuses a credential for
+any repo outside the session's authorized source set, and the `add_repo` tool that would add one
+is blocked at the MCP permission layer — as are `list_repos` and `list_environments` on that same
+server, which is how the block was identified as server-wide rather than repo-specific. Granting
+the GitHub App access to the repo and giving it an initial commit were both necessary but not
+sufficient. changelog [2026-08-19].
+**Next action:** From a session that has `rrichardtang/claude-config` as a configured **source**
+(set at provisioning, which bypasses `add_repo` entirely), copy `claude-config-seed/`'s contents
+to that repo's root, push to `main`, then delete `claude-config-seed/` and its `SEED_NOTE.md`
+here. Then verify: `bash scripts/syncClaudeConfig.sh` should stop warning, and
+`~/.claude/agents/{bob-the-builder,felix-the-fixer}.md` plus `~/.claude/skills/caveman/SKILL.md`
+should exist. Alternatively, allowing the `claude-code-remote` MCP server in `/permissions` would
+unblock `add_repo` in-session.
+
 ## [2026-08-17] Watch the first keyed run of the dirty-city Arrange
 **Status:** Pending input (needs deploy)
 **Description:** Entering Arrange now fires `/api/arrange` with no click behind it, once per changed

@@ -27,6 +27,24 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
   `install.sh`, and `README.md` are drafted and verified locally, ready to push once access is
   granted. See decisions [2026-08-18].
 
+## [2026-08-19] Global agent config staged in-repo; `install.sh` hardened against config loss
+- `claude-config-seed/` added: the `caveman` skill, `bob-the-builder`, `felix-the-fixer`, the
+  user-level `CLAUDE.md` and `install.sh`, staged here because this session cannot push to
+  `rrichardtang/claude-config` (see open_items [2026-08-19] for the mechanism and the move).
+  `SEED_NOTE.md` documents that nothing in the app reads the path.
+- `claude-config-seed/install.sh`: two fixes found by testing against a throwaway `$CLAUDE_HOME`
+  rather than by reading it. A start marker with no matching end marker — a plausible hand-edit —
+  made the `awk` rewrite delete every line after the start marker; it now detects that and skips
+  the `CLAUDE.md` merge instead of truncating the user's own config. The replacement block moved
+  from `awk -v` to `ENVIRON`, since `-v` applies backslash-escape processing and would corrupt
+  content containing a backslash. A Windows-style path in surrounding user content now survives
+  two consecutive syncs byte-intact. An earlier round caught `cp -r` nesting
+  `skills/caveman/caveman/` on re-run.
+- Verified in this container: `install.sh` run against the real `~/.claude` installed both agents,
+  the skill, and a single managed `CLAUDE.md` block. The `caveman` skill registered immediately;
+  the two subagents did **not** — subagent definitions are read at session start, so they need a
+  restart while skills hot-reload.
+
 ## [2026-08-18] Snapshot restore respects the zero-city guard
 Seventh `pre-push-reviewer` pass returned no blocking findings and confirmed the four-exit
 enumeration complete — it independently verified that no `.panel`/`.step-panel` class is toggled
