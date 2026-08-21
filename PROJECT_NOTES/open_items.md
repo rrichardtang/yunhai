@@ -1,5 +1,38 @@
 # Open Items
 
+## [2026-08-21] Refine's per-city batch is not wired to the frontend
+**Status:** Pending
+**Description:** `POST /api/activity/refine` now speaks the per-city batch contract
+(`{ city, activities, note, budget_target, exclude }` -> `{ activities: { [id]: activity } }`), but
+`onConfirmLocks` (`public/app.js:4220`) still posts one activity per call in the old shape. Budget
+optimization is broken end to end until the caller is rewritten.
+**Context:** decisions [2026-08-21]. Branch `claude/refine-endpoint-duplicates-4gg4g3`.
+**Next action:** Group `unlocked` by city, one `apiFetch` per city under `Promise.allSettled`, build
+each city's `exclude` from `state.activities` in that city minus the ones being refined, and advance
+the loader by the city's activity count as each city settles rather than per call. The merge at
+`:4259` must become a *replace*: the route returns a whole normalized activity carrying the original
+`id`, so the client takes it as-is and re-attaches only the trip placement it holds
+(`scheduled_date`/`scheduled_time`). Spreading it over the old activity would reintroduce the
+inheritance the new contract exists to prevent, and would leave a legacy-shaped activity carrying
+both `cost` and `estimated_cost_usd`.
+
+## [2026-08-21] `/api/activity/replace` has the same duplicate blind spot, and a dead coords check
+**Status:** Pending
+**Description:** Two problems in one route. (1) `/replace` is told "NOT this venue" but knows nothing
+about the rest of the trip, so a replacement can duplicate a *different* activity the traveler
+already has - the same class the refine roster just closed. (2) `coordsOk` uses
+`Number.isFinite(Number(a?.location?.lat))`, and `Number(null)` is `0`, which is finite, so the
+"venue could not be found on Google Maps" retry almost certainly never fires. The same bug was found
+and found on the refine side, where the switch to whole activities removed the check entirely.
+**Context:** Found during the refine rewrite; `coordsOk` deliberately left alone because fixing it
+changes `/replace`'s retry behavior (an extra Sonnet call when a venue genuinely does not resolve),
+which does not belong in a commit about refine.
+**Next action:** Accept `exclude` from both call sites (`public/app.js:4615`, `:4764`), add the
+roster block after the existing `NOT "${activity.name}"` line, and extend the retry trigger to fire
+on a roster collision as well as missing coords. Fix `coordsOk` to reject null before the numeric
+test (`placesEnrich`'s `hasCoords` is the canonical form) in the same pass, and re-measure how often
+the retry actually fires.
+
 ## [2026-08-17] Watch the first keyed run of the dirty-city Arrange
 **Status:** Pending input (needs deploy)
 **Description:** Entering Arrange now fires `/api/arrange` with no click behind it, once per changed

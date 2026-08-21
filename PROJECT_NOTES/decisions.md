@@ -4,6 +4,63 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-21] `/api/activity/refine` batches by city, and duplicate venues are made impossible rather than discouraged
+
+**Decision:** `POST /api/activity/refine` takes one city's activities per call —
+`{ city, activities, note, budget_target, exclude, tripId }` → `{ activities: { [id]: activity } }`
+— instead of one call per activity. The prompt carries a venue roster (the activities being refined
+plus the rest of that city's activities), and `dedupeActivities` re-checks the answer with the
+roster first, so a colliding suggestion is the one dropped. Each suggestion is passed to
+`normalizeActivity` **on its own** to build the replacement activity — *before* the dedupe, so both
+sides of that comparison use one naming convention. The route additionally carries the replaced
+activity's `id` (the itinerary slot every arrange placement, checklist entry and calendar
+fingerprint keys on) and clears `place_id`, `imageUrl` and `price_level`, which are not part of
+`normalizeActivity`'s shape.
+
+Order matters twice over. Deduping on the model's raw labels let `"Dinner at Casa Lucio"` past a
+roster holding `"Casa Lucio"`, because `stripMealPrefix` only runs inside `normalizeActivity` — and
+then shipped it as exactly `"Casa Lucio"`, the venue it was replacing. The suggestion's `timing` key
+is stripped for the same class of reason: `isLegacyActivity` is `timing === undefined`, so a model
+that emits one would send the suggestion through `normalizeActivity` untouched, leaving no `booking`
+for `applyBookingLinks` and failing the whole city's batch.
+
+**Reasoning:** The duplicates were structural, not a model-quality problem. N parallel calls each
+saw only their own activity, so nothing forbade two of them picking the same venue; and because
+`placesQuery()` searches `venue_name` first, a suggestion that changed `name` but not `venue_name`
+resolved the *original* venue and inherited its coordinates, hours, photo and Maps pin. Cities
+partition the venue pool — a Kyoto venue cannot duplicate a Tokyo one — so the city is the smallest
+batch that lets the model see everything it must avoid, and it makes cross-city duplicates
+impossible by construction. This is the same move `/api/arrange` made by never letting the LLM emit
+a time: remove the error class, don't ask the model to avoid it. Batching also collapsed N Brave
+searches and N `recall()` calls to one per city, and let the call take an LLM semaphore slot, which
+the per-activity fan-out bypassed entirely.
+
+**Alternatives rejected:** *Keep per-activity calls and send an exclusion roster* — two concurrent
+calls still cannot see each other's answer, so it discourages duplicates without preventing them.
+*Bounded-concurrency waves* — same hole, smaller. *Route budget optimization through
+`/api/activity/replace`*, which already says "NOT this venue" — it runs Sonnet 4.6 at N calls, and
+its `observe({ source: 'decline' })` would write a false decline signal into memory for what is only
+a budget swap.
+
+**Superseded within this branch — returning a partial diff.** The endpoint first returned
+`{ updates: { [id]: partial } }` for the caller to merge onto the activity being replaced. Three
+`pre-push-reviewer` rounds each found another field surviving that merge — the street address, then
+opening hours, then duration, `booking.reference` and the prose fields, then `smarter_alternative` —
+because a diff makes *the replaced venue's value* the default for anything the model omits. The
+prompt's required-field list was a whitelist that had to be re-audited every time an activity gained
+a field, and nothing enforced it. Building the activity from the suggestion alone inverts the
+default, so the leak class is closed rather than enumerated. `normalizeActivity` returns an
+already-normalized input untouched, which is why it must be given the raw suggestion and never a
+merge with the activity being replaced. `applyCostShapeToUpdates`, `buildRefinedMerge` and
+`applyRefinedVenue` existed only to police that merge and were deleted with it.
+
+**Tradeoffs:** One failed call now costs a whole city's refinements rather than one activity's; the
+per-city split keeps that blast radius bounded and `Promise.allSettled` across cities preserves
+partial success. Research is city-level rather than venue-level, so suggestions are grounded in a
+broader, less specific result set. A suggestion that keeps the original venue at a lower price is
+now dropped by the roster, so the budget prompt no longer offers that option — prompting for
+something the pipeline discards is what this codebase forbids.
+
 ## [2026-08-17] The changed-city set comes from the existing fingerprint, and `planTrip`'s payload defines "planning input"
 
 **Decision:** `citiesChangedSincePlan()` derives which cities changed by parsing

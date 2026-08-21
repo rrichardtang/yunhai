@@ -4,6 +4,36 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-21] Refine endpoint batched by city; duplicate and inherited-venue bugs closed
+- `src/routes/activities.js`: `/api/activity/refine` rewritten as a per-city batch. New contract
+  `{ city, activities, note, budget_target, exclude, tripId }` → `{ activities: { [id]: activity } }`.
+  Venue roster in the prompt (same phrasing `planCity` uses for locked activities) plus a
+  `dedupeActivities` backstop with the roster first. Takes an LLM semaphore slot; Brave research is
+  one city-level query that never names the venues being replaced.
+- The response is a whole activity built by `normalizeActivity` from the model's suggestion alone,
+  not a partial diff. Under the diff, every field the model omitted defaulted to the replaced
+  venue's value; four review rounds found the address, opening hours, duration, `booking.reference`,
+  the prose fields and `smarter_alternative` leaking through in turn.
+- Suggestions are normalized *before* the roster dedupe, so both sides share one naming convention.
+  Keying on the model's raw labels let `"Dinner at Casa Lucio"` past a roster holding `"Casa Lucio"`
+  and then shipped it as exactly that venue, `stripMealPrefix` having run only inside
+  `normalizeActivity`. The suggestion's `timing` key is stripped so `isLegacyActivity` cannot
+  short-circuit normalization and leave no `booking` for `applyBookingLinks`.
+- `applyCostShapeToUpdates`, `buildRefinedMerge` and `applyRefinedVenue` deleted — they existed only
+  to police that merge. `applyBookingLinks` collapses to one booking shape. New
+  `buildRefinedActivity` and `buildVenueRosterBlock` helpers.
+- Duplicate suggestion ids resolve to the first *surviving* one; an empty suggestion list is a 200
+  rather than a parse error; the budget clause no longer offers a same-venue downgrade that the
+  roster would then drop.
+- `src/activityRefine.test.js` rewritten against the new contract, led by a case asserting that no
+  field of the replaced venue survives a minimal suggestion. The 8 `applyCostShapeToUpdates` cases
+  removed with the function. Suite 292 → 293, all passing.
+- Five `pre-push-reviewer` rounds, every finding addressed. Round 3 returned "not converging" on the
+  partial-diff contract, which is what prompted the rewrite; round 4 then caught the raw-label dedupe
+  above, which would have reintroduced the original duplicate. Two findings were vacuous tests of
+  mine — worth noting as a pattern, since both asserted the property this change exists to guarantee
+  while never exercising the code path that provides it.
+
 ## [2026-08-18] Snapshot restore respects the zero-city guard
 Seventh `pre-push-reviewer` pass returned no blocking findings and confirmed the four-exit
 enumeration complete — it independently verified that no `.panel`/`.step-panel` class is toggled

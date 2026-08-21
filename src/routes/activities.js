@@ -6,6 +6,7 @@ const { acquire: acquireLlmSlot, release: releaseLlmSlot } = require('../middlew
 const {
   planCity,
   normalizeActivity,
+  dedupeActivities,
   SYSTEM_PROMPT: ACTIVITY_SYSTEM_PROMPT
 } = require('../claude');
 const { recall, observe } = require('../memory');
@@ -21,6 +22,14 @@ const { enrichWithPlaceDetails, formatOpeningHoursFromPlaces, PRICE_LEVEL_MAP } 
 const { debugLog } = require('../services/debugLog');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
+// A refine batch is one city's worth of suggestions, so the output budget scales
+// with the batch and is capped rather than fixed at a single activity's size. The
+// allowance is generous because the prompt requires eleven fields per suggestion,
+// four of them prose, and the budget covers reasoning as well as output — a hard
+// truncation now costs a whole city's refinements rather than one activity's.
+const REFINE_BASE_TOKENS = 600;
+const REFINE_TOKENS_PER_ACTIVITY = 400;
+const REFINE_MAX_TOKENS = 8000;
 // Generating a stay as parallel N-day windows instead of one serial call is
 // roughly a 3x speed win, but it changes the activity mix, so it ships off and
 // is enabled per environment once the bake-off has compared the two.
@@ -154,28 +163,64 @@ function groundActivityToPlace(activity, place, { cost = null, costType = 'per_p
   return activity;
 }
 
-// LLM refinements may emit cost in either shape; fold it into the shape the
-// activity actually carries so actCostUsd() sees the new value after merge.
-function applyCostShapeToUpdates(activity, updates) {
-  const activityIsNested = activity.cost && typeof activity.cost === 'object';
-  const updateNested = updates.cost && typeof updates.cost === 'object' ? Number(updates.cost.estimated_usd) : NaN;
-  const updateFlat = Number(updates.estimated_cost_usd);
+function activityCostUsd(activity) {
+  const nested = Number(activity?.cost?.estimated_usd);
+  if (Number.isFinite(nested)) return nested;
+  const flat = Number(activity?.estimated_cost_usd);
+  return Number.isFinite(flat) ? flat : null;
+}
 
-  if (activityIsNested && Number.isFinite(updateFlat)) {
-    updates.cost = {
-      ...activity.cost,
-      ...(updates.cost || {}),
-      estimated_usd: updateFlat,
-      type: updates.cost_type || updates.cost?.type || activity.cost.type
-    };
-    delete updates.estimated_cost_usd;
-    delete updates.cost_type;
-  } else if (!activityIsNested && Number.isFinite(updateNested)) {
-    updates.estimated_cost_usd = updateNested;
-    updates.cost_type = updates.cost.type || updates.cost_type || activity.cost_type || 'per_person';
-    delete updates.cost;
-  }
-  return updates;
+const VENUE_ROSTER_HEADING = "Venues already in this traveler's trip — every suggestion must be a different venue from all of these:";
+
+// Same shape as the locked-activity block planCity sends (src/claude.js): the
+// model is told which venues are taken, and dedupeActivities enforces it after.
+function buildVenueRosterBlock(roster) {
+  const rows = (Array.isArray(roster) ? roster : [])
+    .map((a) => {
+      const name = String(a?.name || '').trim();
+      if (!name) return '';
+      const venue = String(a?.venue_name || '').trim();
+      const type = String(a?.type || '').trim();
+      return `- "${name}"${venue ? ` | venue: ${venue}` : ''}${type ? ` | type: ${type}` : ''}`;
+    })
+    .filter(Boolean);
+  return rows.length ? `\n\n${VENUE_ROSTER_HEADING}\n${rows.join('\n')}` : '';
+}
+
+// The suggestion alone becomes the replacement activity. It is never merged with
+// the activity being replaced: a merge makes the replaced venue's value the default
+// for every field the model omits, which is how its address, hours, duration,
+// booking reference and prose each followed the swap in turn.
+//
+// `timing` is stripped because normalizeActivity returns an already-normalized input
+// untouched (isLegacyActivity is `timing === undefined`), and a model that emits a
+// timing object would otherwise pass straight through unnormalized — leaving no
+// `booking` for applyBookingLinks and failing the whole city's batch.
+function buildRefinedActivity(activity, suggestion, city) {
+  const { id, timing, ...raw } = suggestion || {};
+  if (!raw.name) return null;
+  const refined = normalizeActivity({ ...raw, city }, city);
+  // The swap keeps the itinerary slot: arrange placements, checklist entries and
+  // calendar fingerprints all key on this id.
+  refined.id = activity.id;
+  // Not part of normalizeActivity's shape, so this route owns clearing them. Cleared
+  // before grounding, so any value they carry afterwards came from a Places lookup
+  // keyed on the new venue.
+  refined.place_id = null;
+  refined.imageUrl = null;
+  refined.price_level = null;
+  return refined;
+}
+
+// normalizeActivity always returns the nested shape, so there is one booking shape
+// to handle here. reference is already null on it — the replaced venue's booking
+// cannot follow the swap.
+function applyBookingLinks(activity, city, date = '') {
+  const bookingType = activity.booking?.type || 'none';
+  activity.booking.links = bookingType === 'none'
+    ? []
+    : buildBookingLinks({ bookingType, name: activity.venue_name || activity.name, city, date });
+  return activity;
 }
 
 function register(app) {
@@ -270,6 +315,10 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
     return res.json({ activity });
   });
 
+  // One call per city, not per activity: a suggestion can only duplicate a venue
+  // in the same city, so the city is the smallest batch that lets the model see
+  // every venue it must avoid. It also isolates a failure to one city, and cuts
+  // one Brave search and one recall() per activity down to one per city.
   app.post('/api/activity/refine', async (req, res) => {
     const refineStartTs = Date.now();
     if (!process.env.OPENAI_API_KEY) {
@@ -277,97 +326,125 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
       return res.status(503).json({ error: 'OpenAI API key not configured' });
     }
 
-    const { activity, note, budget_target, tripId = null } = req.body || {};
-    debugLog('activity-refine', `INBOUND name="${activity?.name || ''}" city="${activity?.city || ''}" note_chars=${(note || '').length}`);
-    if (!activity?.name || !note) {
-      debugLog('activity-refine', `REJECT reason=missing_activity_or_note`);
-      return res.status(400).json({ error: 'activity and note are required' });
+    const { city, activities, note, budget_target, exclude = [], tripId = null } = req.body || {};
+    const targets = (Array.isArray(activities) ? activities : []).filter((a) => a?.id && a?.name);
+    debugLog('activity-refine', `INBOUND city="${city || ''}" activities=${targets.length} exclude=${Array.isArray(exclude) ? exclude.length : 0} note_chars=${(note || '').length}`);
+    if (!city || !targets.length || !note) {
+      debugLog('activity-refine', `REJECT reason=missing_city_activities_or_note`);
+      return res.status(400).json({ error: 'city, activities and note are required' });
     }
 
+    // The activities being refined are themselves on the roster: a suggestion that
+    // lands back on the venue it was replacing is the duplicate users were seeing.
+    const roster = [...targets, ...(Array.isArray(exclude) ? exclude : [])];
+
     try {
+      // Built from the city and the types in play, never from the venues being
+      // replaced — searching those returned articles about the very venue the
+      // suggestion had to move away from, which is what anchored it there.
+      const types = [...new Set(targets.map((a) => String(a.type || '').trim().toLowerCase()).filter(Boolean))].slice(0, 4);
+      const researchQuery = `${budget_target != null ? 'best value affordable' : 'best'} ${types.join(' ')} in ${city}`.replace(/\s{2,}/g, ' ');
       const braveResults = isBraveConfigured()
-        ? await search(`${activity.name} ${activity.city} ${note}`, { task: 'entity_enrichment', count: 3 })
+        ? await search(researchQuery, { task: 'entity_enrichment', count: 5 })
         : [];
       const braveBlock = braveResults.length
-        ? `\nWeb research (use to anchor the refined activity in a real venue — do not invent place names):\n${braveResults.map(r => `- ${r.title}: ${r.description}`).join('\n')}`
+        ? `\n\nWeb research (use to anchor each suggestion in a real venue — do not invent place names):\n${braveResults.map((r) => `- ${r.title}: ${r.description}`).join('\n')}`
         : '';
+      // Deliberately does not offer "downscale the same venue": a suggestion that
+      // keeps the original venue collides with it on the roster and is dropped, and
+      // prompting for something the pipeline then silently discards is exactly what
+      // this codebase forbids.
       const budgetClause = budget_target != null
-        ? `\nThe refined activity's estimated_cost_usd must be at or below ${budget_target}. Downscale the venue or choose a cheaper equivalent within the same activity type and city.`
+        ? `\n\nEach suggestion's estimated_cost_usd must be at or below ${budget_target}. Choose a cheaper venue of the same activity type in ${city} — a different venue, never the same one at a lower price.`
         : '';
-      const memText = recall({ userId: parseUserId(getAuthedUserId(req)), tripId, query: `${activity.name} ${note}` }).text;
-      const memBlock = memText ? `\n\nTraveler profile & learned preferences (honor these in the refinement):\n${memText}` : '';
+      const memText = recall({ userId: parseUserId(getAuthedUserId(req)), tripId, query: `${city} ${note}` }).text;
+      const memBlock = memText ? `\n\nTraveler profile & learned preferences (honor these in every suggestion):\n${memText}` : '';
 
-      const userContent = `You are refining an existing travel activity. The traveler wants a tweak, not a replacement.
+      const activityLines = targets.map((a) => {
+        const cost = activityCostUsd(a);
+        return `- id: ${a.id} | ${a.name}${a.venue_name ? ` | venue: ${a.venue_name}` : ''}${a.type ? ` | type: ${a.type}` : ''}${cost != null ? ` | current cost: $${cost}` : ''}`;
+      }).join('\n');
 
-Current activity: ${JSON.stringify(activity)}
-Traveler's note: "${note}"${braveBlock}${budgetClause}${memBlock}
+      const userContent = `You are swapping ${targets.length} activit${targets.length === 1 ? 'y' : 'ies'} in a traveler's ${city} itinerary for different venues.
 
-Return ONLY a JSON object containing the fields that should change. Preserve all field names from the current activity. If the traveler names a specific place, the "name" field must include it verbatim.`;
+Activities to swap:
+${activityLines}
+
+Traveler's request: "${note}"${budgetClause}${buildVenueRosterBlock(roster)}${braveBlock}${memBlock}
+
+Rules:
+- Every suggestion must be a DIFFERENT real venue in ${city} from the activity it replaces.
+- No two suggestions may name the same venue, and none may match a venue listed above.
+- "venue_name" is required on every suggestion: the place exactly as it appears on Google Maps.
+- If the traveler's request names a specific place, that suggestion's "name" must include it verbatim.
+- These fields describe the venue, so every suggestion must carry all of them, written for the NEW venue: name, venue_name, type, why_it_fits, pitfall, booking_advice, insider_tips, duration_hours, suggested_time, opening_hours, estimated_cost_usd. Never leave one out to mean "unchanged" — nothing about the replaced venue's description carries over.
+
+Return ONLY a JSON object: {"suggestions":[{"id":"<an id listed above>", ...changed fields...}]}`;
 
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const response = await openai.chat.completions.create({
-        model: ACTIVITY_REFINE_MODEL,
-        max_completion_tokens: 500,
-        response_format: { type: 'json_object' },
-        messages: [{ role: 'user', content: userContent }]
-      });
-
-      const updates = JSON.parse(response.choices?.[0]?.message?.content?.trim() || '{}');
-      applyCostShapeToUpdates(activity, updates);
-
-      const updatedName = updates.name || activity.name;
-      const updatedCity = updates.city || activity.city;
-
-      if (updates.name && updates.name !== activity.name && process.env.GOOGLE_MAPS_API_KEY) {
-        const merged = { ...activity, ...updates, city: updatedCity };
-        merged.location = { ...(activity.location || {}), lat: null, lng: null };
-        // Clear the old venue's price level so a post-enrich value is known to come
-        // from Places for the NEW venue, not inherited from the one being replaced.
-        delete merged.price_level;
-        if (activity.timing) merged.timing = { ...activity.timing, ...(updates.timing || {}) };
-        await enrichWithPlaceDetails([merged], updatedCity);
-        if (Number.isFinite(Number(merged.location?.lat)) && Number.isFinite(Number(merged.location?.lng))) {
-          updates.location = merged.location;
-          if (merged.opening_hours) updates.opening_hours = merged.opening_hours;
-          if (merged.timing) updates.timing = merged.timing;
-        }
-        if (Number.isInteger(merged.price_level)) updates.price_level = merged.price_level;
-        else if (updates.price_level == null && activity.price_level != null) updates.price_level = null;
-      }
-
-      const isNewShape = activity.booking !== undefined;
-      const existingBookingType = isNewShape ? activity.booking?.type : activity.booking_type;
-      const updatedBookingType = updates.booking_type || existingBookingType || 'none';
-
-      if (updatedBookingType !== 'none') {
-        const searchName = updates.venue_name || activity.venue_name || updatedName;
-        const newLinks = buildBookingLinks({
-          bookingType: updatedBookingType,
-          name: searchName,
-          city: updatedCity,
-          date: activity.scheduled_date || ''
+      await acquireLlmSlot();
+      let response;
+      try {
+        response = await openai.chat.completions.create({
+          model: ACTIVITY_REFINE_MODEL,
+          max_completion_tokens: Math.min(REFINE_MAX_TOKENS, REFINE_BASE_TOKENS + targets.length * REFINE_TOKENS_PER_ACTIVITY),
+          response_format: { type: 'json_object' },
+          messages: [{ role: 'user', content: userContent }]
         });
-
-        if (isNewShape) {
-          updates.booking = { ...(activity.booking || {}), type: updatedBookingType, links: newLinks };
-          delete updates.booking_type;
-          delete updates.booking_links;
-        } else {
-          updates.booking_links = newLinks;
-        }
-      } else if (isNewShape) {
-        updates.booking = { ...(activity.booking || {}), type: 'none', links: [] };
-        delete updates.booking_type;
-        delete updates.booking_links;
-      } else {
-        updates.booking_links = [];
+      } finally {
+        releaseLlmSlot();
       }
 
-      debugLog('activity-refine', `DONE name="${updatedName}" updated_fields=${Object.keys(updates).join(',')} elapsed_ms=${Date.now() - refineStartTs}`);
-      return res.json({ updates });
+      const parsed = tryParseJsonObject(response.choices?.[0]?.message?.content || '');
+      if (!Array.isArray(parsed?.suggestions)) {
+        debugLog('activity-refine', `PARSE_FAIL city="${city}" elapsed_ms=${Date.now() - refineStartTs}`);
+        return res.status(500).json({ error: 'Failed to parse refinement JSON' });
+      }
+
+      // Normalize before deduping, so both sides of the comparison use one naming
+      // convention. Keying on the model's raw labels let "Dinner at Casa Lucio" past
+      // a roster holding "Casa Lucio" — and stripMealPrefix then shipped it as
+      // exactly "Casa Lucio", the venue it was replacing.
+      const byId = new Map(targets.map((a) => [String(a.id), a]));
+      const candidates = [];
+      for (const suggestion of parsed.suggestions) {
+        const activity = byId.get(String(suggestion?.id || ''));
+        if (!activity) continue;
+        const refined = buildRefinedActivity(activity, suggestion, city);
+        if (refined) candidates.push({ activity, refined });
+      }
+
+      // Accepted one at a time, roster first, so a suggestion colliding with a venue
+      // the trip already has is the one dropped rather than the venue itself. Testing
+      // each candidate against only what has been accepted means a candidate that is
+      // never used — a second suggestion for an id already filled — cannot consume a
+      // venue that another activity's suggestion needed. Runs ahead of grounding:
+      // enrichment does not touch the names this keys on, so it cannot improve the
+      // comparison, and a dropped candidate would otherwise cost a billed lookup.
+      //
+      // First *surviving* suggestion per id wins. Claiming the id before the roster
+      // check would let a dropped suggestion block a valid second one for it.
+      const activitiesById = {};
+      const survivors = [];
+      const accepted = [];
+      for (const { activity, refined } of candidates) {
+        if (activitiesById[activity.id]) continue;
+        if (!dedupeActivities([...roster, ...accepted, refined], city).includes(refined)) continue;
+        accepted.push(refined);
+        activitiesById[activity.id] = refined;
+        survivors.push({ refined, date: activity.scheduled_date || '' });
+      }
+
+      if (survivors.length && process.env.GOOGLE_MAPS_API_KEY) {
+        await enrichWithPlaceDetails(survivors.map((s) => s.refined), city);
+      }
+      survivors.forEach(({ refined, date }) => applyBookingLinks(refined, city, date));
+
+      debugLog('activity-refine', `DONE city="${city}" requested=${targets.length} suggested=${candidates.length} kept=${survivors.length} elapsed_ms=${Date.now() - refineStartTs}`);
+      return res.json({ activities: activitiesById });
     } catch (error) {
-      debugLog('activity-refine', `ERROR msg="${error?.message || error}" elapsed_ms=${Date.now() - refineStartTs}`);
-      return res.status(500).json({ error: error.message || 'Failed to refine activity' });
+      debugLog('activity-refine', `ERROR city="${city}" msg="${error?.message || error}" elapsed_ms=${Date.now() - refineStartTs}`);
+      return res.status(500).json({ error: error.message || 'Failed to refine activities' });
     }
   });
 
@@ -757,4 +834,10 @@ Return ONLY valid JSON (no markdown fences):
   });
 }
 
-module.exports = { register, groundActivityToPlace, applyCostShapeToUpdates };
+module.exports = {
+  register,
+  groundActivityToPlace,
+  buildRefinedActivity,
+  buildVenueRosterBlock,
+  applyBookingLinks
+};

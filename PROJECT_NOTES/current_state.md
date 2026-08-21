@@ -1,6 +1,6 @@
 # Current State
 
-_Last updated: 2026-08-18_
+_Last updated: 2026-08-21_
 
 ## Objective
 Ship branch `claude/guide-me-setup-stuck-mszkyo`. Both open decisions are settled — `planCity` runs
@@ -19,6 +19,14 @@ That branch also now carries the regenerate-scope work that came out of the Osak
 dialog pre-checks only the cities whose planning inputs actually changed, matched by city `id`, and
 Setup refuses to advance with zero cities at all three interactive exits. Five commits, unpushed,
 gated behind `pre-push-reviewer` (below).
+
+A third independent branch is now in flight: `claude/refine-endpoint-duplicates-4gg4g3` rewrites
+`/api/activity/refine` from one call per activity into one call per city, which is what stops the
+budget optimizer returning the same venue twice, and returns whole activities rather than a partial
+diff, which is what stops the replaced venue's address, hours and booking reference following the
+swap (decisions [2026-08-21]). The server half is committed; the frontend caller and
+`/api/activity/replace` are not done, both tracked in open_items [2026-08-21]. It touches no planning or scheduling code, so it is independent of the
+GPT-5.6 verification and can deploy in any order relative to the other two branches.
 
 ## Active Workstream
 The branch fixed the reported "stuck" plan, then found three bugs underneath it that each
