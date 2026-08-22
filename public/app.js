@@ -3650,11 +3650,25 @@ function getActivityStyle(type = '') {
 }
 
 
-function updateReviewNav() {
+function updateReviewNav(visibleActivities = getFilteredReviewActivities()) {
   if (!els.continueArrangeBtn) return;
-  const canContinue = state.activities.some((a) => state.reviewed[a.id]?.approved);
-  els.continueArrangeBtn.disabled = !canContinue;
-  els.continueArrangeBtn.title = canContinue ? '' : 'Approve at least one activity to continue';
+  const visibleIds = new Set(visibleActivities.map((a) => a.id));
+  const gate = reviewGateState(state.activities, state.reviewed, visibleIds);
+  els.continueArrangeBtn.disabled = !gate.canContinue;
+  els.continueArrangeBtn.title = gate.reason;
+}
+
+// Every verdict change routes through here. The four approve/decline buttons (grid
+// card and expanded card) each did their own subset of the follow-up, so what went
+// stale depended on which card you clicked: the expanded card never refreshed the
+// Continue button, the budget tracker, or a declined activity's day placement.
+function setActivityVerdict(activityId, approved) {
+  state.reviewed[activityId] = { ...(state.reviewed[activityId] || {}), approved };
+  if (approved === false && state.placements[activityId]?.dayId) {
+    state.placements[activityId] = { dayId: null, time: null };
+  }
+  updateReviewNav();
+  renderBudgetTracker();
 }
 
 function populateReviewCityFilter() {
@@ -4393,12 +4407,11 @@ function updateActivityInState(id, updates) {
 }
 
 function renderActivities() {
-  updateReviewNav();
+  const filteredActivities = getFilteredReviewActivities();
+  updateReviewNav(filteredActivities);
   populateReviewCityFilter();
   populateReviewTypeFilter();
   destroyMiniMaps();
-
-  const filteredActivities = getFilteredReviewActivities();
 
   if (!filteredActivities.length) {
     els.activitiesGrid.innerHTML = '<div class="item"><strong>No activities match your filters.</strong><p>Try clearing search/filter settings.</p></div>';
@@ -4564,11 +4577,9 @@ function renderActivities() {
     }
 
     card.querySelector('.approve').addEventListener('click', () => {
-      const current = state.reviewed[a.id]?.approved;
-      const nextApproved = current === true ? null : true;
-      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: nextApproved };
+      const nextApproved = activityVerdict(state.reviewed, a.id) === true ? null : true;
+      setActivityVerdict(a.id, nextApproved);
       syncVerdictClasses(card, nextApproved);
-      renderBudgetTracker();
     });
     const declineReason = card.querySelector('.decline-reason');
     const confirmReplace = card.querySelector('.confirm-replace');
@@ -4578,14 +4589,9 @@ function renderActivities() {
     bindTextareaExpandButtons(card);
 
     declineBtn.addEventListener('click', () => {
-      const current = state.reviewed[a.id]?.approved;
-      const nextApproved = current === false ? null : false;
-      state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: nextApproved };
-      if (nextApproved === false && state.placements[a.id]?.dayId) {
-        state.placements[a.id] = { dayId: null, time: null };
-      }
+      const nextApproved = activityVerdict(state.reviewed, a.id) === false ? null : false;
+      setActivityVerdict(a.id, nextApproved);
       syncVerdictClasses(card, nextApproved);
-      renderBudgetTracker();
     });
 
     saveActivityNotes.addEventListener('click', () => {
@@ -4717,9 +4723,8 @@ function renderActivities() {
 
       // Wire up actions directly against state (grid card may be re-rendered)
       body.querySelector('.approve')?.addEventListener('click', () => {
-        const current = state.reviewed[a.id]?.approved;
-        const next = current === true ? null : true;
-        state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: next };
+        const next = activityVerdict(state.reviewed, a.id) === true ? null : true;
+        setActivityVerdict(a.id, next);
         syncExpand(next);
       });
 
@@ -4730,9 +4735,8 @@ function renderActivities() {
       const expandActivityNotesText = body.querySelector('.activity-notes-text');
 
       expandDeclineBtn?.addEventListener('click', () => {
-        const current = state.reviewed[a.id]?.approved;
-        const next = current === false ? null : false;
-        state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: next };
+        const next = activityVerdict(state.reviewed, a.id) === false ? null : false;
+        setActivityVerdict(a.id, next);
         syncExpand(next);
       });
 
