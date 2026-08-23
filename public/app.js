@@ -3977,10 +3977,19 @@ function activityBudgetUsd(act) {
 // estimated_cost_usd as "current cost" and asks for that same field back, so a
 // budget target has to be in that unit — the party totals the cards show would
 // read as a ceiling several times the current price and stop binding entirely.
-function activityUnitCostUsd(act) {
+// A per_group cost is already whole-party in that raw field, so the two
+// party-scaled fallbacks convert in opposite directions.
+function activityUnitCostUsd(act, partyUnits) {
   const raw = actCostUsd(act);
   if (raw != null && raw > 0) return raw;
-  return representativeCostUsd(act);
+  const perGroup = actCostType(act) === 'per_group';
+  const representative = representativeCostUsd(act);
+  if (representative != null) return perGroup ? representative * partyUnits : representative;
+  // A hand-edited checklist budget is the traveler's own number and the only
+  // price some activities carry, so it beats sending no ceiling at all.
+  const carded = activityCardCostUsd(act);
+  if (carded != null && carded > 0) return perGroup ? carded : carded / partyUnits;
+  return null;
 }
 
 // The figure to show on a card — prefer any user-edited checklist budget so the
@@ -4312,26 +4321,33 @@ async function onConfirmLocks() {
   const locked = approved.filter((a) => budgetOptState.lockedIds.has(a.id));
   const lockedCost = sumCardCosts(locked);
   const totalBudget = state.tripBudget || sumCardCosts(approved) * 0.8;
-  // Two ceilings, tighter one wins, both in the per-unit basis the prompt reads.
-  // Budget headroom alone collapses to nothing as soon as the locked picks
-  // already cost more than the budget — the normal case when most of the trip is
-  // locked, since the default budget is only 80% of current spend. That asked the
-  // model for a venue at or below $0, and a $0 cost is read downstream as
-  // "unpriced", so every suggestion fell back to the flat type estimate, tied
-  // with the original, and was dropped as not-cheaper. Undercutting what the
-  // unlocked picks already cost is a real target at any lock level.
+  // A ceiling per activity, in the same units the route prints that activity's
+  // "current cost". One figure for the batch cannot bind a $30 meal and a $240
+  // group tour at once, and per_group costs are whole-party where per_person
+  // costs are not, so the conversion differs per activity too.
+  //
+  // Two ceilings, tighter wins. Budget headroom alone collapses to nothing as
+  // soon as the locked picks already cost more than the budget — the normal case
+  // when most of the trip is locked, since the default budget is only 80% of
+  // current spend. That asked the model for a venue at or below $0, and a $0 cost
+  // is read downstream as "unpriced", so every suggestion fell back to the flat
+  // type estimate, tied with the original, and was dropped as not-cheaper.
+  // Undercutting what each pick already costs is a real target at any lock level.
   const partyUnits = (state.numTravelers || 1) + 0.6 * (state.numChildren || 0);
   const headroomPerActivity = totalBudget > lockedCost
-    ? (totalBudget - lockedCost) / refinable.length / partyUnits
+    ? (totalBudget - lockedCost) / refinable.length
     : Infinity;
-  const unitCosts = refinable.map(activityUnitCostUsd).filter((c) => c != null && c > 0);
-  const undercutCurrent = unitCosts.length
-    ? (unitCosts.reduce((sum, c) => sum + c, 0) / unitCosts.length) * 0.8
-    : Infinity;
-  // Nothing priceable on either side leaves no honest number to send; the prompt
-  // drops the budget clause rather than inventing a ceiling.
-  const ceiling = Math.min(headroomPerActivity, undercutCurrent);
-  const perActivityTarget = Number.isFinite(ceiling) ? Math.max(1, Math.round(ceiling)) : null;
+  const budgetTargetFor = (a) => {
+    const perGroup = actCostType(a) === 'per_group';
+    const unitCost = activityUnitCostUsd(a, partyUnits);
+    // Headroom is a whole-party figure, which is already the unit a per_group
+    // activity is priced in; a per_person one has to be divided back down.
+    const headroom = perGroup ? headroomPerActivity : headroomPerActivity / partyUnits;
+    const ceiling = Math.min(headroom, unitCost != null ? unitCost * 0.8 : Infinity);
+    // Nothing priceable on either side leaves no honest number to send, and the
+    // route drops the budget clause rather than inventing a ceiling.
+    return Number.isFinite(ceiling) ? Math.max(1, Math.round(ceiling)) : null;
+  };
 
   const btn = document.getElementById('budgetOptConfirmLocksBtn');
   btn.disabled = true;
@@ -4371,6 +4387,12 @@ async function onConfirmLocks() {
         .filter((a) => cityMatches(a.city, city) && !refiningIds.has(a.id))
         .map((a) => ({ name: a.name, venue_name: a.venue_name || null, type: a.type || null }));
 
+      const budget_targets = {};
+      cityActivities.forEach((a) => {
+        const target = budgetTargetFor(a);
+        if (target != null) budget_targets[a.id] = target;
+      });
+
       return apiFetch('/api/activity/refine', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4378,7 +4400,7 @@ async function onConfirmLocks() {
           city,
           activities: cityActivities,
           note: 'find a cheaper alternative within the same activity type and city',
-          budget_target: perActivityTarget,
+          budget_targets,
           exclude,
           tripId: state.currentItineraryId || null
         })

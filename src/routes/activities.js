@@ -331,7 +331,10 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
       return res.status(503).json({ error: 'OpenAI API key not configured' });
     }
 
-    const { city, activities, note, budget_target, exclude = [], tripId = null } = req.body || {};
+    // Per activity, not one figure for the batch: a city mixes price tiers and
+    // per_group with per_person costs, so a single ceiling either fails to bind on
+    // the cheap half or is several times too tight on the expensive half.
+    const { city, activities, note, budget_targets = {}, exclude = [], tripId = null } = req.body || {};
     const targets = (Array.isArray(activities) ? activities : []).filter((a) => a?.id && a?.name);
     debugLog('activity-refine', `INBOUND city="${city || ''}" activities=${targets.length} exclude=${Array.isArray(exclude) ? exclude.length : 0} note_chars=${(note || '').length}`);
     if (!city || !targets.length || !note) {
@@ -348,7 +351,12 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
       // replaced — searching those returned articles about the very venue the
       // suggestion had to move away from, which is what anchored it there.
       const types = [...new Set(targets.map((a) => String(a.type || '').trim().toLowerCase()).filter(Boolean))].slice(0, 4);
-      const researchQuery = `${budget_target != null ? 'best value affordable' : 'best'} ${types.join(' ')} in ${city}`.replace(/\s{2,}/g, ' ');
+      const budgetTargetFor = (id) => {
+        const target = Number(budget_targets?.[id]);
+        return Number.isFinite(target) && target > 0 ? target : null;
+      };
+      const anyBudgetTarget = targets.some((a) => budgetTargetFor(a.id) != null);
+      const researchQuery = `${anyBudgetTarget ? 'best value affordable' : 'best'} ${types.join(' ')} in ${city}`.replace(/\s{2,}/g, ' ');
       const braveResults = isBraveConfigured()
         ? await search(researchQuery, { task: 'entity_enrichment', count: 5 })
         : [];
@@ -359,15 +367,16 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
       // keeps the original venue collides with it on the roster and is dropped, and
       // prompting for something the pipeline then silently discards is exactly what
       // this codebase forbids.
-      const budgetClause = budget_target != null
-        ? `\n\nEach suggestion's estimated_cost_usd must be at or below ${budget_target}. Choose a cheaper venue of the same activity type in ${city} — a different venue, never the same one at a lower price.`
+      const budgetClause = anyBudgetTarget
+        ? `\n\nEach suggestion's estimated_cost_usd must be at or below the "target" shown for the activity it replaces, in the same units as that activity's "current cost". Choose a cheaper venue of the same activity type in ${city} — a different venue, never the same one at a lower price.`
         : '';
       const memText = recall({ userId: parseUserId(getAuthedUserId(req)), tripId, query: `${city} ${note}` }).text;
       const memBlock = memText ? `\n\nTraveler profile & learned preferences (honor these in every suggestion):\n${memText}` : '';
 
       const activityLines = targets.map((a) => {
         const cost = activityCostUsd(a);
-        return `- id: ${a.id} | ${a.name}${a.venue_name ? ` | venue: ${a.venue_name}` : ''}${a.type ? ` | type: ${a.type}` : ''}${cost != null ? ` | current cost: $${cost}` : ''}`;
+        const target = budgetTargetFor(a.id);
+        return `- id: ${a.id} | ${a.name}${a.venue_name ? ` | venue: ${a.venue_name}` : ''}${a.type ? ` | type: ${a.type}` : ''}${cost != null ? ` | current cost: $${cost}` : ''}${target != null ? ` | target: at or below $${target}` : ''}`;
       }).join('\n');
 
       const userContent = `You are swapping ${targets.length} activit${targets.length === 1 ? 'y' : 'ies'} in a traveler's ${city} itinerary for different venues.
