@@ -4,6 +4,16 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-23] First live confirmation of `/api/activity/replace`'s duplicate fix
+- User-run manual test against a real LLM in production use (Dali, Yunnan trip): two sequential
+  `/replace` calls on two different landmark activities, near-identical "peaceful beach walk" notes,
+  returned two distinct real venues (`Sunset Walk at Caicun Pier`, `Erhai Lake Coastal Walk`) instead
+  of the same one. This is the semantic-duplicate case (no shared name, both `venue_name` null going
+  in) that the structural dedupe backstop cannot catch — first live evidence the roster wording in
+  the prompt (decisions [2026-08-21]) is doing real work, not just the unit-tested structural path.
+  Neither call triggered the retry-on-collision fallback, so that path is still unexercised live; see
+  open_items [2026-08-23].
+
 ## [2026-08-23] Budget optimizer's refine caller wired to the per-city batch contract
 - `public/app.js`: `onConfirmLocks` (budget optimization's "Confirm" step) rewritten to group
   unlocked-and-approved activities by city with `cityMatches`, one `apiFetch('/api/activity/refine')`

@@ -1,22 +1,30 @@
 # Open Items
 
-## [2026-08-23] Verify the refine/replace duplicate fixes against a live LLM
+## [2026-08-23] `/api/activity/replace`'s retry-on-collision path is still unexercised live
 **Status:** Pending input (needs API keys)
-**Description:** `onConfirmLocks` now batches `/api/activity/refine` by city and replaces each
-approved card outright with the route's response (`public/app.js:4248`); `/api/activity/replace`
-carries the same exclusion roster. Neither has received a real LLM call — this container has no
-`OPENAI_API_KEY`/`ANTHROPIC_API_KEY`, and the repo deliberately does not mock the SDKs. Structural
-dedupe (`dedupeActivities` against the roster) is unit-tested, but whether the prompt wording
-actually keeps the model off roster venues, and whether `REFINE_MAX_TOKENS` (8000, `600 +
-400/activity`) is enough for a dense city's batch, are unverified.
+**Description:** Live-tested by the user against a real LLM (Dali, China): two sequential
+`/replace` calls on two different landmark activities, both under near-identical "peaceful beach
+walk" notes, returned two distinct real venues (`Sunset Walk at Caicun Pier`, `Erhai Lake Coastal
+Walk`) rather than converging on the same one — this is exactly the semantic-duplicate case
+`dedupeActivities` (name/`venue_name`-keyed) cannot catch structurally, so it's real evidence the
+roster wording in the prompt is working. `exclude` count stayed flat (22, 22) across the two calls,
+consistent with correct live bookkeeping — a 1-for-1 replace doesn't change city activity count.
+What that run did *not* exercise: both calls succeeded on the first attempt (one Brave lookup, one
+Places fetch each, no retry logged), so the fallback retry path — fired when `duplicatesTrip()`
+catches the model landing on a roster venue anyway — remains unit-tested only, never triggered live.
+`/api/activity/refine`'s per-city batch (budget optimization's `onConfirmLocks`,
+`public/app.js:4248`) is untouched by this test — different endpoint, no live run yet at all —
+and `REFINE_MAX_TOKENS` sizing (8000, `600 + 400/activity`) for a dense city's batch is still
+unmeasured.
 **Context:** decisions [2026-08-21]; changelog [2026-08-23]. Branch
 `claude/refine-endpoint-duplicates-4gg4g3`.
-**Next action:** In a keyed env: (1) plan a 2-3 city trip, approve ~10-15 activities, enter budget
-optimization, lock a couple, Confirm — check no two refined cards name the same venue and none
-duplicates a locked/booked one; (2) confirm each refined card shows the *new* venue's photo and its
-Navigate link opens the new venue, not the original's; (3) `/debug` shows one `activity-refine` call
-per city, not per activity, with no truncation/`PARSE_FAIL` lines; (4) decline an activity in Review
-and confirm the replacement isn't a venue already elsewhere in that city.
+**Next action:** (1) Deliberately try to trigger `/replace`'s retry path — a city with few real
+venues matching a narrow note raises first-try collision odds; confirm the retry fires and its
+second attempt avoids the roster too. (2) In budget optimization: approve ~10-15 activities across
+2-3 cities, lock a couple, Confirm — check no two refined cards share a venue and none duplicates a
+locked/booked one; confirm each refined card's photo and Navigate link point at the *new* venue, not
+the original's; check `/debug` shows one `activity-refine` call per city, not per activity, with no
+truncation/`PARSE_FAIL` lines.
 
 ## [2026-08-23] The two decline-and-replace handlers are duplicated
 **Status:** Deferred
