@@ -3973,6 +3973,16 @@ function activityBudgetUsd(act) {
   return perPerson * adults + perPerson * 0.6 * children;
 }
 
+// The unit the refine prompt speaks. The route prints each activity's raw
+// estimated_cost_usd as "current cost" and asks for that same field back, so a
+// budget target has to be in that unit — the party totals the cards show would
+// read as a ceiling several times the current price and stop binding entirely.
+function activityUnitCostUsd(act) {
+  const raw = actCostUsd(act);
+  if (raw != null && raw > 0) return raw;
+  return representativeCostUsd(act);
+}
+
 // The figure to show on a card — prefer any user-edited checklist budget so the
 // card matches the checklist exactly, else the derived estimate.
 function activityCardCostUsd(act) {
@@ -4302,18 +4312,26 @@ async function onConfirmLocks() {
   const locked = approved.filter((a) => budgetOptState.lockedIds.has(a.id));
   const lockedCost = sumCardCosts(locked);
   const totalBudget = state.tripBudget || sumCardCosts(approved) * 0.8;
-  // Two ceilings, tighter one wins. Budget headroom alone collapses to nothing as
-  // soon as the locked picks already cost more than the budget — the normal case
-  // when most of the trip is locked, since the default budget is only 80% of
-  // current spend. That asked the model for a venue at or below $0, and a $0 cost
-  // is read downstream as "unpriced", so every suggestion fell back to the flat
-  // type estimate, tied with the original, and was dropped as not-cheaper.
-  // Undercutting what the unlocked picks already cost is always a real target.
+  // Two ceilings, tighter one wins, both in the per-unit basis the prompt reads.
+  // Budget headroom alone collapses to nothing as soon as the locked picks
+  // already cost more than the budget — the normal case when most of the trip is
+  // locked, since the default budget is only 80% of current spend. That asked the
+  // model for a venue at or below $0, and a $0 cost is read downstream as
+  // "unpriced", so every suggestion fell back to the flat type estimate, tied
+  // with the original, and was dropped as not-cheaper. Undercutting what the
+  // unlocked picks already cost is a real target at any lock level.
+  const partyUnits = (state.numTravelers || 1) + 0.6 * (state.numChildren || 0);
   const headroomPerActivity = totalBudget > lockedCost
-    ? (totalBudget - lockedCost) / refinable.length
+    ? (totalBudget - lockedCost) / refinable.length / partyUnits
     : Infinity;
-  const undercutCurrent = (sumCardCosts(refinable) / refinable.length) * 0.8;
-  const perActivityTarget = Math.max(1, Math.round(Math.min(headroomPerActivity, undercutCurrent)));
+  const unitCosts = refinable.map(activityUnitCostUsd).filter((c) => c != null && c > 0);
+  const undercutCurrent = unitCosts.length
+    ? (unitCosts.reduce((sum, c) => sum + c, 0) / unitCosts.length) * 0.8
+    : Infinity;
+  // Nothing priceable on either side leaves no honest number to send; the prompt
+  // drops the budget clause rather than inventing a ceiling.
+  const ceiling = Math.min(headroomPerActivity, undercutCurrent);
+  const perActivityTarget = Number.isFinite(ceiling) ? Math.max(1, Math.round(ceiling)) : null;
 
   const btn = document.getElementById('budgetOptConfirmLocksBtn');
   btn.disabled = true;
@@ -4413,23 +4431,25 @@ async function onConfirmLocks() {
 
   // Drop refinements that aren't actually cheaper than the original (e.g. a $$
   // restaurant swapped for another $$) — showing an unchanged price reads as broken.
+  let dropped = 0;
   let droppedUnpriced = 0;
   for (const [id, refined] of [...budgetOptState.refinements.entries()]) {
     const original = approved.find((a) => a.id === id);
     const refinedCost = activityBudgetUsd(refined);
     const originalCost = original ? activityCardCostUsd(original) : null;
     const unpriced = refinedCost == null || originalCost == null;
+    if (!unpriced && refinedCost < originalCost) continue;
+    dropped += 1;
     if (unpriced) droppedUnpriced += 1;
-    if (unpriced || refinedCost >= originalCost) {
-      budgetOptState.refinements.delete(id);
-      budgetOptState.choiceIsRefined.delete(id);
-    }
+    budgetOptState.refinements.delete(id);
+    budgetOptState.choiceIsRefined.delete(id);
   }
 
   if (!budgetOptState.refinements.size) {
-    // An unpriced drop is a pipeline failure, not a verdict on the traveler's
-    // picks — telling them their picks are good value would be a wrong answer.
-    abortToLock(droppedUnpriced
+    // Only blame pricing when pricing is the whole story — a batch that was
+    // mostly priced and genuinely not cheaper is a verdict, and reporting it as a
+    // failure invites a retry that will land in the same place.
+    abortToLock(droppedUnpriced === dropped
       ? 'Couldn\'t price the alternatives we found — try again.'
       : 'No cheaper alternatives found at a lower price — your picks are already good value.');
     return;
