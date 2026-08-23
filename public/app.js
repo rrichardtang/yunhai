@@ -4270,34 +4270,57 @@ async function onConfirmLocks() {
     totalUnits: unlocked.length
   });
 
+  const byCity = new Map();
+  unlocked.forEach((a) => {
+    const key = a.city || '';
+    if (!byCity.has(key)) byCity.set(key, []);
+    byCity.get(key).push(a);
+  });
+
   let settledCount = 0;
   const results = await Promise.allSettled(
-    unlocked.map((a) =>
-      apiFetch('/api/activity/refine', {
+    [...byCity.entries()].map(([city, cityActivities]) => {
+      const refiningIds = new Set(cityActivities.map((a) => a.id));
+      // Excludes everything else the traveler has in this city — locked picks,
+      // confirmed bookings, and unapproved cards — so a suggestion can't land on
+      // a venue already sitting elsewhere in the trip.
+      const exclude = state.activities
+        .filter((a) => cityMatches(a.city, city) && !refiningIds.has(a.id))
+        .map((a) => ({ name: a.name, venue_name: a.venue_name || null, type: a.type || null }));
+
+      return apiFetch('/api/activity/refine', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          activity: a,
+          city,
+          activities: cityActivities,
           note: 'find a cheaper alternative within the same activity type and city',
           budget_target: perActivityTarget,
+          exclude,
           tripId: state.currentItineraryId || null
         })
       })
         .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then(({ updates }) => ({ id: a.id, refined: { ...a, ...updates, id: a.id } }))
+        .then(({ activities: refined }) => ({ cityActivities, refined: refined || {} }))
         .finally(() => {
-          settledCount += 1;
+          settledCount += cityActivities.length;
           setLoaderUnitsDone(settledCount);
           setLoaderStatus('Finding cheaper alternatives…', `Activity ${settledCount} of ${unlocked.length}`);
-        })
-    )
+        });
+    })
   );
 
   results.forEach((r) => {
-    if (r.status === 'fulfilled') {
-      budgetOptState.refinements.set(r.value.id, r.value.refined);
-      budgetOptState.choiceIsRefined.set(r.value.id, true);
-    }
+    if (r.status !== 'fulfilled') return;
+    const { cityActivities, refined } = r.value;
+    cityActivities.forEach((a) => {
+      // The route returns a whole normalized activity carrying the original id —
+      // it replaces the card outright rather than merging, so a renamed venue
+      // can't inherit the original's place_id, image, or booking details.
+      if (!refined[a.id]) return;
+      budgetOptState.refinements.set(a.id, { ...refined[a.id], scheduled_date: a.scheduled_date, scheduled_time: a.scheduled_time });
+      budgetOptState.choiceIsRefined.set(a.id, true);
+    });
   });
 
   budgetOptState.inFlight = false;
