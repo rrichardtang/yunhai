@@ -1,5 +1,23 @@
 # Open Items
 
+## [2026-08-23] Verify the refine/replace duplicate fixes against a live LLM
+**Status:** Pending input (needs API keys)
+**Description:** `onConfirmLocks` now batches `/api/activity/refine` by city and replaces each
+approved card outright with the route's response (`public/app.js:4248`); `/api/activity/replace`
+carries the same exclusion roster. Neither has received a real LLM call — this container has no
+`OPENAI_API_KEY`/`ANTHROPIC_API_KEY`, and the repo deliberately does not mock the SDKs. Structural
+dedupe (`dedupeActivities` against the roster) is unit-tested, but whether the prompt wording
+actually keeps the model off roster venues, and whether `REFINE_MAX_TOKENS` (8000, `600 +
+400/activity`) is enough for a dense city's batch, are unverified.
+**Context:** decisions [2026-08-21]; changelog [2026-08-23]. Branch
+`claude/refine-endpoint-duplicates-4gg4g3`.
+**Next action:** In a keyed env: (1) plan a 2-3 city trip, approve ~10-15 activities, enter budget
+optimization, lock a couple, Confirm — check no two refined cards name the same venue and none
+duplicates a locked/booked one; (2) confirm each refined card shows the *new* venue's photo and its
+Navigate link opens the new venue, not the original's; (3) `/debug` shows one `activity-refine` call
+per city, not per activity, with no truncation/`PARSE_FAIL` lines; (4) decline an activity in Review
+and confirm the replacement isn't a venue already elsewhere in that city.
+
 ## [2026-08-23] The two decline-and-replace handlers are duplicated
 **Status:** Deferred
 **Description:** The grid-card handler (`public/app.js:4635`) and the expanded-card handler
@@ -13,22 +31,6 @@ shows a banner), so collapsing them means choosing one.
 **Next action:** Extract `async function requestReplacement(a, reason)` returning the normalized
 replacement, and decide whether the grid card should start bannering generic failures (it should —
 silently resetting the button tells the traveler nothing).
-
-## [2026-08-21] Refine's per-city batch is not wired to the frontend
-**Status:** Pending
-**Description:** `POST /api/activity/refine` now speaks the per-city batch contract
-(`{ city, activities, note, budget_target, exclude }` -> `{ activities: { [id]: activity } }`), but
-`onConfirmLocks` (`public/app.js:4220`) still posts one activity per call in the old shape. Budget
-optimization is broken end to end until the caller is rewritten.
-**Context:** decisions [2026-08-21]. Branch `claude/refine-endpoint-duplicates-4gg4g3`.
-**Next action:** Group `unlocked` by city, one `apiFetch` per city under `Promise.allSettled`, build
-each city's `exclude` from `state.activities` in that city minus the ones being refined, and advance
-the loader by the city's activity count as each city settles rather than per call. The merge at
-`:4259` must become a *replace*: the route returns a whole normalized activity carrying the original
-`id`, so the client takes it as-is and re-attaches only the trip placement it holds
-(`scheduled_date`/`scheduled_time`). Spreading it over the old activity would reintroduce the
-inheritance the new contract exists to prevent, and would leave a legacy-shaped activity carrying
-both `cost` and `estimated_cost_usd`.
 
 ## [2026-08-21] `/api/activity/replace` has the same duplicate blind spot, and a dead coords check
 **Status:** Pending

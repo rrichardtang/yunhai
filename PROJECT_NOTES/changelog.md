@@ -4,6 +4,29 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-23] Budget optimizer's refine caller wired to the per-city batch contract
+- `public/app.js`: `onConfirmLocks` (budget optimization's "Confirm" step) rewritten to group
+  unlocked-and-approved activities by city with `cityMatches`, one `apiFetch('/api/activity/refine')`
+  per city under `Promise.allSettled`. Each call's `exclude` roster is built from everything else the
+  traveler has in that city — locked picks, confirmed bookings, unapproved cards. This closes the
+  last gap from the [2026-08-21] rewrite: the route's per-city batch contract had no live caller
+  until now, so budget optimization was broken end to end.
+- The response is taken as a *replacement*, not a merge — the returned normalized activity is used
+  as-is, since a merge would reintroduce the field-inheritance bug the [2026-08-21] contract exists
+  to prevent.
+- Activities with no `city` are split out (`refinable`) before batching and sizing the per-activity
+  budget target, with their own error message, rather than folding into the "all locked" check.
+- Loader progress now credits activities actually refined (`Object.keys(refined).length`), not group
+  size, so a partial per-city response doesn't read as fully done.
+- Three `pre-push-reviewer` rounds on this change each found a real defect before push: exact-string
+  city grouping split a spelling-variant city into two calls that couldn't see each other's
+  suggestions (reopening the duplicate-venue bug this whole rewrite exists to close); a dead
+  `scheduled_date`/`scheduled_time` spread stamped `undefined` keys onto every refined card (neither
+  field is ever written anywhere in `app.js`); the all-locked message misfired when activities merely
+  lacked a city.
+- `npm test` 303/303 throughout (no server-side change; frontend logic here has no dedicated test
+  file).
+
 ## [2026-08-21] Refine endpoint batched by city; duplicate and inherited-venue bugs closed
 - `src/routes/activities.js`: `/api/activity/refine` rewritten as a per-city batch. New contract
   `{ city, activities, note, budget_target, exclude, tripId }` → `{ activities: { [id]: activity } }`.
