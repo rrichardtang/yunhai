@@ -4248,7 +4248,7 @@ function renderBudgetOptCards(activities, mode) {
 async function onConfirmLocks() {
   if (budgetOptState.inFlight) return;
   const approved = budgetOptApprovedActivities();
-  const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id) && !isConfirmedBooking(a.id));
+  const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id) && !isConfirmedBooking(a.id) && a.city);
   if (!unlocked.length) {
     alert('All activities are locked — nothing to optimize.');
     return;
@@ -4270,16 +4270,20 @@ async function onConfirmLocks() {
     totalUnits: unlocked.length
   });
 
-  const byCity = new Map();
+  // Grouped with cityMatches, not exact string equality — a real city can appear
+  // under spelling variants ("Paris" / "Paris, France"), and two calls for the
+  // same city can't see each other's suggestions, defeating the dedupe this
+  // batching exists for.
+  const byCity = [];
   unlocked.forEach((a) => {
-    const key = a.city || '';
-    if (!byCity.has(key)) byCity.set(key, []);
-    byCity.get(key).push(a);
+    const group = byCity.find((g) => cityMatches(g.city, a.city));
+    if (group) group.activities.push(a);
+    else byCity.push({ city: a.city, activities: [a] });
   });
 
   let settledCount = 0;
   const results = await Promise.allSettled(
-    [...byCity.entries()].map(([city, cityActivities]) => {
+    byCity.map(({ city, activities: cityActivities }) => {
       const refiningIds = new Set(cityActivities.map((a) => a.id));
       // Excludes everything else the traveler has in this city — locked picks,
       // confirmed bookings, and unapproved cards — so a suggestion can't land on
@@ -4301,11 +4305,17 @@ async function onConfirmLocks() {
         })
       })
         .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then(({ activities: refined }) => ({ cityActivities, refined: refined || {} }))
-        .finally(() => {
-          settledCount += cityActivities.length;
+        .then(({ activities: refined }) => {
+          refined = refined || {};
+          settledCount += Object.keys(refined).length;
           setLoaderUnitsDone(settledCount);
           setLoaderStatus('Finding cheaper alternatives…', `Activity ${settledCount} of ${unlocked.length}`);
+          return { cityActivities, refined };
+        })
+        .catch((err) => {
+          setLoaderUnitsDone(settledCount);
+          setLoaderStatus('Finding cheaper alternatives…', `Activity ${settledCount} of ${unlocked.length}`);
+          return Promise.reject(err);
         });
     })
   );
@@ -4318,7 +4328,7 @@ async function onConfirmLocks() {
       // it replaces the card outright rather than merging, so a renamed venue
       // can't inherit the original's place_id, image, or booking details.
       if (!refined[a.id]) return;
-      budgetOptState.refinements.set(a.id, { ...refined[a.id], scheduled_date: a.scheduled_date, scheduled_time: a.scheduled_time });
+      budgetOptState.refinements.set(a.id, refined[a.id]);
       budgetOptState.choiceIsRefined.set(a.id, true);
     });
   });
