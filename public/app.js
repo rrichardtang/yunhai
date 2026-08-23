@@ -3979,10 +3979,9 @@ function activityBudgetUsd(act) {
 // read as a ceiling several times the current price and stop binding entirely.
 // A per_group cost is already whole-party in that raw field, so the two
 // party-scaled fallbacks convert in opposite directions.
-function activityUnitCostUsd(act, partyUnits) {
+function activityUnitCostUsd(act, partyUnits, perGroup = actCostType(act) === 'per_group') {
   const raw = actCostUsd(act);
   if (raw != null && raw > 0) return raw;
-  const perGroup = actCostType(act) === 'per_group';
   const representative = representativeCostUsd(act);
   if (representative != null) return perGroup ? representative * partyUnits : representative;
   // A hand-edited checklist budget is the traveler's own number and the only
@@ -4339,7 +4338,7 @@ async function onConfirmLocks() {
     : Infinity;
   const budgetTargetFor = (a) => {
     const perGroup = actCostType(a) === 'per_group';
-    const unitCost = activityUnitCostUsd(a, partyUnits);
+    const unitCost = activityUnitCostUsd(a, partyUnits, perGroup);
     // Headroom is a whole-party figure, which is already the unit a per_group
     // activity is priced in; a per_person one has to be divided back down.
     const headroom = perGroup ? headroomPerActivity : headroomPerActivity / partyUnits;

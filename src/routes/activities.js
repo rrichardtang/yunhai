@@ -214,6 +214,10 @@ function buildRefinedActivity(activity, suggestion, city) {
   refined.place_id = null;
   refined.imageUrl = null;
   refined.price_level = null;
+  // normalizeActivity hardcodes per_person. Left alone, a per_group swap comes
+  // back priced per traveler, the client multiplies it by party size, and the
+  // result loses the cheaper-than-original comparison it actually won.
+  refined.cost.type = activity.cost?.type || activity.cost_type || 'per_person';
   return refined;
 }
 
@@ -351,11 +355,11 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
       // replaced — searching those returned articles about the very venue the
       // suggestion had to move away from, which is what anchored it there.
       const types = [...new Set(targets.map((a) => String(a.type || '').trim().toLowerCase()).filter(Boolean))].slice(0, 4);
-      const budgetTargetFor = (id) => {
-        const target = Number(budget_targets?.[id]);
-        return Number.isFinite(target) && target > 0 ? target : null;
-      };
-      const anyBudgetTarget = targets.some((a) => budgetTargetFor(a.id) != null);
+      const targetById = new Map(targets.map((a) => {
+        const target = Number(budget_targets?.[a.id]);
+        return [a.id, Number.isFinite(target) && target > 0 ? target : null];
+      }));
+      const anyBudgetTarget = [...targetById.values()].some((t) => t != null);
       const researchQuery = `${anyBudgetTarget ? 'best value affordable' : 'best'} ${types.join(' ')} in ${city}`.replace(/\s{2,}/g, ' ');
       const braveResults = isBraveConfigured()
         ? await search(researchQuery, { task: 'entity_enrichment', count: 5 })
@@ -367,16 +371,22 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
       // keeps the original venue collides with it on the roster and is dropped, and
       // prompting for something the pipeline then silently discards is exactly what
       // this codebase forbids.
+      // Scoped to the activities that carry a target: a blanket rule with one
+      // visible number is how a suggestion ends up borrowing a neighbour's ceiling.
       const budgetClause = anyBudgetTarget
-        ? `\n\nEach suggestion's estimated_cost_usd must be at or below the "target" shown for the activity it replaces, in the same units as that activity's "current cost". Choose a cheaper venue of the same activity type in ${city} — a different venue, never the same one at a lower price.`
+        ? `\n\nWhere an activity below shows a "target", that suggestion's estimated_cost_usd must be at or below it, priced the same way that activity is ("priced: per person" means per traveler, "priced: per group" means one total for the whole party). Choose a cheaper venue of the same activity type in ${city} — a different venue, never the same one at a lower price.`
         : '';
       const memText = recall({ userId: parseUserId(getAuthedUserId(req)), tripId, query: `${city} ${note}` }).text;
       const memBlock = memText ? `\n\nTraveler profile & learned preferences (honor these in every suggestion):\n${memText}` : '';
 
       const activityLines = targets.map((a) => {
         const cost = activityCostUsd(a);
-        const target = budgetTargetFor(a.id);
-        return `- id: ${a.id} | ${a.name}${a.venue_name ? ` | venue: ${a.venue_name}` : ''}${a.type ? ` | type: ${a.type}` : ''}${cost != null ? ` | current cost: $${cost}` : ''}${target != null ? ` | target: at or below $${target}` : ''}`;
+        const target = targetById.get(a.id);
+        // The dollar figures are meaningless without their basis: the same $200
+        // is a per-traveler price or a whole-party one depending on this field.
+        const pricedAs = (a.cost?.type || a.cost_type) === 'per_group' ? 'per group' : 'per person';
+        const pricedSuffix = cost != null || target != null ? ` | priced: ${pricedAs}` : '';
+        return `- id: ${a.id} | ${a.name}${a.venue_name ? ` | venue: ${a.venue_name}` : ''}${a.type ? ` | type: ${a.type}` : ''}${cost != null ? ` | current cost: $${cost}` : ''}${target != null ? ` | target: at or below $${target}` : ''}${pricedSuffix}`;
       }).join('\n');
 
       const userContent = `You are swapping ${targets.length} activit${targets.length === 1 ? 'y' : 'ies'} in a traveler's ${city} itinerary for different venues.
