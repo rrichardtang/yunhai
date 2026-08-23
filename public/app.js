@@ -4248,15 +4248,23 @@ function renderBudgetOptCards(activities, mode) {
 async function onConfirmLocks() {
   if (budgetOptState.inFlight) return;
   const approved = budgetOptApprovedActivities();
-  const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id) && !isConfirmedBooking(a.id) && a.city);
+  const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id) && !isConfirmedBooking(a.id));
   if (!unlocked.length) {
     alert('All activities are locked — nothing to optimize.');
+    return;
+  }
+  // Refine keys its call on city, so an activity missing one can't be batched —
+  // drop those before sizing the budget split rather than folding them into the
+  // "all locked" message, which would misname the reason.
+  const refinable = unlocked.filter((a) => a.city);
+  if (!refinable.length) {
+    alert('Couldn\'t optimize — none of your unlocked activities have a city set.');
     return;
   }
   const locked = approved.filter((a) => budgetOptState.lockedIds.has(a.id));
   const lockedCost = sumCardCosts(locked);
   const totalBudget = state.tripBudget || sumCardCosts(approved) * 0.8;
-  const perActivityTarget = Math.max(0, Math.round((totalBudget - lockedCost) / unlocked.length));
+  const perActivityTarget = Math.max(0, Math.round((totalBudget - lockedCost) / refinable.length));
 
   const btn = document.getElementById('budgetOptConfirmLocksBtn');
   btn.disabled = true;
@@ -4265,9 +4273,9 @@ async function onConfirmLocks() {
   showLoader({
     title: 'Optimizing your budget',
     status: 'Finding cheaper alternatives…',
-    progressLabel: `Activity 0 of ${unlocked.length}`,
+    progressLabel: `Activity 0 of ${refinable.length}`,
     messages: BUDGET_OPT_MESSAGES,
-    totalUnits: unlocked.length
+    totalUnits: refinable.length
   });
 
   // Grouped with cityMatches, not exact string equality — a real city can appear
@@ -4275,13 +4283,17 @@ async function onConfirmLocks() {
   // same city can't see each other's suggestions, defeating the dedupe this
   // batching exists for.
   const byCity = [];
-  unlocked.forEach((a) => {
+  refinable.forEach((a) => {
     const group = byCity.find((g) => cityMatches(g.city, a.city));
     if (group) group.activities.push(a);
     else byCity.push({ city: a.city, activities: [a] });
   });
 
   let settledCount = 0;
+  const syncLoader = () => {
+    setLoaderUnitsDone(settledCount);
+    setLoaderStatus('Finding cheaper alternatives…', `Activity ${settledCount} of ${refinable.length}`);
+  };
   const results = await Promise.allSettled(
     byCity.map(({ city, activities: cityActivities }) => {
       const refiningIds = new Set(cityActivities.map((a) => a.id));
@@ -4308,13 +4320,11 @@ async function onConfirmLocks() {
         .then(({ activities: refined }) => {
           refined = refined || {};
           settledCount += Object.keys(refined).length;
-          setLoaderUnitsDone(settledCount);
-          setLoaderStatus('Finding cheaper alternatives…', `Activity ${settledCount} of ${unlocked.length}`);
+          syncLoader();
           return { cityActivities, refined };
         })
         .catch((err) => {
-          setLoaderUnitsDone(settledCount);
-          setLoaderStatus('Finding cheaper alternatives…', `Activity ${settledCount} of ${unlocked.length}`);
+          syncLoader();
           return Promise.reject(err);
         });
     })
@@ -4349,7 +4359,7 @@ async function onConfirmLocks() {
     return;
   }
 
-  setLoaderStatus('Polishing alternatives…', `Activity ${settledCount} of ${unlocked.length}`);
+  setLoaderStatus('Polishing alternatives…', `Activity ${settledCount} of ${refinable.length}`);
   await enrichActivities([...budgetOptState.refinements.values()]);
 
   // Drop refinements that aren't actually cheaper than the original (e.g. a $$
