@@ -4302,7 +4302,18 @@ async function onConfirmLocks() {
   const locked = approved.filter((a) => budgetOptState.lockedIds.has(a.id));
   const lockedCost = sumCardCosts(locked);
   const totalBudget = state.tripBudget || sumCardCosts(approved) * 0.8;
-  const perActivityTarget = Math.max(0, Math.round((totalBudget - lockedCost) / refinable.length));
+  // Two ceilings, tighter one wins. Budget headroom alone collapses to nothing as
+  // soon as the locked picks already cost more than the budget — the normal case
+  // when most of the trip is locked, since the default budget is only 80% of
+  // current spend. That asked the model for a venue at or below $0, and a $0 cost
+  // is read downstream as "unpriced", so every suggestion fell back to the flat
+  // type estimate, tied with the original, and was dropped as not-cheaper.
+  // Undercutting what the unlocked picks already cost is always a real target.
+  const headroomPerActivity = totalBudget > lockedCost
+    ? (totalBudget - lockedCost) / refinable.length
+    : Infinity;
+  const undercutCurrent = (sumCardCosts(refinable) / refinable.length) * 0.8;
+  const perActivityTarget = Math.max(1, Math.round(Math.min(headroomPerActivity, undercutCurrent)));
 
   const btn = document.getElementById('budgetOptConfirmLocksBtn');
   btn.disabled = true;
@@ -4402,18 +4413,25 @@ async function onConfirmLocks() {
 
   // Drop refinements that aren't actually cheaper than the original (e.g. a $$
   // restaurant swapped for another $$) — showing an unchanged price reads as broken.
+  let droppedUnpriced = 0;
   for (const [id, refined] of [...budgetOptState.refinements.entries()]) {
     const original = approved.find((a) => a.id === id);
     const refinedCost = activityBudgetUsd(refined);
     const originalCost = original ? activityCardCostUsd(original) : null;
-    if (refinedCost == null || originalCost == null || refinedCost >= originalCost) {
+    const unpriced = refinedCost == null || originalCost == null;
+    if (unpriced) droppedUnpriced += 1;
+    if (unpriced || refinedCost >= originalCost) {
       budgetOptState.refinements.delete(id);
       budgetOptState.choiceIsRefined.delete(id);
     }
   }
 
   if (!budgetOptState.refinements.size) {
-    abortToLock('No cheaper alternatives found at a lower price — your picks are already good value.');
+    // An unpriced drop is a pipeline failure, not a verdict on the traveler's
+    // picks — telling them their picks are good value would be a wrong answer.
+    abortToLock(droppedUnpriced
+      ? 'Couldn\'t price the alternatives we found — try again.'
+      : 'No cheaper alternatives found at a lower price — your picks are already good value.');
     return;
   }
 
