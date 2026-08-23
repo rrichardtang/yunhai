@@ -1,5 +1,19 @@
 # Open Items
 
+## [2026-08-23] The two decline-and-replace handlers are duplicated
+**Status:** Deferred
+**Description:** The grid-card handler (`public/app.js:4635`) and the expanded-card handler
+(`:4784`) are byte-identical for ~12 lines — the fetch, the 409 check, `normalizeActivityMetadata`,
+and `replaceActivityInState`. The `/replace` roster change had to edit both in lockstep, and the
+indentation difference between them defeated three successive scripted edits before landing.
+**Context:** Raised by `pre-push-reviewer` on 150c10e. Deferred rather than merged in a commit about
+duplicate suggestions, and because the merge is not purely behavior-preserving: the two `catch`
+blocks differ (the grid card resets its button silently on a generic failure, the expanded card
+shows a banner), so collapsing them means choosing one.
+**Next action:** Extract `async function requestReplacement(a, reason)` returning the normalized
+replacement, and decide whether the grid card should start bannering generic failures (it should —
+silently resetting the button tells the traveler nothing).
+
 ## [2026-08-21] Refine's per-city batch is not wired to the frontend
 **Status:** Pending
 **Description:** `POST /api/activity/refine` now speaks the per-city batch contract

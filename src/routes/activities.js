@@ -18,7 +18,7 @@ const { schedule } = require('../services/arrangeScheduler');
 const { buildCityTravelTiming } = require('../services/distanceMatrix');
 const arrangeTelemetry = require('../services/arrangeTelemetry');
 const { extractText, tryParseJsonObject } = require('../services/llmJson');
-const { enrichWithPlaceDetails, formatOpeningHoursFromPlaces, PRICE_LEVEL_MAP } = require('../services/placesEnrich');
+const { enrichWithPlaceDetails, hasCoords, formatOpeningHoursFromPlaces, PRICE_LEVEL_MAP } = require('../services/placesEnrich');
 const { debugLog } = require('../services/debugLog');
 
 const ACTIVITY_REFINE_MODEL = 'gpt-5.4-mini';
@@ -170,7 +170,12 @@ function activityCostUsd(activity) {
   return Number.isFinite(flat) ? flat : null;
 }
 
-const VENUE_ROSTER_HEADING = "Venues already in this traveler's trip — every suggestion must be a different venue from all of these:";
+// Wording follows planCity's locked-activity block: naming only venues is not
+// enough, because an unstructured activity has no venue to compare. "Explore Dali
+// Old Town's Ancient Streets" and "Slow Circuit through Dali Ancient City" share no
+// word and no venue_name, so nothing deterministic can tell them apart — only the
+// model can, and only if it is told the experience itself is taken.
+const VENUE_ROSTER_HEADING = "Already in this traveler's trip — do not repeat any of these, and do not suggest the same place or neighborhood under a different name, or the same experience relabelled:";
 
 // Same shape as the locked-activity block planCity sends (src/claude.js): the
 // model is told which venues are taken, and dedupeActivities enforces it after.
@@ -455,8 +460,8 @@ Return ONLY a JSON object: {"suggestions":[{"id":"<an id listed above>", ...chan
       return res.status(503).json({ error: 'Anthropic API key not configured' });
     }
 
-    const { activity, reason, notes, tripId = null } = req.body || {};
-    debugLog('activity-replace', `INBOUND name="${activity?.name || ''}" city="${activity?.city || ''}" type="${activity?.type || ''}" reason_chars=${(reason || '').length}`);
+    const { activity, reason, notes, exclude = [], tripId = null } = req.body || {};
+    debugLog('activity-replace', `INBOUND name="${activity?.name || ''}" city="${activity?.city || ''}" type="${activity?.type || ''}" exclude=${Array.isArray(exclude) ? exclude.length : 0} reason_chars=${(reason || '').length}`);
     if (!activity?.name || !activity?.city) {
       debugLog('activity-replace', `REJECT reason=missing_name_or_city`);
       return res.status(400).json({ error: 'activity.name and activity.city are required' });
@@ -482,6 +487,7 @@ Return ONLY a JSON object: {"suggestions":[{"id":"<an id listed above>", ...chan
       ? `\nWeb research (use to ground the replacement in a real venue — pick from these results when they match what the traveler asked for):\n${braveResults.map(r => `- ${r.title}: ${r.description}`).join('\n')}`
       : '';
 
+    await acquireLlmSlot();
     try {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -490,9 +496,12 @@ Return ONLY a JSON object: {"suggestions":[{"id":"<an id listed above>", ...chan
       const mealReminderClause = isMeal
         ? '\nThis is a meal activity — name a specific restaurant and include 1–2 must-order dishes in why_it_fits.'
         : '';
-      const userContent = `The traveler DECLINED "${activity.name}" in ${activity.city} and wants a different ${activityType || 'activity'}.${contextClause}${notesClause}${mealReminderClause}${braveBlock}
+      // The declined activity rides on the roster too, so one block states every
+      // thing the replacement may not be.
+      const rosterBlock = buildVenueRosterBlock([activity, ...(Array.isArray(exclude) ? exclude : [])]);
+      const userContent = `The traveler DECLINED "${activity.name}" in ${activity.city} and wants a different ${activityType || 'activity'}.${contextClause}${notesClause}${mealReminderClause}${rosterBlock}${braveBlock}
 
-Find a DIFFERENT real-world venue — NOT "${activity.name}". The replacement must directly address the reason for declining (e.g. if the reason mentions a neighborhood, the replacement must be in that neighborhood; if it mentions a cuisine or price level, match that). Use the web research to ground it in an actual venue, and fill in pricing, booking info, duration, and other details.
+Find a DIFFERENT real-world venue — NOT "${activity.name}", and nothing already in the trip above. The replacement must directly address the reason for declining (e.g. if the reason mentions a neighborhood, the replacement must be in that neighborhood; if it mentions a cuisine or price level, match that). Use the web research to ground it in an actual venue, and fill in pricing, booking info, duration, and other details.
 
 Also extract any learnable preferences or constraints from the traveler's note. Omit if one-off or situational (e.g. "already did this", "too expensive this trip"). Preferences are specific, reusable details (e.g. "gets seasick easily"). Constraints are hard limits (e.g. "no early mornings").
 
@@ -520,13 +529,37 @@ Return ONLY valid JSON (no markdown fences):
         return res.status(500).json({ error: 'LLM returned unexpected shape' });
       }
 
+      const roster = [activity, ...(Array.isArray(exclude) ? exclude : [])];
+      // Only catches a replacement that reuses a name or venue outright. Two
+      // unstructured activities describing the same place under different labels
+      // are invisible here — the roster block in the prompt is what covers those.
+      const duplicatesTrip = (a) => !dedupeActivities([...roster, a], activity.city).includes(a);
+
+      const declineSignals = [
+        ...(Array.isArray(parsed.preferences) ? parsed.preferences : []),
+        ...(Array.isArray(parsed.constraints) ? parsed.constraints : [])
+      ];
+      // Ingested before the retry can bail out with a 409: what the traveler said is
+      // worth learning whether or not a usable replacement comes back, and refusing a
+      // duplicate then telling them to give a better reason must not also discard the
+      // reason they already gave. Detached — reconciliation must not delay the response.
+      observe({ userId: resolvedUserId, tripId, source: 'decline', candidates: declineSignals });
+
       let normalized = normalizeActivity(parsed.activity, activity.city);
       await enrichWithPlaceDetails([normalized], activity.city);
 
-      const coordsOk = (a) => Number.isFinite(Number(a?.location?.lat)) && Number.isFinite(Number(a?.location?.lng));
       let unverified = false;
-      if (!coordsOk(normalized) && process.env.GOOGLE_MAPS_API_KEY) {
-        debugLog('activity-replace', `RETRY name="${normalized?.name || ''}" reason=venue_not_found_on_maps`);
+      // hasCoords, not Number.isFinite(Number(lat)): normalizeActivity always seeds
+      // location.lat as null, and Number(null) is 0, which is finite — so the naive
+      // form reported every ungeocoded replacement as verified and this retry never
+      // ran in the one case it exists for.
+      const needsVenue = !hasCoords(normalized) && process.env.GOOGLE_MAPS_API_KEY;
+      const isDuplicate = duplicatesTrip(normalized);
+      if (needsVenue || isDuplicate) {
+        const retryReason = isDuplicate
+          ? `"${normalized.name}" is already in the traveler's itinerary — suggesting it again would duplicate an activity they already have.`
+          : `Your suggestion "${normalized.name}" could not be found on Google Maps — it likely does not exist under that name.`;
+        debugLog('activity-replace', `RETRY name="${normalized?.name || ''}" reason=${isDuplicate ? 'duplicates_trip' : 'venue_not_found_on_maps'}`);
         const retryResponse = await anthropic.messages.create({
           model: 'claude-sonnet-4-6',
           max_tokens: 1024,
@@ -534,32 +567,45 @@ Return ONLY valid JSON (no markdown fences):
           messages: [
             { role: 'user', content: userContent },
             { role: 'assistant', content: raw },
-            { role: 'user', content: `Your suggestion "${normalized.name}" could not be found on Google Maps — it likely does not exist under that name. Suggest a different, verifiable venue in ${activity.city} that satisfies the same request. Prefer venues from the web research list above. Same JSON format.` }
+            { role: 'user', content: `${retryReason} Suggest a different, verifiable venue in ${activity.city} that satisfies the same request and is not already in the trip. Prefer venues from the web research list above. Same JSON format.` }
           ]
         });
         const retryParsed = tryParseJsonObject(extractText(retryResponse.content));
         if (retryParsed?.activity && typeof retryParsed.activity === 'object') {
           const retryNormalized = normalizeActivity(retryParsed.activity, activity.city);
           await enrichWithPlaceDetails([retryNormalized], activity.city);
-          if (coordsOk(retryNormalized)) normalized = retryNormalized;
-          else unverified = true;
+          if (duplicatesTrip(retryNormalized)) {
+            // Refuse only when the duplicate is what we retried for. When the original
+            // was merely ungeocodable it was never a duplicate, so keep it rather than
+            // throwing a good suggestion away over the retry's collision — and the
+            // "already in your trip" message would be untrue of it.
+            if (isDuplicate) {
+              debugLog('activity-replace', `REJECT name="${retryNormalized.name}" reason=duplicates_trip_after_retry elapsed_ms=${Date.now() - replaceStartTs}`);
+              return res.status(409).json({ error: 'duplicate_venue' });
+            }
+            unverified = true;
+          } else {
+            normalized = retryNormalized;
+            // Without a Maps key nothing was geocoded, so a missing coordinate says
+            // nothing about the venue — flagging it unverified here while the
+            // no-retry path calls the identical state verified is just inconsistent.
+            unverified = !!process.env.GOOGLE_MAPS_API_KEY && !hasCoords(retryNormalized);
+          }
+        } else if (isDuplicate) {
+          debugLog('activity-replace', `REJECT name="${normalized.name}" reason=duplicate_retry_unparsed elapsed_ms=${Date.now() - replaceStartTs}`);
+          return res.status(409).json({ error: 'duplicate_venue' });
         } else {
           unverified = true;
         }
       }
 
-      const declineSignals = [
-        ...(Array.isArray(parsed.preferences) ? parsed.preferences : []),
-        ...(Array.isArray(parsed.constraints) ? parsed.constraints : [])
-      ];
-      // Detached: reconciliation must not delay the replacement response.
-      observe({ userId: resolvedUserId, tripId, source: 'decline', candidates: declineSignals });
-
-      debugLog('activity-replace', `DONE name="${normalized?.name || ''}" has_coords=${coordsOk(normalized)} unverified=${unverified} elapsed_ms=${Date.now() - replaceStartTs}`);
+      debugLog('activity-replace', `DONE name="${normalized?.name || ''}" has_coords=${hasCoords(normalized)} unverified=${unverified} elapsed_ms=${Date.now() - replaceStartTs}`);
       return res.json(unverified ? { activity: normalized, unverified: true } : { activity: normalized });
     } catch (error) {
       debugLog('activity-replace', `ERROR msg="${error?.message || error}" elapsed_ms=${Date.now() - replaceStartTs}`);
       return res.status(500).json({ error: error.message || 'Failed to replace activity' });
+    } finally {
+      releaseLlmSlot();
     }
   });
 

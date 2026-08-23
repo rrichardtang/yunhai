@@ -309,6 +309,7 @@ async function enrichWithPlaceDetails(activities, cityName, cityCenter = null, o
 
 module.exports = {
   enrichWithPlaceDetails,
+  hasCoords,
   isFoodActivity,
   isVenueActivity,
   formatOpeningHoursFromPlaces,

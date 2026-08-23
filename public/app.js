@@ -3650,6 +3650,20 @@ function getActivityStyle(type = '') {
 }
 
 
+const DUPLICATE_REPLACEMENT_MESSAGE = 'Every alternative we found is already in your trip — try a more specific reason for declining.';
+
+// What a replacement may not duplicate: everything else the traveler still has in
+// that city. Declined activities are excluded — they are on their way out, so
+// re-suggesting one is not a duplicate. The declined activity itself is added
+// server-side, so it is not repeated here.
+function replacementExclusions(activity) {
+  return state.activities
+    .filter((a) => a.id !== activity.id
+      && cityMatches(a.city, activity.city)
+      && activityVerdict(state.reviewed, a.id) !== false)
+    .map((a) => ({ name: a.name, venue_name: a.venue_name || null, type: a.type || null }));
+}
+
 function updateReviewNav(visibleActivities = getFilteredReviewActivities()) {
   if (!els.continueArrangeBtn) return;
   const visibleIds = new Set(visibleActivities.map((a) => a.id));
@@ -4621,15 +4635,17 @@ function renderActivities() {
         const resp = await apiFetch('/api/activity/replace', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity: a, reason, notes, tripId: state.currentItineraryId || null })
+          body: JSON.stringify({ activity: a, reason, notes, exclude: replacementExclusions(a), tripId: state.currentItineraryId || null })
         });
+        if (resp.status === 409) throw new Error(DUPLICATE_REPLACEMENT_MESSAGE);
         if (!resp.ok) throw new Error('Replace failed');
         const { activity: rawReplacement } = await resp.json();
         if (!rawReplacement) throw new Error('No activity in response');
         const replacement = { id: `${rawReplacement.city || a.city}-replacement-${uid()}`, ...normalizeActivityMetadata(rawReplacement), city: canonicalizeActivityCity(rawReplacement.city, a.city) };
         finishLoaderProgress();
         replaceActivityInState(a.id, replacement);
-      } catch {
+      } catch (err) {
+        if (err?.message === DUPLICATE_REPLACEMENT_MESSAGE) showErrorBanner(DUPLICATE_REPLACEMENT_MESSAGE);
         confirmReplace.innerHTML = '<i class="ph-bold ph-arrows-clockwise"></i>';
         confirmReplace.disabled = false;
       } finally {
@@ -4768,16 +4784,19 @@ function renderActivities() {
           const resp = await apiFetch('/api/activity/replace', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ activity: a, reason, notes, tripId: state.currentItineraryId || null })
+            body: JSON.stringify({ activity: a, reason, notes, exclude: replacementExclusions(a), tripId: state.currentItineraryId || null })
           });
+          if (resp.status === 409) throw new Error(DUPLICATE_REPLACEMENT_MESSAGE);
           if (!resp.ok) throw new Error('Replace failed');
           const { activity: rawReplacement } = await resp.json();
           if (!rawReplacement) throw new Error('No activity in response');
           const replacement = { id: `${rawReplacement.city || a.city}-replacement-${uid()}`, ...normalizeActivityMetadata(rawReplacement), city: canonicalizeActivityCity(rawReplacement.city, a.city) };
           finishLoaderProgress();
           replaceActivityInState(a.id, replacement);
-        } catch {
-          showErrorBanner('Couldn\'t find a replacement — try again.');
+        } catch (err) {
+          showErrorBanner(err?.message === DUPLICATE_REPLACEMENT_MESSAGE
+            ? DUPLICATE_REPLACEMENT_MESSAGE
+            : 'Couldn\'t find a replacement — try again.');
         } finally {
           hideLoader();
         }
