@@ -4407,8 +4407,55 @@ function replaceActivityInState(oldId, newActivity) {
   if (idx !== -1) state.activities.splice(idx, 1, newActivity);
   delete state.reviewed[oldId];
   state.reviewed[newActivity.id] = { approved: null, notes: '' };
-  enrichActivity(newActivity).then(() => renderActivities());
+  // Focus the swap itself, then only hold position when enrichment lands — by then
+  // the reader may have scrolled on, and re-centering would yank them back.
+  renderActivitiesKeepingPlace(newActivity.id);
+  enrichActivity(newActivity).then(() => renderActivitiesKeepingPlace());
+}
+
+// A full render rebuilds the grid as uniform 520px placeholders, but a card that has
+// already materialized is taller than that floor — real content overflows the
+// min-height. So the document shrinks under the reader and the browser clamps the
+// scroll to the new maximum. The further down the list, the more is lost; on a
+// 48-activity trip it is thousands of pixels, which reads as being thrown to the top.
+//
+// Restoring a saved pixel offset would be clamped by exactly the same shrink, so
+// position is held against an element: whichever activity was at the top of the
+// viewport is put back at the same offset once the placeholders are laid out.
+function renderActivitiesKeepingPlace(focusActivityId = null) {
+  const anchor = focusActivityId == null ? topmostReviewAnchor() : null;
   renderActivities();
+
+  if (focusActivityId != null) {
+    // Filters can leave the activity off screen entirely, in which case there is
+    // nowhere useful to go and staying put is the least surprising outcome.
+    reviewSlotFor(focusActivityId)?.scrollIntoView({ block: 'center' });
+    return;
+  }
+  const slot = anchor && reviewSlotFor(anchor.id);
+  if (slot) window.scrollTo(0, window.scrollY + slot.getBoundingClientRect().top - anchor.offset);
+}
+
+// By identity, never by index: the grid is built from one snapshot of the filtered
+// list, and enrichment writes a price level afterwards without re-rendering, so a
+// later sort can reorder the list out from under the DOM it produced.
+function reviewSlotFor(activityId) {
+  return [...els.activitiesGrid.children].find((el) => el.dataset.activityId === activityId) || null;
+}
+
+function topmostReviewAnchor() {
+  let partiallyPast = null;
+  for (const el of els.activitiesGrid.children) {
+    const id = el.dataset.activityId;
+    if (!id) continue;
+    const { top, bottom } = el.getBoundingClientRect();
+    // A row starting at or below the viewport top is the better anchor: its offset
+    // is non-negative, so it cannot be swallowed when the row itself shrinks back to
+    // the placeholder floor. A row mostly scrolled past is the fallback.
+    if (top >= 0) return { id, offset: top };
+    if (!partiallyPast && bottom > 0) partiallyPast = { id, offset: top };
+  }
+  return partiallyPast;
 }
 
 function updateActivityInState(id, updates) {
@@ -4470,6 +4517,10 @@ function renderActivities() {
     const placeholder = document.createElement('div');
     placeholder.className = 'activity-card-placeholder';
     placeholder.dataset.cardIndex = i;
+    // Matches what buildActivityCard stamps, so a slot can be found by identity
+    // rather than by position — the list re-sorts under the DOM when enrichment
+    // fills in a price level, and an index would then name the wrong activity.
+    placeholder.dataset.activityId = a.id;
     els.activitiesGrid.appendChild(placeholder);
     observer.observe(placeholder);
   });
@@ -4715,8 +4766,12 @@ function renderActivities() {
       else if (e.key === 'ArrowRight' && index < filteredActivities.length - 1) show(index + 1);
     }
 
+    // Materialized cards only — they are the grid's only <article>s. Placeholders
+    // carry the same id so the scroll anchor can find a slot by identity, but a
+    // placeholder is empty: matching one here would leave the caller below copying
+    // no innerHTML into the overlay instead of falling back to building the card.
     function gridCardFor(id) {
-      return els.activitiesGrid.querySelector(`[data-activity-id="${CSS.escape(String(id))}"]`);
+      return els.activitiesGrid.querySelector(`article.activity-card[data-activity-id="${CSS.escape(String(id))}"]`);
     }
 
     function show(i) {
