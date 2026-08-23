@@ -1,5 +1,40 @@
 # Open Items
 
+## [2026-08-23] `/api/activity/replace` drops cost type, doubling per_group prices on the card
+**Status:** Pending
+**Description:** `normalizeActivity` hardcodes `cost.type = 'per_person'`. `/api/activity/refine`'s
+`buildRefinedActivity` now restores the original's type, but `/api/activity/replace`
+(`src/routes/activities.js:567`) does not. A `per_group` $200 tour replaced through the normal
+decline-and-replace flow comes back `per_person`, and the client party-multiplies it — the card
+reads $400 for two travelers, $800 for four. Visible price corruption, not just a filter miss.
+**Context:** Found by `pre-push-reviewer` on 31c251d, which fixed the same bug on the refine side.
+Not fixed there because it is not the same fix: refine's prompt now states each activity's pricing
+basis (`priced: per group` / `priced: per person`), so inheriting the original's type is sound.
+Replace's prompt never states a basis, so blindly inheriting would relabel a genuinely per-person
+number as whole-party.
+**Next action:** Decide between (a) stating the basis in the replace prompt the way refine now does,
+then inheriting the type, or (b) having the replace prompt emit `cost_type` explicitly and trusting
+it. (a) is consistent with refine and is the recommendation. Verify on a trip containing a
+`per_group` activity — the bug is invisible on a per_person-only trip.
+
+## [2026-08-23] Three cost bases flow through the same variables with nothing distinguishing them
+**Status:** Deferred
+**Description:** Activity cost exists in three bases — raw per-unit (`actCostUsd`, what the LLM
+prompts print and request), party total (`activityCardCostUsd`/`activityBudgetUsd`, what cards and
+the checklist show), and a flat type-based fallback (`representativeCostUsd`, per person) — and
+`per_group` activities are whole-party in the "raw" basis while `per_person` ones are not.
+Conversions happen implicitly at every boundary and nothing in the names or types marks which basis
+a value is in.
+**Context:** Four consecutive commits on 2026-08-23 (6d34f86, 340d4c4, 6cc27be, 31c251d) each fixed
+a bug in this family, and each fix exposed the next: a target clamped to $0, a party-total target
+compared against a per-unit cost, one scalar target for a batch mixing both types, and a swap that
+lost the type entirely. 31c251d's bug was latent until 6cc27be removed the compensating error that
+had been cancelling it — two wrongs making a right.
+**Next action:** Deliberately deferred while the endpoint is under live testing. When it settles,
+make the basis explicit rather than conventional — either a single `{ amount, basis }` shape or
+names that carry it (`unitCostUsd` vs `partyCostUsd`) — so a mismatched comparison is a visible
+error rather than a silent factor-of-N.
+
 ## [2026-08-23] `/api/activity/replace`'s retry-on-collision path is still unexercised live
 **Status:** Pending input (needs API keys)
 **Description:** Live-tested by the user against a real LLM (Dali, China): two sequential

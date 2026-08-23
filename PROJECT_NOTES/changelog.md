@@ -4,6 +4,32 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-23] Budget optimization's refine targets fixed; per-activity budget contract
+- Live testing surfaced a batch where the server returned 2 usable refinements and the client
+  discarded both, reporting "your picks are already good value". Root cause chain, fixed across four
+  commits, each defect found by `pre-push-reviewer` before push:
+  - `6d34f86`: the per-activity target collapsed to `$0`. The default trip budget is 80% of current
+    approved spend, so locking 21 of 24 activities (~87% of spend) drove `totalBudget - lockedCost`
+    negative and `Math.max(0, …)` clamped it. The prompt then required `estimated_cost_usd` at or
+    below 0; a $0 cost reads as not-credible downstream, so every suggestion fell back to the flat
+    type estimate, tied exactly with the original, and lost the not-cheaper filter. Target is now
+    the tighter of budget headroom and 20% under current cost, floored at 1.
+  - `340d4c4`: the target was a whole-party figure while the route prints and requests raw per-unit
+    `estimated_cost_usd` — a $50/person pick yielded a $160 ceiling for a party of four, i.e. no
+    downward pressure at all. Both ceilings moved to the per-unit basis (`activityUnitCostUsd`).
+  - `6cc27be`: one scalar could not bind a batch mixing price tiers and cost types. Contract is now
+    `budget_targets: { [activityId]: number }`; the route prints each activity's own ceiling beside
+    its own current cost. Headroom stops dividing by party size for `per_group` activities, whose
+    raw cost is already whole-party.
+  - `31c251d`: `normalizeActivity` hardcodes `cost.type = 'per_person'` and `buildRefinedActivity`
+    never restored the original's, so a compliant $160 replacement for a $200 `per_group` tour was
+    measured as $320 vs $200 and dropped. Latent until `6cc27be` removed the compensating headroom
+    error that had been cancelling it. Prompt lines now carry `priced: per group` / `per person`,
+    and the budget clause defines both and applies only where a target is shown.
+- `public/app.js`: the all-dropped message now blames pricing only when every drop was unpriced —
+  reporting a genuine "not cheaper" verdict as a failure invited a retry that lands identically.
+- Remaining gap recorded in open_items [2026-08-23]: `/api/activity/replace` still drops cost type.
+
 ## [2026-08-23] First live confirmation of `/api/activity/replace`'s duplicate fix
 - User-run manual test against a real LLM in production use (Dali, Yunnan trip): two sequential
   `/replace` calls on two different landmark activities, near-identical "peaceful beach walk" notes,
