@@ -4118,6 +4118,7 @@ function buildBudgetOptCard(a, mode, approved) {
           cardEl.classList.add('opt-card--locked');
           cardEl.querySelector('.opt-lock-btn').innerHTML = '<i class="ph-bold ph-lock-key" aria-hidden="true"></i>';
         }
+        updateBudgetOptProgressBar();
       });
     }
     cardEl.addEventListener('click', (e) => {
@@ -4234,15 +4235,52 @@ function openOptCardExpand(activities, startIndex) {
   show(startIndex);
 }
 
+// Visit order comes from state.cities, which budget optimization can rely on at
+// any step — state.days only exists once the trip has been arranged.
+function budgetOptCityRank(city) {
+  const idx = state.cities.findIndex((c) => cityMatches(c.name, city));
+  return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+}
+
+function groupBudgetOptByCity(activities) {
+  const groups = [];
+  activities.forEach((a) => {
+    const city = a.city || '';
+    const group = city
+      ? groups.find((g) => g.city && cityMatches(g.city, city))
+      : groups.find((g) => !g.city);
+    if (group) group.activities.push(a);
+    else groups.push({ city, activities: [a] });
+  });
+  return groups.sort((x, y) => budgetOptCityRank(x.city) - budgetOptCityRank(y.city));
+}
+
 function renderBudgetOptCards(activities, mode) {
   budgetOptState.lastRender = { activities, mode };
-  let list = activities;
-  if (budgetOptState.sortMode && budgetOptState.sortMode !== 'default') {
-    list = [...activities].sort(priceComparator(budgetOptState.sortMode === 'price-asc' ? 1 : -1, budgetOptCurrentCostUsd));
-  }
+  const sortWithin = (list) => (budgetOptState.sortMode && budgetOptState.sortMode !== 'default'
+    ? [...list].sort(priceComparator(budgetOptState.sortMode === 'price-asc' ? 1 : -1, budgetOptCurrentCostUsd))
+    : list);
+
+  // Price sorting stays inside each city — sorting across cities would undo the
+  // grouping the traveler reads the screen by.
+  const groups = groupBudgetOptByCity(activities).map((g) => ({ ...g, activities: sortWithin(g.activities) }));
+  // Expand-overlay next/prev walks this, so it has to be visual order.
+  const ordered = groups.flatMap((g) => g.activities);
+
   const grid = document.getElementById('budgetOptGrid');
   grid.innerHTML = '';
-  list.forEach((a) => grid.appendChild(buildBudgetOptCard(a, mode, list)));
+  groups.forEach(({ city, activities: cityActivities }) => {
+    if (groups.length > 1) {
+      const header = document.createElement('div');
+      header.className = 'opt-city-header';
+      const count = cityActivities.length;
+      header.innerHTML = `
+        <span class="opt-city-name">${esc(city || 'Other')}</span>
+        <span class="opt-city-count">${count} ${count === 1 ? 'activity' : 'activities'}</span>`;
+      grid.appendChild(header);
+    }
+    cityActivities.forEach((a) => grid.appendChild(buildBudgetOptCard(a, mode, ordered)));
+  });
 }
 
 async function onConfirmLocks() {
@@ -4400,15 +4438,19 @@ function updateBudgetOptProgressBar() {
   const approved = budgetOptApprovedActivities();
 
   if (budgetOptState.phase === 'lock') {
-    const used = computeBudgetLensBreakdown().budgetLensTotal;
+    // Locked activities are the ones being kept at their current price, so they
+    // are what the bar commits. Unlocking one hands it to the optimizer, and the
+    // committed figure has to drop to show that headroom.
+    const kept = approved.filter((a) => budgetOptState.lockedIds.has(a.id));
+    const used = kept.reduce((s, a) => s + (budgetOptCurrentCostUsd(a) ?? 0), 0);
     const budget = state.tripBudget || sumCardCosts(approved);
     const ratio = budget > 0 ? used / budget : 0;
     bar.style.width = `${Math.min(ratio, 1) * 100}%`;
     bar.className = 'budget-opt-progress-bar' + (ratio >= 0.9 ? ' bar-red' : ratio >= 0.6 ? ' bar-yellow' : '');
     const budgetLabel = state.tripBudget ? `$${Math.round(budget).toLocaleString()}` : `~$${Math.round(budget).toLocaleString()}`;
     document.getElementById('budgetOptProgressLabel').textContent =
-      `~$${Math.round(used).toLocaleString()} / ${budgetLabel}`;
-    renderBudgetOptCategorySummary(approved);
+      `~$${Math.round(used).toLocaleString()} locked / ${budgetLabel}`;
+    renderBudgetOptCategorySummary(kept);
     return;
   }
 

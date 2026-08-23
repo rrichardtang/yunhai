@@ -2562,6 +2562,19 @@ body.overlay-active #chatWidget {
 
 .budget-opt-grid { /* inherits .cards-grid */ }
 
+/* Full-width row inside the card grid, so cities read as sections without
+   nesting a second grid container. */
+.opt-city-header {
+  grid-column: 1 / -1;
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 4px 0 -4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(10,22,40,.10);
+}
+.opt-city-header:not(:first-child) { margin-top: 16px; }
+.opt-city-name { font-weight: 700; color: var(--text-900); font-size: .95rem; }
+.opt-city-count { font-size: .8rem; opacity: .6; }
+
 .opt-card { position: relative; overflow: visible; }
 .card.activity-card.opt-card {
   background: var(--paper-1);
