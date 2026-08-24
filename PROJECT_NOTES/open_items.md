@@ -1,5 +1,23 @@
 # Open Items
 
+## [2026-08-23] A hand-edited checklist budget and the activity's own price disagree in budget-opt
+**Status:** Deferred
+**Description:** Two cost questions in `onConfirmLocks` deliberately read different tiers. The refine
+target (`activityUnitCostUsd`) uses the activity's own price first, because the ceiling has to
+undercut the "current cost" the route prints — which is the activity's raw `estimated_cost_usd`. The
+cheaper-than-original check (`compareCost` against `checklistBudgetCost(original) || resolveCost`)
+prefers the traveler's edited budget, because that is the figure on the card they are comparing
+against. The two agree unless someone hand-edits a budget, and then a suggestion can be targeted
+against $200 but judged against $1000, or the reverse.
+**Context:** Pre-existing — `activityCardCostUsd` has always preferred the checklist figure while the
+prompt has always printed the activity's. 46849ef briefly made the target prefer the checklist too,
+which `pre-push-reviewer` caught: an upward budget edit then lifted the ceiling above the price it
+was meant to undercut, so it stopped binding entirely. Restored, and the precedence is now a stated
+decision on both sides rather than an accident.
+**Next action:** Decide which figure is authoritative for "what this activity costs" and use it for
+both. Probably the checklist edit (it is the traveler's own number and what the card shows), which
+would mean sending the route that figure as "current cost" instead of the stored raw one.
+
 ## [2026-08-23] Verify the cost-schema migration in a browser
 **Status:** Pending input (needs a live run)
 **Description:** `shared/cost.js` now backs both server and client (decisions [2026-08-23]).

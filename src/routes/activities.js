@@ -303,9 +303,10 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
         if (rawActivity && typeof rawActivity === 'object') {
           rawActivity.name = canonicalName;
           // The traveler picked the basis in the form; the model is never asked
-          // for one. Without this stamp their choice survives only when they also
-          // typed a price, because groundActivityToPlace re-applies it on cost.
-          activity = normalizeActivity({ ...rawActivity, cost_type: costType }, city);
+          // for one. Without this their choice survives only when they also typed
+          // a price, because groundActivityToPlace re-applies it on cost — and a
+          // nested cost the model volunteered would outrank the flat field.
+          activity = normalizeActivity(withBasis(rawActivity, { cost_type: costType }), city);
         }
       } catch (error) {
         debugLog('activity-add', `LLM_FAIL name="${canonicalName}" msg="${error?.message || error}"`);

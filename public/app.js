@@ -3995,18 +3995,23 @@ function activityBudgetUsd(act) {
 // has to be in that same basis. Converting to a party total and back is what
 // keeps the two ends in step — the three-way fallback this replaced converted in
 // opposite directions depending on which tier answered.
-function activityUnitCostUsd(act) {
+//
+// The activity's own price comes first and an entered budget is the last resort,
+// because the ceiling has to relate to the "current cost" the prompt prints —
+// which is the activity's raw figure. A budget edited upward would otherwise
+// raise the ceiling above the price it is meant to undercut, and stop binding.
+function activityUnitCostUsd(act, perGroup = readBasis(act) === PER_GROUP) {
   const party = travelingParty();
-  const total = partyTotalUsd(checklistBudgetCost(act) || resolveCost(act), party);
+  const total = partyTotalUsd(resolveCost(act) || checklistBudgetCost(act), party);
   if (total == null) return null;
-  return readBasis(act) === PER_GROUP ? total : total / partyWeight(party);
+  return perGroup ? total : total / partyWeight(party);
 }
 
 function activityCostChipHtml(act) {
   const cost = activityCardCostUsd(act);
   if (cost == null) return `<span class="activity-cost-chip activity-cost-chip--empty" data-cost-chip="${esc(act.id)}"></span>`;
-  const party = (state.numTravelers || 1) + (state.numChildren || 0) > 1;
-  const tip = party ? 'Estimated total for your party' : 'Estimated cost';
+  const { adults, children } = travelingParty();
+  const tip = adults + children > 1 ? 'Estimated total for your party' : 'Estimated cost';
   return `<span class="activity-cost-chip" data-cost-chip="${esc(act.id)}" title="${esc(tip)}">~$${Math.round(cost).toLocaleString()}</span>`;
 }
 
@@ -4345,7 +4350,7 @@ async function onConfirmLocks() {
     : Infinity;
   const budgetTargetFor = (a) => {
     const perGroup = readBasis(a) === PER_GROUP;
-    const unitCost = activityUnitCostUsd(a);
+    const unitCost = activityUnitCostUsd(a, perGroup);
     // Headroom is a whole-party figure, which is already the unit a per_group
     // activity is priced in; a per_person one has to be divided back down.
     const headroom = perGroup ? headroomPerActivity : headroomPerActivity / partyUnits;
