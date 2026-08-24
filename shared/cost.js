@@ -95,7 +95,11 @@
   // worse than useless: readBasis would take the basis from it while the
   // normalizer still reads the price from the flat field, leaving the two halves
   // of one price sourced from different places.
-  function withoutModelBasis(raw = {}) {
+  function withoutModelBasis(raw) {
+    // A default only covers undefined. planCity maps this over a parsed model
+    // array, where a null element used to be dropped downstream rather than
+    // taking the whole city's plan down with it.
+    if (!raw || typeof raw !== 'object') return raw;
     const { cost, cost_type, ...rest } = raw;
     return rest;
   }

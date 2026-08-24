@@ -35,8 +35,11 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
   model output, let the model declare a basis no prompt asks for; `withoutModelBasis` now strips it
   there. `/add` stamped the traveler's basis onto a price the model was never told how to compute, so
   it gained `/replace`'s pricing clause (now shared as `pricingClauseFor`). And `withBasis` stripped
-  `cost` but not `timing`, so an already-normalized reply lost its price entirely — it now strips
-  both, and `buildRefinedActivity` reuses it instead of repeating the strip.
+  `cost` but not `timing`, so a reply volunteering a `timing` skipped normalization altogether and
+  travelled on without the shape the rest of the pipeline reads — it now strips both, and
+  `buildRefinedActivity` reuses it instead of repeating the strip. (An earlier note here said such a
+  reply "lost its price entirely"; executing the case showed the price was lost either way, because
+  `normalizeActivity` only ever reads the flat `estimated_cost_usd`, never a nested one.)
 - `actCostType` deleted: a second definition of "read the basis" alongside `readBasis` is the
   duplication the schema exists to end. `groundActivityToPlace`'s inline basis normalization now
   calls `readBasis` too — no server path normalizes a basis outside the module.
@@ -44,6 +47,8 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
   5,760 input combinations: `activityCardCostUsd` and `activityBudgetUsd` identical,
   `activityUnitCostUsd` differing only for a checklist budget of exactly $0, and all such activities
   are ineligible for budget optimization so its only caller never reaches them.
+- A third route, `/refine`, was stamping a basis while stating it to the model only when a cost or
+  target happened to be shown; the `priced:` suffix is now unconditional, matching the stamp.
 - 320 tests pass.
 
 ## [2026-08-23] Budget optimization's refine targets fixed; per-activity budget contract

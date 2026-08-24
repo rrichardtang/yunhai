@@ -164,11 +164,6 @@ function groundActivityToPlace(activity, place, { cost = null, costType = 'per_p
   return activity;
 }
 
-// Model output priced in the basis the prompt asked for, labelled to match. The
-// model's own cost fields are dropped rather than merged, and `timing` with them:
-// normalizeActivity returns an object carrying `timing` untouched, so a reply
-// that volunteers one would keep the stripped-out cost stripped and arrive with
-// no price at all.
 // Any route that stamps a basis onto a model's price has to tell the model which
 // basis to price in first. Stamping alone relabels the number instead of
 // describing it — a per-traveler figure marked as a whole-party total.
@@ -178,6 +173,11 @@ function pricingClauseFor(pricedLike) {
     : '\nPrice estimated_cost_usd per traveler.';
 }
 
+// Model output priced in the basis the prompt asked for, labelled to match. The
+// model's own basis goes, and `timing` with it: normalizeActivity short-circuits
+// on an object that carries `timing`, so a reply volunteering one would skip
+// normalization entirely and travel on without the shape the rest of the
+// pipeline reads.
 function withBasis(suggestion, pricedLike) {
   const { timing, ...raw } = withoutModelBasis(suggestion);
   return { ...raw, cost_type: readBasis(pricedLike) };
@@ -271,6 +271,8 @@ function register(app) {
     const { name, city, why = '', cost = null, costType = 'per_person', tripId = null } = req.body || {};
     debugLog('activity-add', `INBOUND name="${name || ''}" city="${city || ''}" why_chars=${(why || '').length}`);
     if (!name || !city) return res.status(400).json({ error: 'name and city are required' });
+    // What the traveler chose in the form, in the shape readBasis reads.
+    const pricedLike = { cost_type: costType };
 
     const cacheKey = `${String(name).toLowerCase()}|${String(city).toLowerCase()}`;
     let place = placesCacheGet(cacheKey);
@@ -296,7 +298,7 @@ function register(app) {
         const addressClause = grounded && place.formattedAddress ? ` (${place.formattedAddress})` : '';
         const verifiedClause = grounded ? ' This is a verified real venue — do NOT rename or substitute it.' : '';
         const noteClause = why ? `\nTraveler's note: "${why}"` : '';
-        const userContent = `The traveler manually added "${canonicalName}"${addressClause} in ${city} to their itinerary.${verifiedClause} The "name" field must be exactly "${canonicalName}".${noteClause}${pricingClauseFor({ cost_type: costType })}
+        const userContent = `The traveler manually added "${canonicalName}"${addressClause} in ${city} to their itinerary.${verifiedClause} The "name" field must be exactly "${canonicalName}".${noteClause}${pricingClauseFor(pricedLike)}
 Fill in the descriptive fields for this venue: type, why_it_fits, pitfall, booking_advice, insider_tips, duration_hours, suggested_time, opening_hours, booking_type, estimated_cost_usd.
 
 Return ONLY valid JSON (no markdown fences): a single activity object matching the standard activity schema.`;
@@ -315,7 +317,7 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
           // for one. Without this their choice survives only when they also typed
           // a price, because groundActivityToPlace re-applies it on cost — and a
           // nested cost the model volunteered would outrank the flat field.
-          activity = normalizeActivity(withBasis(rawActivity, { cost_type: costType }), city);
+          activity = normalizeActivity(withBasis(rawActivity, pricedLike), city);
         }
       } catch (error) {
         debugLog('activity-add', `LLM_FAIL name="${canonicalName}" msg="${error?.message || error}"`);
@@ -407,10 +409,12 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
       const activityLines = targets.map((a) => {
         const cost = activityCostUsd(a);
         const target = targetById.get(a.id);
-        // The dollar figures are meaningless without their basis: the same $200
-        // is a per-traveler price or a whole-party one depending on this field.
+        // Unconditional, because the stamp is: buildRefinedActivity labels every
+        // suggestion with this activity's basis whether or not a figure is shown,
+        // so a line that omits it lets the model price per traveler and have that
+        // number relabelled as a whole-party total.
         const pricedAs = readBasis(a) === PER_GROUP ? 'per group' : 'per person';
-        const pricedSuffix = cost != null || target != null ? ` | priced: ${pricedAs}` : '';
+        const pricedSuffix = ` | priced: ${pricedAs}`;
         return `- id: ${a.id} | ${a.name}${a.venue_name ? ` | venue: ${a.venue_name}` : ''}${a.type ? ` | type: ${a.type}` : ''}${cost != null ? ` | current cost: $${cost}` : ''}${target != null ? ` | target: at or below $${target}` : ''}${pricedSuffix}`;
       }).join('\n');
 
