@@ -27,6 +27,12 @@ the drop filter in `onConfirmLocks` now uses `compareCost`. `app.js` has no test
 rests on review plus the shared module's 15 tests.
 **Context:** `partyTotalUsd` throws a TypeError on a bare number by design — that guard is the point
 of the schema, but it means a missed call site fails loudly in the browser rather than quietly.
+A differential harness compared the rewritten helpers against the deleted originals over 5,760
+combinations of type, price, basis, price level, party size and checklist budget:
+`activityCardCostUsd` and `activityBudgetUsd` match exactly. `activityUnitCostUsd` differs in 288,
+all of them a checklist budget of exactly $0 (old returned null, new returns 0) — and all 288 are
+ineligible for budget optimization, so its only caller never reaches them. That leaves the browser
+run to confirm rendering and event paths, not arithmetic.
 **Next action:** Exercise every surface that shows a price: Review cards, the checklist, Finalize,
 budget optimization (both phases), and a trip containing a `per_group` activity. Watch the console
 for `partyTotalUsd expects a cost object`. Two figures may shift by under a dollar — party weighting

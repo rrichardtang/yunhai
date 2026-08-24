@@ -113,6 +113,16 @@ test('an empty form field is not a free activity', () => {
   assert.equal(makeCost('40', 'per_person', ENTERED).usd, 40);
 });
 
+test('$0 means different things from a model and from a traveler', () => {
+  // A model answering $0 to hit a budget target has told us nothing, so a stated
+  // price of 0 is not a price. A traveler entering 0 is saying it is free, which
+  // is a real statement — and it is what makes such an activity ineligible for
+  // budget optimization rather than giving it a $0 target to shop against.
+  assert.equal(statedCost({ estimated_cost_usd: 0 }), null);
+  assert.equal(makeCost(0, PER_GROUP, ENTERED).usd, 0);
+  assert.equal(partyTotalUsd(enteredCost(0, PER_GROUP), family), 0);
+});
+
 test('resolve prefers a real price over a guess and never invents one', () => {
   const landmark = { type: 'landmark', estimated_cost_usd: 60 };
   assert.equal(resolveCost(landmark).usd, 60);
