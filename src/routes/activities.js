@@ -10,6 +10,7 @@ const {
   SYSTEM_PROMPT: ACTIVITY_SYSTEM_PROMPT
 } = require('../claude');
 const { recall, observe } = require('../memory');
+const { readBasis, PER_GROUP } = require('../../shared/cost');
 const { search, isConfigured: isBraveConfigured, shouldUseBrave } = require('../braveSearch');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('../arrangeConfig');
 const { buildBookingLinks } = require('../services/bookingLinks');
@@ -214,10 +215,9 @@ function buildRefinedActivity(activity, suggestion, city) {
   refined.place_id = null;
   refined.imageUrl = null;
   refined.price_level = null;
-  // normalizeActivity hardcodes per_person. Left alone, a per_group swap comes
-  // back priced per traveler, the client multiplies it by party size, and the
-  // result loses the cheaper-than-original comparison it actually won.
-  refined.cost.type = activity.cost?.type || activity.cost_type || 'per_person';
+  // The prompt states each activity's basis and asks for a target in that same
+  // basis, so the suggestion is priced the way the activity it replaces is.
+  refined.cost.type = readBasis(activity);
   return refined;
 }
 
@@ -387,7 +387,7 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
         const target = targetById.get(a.id);
         // The dollar figures are meaningless without their basis: the same $200
         // is a per-traveler price or a whole-party one depending on this field.
-        const pricedAs = (a.cost?.type || a.cost_type) === 'per_group' ? 'per group' : 'per person';
+        const pricedAs = readBasis(a) === PER_GROUP ? 'per group' : 'per person';
         const pricedSuffix = cost != null || target != null ? ` | priced: ${pricedAs}` : '';
         return `- id: ${a.id} | ${a.name}${a.venue_name ? ` | venue: ${a.venue_name}` : ''}${a.type ? ` | type: ${a.type}` : ''}${cost != null ? ` | current cost: $${cost}` : ''}${target != null ? ` | target: at or below $${target}` : ''}${pricedSuffix}`;
       }).join('\n');
@@ -518,10 +518,16 @@ Return ONLY a JSON object: {"suggestions":[{"id":"<an id listed above>", ...chan
       const mealReminderClause = isMeal
         ? '\nThis is a meal activity — name a specific restaurant and include 1–2 must-order dishes in why_it_fits.'
         : '';
+      // Without this the model has no way to know which basis it is pricing in,
+      // and the reply inherits the declined activity's basis blind — relabelling
+      // a per-traveler number as a whole-party one, or the reverse.
+      const pricingClause = readBasis(activity) === PER_GROUP
+        ? '\nPrice estimated_cost_usd as ONE total for the whole party, the way the declined activity is priced — not per traveler.'
+        : '\nPrice estimated_cost_usd per traveler.';
       // The declined activity rides on the roster too, so one block states every
       // thing the replacement may not be.
       const rosterBlock = buildVenueRosterBlock([activity, ...(Array.isArray(exclude) ? exclude : [])]);
-      const userContent = `The traveler DECLINED "${activity.name}" in ${activity.city} and wants a different ${activityType || 'activity'}.${contextClause}${notesClause}${mealReminderClause}${rosterBlock}${braveBlock}
+      const userContent = `The traveler DECLINED "${activity.name}" in ${activity.city} and wants a different ${activityType || 'activity'}.${contextClause}${notesClause}${mealReminderClause}${pricingClause}${rosterBlock}${braveBlock}
 
 Find a DIFFERENT real-world venue — NOT "${activity.name}", and nothing already in the trip above. The replacement must directly address the reason for declining (e.g. if the reason mentions a neighborhood, the replacement must be in that neighborhood; if it mentions a cuisine or price level, match that). Use the web research to ground it in an actual venue, and fill in pricing, booking info, duration, and other details.
 
@@ -567,7 +573,9 @@ Return ONLY valid JSON (no markdown fences):
       // reason they already gave. Detached — reconciliation must not delay the response.
       observe({ userId: resolvedUserId, tripId, source: 'decline', candidates: declineSignals });
 
-      let normalized = normalizeActivity(parsed.activity, activity.city);
+      // The model priced it in the basis pricingClause asked for, which is the
+      // declined activity's, so the label follows the number.
+      let normalized = normalizeActivity({ ...parsed.activity, cost_type: readBasis(activity) }, activity.city);
       await enrichWithPlaceDetails([normalized], activity.city);
 
       let unverified = false;
@@ -594,7 +602,7 @@ Return ONLY valid JSON (no markdown fences):
         });
         const retryParsed = tryParseJsonObject(extractText(retryResponse.content));
         if (retryParsed?.activity && typeof retryParsed.activity === 'object') {
-          const retryNormalized = normalizeActivity(retryParsed.activity, activity.city);
+          const retryNormalized = normalizeActivity({ ...retryParsed.activity, cost_type: readBasis(activity) }, activity.city);
           await enrichWithPlaceDetails([retryNormalized], activity.city);
           if (duplicatesTrip(retryNormalized)) {
             // Refuse only when the duplicate is what we retried for. When the original

@@ -10,6 +10,7 @@ const { formatProfileForEnrichment } = require('./services/profilePrompt');
 const { shortCity } = require('./services/imageQuery');
 const { debugLog } = require('./services/debugLog');
 const { isLegacyActivity, parseTimeString, parseDurationToMinutes } = require('../shared/activityMigration');
+const { readBasis } = require('../shared/cost');
 
 // Chosen over claude-sonnet-4-6 on a measured bake-off plus a blind read of both
 // arms' output — decisions [2026-08-08]. Pairs with SYSTEM_PROMPT_GPT_LEAN, which
@@ -326,9 +327,13 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
       reference: null
     },
 
+    // Read, not assumed. Hardcoding per_person here made this the one field in
+    // the whole normalizer that discarded its input, so every caller with a real
+    // basis had to repair it afterwards — /add re-applied it, /refine
+    // re-assigned it, and /replace silently dropped the traveler's choice.
     cost: {
       estimated_usd: costUsd,
-      type: 'per_person'
+      type: readBasis(raw)
     },
 
     dedicated_time_block: durationHours >= 2,

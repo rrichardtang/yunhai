@@ -4,6 +4,77 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-08-23] Cost is a tagged amount, not a number — `shared/cost.js`
+
+**Decision:** A cost travels as a frozen `{ usd, basis, source }` rather than a bare number.
+`basis` is `per_person` | `per_group`; `source` is `stated` (a real price) | `entered` (the traveler
+typed it) | `estimated` (a lookup-table guess). `shared/cost.js` owns the shape and is the only place
+party arithmetic exists. Four rules make the old failure mode unrepresentable:
+
+1. **`partyTotalUsd(cost, party)` takes a cost object and returns a number.** Its own output cannot be
+   fed back in — a second conversion is a `TypeError`, not a plausible-looking price. Every
+   factor-of-N bug in this area was a value converted twice or compared across bases.
+2. **`partyWeight(party)` is the single definition** of `adults + 0.6 × children`. Three spellings
+   were live simultaneously and disagreed on whether the children's share was rounded.
+3. **`compareCost` converts both sides before comparing**, so a unit price can never be measured
+   against a party total, and returns `null` — not `0` — when equal totals rest on an `estimated`
+   value. Two guesses agreeing is not a finding.
+4. **`readBasis` reads the basis; nothing invents one.** `normalizeActivity` now calls it instead of
+   hardcoding `per_person`.
+
+Storage is unchanged: `readBasis`/`statedCost` read both the normalized (`cost.estimated_usd`) and
+legacy (`estimated_cost_usd`) shapes already on disk. This is a seam, not a migration.
+
+**Reasoning:** Four consecutive bugs on 2026-08-23 (`6d34f86`, `340d4c4`, `6cc27be`, `31c251d`) were
+one defect wearing four faces: a cost's meaning lived somewhere other than the cost. `31c251d`'s bug
+was invisible until `6cc27be` removed a compensating error of the same magnitude in the opposite
+direction — two wrongs had been making a right, and fixing one exposed the other. That is the
+signature of a representation problem, not four coding mistakes.
+
+The evidence that it was structural rather than local: `normalizeActivity` hardcoded `cost.type`,
+the only field in a ~100-line function that discarded its input. Three call sites each invented a
+different workaround — `/add` passed `cost_type` in (ignored) then re-applied it via
+`groundActivityToPlace` but only when `cost != null`; `/refine` re-assigned it after the fact;
+`/replace` did nothing and silently dropped the traveler's choice. When three callers independently
+work around one function, the function is wrong.
+
+Making the output type of the conversion differ from its input type is the load-bearing idea. Naming
+conventions (`unitCostUsd` vs `partyCostUsd`) were the obvious cheaper fix, and they rely on the same
+discipline that had already failed four times in one day. A `TypeError` does not rely on discipline.
+
+The `source` tag exists because "cheaper than" was being asked of two values that could not answer
+it: a landmark with no real price and its replacement both fell back to the same flat $25 table
+entry, tied, and the whole batch was discarded as "not cheaper" — reported to the traveler as "your
+picks are already good value", a conclusion the code never reached. `null` for "cannot tell" lets
+that be said honestly.
+
+**Alternatives rejected:**
+- *Naming conventions only.* Cheapest, no new module, but enforcement is discipline — precisely what
+  failed. Rejected.
+- *TypeScript or JSDoc-checked types.* Real compile-time safety, but the project has no build step
+  and vanilla-JS-no-framework is a standing decision. Rejected as too large a change to carry one fix.
+- *Normalize everything to party totals at the boundary.* Removes `basis` entirely, but the LLM
+  prompts and the stored schema both speak per-unit, so the conversion would move to the edges
+  rather than disappear — and prompts would need party size threaded through them.
+- *Store the basis on the checklist item instead of the activity.* The checklist is derived state;
+  the basis belongs to the activity that has the price.
+
+**Tradeoffs:**
+- `partyWeight` unifies three formulas that disagreed by sub-dollar amounts (the old `optActivityCost`
+  rounded the children's share, the checklist auto-budget did not). Displayed figures are rounded, so
+  no card changes by a visible amount, but the numbers are not bit-identical to before.
+- `partyTotalUsd` throws on a bare number. That is deliberate — it is the guard — but it means a
+  mis-migrated client call site fails loudly in the browser rather than rendering a wrong price. The
+  client migration is therefore staged rather than done in one pass (open_items [2026-08-23]).
+- `estimatedCost` is always `per_person`, even for an activity declared `per_group`: the table holds
+  what one traveler typically pays. This removed a `representative × partyUnits` special case rather
+  than adding one, but it means a group-priced activity with no real price is estimated as if priced
+  per head.
+- The server is migrated; the client's ~8 cost helpers still pass bare numbers and are unchanged.
+  Both behaviors are correct today because the client's conversions were fixed individually in the
+  four commits above — the module removes the possibility of the next one, it does not fix a live bug
+  on that side.
+
 ## [2026-08-21] `/api/activity/refine` batches by city, and duplicate venues are made impossible rather than discouraged
 
 **Decision:** `POST /api/activity/refine` takes one city's activities per call —

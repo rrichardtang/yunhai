@@ -1,7 +1,29 @@
 # Open Items
 
+## [2026-08-23] Migrate the client's cost helpers onto `shared/cost.js`
+**Status:** Deferred
+**Description:** `shared/cost.js` is the single definition of cost basis and party arithmetic
+(decisions [2026-08-23]) and the server now uses it. The client's eight helpers still pass bare
+numbers: `optActivityCost`, `activityBudgetUsd`, `activityUnitCostUsd`, `activityCardCostUsd`,
+`sumCardCosts`, `budgetOptCurrentCostUsd`, `representativeCostUsd`, plus the checklist auto-budget at
+`public/app.js:1294`. Two known inconsistencies live in that set: the checklist auto-budget scales a
+per-person table figure by party size unconditionally, ignoring `per_group`, while `optActivityCost`
+respects it; and `optActivityCost` rounds the children's share where the checklist path does not.
+**Context:** Not a live bug — each conversion was fixed individually in 6d34f86, 340d4c4, 6cc27be and
+31c251d. The migration removes the possibility of the next one rather than fixing a current fault.
+**Next action:** Add `shared/cost.js` to `planner.html`'s script tags, then replace the helpers one at
+a time, each with the equivalent `resolveCost` + `partyTotalUsd` pair, keeping the existing helper
+names as thin wrappers so the ~23 call sites don't move. Do it after the current branch is verified
+live — `partyTotalUsd` throws on a bare number by design, so a half-migrated call site fails loudly
+in the browser.
+
 ## [2026-08-23] `/api/activity/replace` drops cost type, doubling per_group prices on the card
-**Status:** Pending
+**Status:** Resolved 2026-08-23 — kept here only until verified live
+**Description:** RESOLVED. `normalizeActivity` no longer hardcodes `cost.type`, `/replace` states the
+declined activity's pricing basis in its prompt and stamps that basis on the reply (both the first
+response and the retry), and `/refine`'s post-hoc repair is now an explicit inherit through
+`readBasis`. Verify on a trip containing a `per_group` activity — the bug is invisible on a
+per_person-only trip.
 **Description:** `normalizeActivity` hardcodes `cost.type = 'per_person'`. `/api/activity/refine`'s
 `buildRefinedActivity` now restores the original's type, but `/api/activity/replace`
 (`src/routes/activities.js:567`) does not. A `per_group` $200 tour replaced through the normal

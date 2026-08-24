@@ -4,6 +4,25 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-08-23] Cost schema: `shared/cost.js`, and the cost-type loss on /replace closed
+- New `shared/cost.js` — cost as a frozen `{ usd, basis, source }` with party arithmetic in one
+  function. `partyTotalUsd` takes a cost object and returns a number, so double-conversion is a
+  TypeError rather than a silent factor-of-N; `compareCost` converts both sides first and returns
+  `null` when equal totals rest on a table guess. Rationale and rejected alternatives in decisions
+  [2026-08-23].
+- `src/cost.test.js` — 14 tests, each of the day's four bugs written as an invariant. Two failed on
+  first run against my own module, both the `Number(null) === 0` trap: `makeCost(null, …)` minted a
+  valid $0 cost, so an absent entered price outranked the real price behind it.
+- `src/claude.js`: `normalizeActivity` reads the basis via `readBasis(raw)` instead of hardcoding
+  `per_person`. It was the only field in that function discarding its input, which is why three
+  callers each carried a different workaround.
+- `src/routes/activities.js`: `/replace` now states the declined activity's pricing basis in the
+  prompt and stamps that basis on the reply — on the retry path too, which re-normalized and would
+  have undone it. `/refine`'s repair became an explicit inherit through `readBasis`; `/add`'s
+  redundant re-application now also covers the case where cost is null.
+- Server migrated; the client's eight cost helpers are unchanged and tracked in open_items
+  [2026-08-23]. 317 tests pass.
+
 ## [2026-08-23] Budget optimization's refine targets fixed; per-activity budget contract
 - Live testing surfaced a batch where the server returned 2 usable refinements and the client
   discarded both, reporting "your picks are already good value". Root cause chain, fixed across four
