@@ -10,7 +10,7 @@ const { formatProfileForEnrichment } = require('./services/profilePrompt');
 const { shortCity } = require('./services/imageQuery');
 const { debugLog } = require('./services/debugLog');
 const { isLegacyActivity, parseTimeString, parseDurationToMinutes } = require('../shared/activityMigration');
-const { readBasis, withoutModelBasis } = require('../shared/cost');
+const { readBasis, withoutModelBasis, makeCost, STATED } = require('../shared/cost');
 
 // Chosen over claude-sonnet-4-6 on a measured bake-off plus a blind read of both
 // arms' output — decisions [2026-08-08]. Pairs with SYSTEM_PROMPT_GPT_LEAN, which
@@ -281,13 +281,13 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
   const preferred_time = (rawSuggested && rawSuggested !== '10:00am')
     ? parseTimeString(rawSuggested) : null;
 
-  // Nullish before coercion. Number(null) and Number('') are both 0, so a model
-  // that answered the price field with an explicit null stored a priced venue as
-  // free — which /refine then printed as "current cost: $0" beside a real target,
-  // asking for something cheaper than nothing.
-  const rawCost = raw.estimated_cost_usd;
-  const parsedCost = rawCost == null || rawCost === '' ? NaN : Number(rawCost);
-  const costUsd = Number.isFinite(parsedCost) && parsedCost >= 0 ? parsedCost : null;
+  // makeCost owns this coercion: nullish, blank string and boolean are all
+  // rejected before Number() can turn them into a price. Hand-rolling it here was
+  // the fourth copy of that rule in this codebase and the third to miss a case —
+  // an explicit null stored a priced venue as free, which /refine then printed as
+  // "current cost: $0" beside a real target. A real 0 is still a real price.
+  const basis = readBasis(raw);
+  const costUsd = makeCost(raw.estimated_cost_usd, basis, STATED)?.usd ?? null;
   const bookingType = bookingTypeFor(type, costUsd);
 
   const address = String(raw.start_location || raw.location?.address || venue_name || '').trim();
@@ -338,7 +338,7 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
     // re-assigned it, and /replace silently dropped the traveler's choice.
     cost: {
       estimated_usd: costUsd,
-      type: readBasis(raw)
+      type: basis
     },
 
     dedicated_time_block: durationHours >= 2,

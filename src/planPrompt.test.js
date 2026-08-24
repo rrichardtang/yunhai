@@ -135,13 +135,19 @@ test('an explicit null price is no price, not a free one', () => {
     { name: 'x', type: 'museum', duration_hours: 1, estimated_cost_usd: v }, 'Lijiang'
   ).cost.estimated_usd;
 
-  assert.equal(cost(null), null);
-  assert.equal(cost(''), null);
-  assert.equal(cost(undefined), null);
-  assert.equal(cost('not a number'), null);
-  assert.equal(cost(0), 0, 'a real zero is still a real price for a free venue');
-  assert.equal(cost(8), 8);
-  assert.equal(cost('8'), 8);
+  // strictEqual, because assert.equal(undefined, null) passes and would hide a
+  // regression that returned undefined instead.
+  assert.strictEqual(cost(null), null);
+  assert.strictEqual(cost(''), null);
+  assert.strictEqual(cost('   '), null);
+  assert.strictEqual(cost(false), null, 'Number(false) is 0');
+  assert.strictEqual(cost(true), null, 'Number(true) is 1');
+  assert.strictEqual(cost(undefined), null);
+  assert.strictEqual(cost('not a number'), null);
+  assert.strictEqual(cost(-3), null);
+  assert.strictEqual(cost(0), 0, 'a real zero is still a real price for a free venue');
+  assert.strictEqual(cost(8), 8);
+  assert.strictEqual(cost('8'), 8);
 });
 
 test('booking type follows cost, not category', () => {
