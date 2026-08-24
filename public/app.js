@@ -952,19 +952,29 @@ function showNoticeBanner(message) {
   showBanner(message, 'notice');
 }
 
+let bannerDismissTimer = null;
+
 function showBanner(message, tone) {
   if (!message) return;
-  let banner = document.getElementById('errorBanner');
-  if (!banner) {
-    banner = document.createElement('div');
-    banner.id = 'errorBanner';
-    banner.innerHTML = '<span class="error-banner-message"></span><button class="error-banner-dismiss" type="button" aria-label="Dismiss">&times;</button>';
-    banner.querySelector('.error-banner-dismiss').addEventListener('click', () => banner.remove());
-    document.body.appendChild(banner);
-  }
-  banner.className = tone === 'notice' ? 'error-banner error-banner--notice' : 'error-banner';
-  banner.setAttribute('role', tone === 'notice' ? 'status' : 'alert');
+  const notice = tone === 'notice';
+  // Re-inserted rather than relabelled when the tone changes: screen readers
+  // register a live region as it enters the DOM, so flipping role on an element
+  // already on screen can announce an error with the politeness of a notice.
+  document.getElementById('errorBanner')?.remove();
+  const banner = document.createElement('div');
+  banner.id = 'errorBanner';
+  banner.className = notice ? 'error-banner error-banner--notice' : 'error-banner';
+  banner.setAttribute('role', notice ? 'status' : 'alert');
+  banner.setAttribute('aria-live', notice ? 'polite' : 'assertive');
+  banner.innerHTML = '<span class="error-banner-message"></span><button class="error-banner-dismiss" type="button" aria-label="Dismiss">&times;</button>';
   banner.querySelector('.error-banner-message').textContent = String(message);
+  banner.querySelector('.error-banner-dismiss').addEventListener('click', () => banner.remove());
+  document.body.appendChild(banner);
+
+  // A bar pinned to the top of the viewport is itself a "something is wrong"
+  // signal, so a benign outcome clears itself; a failure stays until dismissed.
+  clearTimeout(bannerDismissTimer);
+  if (notice) bannerDismissTimer = setTimeout(() => banner.remove(), 8000);
 }
 
 function setLoaderStatus(status = '', progressLabel = '') {
@@ -4317,7 +4327,11 @@ async function onConfirmLocks() {
   const approved = budgetOptApprovedActivities();
   const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id) && !isConfirmedBooking(a.id));
   if (!unlocked.length) {
-    showNoticeBanner('All activities are locked — unlock the ones you would swap for something cheaper.');
+    // Confirmed bookings are held back by the same filter, and telling someone to
+    // unlock when the lock UI shows none is a dead end.
+    showNoticeBanner(approved.some((a) => budgetOptState.lockedIds.has(a.id))
+      ? 'All activities are locked — unlock the ones you would swap for something cheaper.'
+      : 'These are all confirmed bookings — there is nothing left to swap.');
     return;
   }
   // Refine keys its call on city, so an activity missing one can't be batched —
