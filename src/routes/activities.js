@@ -401,7 +401,7 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
       // the model either invent an implausibly cheap venue or return nothing for
       // that activity — both of which the traveler sees as the step failing.
       const budgetClause = anyBudgetTarget
-        ? `\n\nWhere an activity below shows a "target", aim to bring that suggestion's estimated_cost_usd to or below it, priced the same way that activity is ("priced: per person" means per traveler, "priced: per group" means one total for the whole party). The target is what the traveler is aiming for, not a limit you must satisfy: if no venue worth recommending exists at that price, suggest the best one you can that still costs less than the activity's current cost, and price it honestly. Never invent an unrealistically low cost to meet a target. Choose a cheaper venue of the same activity type in ${city} — a different venue, never the same one at a lower price.`
+        ? `\n\nWhere an activity below shows a "target", aim to bring that suggestion's estimated_cost_usd to or below it, in that activity's stated pricing basis. The target is what the traveler is aiming for, not a limit you must satisfy: if no venue worth recommending exists at that price, suggest the best one you can that still costs less than the activity's current cost, and price it honestly. Never invent an unrealistically low cost to meet a target. Choose a cheaper venue of the same activity type in ${city} — a different venue, never the same one at a lower price.`
         : '';
       const memText = recall({ userId: parseUserId(getAuthedUserId(req)), tripId, query: `${city} ${note}` }).text;
       const memBlock = memText ? `\n\nTraveler profile & learned preferences (honor these in every suggestion):\n${memText}` : '';
@@ -410,12 +410,11 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
         const cost = activityCostUsd(a);
         const target = targetById.get(a.id);
         // Unconditional, because the stamp is: buildRefinedActivity labels every
-        // suggestion with this activity's basis whether or not a figure is shown,
-        // so a line that omits it lets the model price per traveler and have that
-        // number relabelled as a whole-party total.
+        // suggestion with this activity's basis whether or not a figure is shown.
+        // The Rules turn this label into an instruction — on its own it reads as a
+        // description of the activity being replaced, not as how to price the reply.
         const pricedAs = readBasis(a) === PER_GROUP ? 'per group' : 'per person';
-        const pricedSuffix = ` | priced: ${pricedAs}`;
-        return `- id: ${a.id} | ${a.name}${a.venue_name ? ` | venue: ${a.venue_name}` : ''}${a.type ? ` | type: ${a.type}` : ''}${cost != null ? ` | current cost: $${cost}` : ''}${target != null ? ` | target: at or below $${target}` : ''}${pricedSuffix}`;
+        return `- id: ${a.id} | ${a.name}${a.venue_name ? ` | venue: ${a.venue_name}` : ''}${a.type ? ` | type: ${a.type}` : ''}${cost != null ? ` | current cost: $${cost}` : ''}${target != null ? ` | target: at or below $${target}` : ''} | priced: ${pricedAs}`;
       }).join('\n');
 
       const userContent = `You are swapping ${targets.length} activit${targets.length === 1 ? 'y' : 'ies'} in a traveler's ${city} itinerary for different venues.
@@ -426,6 +425,7 @@ ${activityLines}
 Traveler's request: "${note}"${budgetClause}${buildVenueRosterBlock(roster)}${braveBlock}${memBlock}
 
 Rules:
+- Price each suggestion's estimated_cost_usd in the basis shown on its line: "priced: per person" means per traveler, "priced: per group" means ONE total for the whole party.
 - Every suggestion must be a DIFFERENT real venue in ${city} from the activity it replaces.
 - No two suggestions may name the same venue, and none may match a venue listed above.
 - "venue_name" is required on every suggestion: the place exactly as it appears on Google Maps.
