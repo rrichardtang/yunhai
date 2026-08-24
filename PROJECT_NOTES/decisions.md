@@ -70,10 +70,13 @@ that be said honestly.
   what one traveler typically pays. This removed a `representative × partyUnits` special case rather
   than adding one, but it means a group-priced activity with no real price is estimated as if priced
   per head.
-- The server is migrated; the client's ~8 cost helpers still pass bare numbers and are unchanged.
-  Both behaviors are correct today because the client's conversions were fixed individually in the
-  four commits above — the module removes the possibility of the next one, it does not fix a live bug
-  on that side.
+- Both sides are migrated. `optActivityCost` and `representativeCostUsd` were deleted rather than
+  wrapped, and `activityUnitCostUsd`'s three-tier fallback — which converted in opposite directions
+  depending on which tier answered — became "convert to a party total, express it in the activity's
+  declared basis". The schema removed that special case rather than accommodating it.
+- `public/app.js` has no test file, so the client half rests on review and the shared module's tests.
+  `partyTotalUsd` throwing is the guard working as intended, but a missed call site surfaces as a
+  console TypeError rather than a wrong number — a deliberate trade of silence for noise.
 
 ## [2026-08-21] `/api/activity/refine` batches by city, and duplicate venues are made impossible rather than discouraged
 

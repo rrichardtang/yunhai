@@ -20,8 +20,17 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
   prompt and stamps that basis on the reply — on the retry path too, which re-normalized and would
   have undone it. `/refine`'s repair became an explicit inherit through `readBasis`; `/add`'s
   redundant re-application now also covers the case where cost is null.
-- Server migrated; the client's eight cost helpers are unchanged and tracked in open_items
-  [2026-08-23]. 317 tests pass.
+- Client migrated onto the same module: `optActivityCost` and `representativeCostUsd` deleted,
+  `activityCardCostUsd`/`activityBudgetUsd`/`activityUnitCostUsd` rewritten as `resolveCost` +
+  `partyTotalUsd`, the checklist auto-budget's unconditional party scaling (which ignored
+  `per_group`) replaced, and `onConfirmLocks`'s drop filter moved to `compareCost` so a tie between
+  two table guesses no longer counts as "not cheaper".
+- Review of the first cut found `/api/activity/add`'s LLM branch still dropped the traveler's chosen
+  basis — the commit had fixed only the fallback branch, leaving the two halves of one route
+  disagreeing. Also that `makeCost('')` minted a free cost (`Number('')` is 0, the same trap one
+  input class over) and that a model-emitted nested `cost` would outrank the basis `/replace` had
+  just asked it to price in. All three fixed; `withBasis` now strips the model's `cost` object.
+- 318 tests pass.
 
 ## [2026-08-23] Budget optimization's refine targets fixed; per-activity budget contract
 - Live testing surfaced a batch where the server returned 2 usable refinements and the client

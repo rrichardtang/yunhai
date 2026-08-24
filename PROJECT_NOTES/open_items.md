@@ -1,21 +1,18 @@
 # Open Items
 
-## [2026-08-23] Migrate the client's cost helpers onto `shared/cost.js`
-**Status:** Deferred
-**Description:** `shared/cost.js` is the single definition of cost basis and party arithmetic
-(decisions [2026-08-23]) and the server now uses it. The client's eight helpers still pass bare
-numbers: `optActivityCost`, `activityBudgetUsd`, `activityUnitCostUsd`, `activityCardCostUsd`,
-`sumCardCosts`, `budgetOptCurrentCostUsd`, `representativeCostUsd`, plus the checklist auto-budget at
-`public/app.js:1294`. Two known inconsistencies live in that set: the checklist auto-budget scales a
-per-person table figure by party size unconditionally, ignoring `per_group`, while `optActivityCost`
-respects it; and `optActivityCost` rounds the children's share where the checklist path does not.
-**Context:** Not a live bug — each conversion was fixed individually in 6d34f86, 340d4c4, 6cc27be and
-31c251d. The migration removes the possibility of the next one rather than fixing a current fault.
-**Next action:** Add `shared/cost.js` to `planner.html`'s script tags, then replace the helpers one at
-a time, each with the equivalent `resolveCost` + `partyTotalUsd` pair, keeping the existing helper
-names as thin wrappers so the ~23 call sites don't move. Do it after the current branch is verified
-live — `partyTotalUsd` throws on a bare number by design, so a half-migrated call site fails loudly
-in the browser.
+## [2026-08-23] Verify the cost-schema migration in a browser
+**Status:** Pending input (needs a live run)
+**Description:** `shared/cost.js` now backs both server and client (decisions [2026-08-23]).
+`optActivityCost` and `representativeCostUsd` were deleted, `activityCardCostUsd` /
+`activityBudgetUsd` / `activityUnitCostUsd` rewritten as `resolveCost` + `partyTotalUsd` pairs, and
+the drop filter in `onConfirmLocks` now uses `compareCost`. `app.js` has no test file, so all of it
+rests on review plus the shared module's 15 tests.
+**Context:** `partyTotalUsd` throws a TypeError on a bare number by design — that guard is the point
+of the schema, but it means a missed call site fails loudly in the browser rather than quietly.
+**Next action:** Exercise every surface that shows a price: Review cards, the checklist, Finalize,
+budget optimization (both phases), and a trip containing a `per_group` activity. Watch the console
+for `partyTotalUsd expects a cost object`. Two figures may shift by under a dollar — party weighting
+is now one formula where three disagreed on rounding the children's share.
 
 ## [2026-08-23] `/api/activity/replace` drops cost type, doubling per_group prices on the card
 **Status:** Resolved 2026-08-23 — kept here only until verified live

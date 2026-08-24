@@ -25,9 +25,11 @@
   const ESTIMATED = 'estimated';
 
   function makeCost(usd, basis, source) {
-    // Number(null) is 0, which is finite and non-negative — without this, an
-    // absent price mints a free one and outranks the real price behind it.
-    if (usd == null) return null;
+    // Number('') and Number(null) are both 0, and Number(true) is 1. Coercing
+    // first mints a free — or one-dollar — cost from an empty form field, which
+    // then outranks the real price behind it.
+    const blank = usd == null || typeof usd === 'boolean' || (typeof usd === 'string' && usd.trim() === '');
+    if (blank) return null;
     const amount = Number(usd);
     if (!Number.isFinite(amount) || amount < 0) return null;
     return Object.freeze({
@@ -66,18 +68,26 @@
   function estimatedCost(activity) {
     const type = String(activity?.type || '').toLowerCase();
     if (type === 'meal') {
+      // The typeof guard stays: a price_level of '2' would index the table.
       const level = activity?.price_level;
-      const usd = typeof level === 'number' ? PRICE_LEVEL_USD[level] : null;
-      return usd == null ? null : makeCost(usd, PER_PERSON, ESTIMATED);
+      return makeCost(typeof level === 'number' ? PRICE_LEVEL_USD[level] : null, PER_PERSON, ESTIMATED);
     }
     if (type === 'tour') return makeCost(75, PER_PERSON, ESTIMATED);
     if (type === 'museum' || type === 'landmark' || type === 'sports') return makeCost(25, PER_PERSON, ESTIMATED);
     return null;
   }
 
-  function resolveCost(activity, { enteredUsd = null } = {}) {
-    const entered = makeCost(enteredUsd, readBasis(activity), ENTERED);
-    return entered || statedCost(activity) || estimatedCost(activity);
+  // A traveler-entered figure carries a basis its producer knows and the activity
+  // does not: a checklist budget is one number for the whole party, so it is
+  // per_group whatever the activity is priced in. Defaulting that from the
+  // activity would silently multiply it by the party again, so the caller states
+  // it and there is no default to get wrong.
+  function enteredCost(usd, basis) {
+    return makeCost(usd, basis, ENTERED);
+  }
+
+  function resolveCost(activity) {
+    return statedCost(activity) || estimatedCost(activity);
   }
 
   // One definition. Three different spellings of this arithmetic were live at
@@ -109,16 +119,15 @@
   }
 
   const api = {
-    PER_PERSON,
     PER_GROUP,
     STATED,
     ENTERED,
     ESTIMATED,
     makeCost,
-    isCost,
     readBasis,
     statedCost,
     estimatedCost,
+    enteredCost,
     resolveCost,
     partyWeight,
     partyTotalUsd,

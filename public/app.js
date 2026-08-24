@@ -243,7 +243,7 @@ function geocodeQueryQueued(query) {
   return geocodeQueue.catch(() => null);
 }
 
-// stripMealPrefix, priceLevelBadge, representativeCostUsd, getGetYourGuideLink,
+// stripMealPrefix, priceLevelBadge, getGetYourGuideLink,
 // googleMapsLinkHtml, headerPriceBadgeHtml, renderActivityCostCell provided by /js/activityCard.js
 
 function loadPlacesCache() {
@@ -1291,13 +1291,7 @@ function buildChecklistFromState() {
     const day = placement ? state.days.find((d) => d.id === placement.dayId) : null;
     const time = day ? parseTimeTo24(placement.time || actPreferredTime(a) || typeToTime(a.type)) : '';
     const notes = String(state.reviewed[a.id]?.notes || '').trim();
-    const representativeCost = (() => {
-      const perPerson = representativeCostUsd(a);
-      if (perPerson == null) return null;
-      const adults = state.numTravelers || 1;
-      const children = state.numChildren || 0;
-      return perPerson * adults + perPerson * 0.6 * children;
-    })();
+    const representativeCost = partyTotalUsd(estimatedCost(a), travelingParty());
     const activityEstimatedCost = activityBudgetUsd(a);
     const item = normalizeChecklistItem({
       type: 'activity',
@@ -3971,55 +3965,41 @@ function enterBudgetOptMode() {
   document.body.classList.add('budget-opt-active');
 }
 
-function optActivityCost(act) {
-  const cost = actCostUsd(act);
-  if (cost == null) return null;
-  const adults = state.numTravelers || 1;
-  const children = state.numChildren || 0;
-  return actCostType(act) === 'per_group' ? cost : cost * adults + Math.round(cost * 0.6 * children);
+function travelingParty() {
+  return { adults: state.numTravelers || 1, children: state.numChildren || 0 };
 }
 
-// Whole-party estimate on the same basis as the checklist budget rollup: the
-// activity's real cost when known, else the type-based representative estimate.
-// A non-positive real cost ($0 or missing) is not a credible estimate for a
-// priced venue (e.g. a refined meal the model priced at $0), so it falls back
-// to the representative estimate rather than displaying an impossible $0.
-function activityBudgetUsd(act) {
-  const partyCost = optActivityCost(act);
-  if (partyCost != null && partyCost > 0) return partyCost;
-  const perPerson = representativeCostUsd(act);
-  if (perPerson == null) return null;
-  const adults = state.numTravelers || 1;
-  const children = state.numChildren || 0;
-  return perPerson * adults + perPerson * 0.6 * children;
-}
-
-// The unit the refine prompt speaks. The route prints each activity's raw
-// estimated_cost_usd as "current cost" and asks for that same field back, so a
-// budget target has to be in that unit — the party totals the cards show would
-// read as a ceiling several times the current price and stop binding entirely.
-// A per_group cost is already whole-party in that raw field, so the two
-// party-scaled fallbacks convert in opposite directions.
-function activityUnitCostUsd(act, partyUnits, perGroup = actCostType(act) === 'per_group') {
-  const raw = actCostUsd(act);
-  if (raw != null && raw > 0) return raw;
-  const representative = representativeCostUsd(act);
-  if (representative != null) return perGroup ? representative * partyUnits : representative;
-  // A hand-edited checklist budget is the traveler's own number and the only
-  // price some activities carry, so it beats sending no ceiling at all.
-  const carded = activityCardCostUsd(act);
-  if (carded != null && carded > 0) return perGroup ? carded : carded / partyUnits;
-  return null;
-}
-
-// The figure to show on a card — prefer any user-edited checklist budget so the
-// card matches the checklist exactly, else the derived estimate.
-function activityCardCostUsd(act) {
+// A checklist budget is one figure covering the whole party, so it is per_group
+// whatever the activity itself is priced in. Reading it as the activity's basis
+// would scale a party total by the party a second time.
+function checklistBudgetCost(act) {
   const item = (state.bookingChecklist || []).find(
-    (it) => it.type === 'activity' && it.activityId === act.id
+    (it) => it.type === 'activity' && it.activityId === act?.id
   );
-  if (item && item.budgetUsd != null) return Number(item.budgetUsd);
-  return activityBudgetUsd(act);
+  return item ? enteredCost(item.budgetUsd, PER_GROUP) : null;
+}
+
+// The cost a card shows: what the traveler entered on the checklist, else the
+// activity's real price, else a type estimate. Party arithmetic lives in
+// partyTotalUsd, not here.
+function activityCardCostUsd(act) {
+  return partyTotalUsd(checklistBudgetCost(act) || resolveCost(act), travelingParty());
+}
+
+function activityBudgetUsd(act) {
+  return partyTotalUsd(resolveCost(act), travelingParty());
+}
+
+// The unit the refine prompt speaks: the route prints each activity's raw
+// estimated_cost_usd as "current cost" and asks for that field back, so a target
+// has to be in that same basis. Converting to a party total and back is what
+// keeps the two ends in step — the three-way fallback this replaced converted in
+// opposite directions depending on which tier answered.
+function activityUnitCostUsd(act) {
+  const party = travelingParty();
+  const total = partyTotalUsd(checklistBudgetCost(act) || resolveCost(act), party);
+  if (total == null) return null;
+  return readBasis(act) === PER_GROUP ? total : total / partyWeight(party);
 }
 
 function activityCostChipHtml(act) {
@@ -4359,13 +4339,13 @@ async function onConfirmLocks() {
   // is read downstream as "unpriced", so every suggestion fell back to the flat
   // type estimate, tied with the original, and was dropped as not-cheaper.
   // Undercutting what each pick already costs is a real target at any lock level.
-  const partyUnits = (state.numTravelers || 1) + 0.6 * (state.numChildren || 0);
+  const partyUnits = partyWeight(travelingParty());
   const headroomPerActivity = totalBudget > lockedCost
     ? (totalBudget - lockedCost) / refinable.length
     : Infinity;
   const budgetTargetFor = (a) => {
-    const perGroup = actCostType(a) === 'per_group';
-    const unitCost = activityUnitCostUsd(a, partyUnits, perGroup);
+    const perGroup = readBasis(a) === PER_GROUP;
+    const unitCost = activityUnitCostUsd(a);
     // Headroom is a whole-party figure, which is already the unit a per_group
     // activity is priced in; a per_person one has to be divided back down.
     const headroom = perGroup ? headroomPerActivity : headroomPerActivity / partyUnits;
@@ -4494,16 +4474,22 @@ async function onConfirmLocks() {
 
   // Drop refinements that aren't actually cheaper than the original (e.g. a $$
   // restaurant swapped for another $$) — showing an unchanged price reads as broken.
+  // compareCost answers null rather than "not cheaper" when the two sides tie on
+  // a table guess, which is how a landmark swapped for a landmark used to lose:
+  // both fell back to the same flat estimate and the tie read as a verdict.
+  const party = travelingParty();
   let dropped = 0;
   let droppedUnpriced = 0;
   for (const [id, refined] of [...budgetOptState.refinements.entries()]) {
     const original = approved.find((a) => a.id === id);
-    const refinedCost = activityBudgetUsd(refined);
-    const originalCost = original ? activityCardCostUsd(original) : null;
-    const unpriced = refinedCost == null || originalCost == null;
-    if (!unpriced && refinedCost < originalCost) continue;
+    const verdict = compareCost(
+      resolveCost(refined),
+      checklistBudgetCost(original) || resolveCost(original),
+      party
+    );
+    if (verdict === -1) continue;
     dropped += 1;
-    if (unpriced) droppedUnpriced += 1;
+    if (verdict === null) droppedUnpriced += 1;
     budgetOptState.refinements.delete(id);
     budgetOptState.choiceIsRefined.delete(id);
   }

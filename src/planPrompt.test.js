@@ -79,7 +79,7 @@ test('no prompt asks for a field the pipeline decides itself', async () => {
   // disagree silently — which is how applyMealPoolCap deleted a full meal list.
   const deterministic = [
     [/opening_hours/, 'placesEnrich overwrites it from Google'],
-    [/cost_type/, 'normalizeActivity always writes per_person'],
+    [/cost_type/, 'the basis is the traveler\'s to set, not the model\'s to declare'],
     [/booking_type/, 'normalizeActivity derives it from type and cost'],
     [/Lunch at/, 'stripMealPrefix removes the prefix'],
     [/appears at most once/, 'dedupeActivities collapses a repeated venue']

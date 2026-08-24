@@ -4,10 +4,12 @@ const {
   PER_GROUP,
   ESTIMATED,
   STATED,
+  ENTERED,
   makeCost,
   readBasis,
   statedCost,
   estimatedCost,
+  enteredCost,
   resolveCost,
   partyWeight,
   partyTotalUsd,
@@ -100,25 +102,45 @@ test('a non-credible price is not a price', () => {
   assert.equal(makeCost(Infinity, 'per_person', STATED), null);
 });
 
-test('resolve prefers what the traveler typed, then a real price, then a guess', () => {
+test('an empty form field is not a free activity', () => {
+  // Number('') is 0, exactly like Number(null): a blank cost input would mint a
+  // $0 entered cost that outranks the real price behind it.
+  assert.equal(makeCost('', 'per_person', ENTERED), null);
+  assert.equal(makeCost('   ', 'per_person', ENTERED), null);
+  assert.equal(makeCost(null, 'per_person', ENTERED), null);
+  assert.equal(makeCost(undefined, 'per_person', ENTERED), null);
+  assert.equal(makeCost(true, 'per_person', ENTERED), null);
+  assert.equal(makeCost('40', 'per_person', ENTERED).usd, 40);
+});
+
+test('resolve prefers a real price over a guess and never invents one', () => {
   const landmark = { type: 'landmark', estimated_cost_usd: 60 };
   assert.equal(resolveCost(landmark).usd, 60);
   assert.equal(resolveCost(landmark).source, STATED);
-  assert.equal(resolveCost(landmark, { enteredUsd: 12 }).usd, 12);
   assert.equal(resolveCost({ type: 'landmark' }).source, ESTIMATED);
   assert.equal(resolveCost({ type: 'shopping' }), null);
 });
 
-test('an entered cost keeps the basis the activity was priced in', () => {
-  const entered = resolveCost({ cost_type: PER_GROUP, type: 'tour' }, { enteredUsd: 300 });
-  assert.equal(entered.basis, PER_GROUP);
-  assert.equal(partyTotalUsd(entered, family), 300);
+test('an entered cost states its own basis, because only its producer knows it', () => {
+  // A checklist budget is one figure for the whole party — per_group — no matter
+  // what the activity is priced in. Taking the basis from the activity would
+  // scale a party total by the party a second time.
+  const checklistBudget = enteredCost(300, PER_GROUP);
+  assert.equal(partyTotalUsd(checklistBudget, family), 300);
+
+  const perHeadEntry = enteredCost(300, 'per_person');
+  assert.equal(partyTotalUsd(perHeadEntry, family), 300 * partyWeight(family));
+
+  // It outranks a stated price only because the caller puts it first.
+  const activity = { type: 'tour', estimated_cost_usd: 500 };
+  assert.equal((checklistBudget || resolveCost(activity)).usd, 300);
 });
 
 test('a guess for a group-priced activity is still a per-head guess', () => {
   // The table holds what one traveler pays. Scaling it by the party is correct
   // for an activity with no real price, whatever basis it was declared in.
   const guess = resolveCost({ type: 'tour', cost_type: PER_GROUP });
+  assert.equal(guess.source, ESTIMATED);
   assert.equal(guess.basis, 'per_person');
   assert.equal(partyTotalUsd(guess, family), 75 * partyWeight(family));
 });

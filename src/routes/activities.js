@@ -164,6 +164,15 @@ function groundActivityToPlace(activity, place, { cost = null, costType = 'per_p
   return activity;
 }
 
+// Model output priced in the basis the prompt asked for, labelled to match. The
+// model's own `cost` object is dropped rather than merged: readBasis prefers a
+// nested cost.type, so one volunteered by the model would outrank the basis it
+// was told to price in.
+function withBasis(suggestion, pricedLike) {
+  const { cost, ...raw } = suggestion;
+  return { ...raw, cost_type: readBasis(pricedLike) };
+}
+
 function activityCostUsd(activity) {
   const nested = Number(activity?.cost?.estimated_usd);
   if (Number.isFinite(nested)) return nested;
@@ -293,7 +302,10 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
         const rawActivity = parsed?.activity && typeof parsed.activity === 'object' ? parsed.activity : parsed;
         if (rawActivity && typeof rawActivity === 'object') {
           rawActivity.name = canonicalName;
-          activity = normalizeActivity(rawActivity, city);
+          // The traveler picked the basis in the form; the model is never asked
+          // for one. Without this stamp their choice survives only when they also
+          // typed a price, because groundActivityToPlace re-applies it on cost.
+          activity = normalizeActivity({ ...rawActivity, cost_type: costType }, city);
         }
       } catch (error) {
         debugLog('activity-add', `LLM_FAIL name="${canonicalName}" msg="${error?.message || error}"`);
@@ -574,8 +586,11 @@ Return ONLY valid JSON (no markdown fences):
       observe({ userId: resolvedUserId, tripId, source: 'decline', candidates: declineSignals });
 
       // The model priced it in the basis pricingClause asked for, which is the
-      // declined activity's, so the label follows the number.
-      let normalized = normalizeActivity({ ...parsed.activity, cost_type: readBasis(activity) }, activity.city);
+      // declined activity's, so the label follows the number. `cost` is dropped
+      // first: readBasis prefers a nested cost.type, so a model that volunteers
+      // one would outrank the basis we just asked it to price in — and the
+      // normalizer only reads the flat field, so the price would be lost too.
+      let normalized = normalizeActivity(withBasis(parsed.activity, activity), activity.city);
       await enrichWithPlaceDetails([normalized], activity.city);
 
       let unverified = false;
@@ -602,7 +617,7 @@ Return ONLY valid JSON (no markdown fences):
         });
         const retryParsed = tryParseJsonObject(extractText(retryResponse.content));
         if (retryParsed?.activity && typeof retryParsed.activity === 'object') {
-          const retryNormalized = normalizeActivity({ ...retryParsed.activity, cost_type: readBasis(activity) }, activity.city);
+          const retryNormalized = normalizeActivity(withBasis(retryParsed.activity, activity), activity.city);
           await enrichWithPlaceDetails([retryNormalized], activity.city);
           if (duplicatesTrip(retryNormalized)) {
             // Refuse only when the duplicate is what we retried for. When the original
