@@ -49,7 +49,22 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
   are ineligible for budget optimization so its only caller never reaches them.
 - A third route, `/refine`, was stamping a basis while stating it to the model only when a cost or
   target happened to be shown; the `priced:` suffix is now unconditional, matching the stamp.
-- 320 tests pass.
+- A final full-range review found `planCity` was the fourth LLM producer and the only one stamping a
+  basis without stating one: no planning prompt says the price is per traveler, while the user prompt
+  names the party and explains child pricing — inviting a party-priced answer that then reads as
+  per-head. A $300 group tour showed $960 to a family of four and seeded the checklist from there.
+  `SYSTEM_PROMPT_GPT_LEAN` now says "the price for ONE traveler"; the two bake-off arms are left
+  frozen.
+- `perUnitUsd` joins `partyTotalUsd`, so the module owns both directions and `public/app.js` no
+  longer references `partyWeight` at all. The decision entry's "one place" claim is now true in code.
+- Three further rounds closed the `Number(null) === 0` family for good: `activityCostUsd` coerced
+  before checking null (printing "current cost: $0" beside a real target), then `normalizeActivity`
+  did the same one layer deeper, then the hand-rolled guard that fixed it still let whitespace
+  strings and booleans through. `normalizeActivity` now calls `makeCost` — the fourth hand-rolled
+  copy of that coercion is deleted rather than patched a third time.
+- 322 tests pass. Verification beyond the suite: a 5,760-case differential against the deleted client
+  helpers (card and budget costs bit-identical; unit cost differs only for a $0 checklist budget,
+  which is unreachable), a six-caller basis check, and a live server boot serving `/shared/cost.js`.
 
 ## [2026-08-23] Budget optimization's refine targets fixed; per-activity budget contract
 - Live testing surfaced a batch where the server returned 2 usable refinements and the client
