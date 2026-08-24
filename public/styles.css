@@ -2081,6 +2081,13 @@ body.overlay-active #chatWidget {
   box-shadow: var(--shadow-lg);
   font-weight: 600;
 }
+/* Same placement, neutral palette: an outcome the traveler should read is not a
+   failure they need to react to. */
+.error-banner--notice {
+  background: var(--paper-1);
+  border-color: rgba(10,22,40,.14);
+  color: var(--text-900);
+}
 .error-banner-message { line-height: 1.35; }
 .error-banner-dismiss {
   background: none;

@@ -942,17 +942,28 @@ function refreshCityTimelineUI(row, city) {
 }
 
 function showErrorBanner(message) {
+  showBanner(message, 'error');
+}
+
+// For an outcome worth reading that is not a failure — "nothing cheaper found"
+// is an answer, and dressing it as an error tells the traveler to fix something
+// that isn't broken.
+function showNoticeBanner(message) {
+  showBanner(message, 'notice');
+}
+
+function showBanner(message, tone) {
   if (!message) return;
   let banner = document.getElementById('errorBanner');
   if (!banner) {
     banner = document.createElement('div');
     banner.id = 'errorBanner';
-    banner.className = 'error-banner';
-    banner.setAttribute('role', 'alert');
     banner.innerHTML = '<span class="error-banner-message"></span><button class="error-banner-dismiss" type="button" aria-label="Dismiss">&times;</button>';
     banner.querySelector('.error-banner-dismiss').addEventListener('click', () => banner.remove());
     document.body.appendChild(banner);
   }
+  banner.className = tone === 'notice' ? 'error-banner error-banner--notice' : 'error-banner';
+  banner.setAttribute('role', tone === 'notice' ? 'status' : 'alert');
   banner.querySelector('.error-banner-message').textContent = String(message);
 }
 
@@ -4306,7 +4317,7 @@ async function onConfirmLocks() {
   const approved = budgetOptApprovedActivities();
   const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id) && !isConfirmedBooking(a.id));
   if (!unlocked.length) {
-    alert('All activities are locked — nothing to optimize.');
+    showNoticeBanner('All activities are locked — unlock the ones you would swap for something cheaper.');
     return;
   }
   // Refine keys its call on city, so an activity missing one can't be batched —
@@ -4314,7 +4325,7 @@ async function onConfirmLocks() {
   // "all locked" message, which would misname the reason.
   const refinable = unlocked.filter((a) => a.city);
   if (!refinable.length) {
-    alert('Couldn\'t optimize — none of your unlocked activities have a city set.');
+    showErrorBanner('Couldn\'t optimize — none of your unlocked activities have a city set.');
     return;
   }
   const locked = approved.filter((a) => budgetOptState.lockedIds.has(a.id));
@@ -4343,9 +4354,14 @@ async function onConfirmLocks() {
     // activity is priced in; a per_person one has to be divided back down.
     const headroom = perGroup ? headroomPerActivity : headroomPerActivity / partyUnits;
     const ceiling = Math.min(headroom, unitCost != null ? unitCost * 0.8 : Infinity);
+    // The budget is awareness, not a cap, so headroom must not ask for something
+    // no real venue costs — a traveler far over budget would otherwise get a
+    // target near zero and, with it, suggestions nobody would book. A quarter of
+    // the current price is as aggressive as this steer is allowed to get.
+    const plausible = unitCost != null ? Math.max(ceiling, unitCost * 0.25) : ceiling;
     // Nothing priceable on either side leaves no honest number to send, and the
     // route drops the budget clause rather than inventing a ceiling.
-    return Number.isFinite(ceiling) ? Math.max(1, Math.round(ceiling)) : null;
+    return Number.isFinite(plausible) ? Math.max(1, Math.round(plausible)) : null;
   };
 
   const btn = document.getElementById('budgetOptConfirmLocksBtn');
@@ -4434,16 +4450,26 @@ async function onConfirmLocks() {
   budgetOptState.inFlight = false;
   btn.disabled = false;
 
-  const abortToLock = (message) => {
+  // The budget is guidance the traveler asked to be measured against, so no
+  // outcome of measuring against it is a failure. Only the request itself
+  // failing outright is an error; "nothing cheaper worth showing" is an answer.
+  const abortToLock = (message, tone = 'notice') => {
     budgetOptState.refinements.clear();
     budgetOptState.choiceIsRefined.clear();
     hideLoader();
     btn.innerHTML = '<i class="ph-bold ph-check" aria-hidden="true"></i> Confirm';
-    showErrorBanner(message);
+    if (tone === 'error') showErrorBanner(message);
+    else showNoticeBanner(message);
   };
 
   if (!budgetOptState.refinements.size) {
-    abortToLock('Couldn\'t find cheaper alternatives — try again.');
+    const everyCityFailed = results.every((r) => r.status !== 'fulfilled');
+    abortToLock(
+      everyCityFailed
+        ? 'Couldn\'t reach the optimizer — try again.'
+        : 'No cheaper alternatives came back for these picks — they stay as they are.',
+      everyCityFailed ? 'error' : 'notice'
+    );
     return;
   }
 
@@ -4471,8 +4497,8 @@ async function onConfirmLocks() {
     // mostly priced and genuinely not cheaper is a verdict, and reporting it as a
     // failure invites a retry that will land in the same place.
     abortToLock(droppedUnpriced === dropped
-      ? 'Couldn\'t price the alternatives we found — try again.'
-      : 'No cheaper alternatives found at a lower price — your picks are already good value.');
+      ? 'Couldn\'t price the alternatives we found — your picks stay as they are.'
+      : 'Nothing cheaper worth swapping in — your picks are already good value.');
     return;
   }
 

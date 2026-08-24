@@ -373,8 +373,11 @@ Return ONLY valid JSON (no markdown fences): a single activity object matching t
       // this codebase forbids.
       // Scoped to the activities that carry a target: a blanket rule with one
       // visible number is how a suggestion ends up borrowing a neighbour's ceiling.
+      // Guidance, not a limit. Stated as a hard cap, an unreachable target makes
+      // the model either invent an implausibly cheap venue or return nothing for
+      // that activity — both of which the traveler sees as the step failing.
       const budgetClause = anyBudgetTarget
-        ? `\n\nWhere an activity below shows a "target", that suggestion's estimated_cost_usd must be at or below it, priced the same way that activity is ("priced: per person" means per traveler, "priced: per group" means one total for the whole party). Choose a cheaper venue of the same activity type in ${city} — a different venue, never the same one at a lower price.`
+        ? `\n\nWhere an activity below shows a "target", aim to bring that suggestion's estimated_cost_usd to or below it, priced the same way that activity is ("priced: per person" means per traveler, "priced: per group" means one total for the whole party). The target is what the traveler is aiming for, not a limit you must satisfy: if no venue worth recommending exists at that price, suggest the best one you can that still costs less than the activity's current cost, and price it honestly. Never invent an unrealistically low cost to meet a target. Choose a cheaper venue of the same activity type in ${city} — a different venue, never the same one at a lower price.`
         : '';
       const memText = recall({ userId: parseUserId(getAuthedUserId(req)), tripId, query: `${city} ${note}` }).text;
       const memBlock = memText ? `\n\nTraveler profile & learned preferences (honor these in every suggestion):\n${memText}` : '';
