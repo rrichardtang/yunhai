@@ -4327,9 +4327,11 @@ async function onConfirmLocks() {
   const approved = budgetOptApprovedActivities();
   const unlocked = approved.filter((a) => !budgetOptState.lockedIds.has(a.id) && !isConfirmedBooking(a.id));
   if (!unlocked.length) {
-    // Confirmed bookings are held back by the same filter, and telling someone to
-    // unlock when the lock UI shows none is a dead end.
-    showNoticeBanner(approved.some((a) => budgetOptState.lockedIds.has(a.id))
+    // Every approved id is seeded into lockedIds and a booked card's lock button
+    // is disabled, so "is anything locked" is always true and would send someone
+    // to unlock a control they cannot operate. The question is whether a lock
+    // exists that they can actually remove.
+    showNoticeBanner(approved.some((a) => budgetOptState.lockedIds.has(a.id) && !isConfirmedBooking(a.id))
       ? 'All activities are locked — unlock the ones you would swap for something cheaper.'
       : 'These are all confirmed bookings — there is nothing left to swap.');
     return;
