@@ -10,7 +10,7 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
   TypeError rather than a silent factor-of-N; `compareCost` converts both sides first and returns
   `null` when equal totals rest on a table guess. Rationale and rejected alternatives in decisions
   [2026-08-23].
-- `src/cost.test.js` — 14 tests, each of the day's four bugs written as an invariant. Two failed on
+- `src/cost.test.js` — a test per invariant, each of the day's four bugs among them. Two failed on
   first run against my own module, both the `Number(null) === 0` trap: `makeCost(null, …)` minted a
   valid $0 cost, so an absent entered price outranked the real price behind it.
 - `src/claude.js`: `normalizeActivity` reads the basis via `readBasis(raw)` instead of hardcoding
@@ -30,7 +30,21 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
   disagreeing. Also that `makeCost('')` minted a free cost (`Number('')` is 0, the same trap one
   input class over) and that a model-emitted nested `cost` would outrank the basis `/replace` had
   just asked it to price in. All three fixed; `withBasis` now strips the model's `cost` object.
-- 318 tests pass.
+- Follow-up review of the whole range found three more, all the same shape — a rule applied on one
+  path and not its sibling. `normalizeActivity` reading the basis meant planCity, which hands it raw
+  model output, let the model declare a basis no prompt asks for; `withoutModelBasis` now strips it
+  there. `/add` stamped the traveler's basis onto a price the model was never told how to compute, so
+  it gained `/replace`'s pricing clause (now shared as `pricingClauseFor`). And `withBasis` stripped
+  `cost` but not `timing`, so an already-normalized reply lost its price entirely — it now strips
+  both, and `buildRefinedActivity` reuses it instead of repeating the strip.
+- `actCostType` deleted: a second definition of "read the basis" alongside `readBasis` is the
+  duplication the schema exists to end. `groundActivityToPlace`'s inline basis normalization now
+  calls `readBasis` too — no server path normalizes a basis outside the module.
+- A differential harness compared the rewritten client helpers against the deleted originals across
+  5,760 input combinations: `activityCardCostUsd` and `activityBudgetUsd` identical,
+  `activityUnitCostUsd` differing only for a checklist budget of exactly $0, and all such activities
+  are ineligible for budget optimization so its only caller never reaches them.
+- 320 tests pass.
 
 ## [2026-08-23] Budget optimization's refine targets fixed; per-activity budget contract
 - Live testing surfaced a batch where the server returned 2 usable refinements and the client

@@ -25,11 +25,6 @@
     return a.cost != null ? a.cost.estimated_usd : a.estimated_cost_usd;
   }
 
-  function actCostType(a) {
-    if (a == null) return 'per_person';
-    return a.cost != null ? a.cost.type : (a.cost_type || 'per_person');
-  }
-
   function actBookingType(a) {
     if (a == null) return 'none';
     return a.booking != null ? a.booking.type : (a.booking_type || 'none');
@@ -109,7 +104,6 @@
     actPreferredTime,
     actAddress,
     actCostUsd,
-    actCostType,
     actBookingType,
     actBookingLinks,
     actOpeningHours,

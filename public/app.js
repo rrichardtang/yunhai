@@ -196,7 +196,7 @@ const esc = (s='') => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','
 // normalizeCity provided by /js/cityPlanner.js
 
 // activity accessors (actDurationHours, actPreferredTime, actAddress, actCostUsd,
-// actCostType, actBookingType, actBookingLinks, actOpeningHours) provided by /js/activityCard.js
+// actBookingType, actBookingLinks, actOpeningHours) provided by /js/activityCard.js
 
 const geocodeCache = loadGeocodeCache();
 let geocodeQueue = Promise.resolve();
@@ -8843,7 +8843,7 @@ function buildActivityDigest(a) {
     lat: a.location?.lat ?? null,
     lng: a.location?.lng ?? null,
     costUsd: actCostUsd(a),
-    costType: actCostType(a),
+    costType: readBasis(a),
     booking: { type: actBookingType(a), reference: a.booking?.reference || null, links: actBookingLinks(a) },
     openingHours: actOpeningHours(a),
     whyItFits: a.why_it_fits || '',

@@ -10,7 +10,7 @@ const { formatProfileForEnrichment } = require('./services/profilePrompt');
 const { shortCity } = require('./services/imageQuery');
 const { debugLog } = require('./services/debugLog');
 const { isLegacyActivity, parseTimeString, parseDurationToMinutes } = require('../shared/activityMigration');
-const { readBasis } = require('../shared/cost');
+const { readBasis, withoutModelBasis } = require('../shared/cost');
 
 // Chosen over claude-sonnet-4-6 on a measured bake-off plus a blind read of both
 // arms' output — decisions [2026-08-08]. Pairs with SYSTEM_PROMPT_GPT_LEAN, which
@@ -585,7 +585,10 @@ async function planCity(city, profile = null, userId = 'default', travels = [], 
   // The model no longer emits `city`, so the fallback is the only source. It must
   // be the short form: the qualified name ("Lijiang, Yunnan, China") is what broke
   // every image query, and it rides into the Places and commute lookups too.
-  const normalized = parsed.map((item) => normalizeActivity(item, shortCity(name)));
+  // withoutModelBasis, because normalizeActivity now reads the basis rather than
+  // hardcoding it: every other caller hands it a basis it vouches for, and this
+  // one hands it raw model output.
+  const normalized = parsed.map((item) => normalizeActivity(withoutModelBasis(item), shortCity(name)));
   const validTyped = filterInvalidTypes(normalized, name);
   const filtered = applyMealPoolCap(validTyped, { city: name, minMeals });
   debugLog('plan-city', `NORMALIZED city="${name}" raw=${parsed.length} after_type_filter=${validTyped.length} after_meal_cap=${filtered.length}`);

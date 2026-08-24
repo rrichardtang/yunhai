@@ -10,7 +10,7 @@ const {
   SYSTEM_PROMPT: ACTIVITY_SYSTEM_PROMPT
 } = require('../claude');
 const { recall, observe } = require('../memory');
-const { readBasis, PER_GROUP } = require('../../shared/cost');
+const { readBasis, withoutModelBasis, PER_GROUP } = require('../../shared/cost');
 const { search, isConfigured: isBraveConfigured, shouldUseBrave } = require('../braveSearch');
 const { DEFAULT_ACTIVITY_CATEGORY_CONFIG } = require('../arrangeConfig');
 const { buildBookingLinks } = require('../services/bookingLinks');
@@ -135,7 +135,7 @@ async function searchPlaceText(input) {
 }
 
 function groundActivityToPlace(activity, place, { cost = null, costType = 'per_person' } = {}) {
-  const resolvedCostType = costType === 'per_group' ? 'per_group' : 'per_person';
+  const resolvedCostType = readBasis({ cost_type: costType });
   if (place) {
     activity.name = place.name || activity.name;
     activity.venue_name = place.name || activity.venue_name || activity.name;
@@ -165,11 +165,21 @@ function groundActivityToPlace(activity, place, { cost = null, costType = 'per_p
 }
 
 // Model output priced in the basis the prompt asked for, labelled to match. The
-// model's own `cost` object is dropped rather than merged: readBasis prefers a
-// nested cost.type, so one volunteered by the model would outrank the basis it
-// was told to price in.
+// model's own cost fields are dropped rather than merged, and `timing` with them:
+// normalizeActivity returns an object carrying `timing` untouched, so a reply
+// that volunteers one would keep the stripped-out cost stripped and arrive with
+// no price at all.
+// Any route that stamps a basis onto a model's price has to tell the model which
+// basis to price in first. Stamping alone relabels the number instead of
+// describing it — a per-traveler figure marked as a whole-party total.
+function pricingClauseFor(pricedLike) {
+  return readBasis(pricedLike) === PER_GROUP
+    ? '\nPrice estimated_cost_usd as ONE total for the whole party — not per traveler.'
+    : '\nPrice estimated_cost_usd per traveler.';
+}
+
 function withBasis(suggestion, pricedLike) {
-  const { cost, ...raw } = suggestion;
+  const { timing, ...raw } = withoutModelBasis(suggestion);
   return { ...raw, cost_type: readBasis(pricedLike) };
 }
 
@@ -212,9 +222,11 @@ function buildVenueRosterBlock(roster) {
 // timing object would otherwise pass straight through unnormalized — leaving no
 // `booking` for applyBookingLinks and failing the whole city's batch.
 function buildRefinedActivity(activity, suggestion, city) {
-  const { id, timing, ...raw } = suggestion || {};
-  if (!raw.name) return null;
-  const refined = normalizeActivity({ ...raw, city }, city);
+  const { id, ...rest } = suggestion || {};
+  if (!rest.name) return null;
+  // withBasis stamps the basis the prompt asked this suggestion to be priced in,
+  // which normalizeActivity then reads — no post-hoc repair.
+  const refined = normalizeActivity({ ...withBasis(rest, activity), city }, city);
   // The swap keeps the itinerary slot: arrange placements, checklist entries and
   // calendar fingerprints all key on this id.
   refined.id = activity.id;
@@ -224,9 +236,6 @@ function buildRefinedActivity(activity, suggestion, city) {
   refined.place_id = null;
   refined.imageUrl = null;
   refined.price_level = null;
-  // The prompt states each activity's basis and asks for a target in that same
-  // basis, so the suggestion is priced the way the activity it replaces is.
-  refined.cost.type = readBasis(activity);
   return refined;
 }
 
@@ -287,7 +296,7 @@ function register(app) {
         const addressClause = grounded && place.formattedAddress ? ` (${place.formattedAddress})` : '';
         const verifiedClause = grounded ? ' This is a verified real venue — do NOT rename or substitute it.' : '';
         const noteClause = why ? `\nTraveler's note: "${why}"` : '';
-        const userContent = `The traveler manually added "${canonicalName}"${addressClause} in ${city} to their itinerary.${verifiedClause} The "name" field must be exactly "${canonicalName}".${noteClause}
+        const userContent = `The traveler manually added "${canonicalName}"${addressClause} in ${city} to their itinerary.${verifiedClause} The "name" field must be exactly "${canonicalName}".${noteClause}${pricingClauseFor({ cost_type: costType })}
 Fill in the descriptive fields for this venue: type, why_it_fits, pitfall, booking_advice, insider_tips, duration_hours, suggested_time, opening_hours, booking_type, estimated_cost_usd.
 
 Return ONLY valid JSON (no markdown fences): a single activity object matching the standard activity schema.`;
@@ -534,9 +543,7 @@ Return ONLY a JSON object: {"suggestions":[{"id":"<an id listed above>", ...chan
       // Without this the model has no way to know which basis it is pricing in,
       // and the reply inherits the declined activity's basis blind — relabelling
       // a per-traveler number as a whole-party one, or the reverse.
-      const pricingClause = readBasis(activity) === PER_GROUP
-        ? '\nPrice estimated_cost_usd as ONE total for the whole party, the way the declined activity is priced — not per traveler.'
-        : '\nPrice estimated_cost_usd per traveler.';
+      const pricingClause = pricingClauseFor(activity);
       // The declined activity rides on the roster too, so one block states every
       // thing the replacement may not be.
       const rosterBlock = buildVenueRosterBlock([activity, ...(Array.isArray(exclude) ? exclude : [])]);

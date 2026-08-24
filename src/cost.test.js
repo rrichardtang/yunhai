@@ -11,6 +11,7 @@ const {
   estimatedCost,
   enteredCost,
   resolveCost,
+  withoutModelBasis,
   partyWeight,
   partyTotalUsd,
   compareCost
@@ -90,7 +91,22 @@ test('an unset basis is per_person, and that is a decision not an accident', () 
 test('both stored activity shapes read the same', () => {
   const nested = { cost: { estimated_usd: 40, type: 'per_person' }, type: 'meal' };
   const flat = { estimated_cost_usd: 40, cost_type: 'per_person', type: 'meal' };
+  // Asserted on the values too: deepEqual alone passes if reading both shapes
+  // broke and each returned null.
+  assert.equal(statedCost(nested).usd, 40);
+  assert.equal(statedCost(nested).basis, 'per_person');
   assert.deepEqual(statedCost(nested), statedCost(flat));
+});
+
+test('a model cannot declare the basis, because nothing asked it to', () => {
+  // No prompt requests cost_type, so a volunteered one was validated by nothing.
+  // A nested cost is worse: readBasis would take the basis from it while the
+  // normalizer reads the price from the flat field.
+  const volunteered = { type: 'tour', estimated_cost_usd: 300, cost_type: PER_GROUP };
+  assert.equal(readBasis(volunteered), PER_GROUP);
+  assert.equal(readBasis(withoutModelBasis(volunteered)), 'per_person');
+  assert.equal(statedCost(withoutModelBasis(volunteered)).usd, 300);
+  assert.equal(withoutModelBasis({ cost: { type: PER_GROUP } }).cost, undefined);
 });
 
 test('a non-credible price is not a price', () => {
@@ -141,9 +157,12 @@ test('an entered cost states its own basis, because only its producer knows it',
   const perHeadEntry = enteredCost(300, 'per_person');
   assert.equal(partyTotalUsd(perHeadEntry, family), 300 * partyWeight(family));
 
-  // It outranks a stated price only because the caller puts it first.
+  // Precedence belongs to the caller, and the two live orderings disagree on
+  // purpose: the card shows what the traveler entered, while the refine target
+  // has to undercut the price the prompt prints, which is the activity's own.
   const activity = { type: 'tour', estimated_cost_usd: 500 };
   assert.equal((checklistBudget || resolveCost(activity)).usd, 300);
+  assert.equal((resolveCost(activity) || checklistBudget).usd, 500);
 });
 
 test('a guess for a group-priced activity is still a per-head guess', () => {

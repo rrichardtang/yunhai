@@ -90,6 +90,16 @@
     return statedCost(activity) || estimatedCost(activity);
   }
 
+  // No prompt asks a model for a basis — it is the traveler's to set — so one
+  // that arrives anyway was never validated against anything. A nested `cost` is
+  // worse than useless: readBasis would take the basis from it while the
+  // normalizer still reads the price from the flat field, leaving the two halves
+  // of one price sourced from different places.
+  function withoutModelBasis(raw = {}) {
+    const { cost, cost_type, ...rest } = raw;
+    return rest;
+  }
+
   // One definition. Three different spellings of this arithmetic were live at
   // once, and they disagreed on whether the children's share was rounded.
   function partyWeight({ adults = 1, children = 0 } = {}) {
@@ -129,6 +139,7 @@
     estimatedCost,
     enteredCost,
     resolveCost,
+    withoutModelBasis,
     partyWeight,
     partyTotalUsd,
     compareCost
