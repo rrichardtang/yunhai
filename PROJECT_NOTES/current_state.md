@@ -20,16 +20,16 @@ dialog pre-checks only the cities whose planning inputs actually changed, matche
 Setup refuses to advance with zero cities at all three interactive exits. Five commits, unpushed,
 gated behind `pre-push-reviewer` (below).
 
-A third independent branch is now done and pushed, unverified: `claude/refine-endpoint-duplicates-4gg4g3`
-rewrote `/api/activity/refine` from one call per activity into one call per city (decisions
-[2026-08-21]), returns whole activities rather than a partial diff, extended `/api/activity/replace`
-with the same exclusion roster, and — as of [2026-08-23] — wired the budget optimizer's
-`onConfirmLocks` to the new batch contract, replacing rather than merging each returned activity so
-identity fields (`place_id`, `imageUrl`) can't leak from the original venue. All four commits cleared
-`pre-push-reviewer` (several real bugs caught per round — see changelog). 303/303 tests pass
-throughout, but none of this has run against a live LLM (open_items [2026-08-23]). It touches no
-planning or scheduling code, so it is independent of the GPT-5.6 verification and can deploy in any
-order relative to the other two branches.
+A third independent branch, `claude/refine-endpoint-duplicates-4gg4g3`, is the active one. It began as
+a duplicate-suggestion fix — `/api/activity/refine` batched by city, whole activities instead of a
+partial diff, the same exclusion roster on `/api/activity/replace` (decisions [2026-08-21]) — and
+live testing then turned it into a cost-representation rewrite. Budget optimization was discarding
+every suggestion it received; the cause ran four layers deep, each fix exposing the next, and one of
+them was invisible until a compensating error of equal magnitude was removed. The outcome is
+`shared/cost.js`: a cost is a tagged `{ usd, basis, source }`, party arithmetic exists in one
+function whose return type differs from its argument type, and both server and client run on it
+(decisions [2026-08-23]). It touches no planning or scheduling logic beyond `normalizeActivity`
+reading the basis it is handed, so it stays independent of the GPT-5.6 verification.
 
 ## Active Workstream
 The branch fixed the reported "stuck" plan, then found three bugs underneath it that each
@@ -79,6 +79,11 @@ on two of our own bugs. Cost per activity rises ~1.7x, the one column Sonnet sti
   `public/app.js`. Deploys via `deployment/promotion.sh` only; run the harness from the staging tree.
 
 ## Risks
+- **One rule applied to one path and not its sibling is this codebase's most repeated defect.** The
+  cost work hit it six times in a day: `/refine` vs `/replace`, `/add`'s two branches, `withBasis` vs
+  `buildRefinedActivity`, planCity vs the routes, and twice on `/refine` alone. Every instance was
+  individually small and individually invisible. When adding a rule to one LLM route, check every
+  sibling route in the same file before considering it done.
 - **The pre-push review gate is load-bearing and is finding real defects, not style.** Five rounds on
   `claude/auto-open-scheduling-modal-jmbjem` each surfaced a distinct shipping bug: a baseline read
   from state that unrelated code rebuilds, a lookup keyed on city name that collapsed a repeat-visit
@@ -113,5 +118,9 @@ on two of our own bugs. Cost per activity rises ~1.7x, the one column Sonnet sti
 2. Phase 2: cluster-based meal sourcing, so restaurants are drawn near or between activity clusters
    rather than planned independently. Designed in `PROJECT_NOTES/plan-deterministic-prompt-split.md`,
    not started.
-3. Deploy behind the three queued branches, then walk the post-deploy checklist in
+3. Exercise the cost-schema migration in a browser (open_items [2026-08-23]) — every surface that
+   shows a price, including a trip with a `per_group` activity, watching the console for
+   `partyTotalUsd expects a cost object`. Arithmetic is covered by a 5,760-case differential; what
+   is not covered is rendering and event paths, since `public/app.js` has no tests.
+4. Deploy behind the three queued branches, then walk the post-deploy checklist in
    open_items [2026-08-07].
