@@ -127,6 +127,23 @@ test('code supplies what the prompt stopped asking for', async () => {
   assert.equal(byName['Heshu Restaurant'].city, 'Lijiang');
 });
 
+test('an explicit null price is no price, not a free one', () => {
+  // Number(null) and Number('') are both 0, so a model answering the price field
+  // with null stored a priced venue at $0 — which /refine printed as
+  // "current cost: $0" next to a real target.
+  const cost = (v) => normalizeActivity(
+    { name: 'x', type: 'museum', duration_hours: 1, estimated_cost_usd: v }, 'Lijiang'
+  ).cost.estimated_usd;
+
+  assert.equal(cost(null), null);
+  assert.equal(cost(''), null);
+  assert.equal(cost(undefined), null);
+  assert.equal(cost('not a number'), null);
+  assert.equal(cost(0), 0, 'a real zero is still a real price for a free venue');
+  assert.equal(cost(8), 8);
+  assert.equal(cost('8'), 8);
+});
+
 test('booking type follows cost, not category', () => {
   // A type-only mapping disagreed with the model on 36 of 135 saved activities:
   // it put an affiliate link on free hikes and viewpoints, and stripped it from

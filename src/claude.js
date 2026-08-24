@@ -281,8 +281,13 @@ function normalizeActivity(raw = {}, fallbackCity = '') {
   const preferred_time = (rawSuggested && rawSuggested !== '10:00am')
     ? parseTimeString(rawSuggested) : null;
 
-  const costUsd = (Number.isFinite(Number(raw.estimated_cost_usd)) && Number(raw.estimated_cost_usd) >= 0)
-    ? Number(raw.estimated_cost_usd) : null;
+  // Nullish before coercion. Number(null) and Number('') are both 0, so a model
+  // that answered the price field with an explicit null stored a priced venue as
+  // free — which /refine then printed as "current cost: $0" beside a real target,
+  // asking for something cheaper than nothing.
+  const rawCost = raw.estimated_cost_usd;
+  const parsedCost = rawCost == null || rawCost === '' ? NaN : Number(rawCost);
+  const costUsd = Number.isFinite(parsedCost) && parsedCost >= 0 ? parsedCost : null;
   const bookingType = bookingTypeFor(type, costUsd);
 
   const address = String(raw.start_location || raw.location?.address || venue_name || '').trim();
