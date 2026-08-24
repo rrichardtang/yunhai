@@ -4000,11 +4000,10 @@ function activityBudgetUsd(act) {
 // because the ceiling has to relate to the "current cost" the prompt prints —
 // which is the activity's raw figure. A budget edited upward would otherwise
 // raise the ceiling above the price it is meant to undercut, and stop binding.
-function activityUnitCostUsd(act, perGroup = readBasis(act) === PER_GROUP) {
+function activityUnitCostUsd(act) {
   const party = travelingParty();
   const total = partyTotalUsd(resolveCost(act) || checklistBudgetCost(act), party);
-  if (total == null) return null;
-  return perGroup ? total : total / partyWeight(party);
+  return perUnitUsd(total, readBasis(act), party);
 }
 
 function activityCostChipHtml(act) {
@@ -4344,16 +4343,14 @@ async function onConfirmLocks() {
   // is read downstream as "unpriced", so every suggestion fell back to the flat
   // type estimate, tied with the original, and was dropped as not-cheaper.
   // Undercutting what each pick already costs is a real target at any lock level.
-  const partyUnits = partyWeight(travelingParty());
   const headroomPerActivity = totalBudget > lockedCost
     ? (totalBudget - lockedCost) / refinable.length
     : Infinity;
   const budgetTargetFor = (a) => {
-    const perGroup = readBasis(a) === PER_GROUP;
-    const unitCost = activityUnitCostUsd(a, perGroup);
-    // Headroom is a whole-party figure, which is already the unit a per_group
-    // activity is priced in; a per_person one has to be divided back down.
-    const headroom = perGroup ? headroomPerActivity : headroomPerActivity / partyUnits;
+    const unitCost = activityUnitCostUsd(a);
+    // Headroom is a whole-party figure, so it converts the same way any party
+    // total does — unchanged for a per_group activity, divided down for the rest.
+    const headroom = perUnitUsd(headroomPerActivity, readBasis(a), travelingParty());
     const ceiling = Math.min(headroom, unitCost != null ? unitCost * 0.8 : Infinity);
     // The budget is awareness, not a cap, so headroom must not ask for something
     // no real venue costs — a traveler far over budget would otherwise get a
@@ -4479,9 +4476,9 @@ async function onConfirmLocks() {
 
   // Drop refinements that aren't actually cheaper than the original (e.g. a $$
   // restaurant swapped for another $$) — showing an unchanged price reads as broken.
-  // compareCost answers null rather than "not cheaper" when the two sides tie on
-  // a table guess, which is how a landmark swapped for a landmark used to lose:
-  // both fell back to the same flat estimate and the tie read as a verdict.
+  // A tie resting on a table guess comes back null, not "not cheaper". The
+  // refinement is dropped either way — what changes is that the batch is then
+  // reported as unpriceable rather than as a verdict on the traveler's picks.
   const party = travelingParty();
   let dropped = 0;
   let droppedUnpriced = 0;

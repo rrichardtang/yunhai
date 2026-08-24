@@ -154,7 +154,7 @@ Return a JSON array of activity objects with these fields:
 - smarter_alternative (string or null)
 - suggested_time (string — e.g. "9:00am", "sunset") — the time of day the activity is best, as intent. The schedule is assigned downstream against the venue's real hours.
 - duration_hours (number) — what the whole visit needs, including getting there
-- estimated_cost_usd (number — overestimate rather than under, scaled to the city's cost of living. 0 for free activities.)
+- estimated_cost_usd (number — the price for ONE traveler, not a total for the party. Overestimate rather than under, scaled to the city's cost of living. 0 for free activities.)
 
 MANDATORY RULE — meals: every activity of type "meal" names a specific restaurant, and why_it_fits names 1-2 must-order dishes there. A list short on meals is a failed list.
 

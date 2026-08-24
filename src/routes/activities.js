@@ -184,10 +184,14 @@ function withBasis(suggestion, pricedLike) {
 }
 
 function activityCostUsd(activity) {
-  const nested = Number(activity?.cost?.estimated_usd);
-  if (Number.isFinite(nested)) return nested;
-  const flat = Number(activity?.estimated_cost_usd);
-  return Number.isFinite(flat) ? flat : null;
+  // Nullish first, then coerce: normalizeActivity writes cost.estimated_usd as
+  // null whenever the model gave no price, and Number(null) is 0 — which the
+  // refine prompt then printed as "current cost: $0" beside a non-zero target,
+  // asking for something cheaper than free.
+  const raw = activity?.cost?.estimated_usd ?? activity?.estimated_cost_usd;
+  if (raw == null) return null;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : null;
 }
 
 // Wording follows planCity's locked-activity block: naming only venues is not

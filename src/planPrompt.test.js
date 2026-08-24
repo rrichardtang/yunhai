@@ -103,7 +103,7 @@ test('code supplies what the prompt stopped asking for', async () => {
     return {
       text: JSON.stringify([
         { name: 'Dinner at Heshu Restaurant', type: 'meal', venue_name: 'Heshu, Lijiang', why_it_fits: 'Order the stone pot fish.', duration_hours: 1.5, estimated_cost_usd: 25 },
-        { name: 'Visit Mu Family Mansion', type: 'landmark', venue_name: 'Mu Family Mansion, Lijiang', duration_hours: 1.5, estimated_cost_usd: 8 },
+        { name: 'Visit Mu Family Mansion', type: 'landmark', venue_name: 'Mu Family Mansion, Lijiang', duration_hours: 1.5, estimated_cost_usd: 8, cost_type: 'per_group' },
         { name: 'Black Dragon Pool Dawn', type: 'neighborhood', duration_hours: 1, estimated_cost_usd: 0 }
       ]),
       stop_reason: 'end_turn'
@@ -119,6 +119,10 @@ test('code supplies what the prompt stopped asking for', async () => {
   assert.equal(byName['Mu Family Mansion'].booking.type, 'attraction', '$8 admission is something to buy');
   assert.equal(byName['Black Dragon Pool Dawn'].booking.type, 'none', 'a free walk has nothing to book');
   assert.equal(byName['Heshu Restaurant'].cost.type, 'per_person');
+  // The model volunteered a basis no prompt asks for, so planCity strips it: an
+  // unvalidated per_group label would stop the price being scaled by party size.
+  assert.equal(byName['Mu Family Mansion'].cost.type, 'per_person');
+  assert.equal(byName['Mu Family Mansion'].cost.estimated_usd, 8);
   // The qualified name is what broke every image query, so the fallback shortens it.
   assert.equal(byName['Heshu Restaurant'].city, 'Lijiang');
 });

@@ -8,10 +8,10 @@
 // a $200 group tour read as $400, a target of $160 shown against a "$50" price,
 // two table guesses tying and reading as "not cheaper".
 //
-// So a cost travels as { usd, basis, source } and the party arithmetic lives in
-// exactly one function. partyTotalUsd takes a cost object and returns a number,
-// so its own output cannot be fed back into it — double-multiplication is a
-// TypeError instead of a plausible-looking price.
+// So a cost travels as { usd, basis, source } and this module owns both
+// directions of the party arithmetic. partyTotalUsd takes a cost object and
+// returns a number, so its own output cannot be fed back into it —
+// double-multiplication is a TypeError instead of a plausible-looking price.
 (function (root) {
   const PER_PERSON = 'per_person';
   const PER_GROUP = 'per_group';
@@ -120,6 +120,14 @@
     return cost.basis === PER_GROUP ? cost.usd : cost.usd * partyWeight(party);
   }
 
+  // The inverse: a party total expressed back in the unit an activity is priced
+  // in, which is the unit the LLM prompts print and read. Lives here so both
+  // directions of the conversion are owned by one module.
+  function perUnitUsd(totalUsd, basis, party) {
+    if (totalUsd == null) return null;
+    return basis === PER_GROUP ? totalUsd : totalUsd / partyWeight(party);
+  }
+
   // Both sides converted before comparing, so a per-unit price can never be
   // measured against a party total. Returns null for "cannot tell": equal totals
   // resting on a table guess are two guesses agreeing, not a finding that one is
@@ -146,6 +154,7 @@
     withoutModelBasis,
     partyWeight,
     partyTotalUsd,
+    perUnitUsd,
     compareCost
   };
 

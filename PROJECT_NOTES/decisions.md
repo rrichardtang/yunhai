@@ -8,8 +8,8 @@ Append-only. Records permanent architectural and design decisions.
 
 **Decision:** A cost travels as a frozen `{ usd, basis, source }` rather than a bare number.
 `basis` is `per_person` | `per_group`; `source` is `stated` (a real price) | `entered` (the traveler
-typed it) | `estimated` (a lookup-table guess). `shared/cost.js` owns the shape and is the only place
-party arithmetic exists. Four rules make the old failure mode unrepresentable:
+typed it) | `estimated` (a lookup-table guess). `shared/cost.js` owns the shape and both directions of the
+party arithmetic (`partyTotalUsd` up, `perUnitUsd` back down to the unit the LLM prompts speak). Four rules make the old failure mode unrepresentable:
 
 1. **`partyTotalUsd(cost, party)` takes a cost object and returns a number.** Its own output cannot be
    fed back in — a second conversion is a `TypeError`, not a plausible-looking price. Every

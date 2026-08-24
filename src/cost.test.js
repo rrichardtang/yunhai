@@ -14,6 +14,7 @@ const {
   withoutModelBasis,
   partyWeight,
   partyTotalUsd,
+  perUnitUsd,
   compareCost
 } = require('../shared/cost');
 
@@ -156,13 +157,22 @@ test('an entered cost states its own basis, because only its producer knows it',
 
   const perHeadEntry = enteredCost(300, 'per_person');
   assert.equal(partyTotalUsd(perHeadEntry, family), 300 * partyWeight(family));
+});
 
-  // Precedence belongs to the caller, and the two live orderings disagree on
-  // purpose: the card shows what the traveler entered, while the refine target
-  // has to undercut the price the prompt prints, which is the activity's own.
-  const activity = { type: 'tour', estimated_cost_usd: 500 };
-  assert.equal((checklistBudget || resolveCost(activity)).usd, 300);
-  assert.equal((resolveCost(activity) || checklistBudget).usd, 500);
+test('a party total converts back to the unit the prompts speak', () => {
+  // The inverse of partyTotalUsd, and the reason it lives in the module: the
+  // route prints and reads a per-unit price, while every figure the client holds
+  // is a party total. Spelling the division at each call site is what let a
+  // per_group activity be divided by the party it was never multiplied by.
+  assert.equal(perUnitUsd(320, 'per_person', family), 100);
+  assert.equal(perUnitUsd(320, PER_GROUP, family), 320);
+  assert.equal(perUnitUsd(null, 'per_person', family), null);
+
+  // Round-trips for both bases.
+  for (const basis of ['per_person', PER_GROUP]) {
+    const cost = makeCost(120, basis, STATED);
+    assert.equal(perUnitUsd(partyTotalUsd(cost, family), basis, family), 120);
+  }
 });
 
 test('a guess for a group-priced activity is still a per-head guess', () => {
