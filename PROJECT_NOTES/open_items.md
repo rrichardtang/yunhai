@@ -78,23 +78,6 @@ shows a banner), so collapsing them means choosing one.
 replacement, and decide whether the grid card should start bannering generic failures (it should —
 silently resetting the button tells the traveler nothing).
 
-## [2026-08-21] `/api/activity/replace` has the same duplicate blind spot, and a dead coords check
-**Status:** Pending
-**Description:** Two problems in one route. (1) `/replace` is told "NOT this venue" but knows nothing
-about the rest of the trip, so a replacement can duplicate a *different* activity the traveler
-already has - the same class the refine roster just closed. (2) `coordsOk` uses
-`Number.isFinite(Number(a?.location?.lat))`, and `Number(null)` is `0`, which is finite, so the
-"venue could not be found on Google Maps" retry almost certainly never fires. The same bug was found
-and found on the refine side, where the switch to whole activities removed the check entirely.
-**Context:** Found during the refine rewrite; `coordsOk` deliberately left alone because fixing it
-changes `/replace`'s retry behavior (an extra Sonnet call when a venue genuinely does not resolve),
-which does not belong in a commit about refine.
-**Next action:** Accept `exclude` from both call sites (`public/app.js:4615`, `:4764`), add the
-roster block after the existing `NOT "${activity.name}"` line, and extend the retry trigger to fire
-on a roster collision as well as missing coords. Fix `coordsOk` to reject null before the numeric
-test (`placesEnrich`'s `hasCoords` is the canonical form) in the same pass, and re-measure how often
-the retry actually fires.
-
 ## [2026-08-17] Watch the first keyed run of the dirty-city Arrange
 **Status:** Pending input (needs deploy)
 **Description:** Entering Arrange now fires `/api/arrange` with no click behind it, once per changed
