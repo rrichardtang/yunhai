@@ -65,7 +65,7 @@ TravelPlannerAgent is a full-stack AI travel itinerary builder: an Express.js ba
 
 ### Frontend (`public/`)
 
-- **`app.js`** (~10300 lines) — Intentionally monolithic. Vanilla JS, no framework. Do not extract modules from it beyond clear boundary concerns. All `innerHTML` interpolation must go through the `esc()` helper; values read back from `dataset.*` come back entity-decoded, so re-escape them at read time.
+- **`app.js`** — Intentionally monolithic, and large enough that you should read the region you're changing rather than the whole file. Vanilla JS, no framework. Do not extract modules from it beyond clear boundary concerns. All `innerHTML` interpolation must go through the `esc()` helper; values read back from `dataset.*` come back entity-decoded, so re-escape them at read time.
 - **`js/apiService.js`** — HTTP layer wrapper.
 - **`js/overlayManager.js`** — Modal/overlay lifecycle.
 - **`js/statePersistence.js`** — localStorage helpers.
