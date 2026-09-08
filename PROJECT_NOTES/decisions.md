@@ -1054,3 +1054,34 @@ meals column measured willingness to guess, not restaurant quality.
 find this next to it. The quality comparison is re-run after Phase 1 of
 `plan-deterministic-prompt-split.md`, not before — until the pipeline stops fighting the model,
 another run measures the same artifact.
+
+## [2026-09-08] Skills live on the claude.ai account; gated skills must be reachable from the `/` menu
+
+**Decision:** The 12 frontend design skills, and in time the rest of the skill set, are uploaded as
+**claude.ai account skills** rather than committed here or synced through `claude-config`. All 12
+carry `disable-model-invocation: true`. This repo's `.claude/skills/` is emptied and
+`!.claude/skills/` comes back out of `.gitignore`.
+
+**Reasoning:** Two documented constraints interact. (1) A cloud session does not read
+`~/.claude/skills/` from the machine — it reads account-enabled skills and the cloned repo's
+`.claude/skills/`. That is what motivated the project-local copies in decision [2026-08-19], and it
+still holds. (2) `disable-model-invocation: true` blocks the `Skill` tool as well as auto-triggering
+— per Claude Code's docs, "Claude can invoke: No — skill won't auto-load, Skill tool calls are
+blocked" — so a gated skill's only entry point is the user's `/` menu. Gating is what makes the
+design skills free: as a listed group they cost ~1,500 tokens of system prompt every turn in every
+session, against a ~4,000-token total, for skills wanted only on deliberate frontend work. Gate
+them and that goes to zero. But gating plus `~/.claude/skills/` would have left them invisible to
+the `/` menu *and* un-invokable by the agent — reachable from nowhere. Account skills are the one
+layer that covers every repo, both session types, and that menu.
+
+**Alternatives rejected:** (1) Keep them project-local here and just add the gating — works today
+and costs nothing, but binds them to this repo when the stated goal is one skill setup shared
+across all repos. (2) Move them to `claude-config` — its sync target is `~/.claude/skills/`, which
+is the layer a cloud `/` menu cannot see. (3) Leave them ungated wherever they live — pays ~1,500
+tokens per turn on backend work to save typing a skill name on the rare frontend push.
+
+**Tradeoffs:** Account skills do not load in local sessions automatically; they need a one-time
+`CLAUDE_CODE_SYNC_SKILLS=1 claude -p "..."` run per machine, after which they land in
+`~/.claude/skills/synced/`. Until that has been run, `claude-config` remains the only skill source
+locally, which is why its skills half is kept for now rather than retired. Uploading is manual —
+there is no API for it, so a new skill means a trip to claude.ai settings instead of a `git push`.

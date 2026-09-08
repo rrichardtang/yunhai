@@ -4,6 +4,24 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-09-08] Skills moved off the repo to the claude.ai account; design skills gated
+- `.claude/skills/`: all 20 project-local skills removed — the 12 design skills and `ponytail` go
+  to the claude.ai account, the 7 duplicates of `claude-config` skills were byte-identical copies
+  frozen at `e05d306` and would have drifted from their source.
+- All 12 design skills gained `disable-model-invocation: true` in frontmatter: ~1,500 tokens per
+  turn of system-prompt listing → 0, invoked on demand as `/design-taste-frontend` and friends.
+- `.gitignore`: `!.claude/skills/` removed, reverting changelog [2026-08-19].
+- `CLAUDE.md` startup step 5: dropped the `.claude/skills/ponytail/` path, which no longer exists.
+- `rrichardtang/claude-config` (branch `claude/self-refreshing-sync`): `install.sh` now registers
+  itself as a user-level `SessionStart` hook via new `hooks/session-start.sh`, so the sync
+  re-runs in every local session in every project instead of only in repos carrying their own
+  bootstrap. Three `felix-the-fixer` findings fixed: `-s` not `-f` when seeding `settings.json`
+  (a zero-byte file silently registered no hook at all), a graceful skip when `jq` is absent
+  (default macOS, previously killed the hook every session after the sync had succeeded), and a
+  temp-inode write for `session-start.sh` (install.sh is invoked by it, and bash reads a running
+  script by byte offset).
+
+
 ## [2026-09-08] Skills merged to `main`; `ponytail` pinned on at session startup
 - Fast-forwarded `main` to `e05d306` (`79208e0..e05d306`), so all 14 skills are available to every
   future session in this repo rather than only on the feature branch.
