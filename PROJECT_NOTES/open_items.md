@@ -1,5 +1,24 @@
 # Open Items
 
+## [2026-09-08] The newly installed skills can auto-fire and contradict this repo's own rules
+**Status:** Pending input (owner decision)
+**Description:** All 14 skills added today are model-invocable — none carries
+`disable-model-invocation`, unlike `wayfinder`/`grill-with-docs`. Two collisions are foreseeable:
+(1) `full-output-enforcement` mandates emitting whole files and bans "output only the changed
+lines", which is the direct inverse of CLAUDE.md **Output Efficiency** and of `ponytail`'s
+shortest-diff rule; (2) the nine design skills (`design-taste-frontend`,
+`redesign-existing-projects`, `high-end-visual-design`, `minimalist-ui`, `gpt-taste`, et al.) fire
+on frontend work and prescribe React/Next.js, GSAP, custom font stacks and dependency additions —
+`public/app.js` is a deliberate vanilla-JS monolith with no build step, and `ponytail` rung 5 says
+never add a dependency for what a few lines cover.
+**Context:** changelog + decisions [2026-09-08]. Nothing has fired yet; this is the shape of the
+conflict, not an observed failure.
+**Next action:** Decide per skill whether to (a) leave as-is and rely on judgement in the moment,
+(b) add `disable-model-invocation: true` to the frontmatter of the ones that should be
+explicit-invoke only — `full-output-enforcement` is the strongest candidate — or (c) drop the ones
+that will never apply to a vanilla-JS travel planner (`imagegen-frontend-*`, `brandkit`,
+`stitch-design-taste`, `image-to-code` are image-generation skills, not code skills).
+
 ## [2026-08-17] Watch the first keyed run of the dirty-city Arrange
 **Status:** Pending input (needs deploy)
 **Description:** Entering Arrange now fires `/api/arrange` with no click behind it, once per changed

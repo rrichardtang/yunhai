@@ -4,6 +4,30 @@ Append-only. Records permanent architectural and design decisions.
 
 ---
 
+## [2026-09-08] Third-party skills are flattened into `.claude/skills/`, not left in `npx skills`' `.agents/` layout
+
+**Decision:** `npx skills add` installs to `.agents/skills/<name>/` and symlinks
+`.claude/skills/<name>` at it. We keep neither half: the real directories are copied into
+`.claude/skills/` and `.agents/` + `skills-lock.json` are deleted.
+
+**Reasoning:** `.gitignore:10` ignores `.agents` (pre-existing, alongside `.agent`, `.augment`,
+`.cline` and the other agent-tool scratch dirs). Committing only the symlinks would leave every one
+of them dangling on a fresh clone — which is every session here, since the remote container clones
+the repo from scratch. `!.claude/skills/` is already un-ignored and already holds seven skills as
+real directories (decisions [2026-08-19]), so flattening costs one `cp` and matches what is there.
+
+**Alternatives rejected:** (1) Add `!.agents` to `.gitignore` and commit both halves — keeps the
+tool's layout but commits symlinks, which are fragile across checkouts, and un-ignores a directory
+the ignore list deliberately groups with other agent scratch dirs. (2) Install to `~/.claude/skills/`
+— that is the `claude-config` sync target, is machine-global rather than project-scoped, and does
+not exist in a fresh cloud container at all. (3) Keep `skills-lock.json` for provenance — it records
+`.agents`-relative paths, so retaining it after moving the files describes a layout that is no
+longer on disk.
+
+**Tradeoffs:** Updating these skills means re-running `npx skills` and re-flattening rather than a
+lockfile-driven `install`. Acceptable — they are static prose, and the provenance is recorded in
+changelog [2026-09-08].
+
 ## [2026-08-19] New skills also get a project-local copy in `.claude/skills/`, alongside the global `claude-config` copy
 
 **Decision:** The 7 skills added to `rrichardtang/claude-config` (`thermo-nuclear-code-quality-review`,
