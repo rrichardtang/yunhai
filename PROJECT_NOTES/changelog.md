@@ -4,6 +4,15 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-09-08] Skills merged to `main`; `ponytail` pinned on at session startup
+- Fast-forwarded `main` to `e05d306` (`79208e0..e05d306`), so all 14 skills are available to every
+  future session in this repo rather than only on the feature branch.
+- `CLAUDE.md` **Session Startup**: new step 5 invokes `ponytail` and keeps it active for the
+  session; old step 5 renumbered to 6. Merging alone only makes a skill auto-*triggerable* — the
+  model still decides whether the description matches — so the pin is what makes it deterministic.
+- Design skills left un-gated and model-invocable by owner decision; `full-output-enforcement`
+  gating still undecided (open_items [2026-09-08]).
+
 ## [2026-09-08] Installed `ponytail` + the 13 `taste-skill` skills, project-local
 - `.claude/skills/ponytail/SKILL.md`: from `github.com/dietrichgebert/ponytail` via
   `npx skills use`, which only prints SKILL.md into context (nothing written to disk), so the file

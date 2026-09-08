@@ -1,23 +1,34 @@
 # Open Items
 
-## [2026-09-08] The newly installed skills can auto-fire and contradict this repo's own rules
+## [2026-09-08] `full-output-enforcement` pulls against `ponytail`, and both auto-fire
 **Status:** Pending input (owner decision)
-**Description:** All 14 skills added today are model-invocable — none carries
-`disable-model-invocation`, unlike `wayfinder`/`grill-with-docs`. Two collisions are foreseeable:
-(1) `full-output-enforcement` mandates emitting whole files and bans "output only the changed
-lines", which is the direct inverse of CLAUDE.md **Output Efficiency** and of `ponytail`'s
-shortest-diff rule; (2) the nine design skills (`design-taste-frontend`,
-`redesign-existing-projects`, `high-end-visual-design`, `minimalist-ui`, `gpt-taste`, et al.) fire
-on frontend work and prescribe React/Next.js, GSAP, custom font stacks and dependency additions —
-`public/app.js` is a deliberate vanilla-JS monolith with no build step, and `ponytail` rung 5 says
-never add a dependency for what a few lines cover.
-**Context:** changelog + decisions [2026-09-08]. Nothing has fired yet; this is the shape of the
-conflict, not an observed failure.
-**Next action:** Decide per skill whether to (a) leave as-is and rely on judgement in the moment,
-(b) add `disable-model-invocation: true` to the frontmatter of the ones that should be
-explicit-invoke only — `full-output-enforcement` is the strongest candidate — or (c) drop the ones
-that will never apply to a vanilla-JS travel planner (`imagegen-frontend-*`, `brandkit`,
-`stitch-design-taste`, `image-to-code` are image-generation skills, not code skills).
+**Description:** `full-output-enforcement` ("treat every task as production-critical", "do not
+optimize for brevity") and `ponytail` ("shortest working diff wins", YAGNI ladder) are both
+model-invocable and both match any coding task, so they can fire on the same turn pointing opposite
+ways on scope and on prose length. An earlier read of this item claimed the skill also contradicts
+CLAUDE.md **Output Efficiency** — that was overstated: its bans are against eliding code with
+`// ...` placeholders, its TODO-marker ban reinforces `scripts/checkPractices.js`, and
+"output only the changed lines" is an edit-format rule the Edit tool satisfies anyway. The live
+tension is with `ponytail` alone.
+**Context:** changelog + decisions [2026-09-08]. Arrived as part of the `Leonxlnx/taste-skill`
+bundle (`skills/output-skill/SKILL.md` upstream), not requested by name. Nothing has fired yet.
+**Next action:** Owner asked what the skill was before deciding; answer given, decision outstanding.
+Options: (a) add `disable-model-invocation: true` so it stays available via explicit invoke only,
+matching `wayfinder`/`grill-with-docs`/`thermo-nuclear-code-quality-review`; (b) delete it;
+(c) leave un-gated and resolve case by case.
+
+## [2026-09-08] Design skills prescribe a stack `public/app.js` deliberately does not use
+**Status:** Deferred (accepted by owner)
+**Description:** The nine design skills (`design-taste-frontend`, `redesign-existing-projects`,
+`high-end-visual-design`, `minimalist-ui`, `gpt-taste`, et al.) fire on frontend work and prescribe
+React/Next.js, GSAP, custom font stacks and dependency additions. `public/app.js` is a deliberate
+vanilla-JS monolith with no build step, and `ponytail` rung 5 says never add a dependency for what
+a few lines cover. Four more (`imagegen-frontend-*`, `brandkit`, `stitch-design-taste`,
+`image-to-code`) are image-generation skills that will rarely apply to a travel planner.
+**Context:** Owner explicitly wants the design skills active in all sessions (2026-09-08), so they
+stay un-gated; this records the known friction rather than proposing to undo it.
+**Next action:** None unless a design skill actually pulls a dependency or a rewrite into a change.
+If that happens, gate the offender rather than the whole set.
 
 ## [2026-08-17] Watch the first keyed run of the dirty-city Arrange
 **Status:** Pending input (needs deploy)

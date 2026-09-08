@@ -10,9 +10,12 @@ At the start of every session, before any task work, load project context:
 2. Always read `PROJECT_NOTES/current_state.md` and `PROJECT_NOTES/open_items.md`.
 3. Read `PROJECT_NOTES/decisions.md` only if the request touches architecture, tooling, or past tradeoffs.
 4. Skim `PROJECT_NOTES/changelog.md` only if the user asks "what changed" or context is unclear.
-5. Output a bootstrap summary (2–3 sentences: active objective, critical open items, immediate next actions), then proceed.
+5. Invoke the `ponytail` skill (`.claude/skills/ponytail/`) and keep it active for the session. It
+   governs what gets built — YAGNI, stdlib and existing helpers before new code, shortest working
+   diff — and stays on until the user says "stop ponytail" or "normal mode".
+6. Output a bootstrap summary (2–3 sentences: active objective, critical open items, immediate next actions), then proceed.
 
-Do not ask the user whether to read the notes — just do it.
+Do not ask the user whether to read the notes, or whether to load ponytail — just do it.
 
 ## Commands
 
