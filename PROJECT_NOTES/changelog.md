@@ -4,6 +4,21 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-09-08] Installed `ponytail` + the 13 `taste-skill` skills, project-local
+- `.claude/skills/ponytail/SKILL.md`: from `github.com/dietrichgebert/ponytail` via
+  `npx skills use`, which only prints SKILL.md into context (nothing written to disk), so the file
+  was transcribed verbatim to make it survive the session.
+- `.claude/skills/{brandkit,design-taste-frontend,design-taste-frontend-v1,full-output-enforcement,
+  gpt-taste,high-end-visual-design,image-to-code,imagegen-frontend-mobile,imagegen-frontend-web,
+  industrial-brutalist-ui,minimalist-ui,redesign-existing-projects,stitch-design-taste}/`: from
+  `github.com/Leonxlnx/taste-skill` via `npx skills add` (13 skills, 14 files).
+- `npx skills add` installed to `.agents/skills/` with symlinks from `.claude/skills/` — but
+  `.agents` is gitignored (`.gitignore:10`), so every symlink would dangle in a fresh clone. The
+  symlinks were replaced with real directories under `.claude/skills/` and `.agents` +
+  `skills-lock.json` removed, matching the layout decisions [2026-08-19] already established.
+- All 14 files read before committing: design/output directives only, no instruction-hijacking or
+  network/exfiltration behavior.
+
 ## [2026-08-19] Project-local copy of the 7 new skills, so they show up in the `/` menu
 - `.claude/skills/{thermo-nuclear-code-quality-review,wayfinder,grill-with-docs,grilling,
   domain-modeling,research,prototype}/`: committed verbatim, copied from the versions just pushed
