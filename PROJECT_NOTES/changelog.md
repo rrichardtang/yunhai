@@ -2092,3 +2092,30 @@ Existing `placesEnrich` tests set `name` but not `venue_name` on fixtures whose 
 under test, so they were taking the new minimal path; `venue_name` added where the fixture is a
 venue. New tests pin both paths: the field mask a venue-less lookup sends, that no `/media` call
 follows it, that Places hours never reach it, and that a named venue still gets the full set. 271/271.
+
+## [2026-09-09] Landing page visual overhaul (`claude/skill-doctor-1dzu19`)
+- Removed the display serif from the landing: dropped `--font-display`, consolidated 13 duplicated
+  `.serif` rules into one token-layer rule, and dropped Instrument Serif from the font request
+  (`tokens.css`, 6 landing stylesheets, `index.html`).
+- Replaced the hero's div-built fake app window (fake tabs, `Itinerary · v03`, fake booking refs,
+  "Jane & Jerry") with a real photograph at a ratio that downscales rather than upscales, and cut
+  the hero to headline, subtext and two CTAs.
+- Deleted the fabricated "Trusted by" logo strip (decisions above).
+- Removed all 36 em-dashes from `index.html` and all 57 from the display strings in
+  `landing-reel.js` / `landing-demo-profile.js`, rewriting each sentence rather than swapping the
+  character; hyphenated 27 en-dash time ranges (`arrangeValidator`'s parser matches `[-–]`, so
+  scheduling is unaffected).
+- Dropped the three `01/02/03` section-number kickers, 3 dead `data-screen-label` attributes and
+  2 decorative status dots; kept the dots that mark live demo state.
+- Unified the page theme: chapter 2 is no longer dark, so all content sections are light with a
+  dark footer. Removed the now-unreachable `.chapter--dark` rules.
+- Fixed WCAG AA on the primary CTA: `--accent` #2F7DFB carried white text at 3.86:1 and is now
+  #1560D8 at 5.68:1. All 12 measured text/background pairs now pass.
+- Fixed a pre-existing mobile defect: the page scrolled horizontally to 584px at a 375px viewport.
+  The chapter grid now uses `minmax(0, 1fr)` and the fixed-width demo panels scroll inside their
+  own container; the nav collapses below 640px.
+- Added a global `prefers-reduced-motion` reset (safe because the demo choreography is timer-driven
+  and never waits on `transitionend`); removed 4 neon accent glows.
+- Deleted 683 lines of dead CSS from `landing.css` (911 to 167): `.stage*`, `.features*`, `.feat*`,
+  `.flow*`, `.hero__stats*`, `.hero__trust*`, `.heroapp*`, `.hstop*`, `.vis-*`, `.cta*`, `.marquee*`.
+- Net: 10 files, +215 / -1104 lines. No file under `src/` touched.
