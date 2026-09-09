@@ -10,9 +10,10 @@ At the start of every session, before any task work, load project context:
 2. Always read `PROJECT_NOTES/current_state.md` and `PROJECT_NOTES/open_items.md`.
 3. Read `PROJECT_NOTES/decisions.md` only if the request touches architecture, tooling, or past tradeoffs.
 4. Skim `PROJECT_NOTES/changelog.md` only if the user asks "what changed" or context is unclear.
-5. Invoke the `ponytail` skill (`.claude/skills/ponytail/`) and keep it active for the session. It
-   governs what gets built — YAGNI, stdlib and existing helpers before new code, shortest working
-   diff — and stays on until the user says "stop ponytail" or "normal mode".
+5. Invoke the `ponytail` skill and keep it active for the session. It governs what gets built —
+   YAGNI, stdlib and existing helpers before new code, shortest working diff — and stays on until
+   the user says "stop ponytail" or "normal mode". It arrives from the claude.ai account (cloud
+   sessions) or the `claude-config` sync (local), not from this repo.
 6. Output a bootstrap summary (2–3 sentences: active objective, critical open items, immediate next actions), then proceed.
 
 Do not ask the user whether to read the notes, or whether to load ponytail — just do it.
@@ -21,7 +22,7 @@ Do not ask the user whether to read the notes, or whether to load ponytail — j
 
 ```bash
 npm start          # Run the server (node src/server.js, port 3457)
-npm test           # Run all tests (node --test src/*.test.js)
+npm test           # Run all tests (node --test "src/**/*.test.js")
 ```
 
 To run a single test file:
@@ -64,7 +65,7 @@ TravelPlannerAgent is a full-stack AI travel itinerary builder: an Express.js ba
 
 ### Frontend (`public/`)
 
-- **`app.js`** (~9900 lines) — Intentionally monolithic. Vanilla JS, no framework. Do not extract modules from it beyond clear boundary concerns. All `innerHTML` interpolation must go through the `esc()` helper; values read back from `dataset.*` come back entity-decoded, so re-escape them at read time.
+- **`app.js`** — Intentionally monolithic, and large enough that you should read the region you're changing rather than the whole file. Vanilla JS, no framework. Do not extract modules from it beyond clear boundary concerns. All `innerHTML` interpolation must go through the `esc()` helper; values read back from `dataset.*` come back entity-decoded, so re-escape them at read time.
 - **`js/apiService.js`** — HTTP layer wrapper.
 - **`js/overlayManager.js`** — Modal/overlay lifecycle.
 - **`js/statePersistence.js`** — localStorage helpers.
@@ -102,7 +103,7 @@ Key variables: `ANTHROPIC_API_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`,
 
 ## Testing
 
-Uses Node.js built-in `node:test` — no Jest or external runner. Tests live alongside source as `src/*.test.js`. Coverage focuses on: Brave routing logic, trip health/overlap detection, and city name validation. LLM integration is not mocked in tests.
+Uses Node.js built-in `node:test` — no Jest or external runner. Tests live alongside source as `*.test.js`, at the top of `src/` and in its subdirectories; `npm test` globs `src/**/*.test.js` recursively, so a bare `node --test src/*.test.js` silently skips the nested ones. Coverage focuses on: Brave routing logic, trip health/overlap detection, and city name validation. LLM integration is not mocked in tests.
 
 ## Engineering Practices
 
