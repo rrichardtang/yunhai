@@ -15,6 +15,19 @@ per machine so account skills load in local sessions. (3) `git rm -r .claude/ski
 (5) Only after (2) is confirmed working, consider retiring `claude-config`'s skills half — until
 then it is the sole skill source for local sessions.
 
+## [2026-09-09] Dead second opening-hours parser diverges from the live one
+**Status:** Deferred
+**Description:** `parseOpeningWindows` (`public/js/arrangeView.js:92`, exported at line 216) has no
+call sites; the only other mention is a comment at `public/app.js:5112`. Its range regex is
+`[\s-]+`, which accepts a hyphen but not an en-dash, while the live parser
+(`parseOpeningHours`, `src/arrangeValidator.js:30`) matches `[-–]` and accepts both.
+**Context:** Surfaced by the pre-push review of the landing overhaul. Not a live defect, and the
+overhaul's hyphenation of the demo time ranges moved those fixtures toward this parser rather than
+away from it. But a second, stricter parser sitting exported and unused is a trap: wiring it up
+would silently yield zero windows for any en-dash hours string still in the system.
+**Next action:** Delete `parseOpeningWindows` and its export, or reconcile its regex with
+`arrangeValidator`'s. Deleting is preferred unless something is about to consume it.
+
 ## [2026-09-09] Landing hero wants a purpose-shot image
 **Status:** Deferred
 **Description:** The hero uses `public/img/demo/patios.jpg` (853x640), which belongs to the demo
