@@ -1,19 +1,15 @@
 # Open Items
 
-## [2026-09-08] Finish the skills move to the claude.ai account
-**Status:** Pending input (owner-only steps)
-**Description:** The skills setup is mid-migration. Decided and recorded in decisions [2026-09-08];
-what remains needs the owner, because uploading account skills has no API and recursive deletion is
-blocked for the agent in cloud sessions.
-**Context:** `claude-config` branch `claude/self-refreshing-sync` is pushed and unmerged. The design
-skills are gated but currently exist nowhere reachable until uploaded.
-**Next action:** (1) Upload `design-skills.zip` (12 gated) and `core-skills.zip` (9) at claude.ai →
-Settings → Capabilities → Skills. (2) Run `CLAUDE_CODE_SYNC_SKILLS=1 claude -p "list my skills"` once
-per machine so account skills load in local sessions. (3) `git rm -r .claude/skills` here and drop
-`!.claude/skills/` from `.gitignore` — deferred, agent lacks the permission. (4) Merge the
-`claude-config` branch to `main`; the bootstrap fetches `main`, so nothing activates until then.
-(5) Only after (2) is confirmed working, consider retiring `claude-config`'s skills half — until
-then it is the sole skill source for local sessions.
+## [2026-09-09] `wayfinder` and `grill-with-docs` are local-only
+**Status:** Deferred (accepted)
+**Description:** Both are `disable-model-invocation`-gated, so the `/` menu is their only entry
+point, and a cloud session's `/` menu does not read `~/.claude/skills/`. They were not uploaded to
+the claude.ai account, so since `.claude/skills/` was deleted they are reachable in local sessions
+only. Not reachable at all from Claude Code on the web.
+**Context:** decisions [2026-09-08]. Owner chose not to upload the full set. Costs nothing either
+way — both read `-` in `/skill-doctor`.
+**Next action:** None unless a cloud session needs them; uploading both to the account restores
+`/` access there.
 
 ## [2026-08-17] Watch the first keyed run of the dirty-city Arrange
 **Status:** Pending input (needs deploy)
