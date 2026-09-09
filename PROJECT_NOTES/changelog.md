@@ -4,6 +4,22 @@ Append-only. Factual log of completed work. Entries older than 30 days may be su
 
 ---
 
+## [2026-09-09] Skills migration complete; measured on the owner's machine
+- `.claude/skills/`: all 21 project-local skills deleted; `.gitignore` `!.claude/skills/` exception
+  removed alongside, reverting changelog [2026-08-19].
+- 5 design skills uploaded to the claude.ai account, gated: `brandkit`, `design-taste-frontend`,
+  `gpt-taste`, `high-end-visual-design`, `image-to-code`. The other 7 in the bundle were not
+  uploaded by choice and now exist only in git history at `e05d306`.
+- Measured via `/skill-doctor` locally: all 5 read `-` (0 tokens/turn) and remain reachable as
+  `/design-taste-frontend` etc. No `projectSettings` rows remain, so the duplicate listings are
+  gone. Per-turn skill listing is now ~2,280 tokens, of which ~1,410 is the claude.ai-synced set.
+- `claude-config` `main`: `install.sh` self-registers a user-level `SessionStart` hook; ENVIRON
+  replaces `awk -v` for the `CLAUDE.md` merge (BSD awk rejects newlines in `-v`, which aborted the
+  whole script on macOS); hook registration moved ahead of the merge so a merge failure can still
+  self-heal next session. `bob-the-builder` preloads `ponytail` + `caveman` via `skills:`;
+  `felix-the-fixer` must now defend each finding with an exact location, quoted line, failure path
+  and verification method.
+
 ## [2026-09-08] Skills moved off the repo to the claude.ai account; design skills gated
 - `.claude/skills/`: all 20 project-local skills removed — the 12 design skills and `ponytail` go
   to the claude.ai account, the 7 duplicates of `claude-config` skills were byte-identical copies
