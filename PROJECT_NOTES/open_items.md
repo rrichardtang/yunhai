@@ -1,34 +1,19 @@
 # Open Items
 
-## [2026-09-08] `full-output-enforcement` pulls against `ponytail`, and both auto-fire
-**Status:** Pending input (owner decision)
-**Description:** `full-output-enforcement` ("treat every task as production-critical", "do not
-optimize for brevity") and `ponytail` ("shortest working diff wins", YAGNI ladder) are both
-model-invocable and both match any coding task, so they can fire on the same turn pointing opposite
-ways on scope and on prose length. An earlier read of this item claimed the skill also contradicts
-CLAUDE.md **Output Efficiency** — that was overstated: its bans are against eliding code with
-`// ...` placeholders, its TODO-marker ban reinforces `scripts/checkPractices.js`, and
-"output only the changed lines" is an edit-format rule the Edit tool satisfies anyway. The live
-tension is with `ponytail` alone.
-**Context:** changelog + decisions [2026-09-08]. Arrived as part of the `Leonxlnx/taste-skill`
-bundle (`skills/output-skill/SKILL.md` upstream), not requested by name. Nothing has fired yet.
-**Next action:** Owner asked what the skill was before deciding; answer given, decision outstanding.
-Options: (a) add `disable-model-invocation: true` so it stays available via explicit invoke only,
-matching `wayfinder`/`grill-with-docs`/`thermo-nuclear-code-quality-review`; (b) delete it;
-(c) leave un-gated and resolve case by case.
-
-## [2026-09-08] Design skills prescribe a stack `public/app.js` deliberately does not use
-**Status:** Deferred (accepted by owner)
-**Description:** The nine design skills (`design-taste-frontend`, `redesign-existing-projects`,
-`high-end-visual-design`, `minimalist-ui`, `gpt-taste`, et al.) fire on frontend work and prescribe
-React/Next.js, GSAP, custom font stacks and dependency additions. `public/app.js` is a deliberate
-vanilla-JS monolith with no build step, and `ponytail` rung 5 says never add a dependency for what
-a few lines cover. Four more (`imagegen-frontend-*`, `brandkit`, `stitch-design-taste`,
-`image-to-code`) are image-generation skills that will rarely apply to a travel planner.
-**Context:** Owner explicitly wants the design skills active in all sessions (2026-09-08), so they
-stay un-gated; this records the known friction rather than proposing to undo it.
-**Next action:** None unless a design skill actually pulls a dependency or a rewrite into a change.
-If that happens, gate the offender rather than the whole set.
+## [2026-09-08] Finish the skills move to the claude.ai account
+**Status:** Pending input (owner-only steps)
+**Description:** The skills setup is mid-migration. Decided and recorded in decisions [2026-09-08];
+what remains needs the owner, because uploading account skills has no API and recursive deletion is
+blocked for the agent in cloud sessions.
+**Context:** `claude-config` branch `claude/self-refreshing-sync` is pushed and unmerged. The design
+skills are gated but currently exist nowhere reachable until uploaded.
+**Next action:** (1) Upload `design-skills.zip` (12 gated) and `core-skills.zip` (9) at claude.ai →
+Settings → Capabilities → Skills. (2) Run `CLAUDE_CODE_SYNC_SKILLS=1 claude -p "list my skills"` once
+per machine so account skills load in local sessions. (3) `git rm -r .claude/skills` here and drop
+`!.claude/skills/` from `.gitignore` — deferred, agent lacks the permission. (4) Merge the
+`claude-config` branch to `main`; the bootstrap fetches `main`, so nothing activates until then.
+(5) Only after (2) is confirmed working, consider retiring `claude-config`'s skills half — until
+then it is the sole skill source for local sessions.
 
 ## [2026-08-17] Watch the first keyed run of the dirty-city Arrange
 **Status:** Pending input (needs deploy)
