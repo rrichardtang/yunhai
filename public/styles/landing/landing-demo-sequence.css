@@ -39,7 +39,6 @@
   color: var(--text-900);
   margin: 0 0 10px;
 }
-.sqp__title .serif { font-family: var(--font-display); font-style: italic; font-weight: 400; }
 .sqp__sub {
   font-size: 13.5px;
   line-height: 1.55;
@@ -120,8 +119,6 @@
   font-weight: 500;
   letter-spacing: -0.02em;
   color: var(--text-900);
-  font-family: var(--font-display);
-  font-style: italic;
 }
 .sqp__choice .now-meta {
   font-family: var(--font-mono);

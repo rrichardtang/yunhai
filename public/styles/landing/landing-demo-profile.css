@@ -125,11 +125,10 @@
 .pf__summary-head .dot {
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 8px rgba(47,125,251,.8);
   animation: gm-pulse 1.4s infinite;
 }
 .pf__summary-head.done { color: #6EDB96; }
-.pf__summary-head.done .dot { background: #6EDB96; box-shadow: 0 0 8px rgba(110,219,150,.7); animation: none; }
+.pf__summary-head.done .dot { background: #6EDB96; animation: none; }
 .pf__summary-body {
   font-size: 13.5px;
   line-height: 1.55;
@@ -146,7 +145,6 @@
   animation: pf-blink 1s steps(1) infinite;
 }
 .pf__summary.typing .scaret { display: inline-block; }
-.pf__summary-body .serif { font-family: var(--font-display); font-style: italic; }
 
 /* ============ SCENE 2 · ACTIVITY + SIGNAL ============ */
 .pf__use {
@@ -289,7 +287,6 @@
   letter-spacing: -0.015em;
   color: var(--text-900);
 }
-.pf__signal-head .serif { font-family: var(--font-display); font-style: italic; }
 .pf__signal-sub { font-size: 12px; line-height: 1.5; color: var(--text-500); margin: 0; }
 
 .pf__signal-input {
@@ -340,7 +337,7 @@
 }
 .pf__signal-status.in, .pf__signal-saved.in { display: inline-flex; }
 .pf__signal-status { color: var(--text-500); }
-.pf__signal-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px rgba(47,125,251,.7); animation: gm-pulse 1.2s infinite; }
+.pf__signal-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: gm-pulse 1.2s infinite; }
 .pf__signal-saved { color: var(--ok); }
 .pf__signal-saved .ck {
   width: 16px; height: 16px; border-radius: 50%;

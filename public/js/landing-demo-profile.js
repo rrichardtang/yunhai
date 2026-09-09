@@ -44,9 +44,9 @@
     var updated = root.querySelector('[data-updated]');
     var whyEl = root.querySelector('[data-why]');
 
-    var WHY_BASE = 'A forested Shinto shrine in central Tokyo — a serene wooded walk that pairs neatly with Harajuku next door.';
-    var WHY_NEW = 'The west-gate path frames a clean sunset over the great wooden torii — exactly the kind of evening you flagged.';
-    var SUMMARY = "Curious, slow-paced, and food-led — you'd rather find the offbeat than tick off a top-10. Calm mornings, lively nights, and always somewhere with a view.";
+    var WHY_BASE = 'A forested Shinto shrine in central Tokyo, a serene wooded walk that pairs neatly with Harajuku next door.';
+    var WHY_NEW = 'The west-gate path frames a clean sunset over the great wooden torii, exactly the kind of evening you flagged.';
+    var SUMMARY = "Curious, slow-paced, and food-led. You'd rather find the offbeat than tick off a top-10. Calm mornings, lively nights, and always somewhere with a view.";
 
     function setAnswered(n) { bar.statv.textContent = n + ' / 4'; }
 
@@ -112,7 +112,7 @@
       var q4start = q3end + 360;
       tl.at(q4start - 120, function () { qs[3].classList.add('in', 'is-active', 'is-typing'); });
       var q4typed = qs[3].querySelector('.pfq__typed');
-      var q4end = typeInto(q4typed, 'Me + my partner — quiet mornings, lively nights', 24, tl, q4start, function () {
+      var q4end = typeInto(q4typed, 'Me + my partner. Quiet mornings, lively nights', 24, tl, q4start, function () {
         qs[3].classList.remove('is-typing', 'is-active'); setAnswered(4);
       });
 

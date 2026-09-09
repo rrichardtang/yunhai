@@ -1,6 +1,6 @@
 # Current State
 
-_Last updated: 2026-08-18_
+_Last updated: 2026-09-09_
 
 ## Objective
 Ship branch `claude/guide-me-setup-stuck-mszkyo`. Both open decisions are settled — `planCity` runs
@@ -14,6 +14,12 @@ Arrange step build its own first draft, deletes the Draft button, and reschedule
 whose day range actually moved (decisions [2026-08-17], both entries). It touches the frontend, the
 concierge guide, and the client half of the arrange call — no server planning or scheduling logic —
 so it does not interact with the GPT-5.6 verification and can deploy in any order relative to it.
+
+A third independent branch is queued: `claude/skill-doctor-1dzu19` is a visual overhaul of the
+landing page only (`public/index.html` plus the eight files under `public/styles/landing/`, and the
+display copy inside `public/js/landing-*.js`). No behaviour changed: every DOM hook the demo
+choreography selects on is intact, and no file under `src/` is touched. It is purely presentational
+and can deploy in any order relative to the other two.
 
 That branch also now carries the regenerate-scope work that came out of the Osaka report: the
 dialog pre-checks only the cities whose planning inputs actually changed, matched by city `id`, and
@@ -104,3 +110,7 @@ on two of our own bugs. Cost per activity rises ~1.7x, the one column Sonnet sti
    not started.
 3. Deploy behind the three queued branches, then walk the post-deploy checklist in
    open_items [2026-08-07].
+4. Landing overhaul (`claude/skill-doctor-1dzu19`): look at it in a real browser with the Geist
+   webfont actually loading. It was verified headless in this sandbox, where Google Fonts is
+   blocked by the proxy, so every screenshot behind it rendered in a fallback face. Line counts and
+   wrap behaviour will shift slightly under the real font.

@@ -15,6 +15,27 @@ per machine so account skills load in local sessions. (3) `git rm -r .claude/ski
 (5) Only after (2) is confirmed working, consider retiring `claude-config`'s skills half — until
 then it is the sole skill source for local sessions.
 
+## [2026-09-09] Landing hero wants a purpose-shot image
+**Status:** Deferred
+**Description:** The hero uses `public/img/demo/patios.jpg` (853x640), which belongs to the demo
+reel's activity-card library and also appears further down the page.
+**Context:** No image-generation tool was available in the session that built the overhaul, and
+picsum.photos placeholders are not appropriate on a production site. The chosen file is the best
+available real photograph that downscales cleanly into the hero box.
+**Next action:** Shoot or generate a dedicated hero asset at roughly 1600x1200, then swap the `src`,
+`width`, `height` and `alt` in the `.hero__figure` block of `public/index.html`.
+
+## [2026-09-09] Landing is light-only until the planner has a dark theme
+**Status:** Deferred
+**Description:** The landing ships no `prefers-color-scheme: dark` support, on purpose
+(decisions [2026-09-09]). The blocker is that the chapter demos render the real planner UI, which is
+light-only.
+**Context:** ~130 hardcoded colours sit across the six demo stylesheets, most of them on surfaces
+that assume a light page. The token layer alone will not carry a dark mode.
+**Next action:** When the planner (`public/styles.css`) gains a dark theme, do both together, and
+split `--accent` into separate text and fill roles first: no single blue passes AA both as text on
+a dark background and as a fill under white text.
+
 ## [2026-08-17] Watch the first keyed run of the dirty-city Arrange
 **Status:** Pending input (needs deploy)
 **Description:** Entering Arrange now fires `/api/arrange` with no click behind it, once per changed

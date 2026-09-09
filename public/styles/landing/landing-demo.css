@@ -26,11 +26,6 @@
   color: var(--text-900);
   max-width: 520px;
 }
-.reel__head h2 .serif {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 400;
-}
 .reel__lede {
   font-size: 17px;
   line-height: 1.55;
@@ -294,11 +289,6 @@
   line-height: 1.18;
   color: var(--paper-0);
   margin: 1px 0 0;
-}
-.reel__narrator-title .serif {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 400;
 }
 .reel__narrator-text {
   font-size: 13px;
