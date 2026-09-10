@@ -28,6 +28,31 @@ would silently yield zero windows for any en-dash hours string still in the syst
 **Next action:** Delete `parseOpeningWindows` and its export, or reconcile its regex with
 `arrangeValidator`'s. Deleting is preferred unless something is about to consume it.
 
+## [2026-09-10] Remaining planner motion proposals, awaiting a look at the first two
+**Status:** Pending input
+**Description:** A motion audit proposed five changes. The first two (easing-token adoption,
+reduced-motion collapse) are done and on `claude/skill-doctor-1dzu19`. Three remain, deliberately
+held back so the first two can be judged deployed.
+**Context:** (3) Step transitions are direction-blind. `.panel.active` gets `panelFadeIn .25s`,
+6px of travel, identical whether the user moves forward or back through the 5-step flow; direction
+is real wayfinding in a wizard. Needs a class set near `_stepTransitionLock` (`public/app.js:1080`)
+plus two keyframes. (4) Approve/decline has no moment: `public/app.js:4463` toggles `.approved` and
+only a border colour changes. The codebase already has the pattern to reuse, `staging-flash`
+(`public/styles.css:879`) and the add-then-remove-after-1s `cl-item--flash`. (5) Several
+`transition: width` on progress bars are probably fine, but `styles.css` transitions `width` and
+`height` alongside `transform` on one element; measure before touching.
+**Next action:** Owner to deploy and judge the first two, then say whether 3 and 4 are wanted.
+
+## [2026-09-10] Chat section keeps a second motion-token namespace
+**Status:** Deferred
+**Description:** `public/styles.css` defines `--ease-out` / `--ease-inout` / `--dur-*` at `:root`
+(line 2) and a parallel `--chat-ease-out` and friends in a second `:root` at line 1620.
+**Context:** Noticed during the easing-token pass, which deliberately left `var(--chat-*)`
+references untouched. Not a bug; the chat widget simply has its own scale. But two namespaces for
+the same concept is how the easing drift being fixed here started.
+**Next action:** Decide whether the chat tokens should alias the global ones or stay independent,
+then collapse or document accordingly. Low priority.
+
 ## [2026-09-09] Landing hero wants a purpose-shot image
 **Status:** Deferred
 **Description:** The hero uses `public/img/demo/patios.jpg` (853x640), which belongs to the demo

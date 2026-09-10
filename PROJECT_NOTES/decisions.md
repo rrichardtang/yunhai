@@ -1122,3 +1122,35 @@ drives the actual app in an iframe, are real proof and already carry that job.
 make; relabelling to something vaguer, which keeps the implication.
 **Tradeoffs:** The page loses an above-the-fold credibility beat. Restore it with real customers,
 or with a metric that is true, when there is one.
+
+## [2026-09-10] Reduced motion collapses by duration, never by `animation: none`
+**Decision:** The planner's `prefers-reduced-motion` block is one global
+`*, *::before, *::after` rule that caps `animation-duration`, `animation-delay`,
+`animation-iteration-count`, `transition-duration` and `transition-delay`, replacing the previous
+list of enumerated selectors. Loading spinners are the one exception and keep looping.
+**Reasoning:** Enumerating selectors is what let 9 of `styles.css`'s 22 keyframes escape the block;
+a global rule cannot be missed by a keyframe added later. `animation: none` is specifically wrong
+here because `.card-expand-overlay` is removed inside its own `animationend` handler
+(`public/app.js:4161` and `:4686`): with `none` that event never fires and the overlay stays on
+screen permanently. A 1ms animation still ends, so the handler still runs. Verified in a browser:
+the close event fires at 18ms under `reduce` versus 275ms normally.
+The iteration cap is required for the same reason it is needed at all, since an infinite animation
+left at 1ms duration would strobe rather than stop.
+**Alternatives rejected:** Adding the 9 missing selectors to the existing list, which fixes today's
+gap and leaves the mechanism that created it; a blanket `animation: none !important`, which is the
+overlay bug above.
+**Tradeoffs:** The block now reaches every element, so any future animation that genuinely needs to
+run under reduced motion has to opt out explicitly, as the spinners do.
+
+## [2026-09-10] Loading spinners keep animating under reduced motion
+**Decision:** `.btn-spinner` and `.activity-enriching-spinner` are exempt from the collapse and run
+at 1.4s instead of their 0.7s default.
+**Reasoning:** A spinner is the only signal that work is in flight, and the plan step runs for
+minutes (~186 sec/city). A frozen spinner reads as a hung app, which is a worse outcome for the
+user the rule is meant to protect. Slowing rather than stopping keeps the signal while removing the
+fast rotation. The planning overlay's decorative motion still stops, and that overlay keeps its
+text progress and progress bar, so it loses nothing load-bearing.
+**Alternatives rejected:** Letting the spinners freeze, which is what a naive global rule does;
+swapping them for a static icon, which is more code for the same information.
+**Tradeoffs:** Two selectors now carry `!important` overrides that must be kept in mind if the
+spinner markup is ever renamed.

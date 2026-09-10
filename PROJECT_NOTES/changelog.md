@@ -2119,3 +2119,17 @@ follows it, that Places hours never reach it, and that a named venue still gets 
 - Deleted 683 lines of dead CSS from `landing.css` (911 to 167): `.stage*`, `.features*`, `.feat*`,
   `.flow*`, `.hero__stats*`, `.hero__trust*`, `.heroapp*`, `.hstop*`, `.vis-*`, `.cta*`, `.marquee*`.
 - Net: 10 files, +215 / -1104 lines. No file under `src/` touched.
+
+## [2026-09-10] Planner motion pass: easing tokens and reduced motion
+- Adopted the existing easing tokens across `public/styles.css`: 62 replacements over 36 lines
+  (53 bare `ease`, 4 `ease-in-out`, 3 bare `ease-out`, 2 literal `cubic-bezier(.2,.8,.2,1)`).
+  Of 115 transition/animation declarations, 53 had been running on the browser default curve.
+  Verified `.panel.active` now computes `cubic-bezier(0.2, 0.8, 0.2, 1)` rather than `ease`.
+- Left all 6 `linear` timings alone: they drive spinners, the orbiting plane, the flowing route
+  dashes and two progress bars, all of which are correct as linear and would read as broken eased.
+- Replaced the enumerated `prefers-reduced-motion` block with a global duration-based collapse,
+  closing the 9 of 22 keyframes that escaped it (`btn-spin`, `enrichSpin`, `staging-flash`,
+  `cardExpandIn`, `cardExpandOut`, `panelFadeIn`, `chat-panel-in`, `wiz-scrim-in`, `wiz-card-in`).
+  Spinners exempted. See decisions above for why duration and not `animation: none`.
+- Scope: `public/styles.css` only, which is loaded only by `planner.html`. The landing page and
+  `src/` are untouched.
