@@ -11,6 +11,65 @@ way — both read `-` in `/skill-doctor`.
 **Next action:** None unless a cloud session needs them; uploading both to the account restores
 `/` access there.
 
+## [2026-09-09] Dead second opening-hours parser diverges from the live one
+**Status:** Deferred
+**Description:** `parseOpeningWindows` (`public/js/arrangeView.js:92`, exported at line 216) has no
+call sites; the only other mention is a comment at `public/app.js:5112`. Its range regex is
+`[\s-]+`, which accepts a hyphen but not an en-dash, while the live parser
+(`parseOpeningHours`, `src/arrangeValidator.js:30`) matches `[-–]` and accepts both.
+**Context:** Surfaced by the pre-push review of the landing overhaul. Not a live defect, and the
+overhaul's hyphenation of the demo time ranges moved those fixtures toward this parser rather than
+away from it. But a second, stricter parser sitting exported and unused is a trap: wiring it up
+would silently yield zero windows for any en-dash hours string still in the system.
+**Next action:** Delete `parseOpeningWindows` and its export, or reconcile its regex with
+`arrangeValidator`'s. Deleting is preferred unless something is about to consume it.
+
+## [2026-09-10] Remaining planner motion proposals, awaiting a look at the first two
+**Status:** Pending input
+**Description:** A motion audit proposed five changes. The first two (easing-token adoption,
+reduced-motion collapse) are done and on `claude/skill-doctor-1dzu19`. Three remain, deliberately
+held back so the first two can be judged deployed.
+**Context:** (3) Step transitions are direction-blind. `.panel.active` gets `panelFadeIn .25s`,
+6px of travel, identical whether the user moves forward or back through the 5-step flow; direction
+is real wayfinding in a wizard. Needs a class set near `_stepTransitionLock` (`public/app.js:1080`)
+plus two keyframes. (4) Approve/decline has no moment: `public/app.js:4463` toggles `.approved` and
+only a border colour changes. The codebase already has the pattern to reuse, `staging-flash`
+(`public/styles.css:879`) and the add-then-remove-after-1s `cl-item--flash`. (5) Several
+`transition: width` on progress bars are probably fine, but `styles.css` transitions `width` and
+`height` alongside `transform` on one element; measure before touching.
+**Next action:** Owner to deploy and judge the first two, then say whether 3 and 4 are wanted.
+
+## [2026-09-10] Chat section keeps a second motion-token namespace
+**Status:** Deferred
+**Description:** `public/styles.css` defines `--ease-out` / `--ease-inout` / `--dur-*` at `:root`
+(line 2) and a parallel `--chat-ease-out` and friends in a second `:root` at line 1620.
+**Context:** Noticed during the easing-token pass, which deliberately left `var(--chat-*)`
+references untouched. Not a bug; the chat widget simply has its own scale. But two namespaces for
+the same concept is how the easing drift being fixed here started.
+**Next action:** Decide whether the chat tokens should alias the global ones or stay independent,
+then collapse or document accordingly. Low priority.
+
+## [2026-09-09] Landing hero wants a purpose-shot image
+**Status:** Deferred
+**Description:** The hero uses `public/img/demo/patios.jpg` (853x640), which belongs to the demo
+reel's activity-card library and also appears further down the page.
+**Context:** No image-generation tool was available in the session that built the overhaul, and
+picsum.photos placeholders are not appropriate on a production site. The chosen file is the best
+available real photograph that downscales cleanly into the hero box.
+**Next action:** Shoot or generate a dedicated hero asset at roughly 1600x1200, then swap the `src`,
+`width`, `height` and `alt` in the `.hero__figure` block of `public/index.html`.
+
+## [2026-09-09] Landing is light-only until the planner has a dark theme
+**Status:** Deferred
+**Description:** The landing ships no `prefers-color-scheme: dark` support, on purpose
+(decisions [2026-09-09]). The blocker is that the chapter demos render the real planner UI, which is
+light-only.
+**Context:** ~130 hardcoded colours sit across the six demo stylesheets, most of them on surfaces
+that assume a light page. The token layer alone will not carry a dark mode.
+**Next action:** When the planner (`public/styles.css`) gains a dark theme, do both together, and
+split `--accent` into separate text and fill roles first: no single blue passes AA both as text on
+a dark background and as a fill under white text.
+
 ## [2026-08-17] Watch the first keyed run of the dirty-city Arrange
 **Status:** Pending input (needs deploy)
 **Description:** Entering Arrange now fires `/api/arrange` with no click behind it, once per changed

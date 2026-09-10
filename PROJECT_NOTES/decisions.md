@@ -1085,3 +1085,72 @@ tokens per turn on backend work to save typing a skill name on the rare frontend
 `~/.claude/skills/synced/`. Until that has been run, `claude-config` remains the only skill source
 locally, which is why its skills half is kept for now rather than retired. Uploading is manual —
 there is no API for it, so a new skill means a trip to claude.ai settings instead of a `git push`.
+
+## [2026-09-09] Landing emphasis drops the display serif for same-family weight
+**Decision:** `--font-display` ('Instrument Serif') is removed from the landing. The `.serif`
+emphasis span, used in 10 headlines across 8 stylesheets, is now one rule in `tokens.css` that
+shifts weight and colour within the existing sans.
+**Reasoning:** Mixing a second font family mid-headline is the most legible "generated" tell on the
+page, and it was duplicated verbatim in 8 files. One definition in the token layer removes both the
+tell and the duplication. The planner (`public/styles.css`) keeps its own serif and its own font
+link; the two surfaces were already independent.
+**Alternatives rejected:** Keeping the serif but rotating to a different face, which preserves the
+mixed-family problem; italicising the sans instead, which Geist has no italic cut for on Google
+Fonts and which would have synthesised an oblique.
+**Tradeoffs:** The landing loses an explicitly editorial note. Emphasis now reads as a colour shift,
+which is quieter and depends on the accent staying legible.
+
+## [2026-09-09] Landing ships light-only, deliberately
+**Decision:** No `prefers-color-scheme: dark` support on the landing page.
+**Reasoning:** The three chapter demos render simulations of the real planner UI, and the planner
+is light-only (`public/styles.css`, out of scope for this branch). A dark landing whose product
+screenshots stay light misrepresents the product, and a dark landing that hands off to a light app
+is a worse experience than a consistent light one. The blocker is the app's single mode, not effort.
+**Alternatives rejected:** Inverting the neutral scale in the token layer alone, which leaves ~130
+hardcoded colours across the six demo stylesheets on assumed-light surfaces; shipping a partial
+dark mode, which breaks the footer, the Pro pricing card and the demo internals.
+**Tradeoffs:** Visitors with a dark system preference get a light page. Revisit when the planner
+itself gains a dark theme, and do both together.
+
+## [2026-09-09] Fabricated social proof removed rather than restyled
+**Decision:** The "Trusted by travelers from" strip listing Stripe, Notion, Figma, Linear, Ramp and
+Vercel is deleted, not rebuilt with real logo SVGs.
+**Reasoning:** On a live public site that row reads as a customer claim. It is not one, and styling
+it more convincingly makes it worse rather than better. The three scripted demos and the reel, which
+drives the actual app in an iframe, are real proof and already carry that job.
+**Alternatives rejected:** Real SVG wordmarks from Simple Icons, which sharpens a claim we cannot
+make; relabelling to something vaguer, which keeps the implication.
+**Tradeoffs:** The page loses an above-the-fold credibility beat. Restore it with real customers,
+or with a metric that is true, when there is one.
+
+## [2026-09-10] Reduced motion collapses by duration, never by `animation: none`
+**Decision:** The planner's `prefers-reduced-motion` block is one global
+`*, *::before, *::after` rule that caps `animation-duration`, `animation-delay`,
+`animation-iteration-count`, `transition-duration` and `transition-delay`, replacing the previous
+list of enumerated selectors. Loading spinners are the one exception and keep looping.
+**Reasoning:** Enumerating selectors is what let 9 of `styles.css`'s 22 keyframes escape the block;
+a global rule cannot be missed by a keyframe added later. `animation: none` is specifically wrong
+here because `.card-expand-overlay` is removed inside its own `animationend` handler
+(`public/app.js:4161` and `:4686`): with `none` that event never fires and the overlay stays on
+screen permanently. A 1ms animation still ends, so the handler still runs. Verified in a browser:
+the close event fires at 18ms under `reduce` versus 275ms normally.
+The iteration cap is required for the same reason it is needed at all, since an infinite animation
+left at 1ms duration would strobe rather than stop.
+**Alternatives rejected:** Adding the 9 missing selectors to the existing list, which fixes today's
+gap and leaves the mechanism that created it; a blanket `animation: none !important`, which is the
+overlay bug above.
+**Tradeoffs:** The block now reaches every element, so any future animation that genuinely needs to
+run under reduced motion has to opt out explicitly, as the spinners do.
+
+## [2026-09-10] Loading spinners keep animating under reduced motion
+**Decision:** `.btn-spinner` and `.activity-enriching-spinner` are exempt from the collapse and run
+at 1.4s instead of their 0.7s default.
+**Reasoning:** A spinner is the only signal that work is in flight, and the plan step runs for
+minutes (~186 sec/city). A frozen spinner reads as a hung app, which is a worse outcome for the
+user the rule is meant to protect. Slowing rather than stopping keeps the signal while removing the
+fast rotation. The planning overlay's decorative motion still stops, and that overlay keeps its
+text progress and progress bar, so it loses nothing load-bearing.
+**Alternatives rejected:** Letting the spinners freeze, which is what a naive global rule does;
+swapping them for a static icon, which is more code for the same information.
+**Tradeoffs:** Two selectors now carry `!important` overrides that must be kept in mind if the
+spinner markup is ever renamed.
