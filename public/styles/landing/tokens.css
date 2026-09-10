@@ -26,8 +26,8 @@
   --hair-dark: rgba(244, 241, 236, 0.10); /* hairline on dark */
 
   /* Accent — electric ocean */
-  --accent: #2F7DFB;
-  --accent-hover: #1D6DE8;
+  --accent: #1560D8;
+  --accent-hover: #0B4AB8;
   --accent-soft: #E6EFFE;
   --accent-deep: #0B4AB8;
 
@@ -37,8 +37,7 @@
   --err: #C0362C;
 
   /* Type */
-  --font-display: 'Instrument Serif', 'Cormorant Garamond', Georgia, serif;
-  --font-sans: 'Geist', 'Inter', 'Söhne', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Geist', 'Söhne', system-ui, -apple-system, sans-serif;
   --font-mono: 'Geist Mono', 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
 
   /* Radii — tight on data, pill on buttons */
@@ -52,7 +51,7 @@
   --sh-sm: 0 1px 2px rgba(10,22,40,.04), 0 1px 1px rgba(10,22,40,.03);
   --sh-md: 0 4px 18px rgba(10,22,40,.06), 0 2px 6px rgba(10,22,40,.04);
   --sh-lg: 0 24px 60px rgba(10,22,40,.12), 0 8px 20px rgba(10,22,40,.06);
-  --sh-glow: 0 0 0 1px rgba(47,125,251,.25), 0 10px 40px rgba(47,125,251,.18);
+  --sh-accent: 0 6px 20px rgba(11,74,184,.22);
 
   /* Motion */
   --ease-out: cubic-bezier(.2, .8, .2, 1);
@@ -112,6 +111,13 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
 
 /* ---------- Primitives ---------- */
 
+/* Emphasis inside a headline. Same family as its parent on purpose:
+   a second font family mid-sentence reads as a mistake, not as emphasis. */
+.serif {
+  font-weight: 500;
+  color: var(--accent-deep);
+}
+
 .gm-mono {
   font-family: var(--font-mono);
   font-feature-settings: 'tnum', 'zero';
@@ -160,13 +166,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   gap: 1px;
 }
 .gm-logo__word .me {
-  font-style: italic;
-  font-family: var(--font-display);
   font-weight: 400;
-  margin-left: 2px;
-  font-size: 1.05em;
+  color: var(--text-500);
   line-height: 1;
 }
+.gm-logo.on-dark .gm-logo__word .me { color: rgba(244, 241, 236, 0.62); }
 
 /* Buttons */
 .gm-btn {
@@ -198,7 +202,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
   background: var(--accent);
   color: #fff;
 }
-.gm-btn--accent:hover { background: var(--accent-hover); box-shadow: var(--sh-glow); }
+.gm-btn--accent:hover { background: var(--accent-hover); box-shadow: var(--sh-accent); }
 
 .gm-btn--ghost {
   background: transparent;
@@ -258,16 +262,26 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
 }
 .gm-ai-mark::before {
   content: '';
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 8px rgba(47,125,251,.6);
-  animation: gm-pulse 1.8s infinite var(--ease-inout);
 }
+
+/* Live-state indicator only: a dot that marks work in progress. */
 @keyframes gm-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.7); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+/* The demo choreography is timer-driven and never waits on transitionend, so
+   collapsing CSS motion here still lets every demo play through to its end state. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Card */

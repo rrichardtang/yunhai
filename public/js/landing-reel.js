@@ -290,132 +290,132 @@
 
   const DEMO_ACTIVITIES = [
     act({ id: 'demo-mezquita', name: 'Mezquita-Catedral de Córdoba', city: CORDOBA, type: 'landmark',
-      why_it_fits: 'A UNESCO masterpiece — a forest of red-and-white arches you can wander for hours. Exactly the kind of slow, architectural awe you flagged.',
-      pitfall: 'Late-morning tour groups swarm the prayer hall — go right at opening.',
+      why_it_fits: 'A UNESCO masterpiece, a forest of red-and-white arches you can wander for hours. Exactly the kind of slow, architectural awe you flagged.',
+      pitfall: 'Late-morning tour groups swarm the prayer hall. Go right at opening.',
       booking_advice: 'Buy timed-entry tickets online; the on-site queue eats an hour.',
-      insider_tips: 'Free entry weekday mornings 08:30–09:30 if you skip the guided route.',
-      estimated_cost_usd: 13, duration_hours: 2, opening_hours: '08:30–19:00',
+      insider_tips: 'Free entry weekday mornings 08:30-09:30 if you skip the guided route.',
+      estimated_cost_usd: 13, duration_hours: 2, opening_hours: '08:30-19:00',
       // Fixed time → enables the Arrange "Finalize" button (updateFinalizeBtn gate).
       timing: { fixed: { date: '2026-04-25', time: '09:30' } } }),
     act({ id: 'demo-alcazar-cor', name: 'Alcázar de los Reyes Cristianos', city: CORDOBA, type: 'outdoors',
-      why_it_fits: 'Terraced gardens, fountains and Moorish towers a six-minute walk from the Mezquita — an easy second stop.',
+      why_it_fits: 'Terraced gardens, fountains and Moorish towers a six-minute walk from the Mezquita, an easy second stop.',
       pitfall: 'Limited shade at midday; the garden loop is exposed.',
-      booking_advice: 'No reservation needed — pay at the gate.',
-      estimated_cost_usd: 5, duration_hours: 1.5, opening_hours: '09:15–20:00',
+      booking_advice: 'No reservation needed. Pay at the gate.',
+      estimated_cost_usd: 5, duration_hours: 1.5, opening_hours: '09:15-20:00',
       // Pre-locked in the Finalize checklist (as if already booked/checked off).
       timing: { fixed: { date: '2026-04-25', time: '13:45' } } }),
     act({ id: 'demo-patios', name: 'Patios de San Basilio', city: CORDOBA, type: 'outdoors',
-      why_it_fits: 'Hidden flower-filled courtyards locals open to visitors — the offbeat, non-top-10 find you love.',
+      why_it_fits: 'Hidden flower-filled courtyards locals open to visitors, the offbeat, non-top-10 find you love.',
       pitfall: 'Best in May during the Patio Festival; some close midday.',
       booking_advice: 'A few patios take a small donation at the door.',
-      estimated_cost_usd: 0, duration_hours: 1, opening_hours: '11:00–14:00, 18:00–22:00' }),
+      estimated_cost_usd: 0, duration_hours: 1, opening_hours: '11:00-14:00, 18:00-22:00' }),
     act({ id: 'demo-bodegas', name: 'Lunch at Bodegas Mezquita', city: CORDOBA, type: 'food',
-      why_it_fits: 'Classic Córdoban plates — salmorejo, oxtail, no seafood in sight — a short walk from the old town.',
+      why_it_fits: 'Classic Córdoban plates (salmorejo, oxtail, no seafood in sight), a short walk from the old town.',
       pitfall: 'Fills up by 2pm with tour groups.',
       booking_advice: 'Walk-ins fine before 1:30pm, otherwise book ahead.',
-      estimated_cost_usd: 28, duration_hours: 1, opening_hours: '12:00–16:00, 20:00–23:00',
+      estimated_cost_usd: 28, duration_hours: 1, opening_hours: '12:00-16:00, 20:00-23:00',
       // Pre-locked in the Finalize checklist (as if already booked/checked off).
       timing: { fixed: { date: '2026-04-25', time: '12:00' } } }),
     act({ id: 'demo-puente', name: 'Puente Romano & Calahorra Tower', city: CORDOBA, type: 'landmark',
-      why_it_fits: 'The Roman bridge over the Guadalquivir at golden hour — the kind of slow riverside view you asked for.',
+      why_it_fits: 'The Roman bridge over the Guadalquivir at golden hour, the kind of slow riverside view you asked for.',
       pitfall: 'Very exposed; skip it at midday heat.',
       booking_advice: 'Bridge is free; tower museum is a few euros.',
-      estimated_cost_usd: 5, duration_hours: 1, opening_hours: '10:00–19:00' }),
+      estimated_cost_usd: 5, duration_hours: 1, opening_hours: '10:00-19:00' }),
     act({ id: 'demo-juderia', name: 'Judería Old-Town Wander', city: CORDOBA, type: 'outdoors',
-      why_it_fits: 'Whitewashed lanes, hidden plazas and craft shops — exactly the offbeat, on-foot drifting you love.',
+      why_it_fits: 'Whitewashed lanes, hidden plazas and craft shops, exactly the offbeat, on-foot drifting you love.',
       pitfall: 'Easy to get turned around; that’s half the fun.',
-      booking_advice: 'No booking — just wander.',
+      booking_advice: 'No booking. Just wander.',
       estimated_cost_usd: 0, duration_hours: 1, opening_hours: 'Open daily' }),
     // --- Córdoba arrival afternoon (Apr 24) ---
     act({ id: 'demo-mercado', name: 'Mercado Victoria Food Hall', city: CORDOBA, type: 'food',
-      why_it_fits: 'A buzzing covered market to land in — small plates, local wine, zero seafood pressure. Easy first stop off the train.',
+      why_it_fits: 'A buzzing covered market to land in: small plates, local wine, zero seafood pressure. Easy first stop off the train.',
       pitfall: 'Busiest right at lunch; mid-afternoon is calmer.',
-      booking_advice: 'No booking — grab a stool at any stall.',
-      estimated_cost_usd: 18, duration_hours: 1, opening_hours: '12:00–24:00' }),
+      booking_advice: 'No booking. Grab a stool at any stall.',
+      estimated_cost_usd: 18, duration_hours: 1, opening_hours: '12:00-24:00' }),
     act({ id: 'demo-vinos', name: 'Taberna Sunset on Calleja de las Flores', city: CORDOBA, type: 'nightlife',
-      why_it_fits: 'A glass of Montilla in the prettiest flowered alley as the light goes gold — a slow, lively first evening.',
+      why_it_fits: 'A glass of Montilla in the prettiest flowered alley as the light goes gold. A slow, lively first evening.',
       pitfall: 'The famous alley gets photo-crowded; go for the side tabernas.',
       booking_advice: 'Walk-in; cash is handy.',
-      estimated_cost_usd: 12, duration_hours: 1, opening_hours: '18:00–24:00' }),
+      estimated_cost_usd: 12, duration_hours: 1, opening_hours: '18:00-24:00' }),
     act({ id: 'demo-realalcazar', name: 'Real Alcázar de Sevilla', city: SEVILLE, type: 'landmark',
-      why_it_fits: 'The royal palace from Game of Thrones — tilework, sunken baths and the Ambassadors’ hall. Unmissable in Seville.',
+      why_it_fits: 'The royal palace from Game of Thrones: tilework, sunken baths and the Ambassadors’ hall. Unmissable in Seville.',
       pitfall: 'Sells out days ahead in spring.',
-      booking_advice: 'Book the first 09:30 slot online — mornings are calm and cool.',
-      estimated_cost_usd: 15, duration_hours: 2.5, opening_hours: '09:30–17:00' }),
+      booking_advice: 'Book the first 09:30 slot online. Mornings are calm and cool.',
+      estimated_cost_usd: 15, duration_hours: 2.5, opening_hours: '09:30-17:00' }),
     act({ id: 'demo-flamenco', name: 'Flamenco at La Carbonería', city: SEVILLE, type: 'nightlife',
-      why_it_fits: 'A raw, no-cover tablao in a candlelit old coal yard — the lively-nights energy from your profile.',
+      why_it_fits: 'A raw, no-cover tablao in a candlelit old coal yard, the lively-nights energy from your profile.',
       pitfall: 'No reservations; arrive 30 min early for a seat.',
-      booking_advice: 'Free entry, buy a drink — cash only.',
-      estimated_cost_usd: 8, cost_type: 'per_person', duration_hours: 1.5, opening_hours: '20:00–02:00' }),
+      booking_advice: 'Free entry, buy a drink. Cash only.',
+      estimated_cost_usd: 8, cost_type: 'per_person', duration_hours: 1.5, opening_hours: '20:00-02:00' }),
     act({ id: 'demo-plaza-espana', name: 'Plaza de España', city: SEVILLE, type: 'landmark',
-      why_it_fits: 'A half-kilometre tiled crescent best at golden hour — exactly the view-at-sunset moment you asked for.',
+      why_it_fits: 'A half-kilometre tiled crescent best at golden hour, exactly the view-at-sunset moment you asked for.',
       pitfall: 'Crowded by afternoon; rowboats have a long queue.',
-      booking_advice: 'Free and open-air — no booking.',
+      booking_advice: 'Free and open-air. No booking.',
       estimated_cost_usd: 0, duration_hours: 1, opening_hours: 'Open 24h' }),
     act({ id: 'demo-catedral', name: 'Seville Cathedral & Giralda Climb', city: SEVILLE, type: 'landmark',
       why_it_fits: 'The world’s largest Gothic cathedral, then a ramped climb up the Giralda for the whole-city view.',
       pitfall: 'Long midday queues; the ramp gets warm.',
       booking_advice: 'Buy a timed combined ticket online.',
-      estimated_cost_usd: 12, duration_hours: 1.5, opening_hours: '11:00–17:00' }),
+      estimated_cost_usd: 12, duration_hours: 1.5, opening_hours: '11:00-17:00' }),
     act({ id: 'demo-triana', name: 'Triana Market & Riverside Walk', city: SEVILLE, type: 'outdoors',
-      why_it_fits: 'Cross the river to the ceramic quarter — a working market and a slow walk back along the Guadalquivir.',
+      why_it_fits: 'Cross the river to the ceramic quarter, a working market and a slow walk back along the Guadalquivir.',
       pitfall: 'Market winds down by mid-afternoon.',
       booking_advice: 'No booking needed.',
-      estimated_cost_usd: 0, duration_hours: 1, opening_hours: '09:00–15:00' }),
+      estimated_cost_usd: 0, duration_hours: 1, opening_hours: '09:00-15:00' }),
     act({ id: 'demo-setas', name: 'Las Setas de Sevilla', city: SEVILLE, type: 'landmark',
-      why_it_fits: 'The giant timber “mushrooms” — a rooftop walkway that’s pure sunset territory, just like you flagged.',
+      why_it_fits: 'The giant timber “mushrooms”, a rooftop walkway that’s pure sunset territory, just like you flagged.',
       pitfall: 'Last entry is well before close; check times.',
       booking_advice: 'Small entry fee; pay at the lift.',
-      estimated_cost_usd: 5, duration_hours: 1, opening_hours: '10:00–23:00' }),
+      estimated_cost_usd: 5, duration_hours: 1, opening_hours: '10:00-23:00' }),
 
     // --- Filler stops: calendar/checklist only (not in Review). No photos needed — the
     //     Arrange/Finalize cards show time + icon + name, not an image. ---
     // Córdoba
     act({ id: 'demo-sinagoga', name: 'Sinagoga & Casa de Sefarad', city: CORDOBA, type: 'culture',
-      why_it_fits: 'A tiny 14th-c. synagogue and Sephardic museum tucked in the Judería — exactly the offbeat history you like.',
+      why_it_fits: 'A tiny 14th-c. synagogue and Sephardic museum tucked in the Judería, exactly the offbeat history you like.',
       pitfall: 'Very small; it fills fast with tour groups.', booking_advice: 'Cheap entry, pay at the door.',
-      estimated_cost_usd: 3, duration_hours: 1, opening_hours: '09:00–20:00' }),
+      estimated_cost_usd: 3, duration_hours: 1, opening_hours: '09:00-20:00' }),
     act({ id: 'demo-viana', name: 'Palacio de Viana Patios', city: CORDOBA, type: 'outdoors',
-      why_it_fits: 'Twelve connected courtyards in a noble house — the patio city at its most peaceful.',
+      why_it_fits: 'Twelve connected courtyards in a noble house, the patio city at its most peaceful.',
       pitfall: 'Closed Mondays; last entry early.', booking_advice: 'Ticket at the gate, no need to pre-book.',
-      estimated_cost_usd: 8, duration_hours: 1.5, opening_hours: '10:00–19:00' }),
+      estimated_cost_usd: 8, duration_hours: 1.5, opening_hours: '10:00-19:00' }),
     act({ id: 'demo-hammam-cor', name: 'Hammam Al Ándalus Córdoba', city: CORDOBA, type: 'wellness',
-      why_it_fits: 'A candlelit thermal-bath wind-down after a full day on foot — slow travel, literally.',
+      why_it_fits: 'A candlelit thermal-bath wind-down after a full day on foot. Slow travel, literally.',
       pitfall: 'Timed sessions; arrive 15 min early.', booking_advice: 'Reserve a slot online; bring a swimsuit.',
-      estimated_cost_usd: 38, duration_hours: 1.5, opening_hours: '10:00–24:00' }),
+      estimated_cost_usd: 38, duration_hours: 1.5, opening_hours: '10:00-24:00' }),
     act({ id: 'demo-tablao-cor', name: 'Tablao Flamenco Cardenal', city: CORDOBA, type: 'nightlife',
-      why_it_fits: 'An intimate courtyard flamenco show — the lively-nights energy without the tourist arena.',
+      why_it_fits: 'An intimate courtyard flamenco show, the lively-nights energy without the tourist arena.',
       pitfall: 'One show a night; it sells out.', booking_advice: 'Book the evening show ahead.',
-      estimated_cost_usd: 23, cost_type: 'per_person', duration_hours: 1.5, opening_hours: '20:00–23:00' }),
+      estimated_cost_usd: 23, cost_type: 'per_person', duration_hours: 1.5, opening_hours: '20:00-23:00' }),
     act({ id: 'demo-salmorejo', name: 'Salmorejo tasting at La Boca', city: CORDOBA, type: 'food',
-      why_it_fits: 'Creative Córdoban small plates — and no seafood on the tasting menu, just as you asked.',
+      why_it_fits: 'Creative Córdoban small plates, and no seafood on the tasting menu, just as you asked.',
       pitfall: 'Tiny dining room; book or go early.', booking_advice: 'Reserve for dinner.',
-      estimated_cost_usd: 34, duration_hours: 1.5, opening_hours: '13:00–16:00, 20:00–23:30' }),
+      estimated_cost_usd: 34, duration_hours: 1.5, opening_hours: '13:00-16:00, 20:00-23:30' }),
     // Seville
     act({ id: 'demo-barrio-santa-cruz', name: 'Barrio Santa Cruz Wander', city: SEVILLE, type: 'outdoors',
-      why_it_fits: 'Orange-tree plazas and twisting lanes in the old Jewish quarter — pure aimless-drift territory.',
-      pitfall: 'Easy to lose the crowd and yourself; bring water.', booking_advice: 'No booking — just wander.',
+      why_it_fits: 'Orange-tree plazas and twisting lanes in the old Jewish quarter, pure aimless-drift territory.',
+      pitfall: 'Easy to lose the crowd and yourself; bring water.', booking_advice: 'No booking. Just wander.',
       estimated_cost_usd: 0, duration_hours: 1, opening_hours: 'Open daily' }),
     act({ id: 'demo-tapas-lonja', name: 'Tapas crawl · El Arenal', city: SEVILLE, type: 'food',
-      why_it_fits: 'Three classic tabernas, one street — Iberian ham and Rioja, zero seafood pressure.',
+      why_it_fits: 'Three classic tabernas, one street: Iberian ham and Rioja, zero seafood pressure.',
       pitfall: 'Standing-room only after 9pm.', booking_advice: 'No booking; go stool to stool.',
-      estimated_cost_usd: 26, duration_hours: 1.5, opening_hours: '12:00–16:00, 20:00–24:00' }),
+      estimated_cost_usd: 26, duration_hours: 1.5, opening_hours: '12:00-16:00, 20:00-24:00' }),
     act({ id: 'demo-metropol-bar', name: 'Sunset drinks above Las Setas', city: SEVILLE, type: 'nightlife',
-      why_it_fits: 'A rooftop drink as the city turns gold — the sunset view you keep flagging, with a glass in hand.',
+      why_it_fits: 'A rooftop drink as the city turns gold, the sunset view you keep flagging, with a glass in hand.',
       pitfall: 'Limited seats at golden hour.', booking_advice: 'Walk-in; arrive before sunset.',
-      estimated_cost_usd: 14, duration_hours: 1, opening_hours: '17:00–01:00' }),
+      estimated_cost_usd: 14, duration_hours: 1, opening_hours: '17:00-01:00' }),
     act({ id: 'demo-maria-luisa', name: 'Parque de María Luisa stroll', city: SEVILLE, type: 'outdoors',
-      why_it_fits: 'Shaded fountains and tiled benches beside Plaza de España — a calm green pause mid-day.',
+      why_it_fits: 'Shaded fountains and tiled benches beside Plaza de España, a calm green pause mid-day.',
       pitfall: 'Big; pick one loop rather than all of it.', booking_advice: 'Free, open all day.',
       estimated_cost_usd: 0, duration_hours: 1, opening_hours: 'Open daily' }),
     act({ id: 'demo-casa-pilatos', name: 'Casa de Pilatos', city: SEVILLE, type: 'culture',
       why_it_fits: 'A half-palace of Mudéjar tilework and a quiet courtyard most top-10 lists skip.',
       pitfall: 'Upper floor is guided-only and timed.', booking_advice: 'Ground-floor ticket at the door.',
-      estimated_cost_usd: 10, duration_hours: 1, opening_hours: '09:00–18:00' }),
+      estimated_cost_usd: 10, duration_hours: 1, opening_hours: '09:00-18:00' }),
     act({ id: 'demo-hospital-caridad', name: 'Hospital de los Venerables', city: SEVILLE, type: 'culture',
-      why_it_fits: 'A jewel-box baroque chapel and patio in Santa Cruz — small, calm, and skippable-by-crowds.',
+      why_it_fits: 'A jewel-box baroque chapel and patio in Santa Cruz: small, calm, and skippable-by-crowds.',
       pitfall: 'Short visit; pairs well with the barrio walk.', booking_advice: 'Ticket at the door.',
-      estimated_cost_usd: 8, duration_hours: 1, opening_hours: '10:00–18:00' })
+      estimated_cost_usd: 8, duration_hours: 1, opening_hours: '10:00-18:00' })
   ];
 
   // The 02/Review beat shows a curated, photo-backed subset (the filler stops below exist
@@ -437,7 +437,7 @@
   const DEMO_REVIEWED_ARRANGED = Object.fromEntries(
     DEMO_ACTIVITIES.map((a) => [a.id, {
       approved: true,
-      notes: a.id === 'demo-mezquita' ? 'Book the 08:30 slot — quietest light for photos.' : ''
+      notes: a.id === 'demo-mezquita' ? 'Book the 08:30 slot. Quietest light for photos.' : ''
     }])
   );
 
@@ -512,11 +512,11 @@
   // app's enrichActivity() (called by replaceActivityInState) makes no network calls.
   const REPLACEMENT = act({
     id: 'demo-patios-replacement', name: 'Hammam Al Ándalus (Arab baths)', city: CORDOBA, type: 'wellness',
-    why_it_fits: 'A candlelit thermal bath circuit in a restored Moorish house — a calm, offbeat evening that fits your slow-travel pace better than another courtyard walk.',
+    why_it_fits: 'A candlelit thermal bath circuit in a restored Moorish house, a calm, offbeat evening that fits your slow-travel pace better than another courtyard walk.',
     pitfall: 'Sessions are timed; latecomers lose part of the slot.',
     booking_advice: 'Reserve a 90-minute slot online; bring a swimsuit.',
-    insider_tips: 'The 21:00 session is quietest — almost private midweek.',
-    estimated_cost_usd: 42, duration_hours: 1.5, opening_hours: '10:00–24:00',
+    insider_tips: 'The 21:00 session is quietest, almost private midweek.',
+    estimated_cost_usd: 42, duration_hours: 1.5, opening_hours: '10:00-24:00',
     place_id: 'demo-place-hammam', price_level: 2
   });
 
@@ -560,7 +560,7 @@
         await eng.narrate(
           'City & dates',
           'Pick the city. Pick the dates.',
-          'Type any city — YunHai resolves it through Google Places. Check-in and check-out drive the rest of the trip math.',
+          'Type any city. YunHai resolves it through Google Places. Check-in and check-out drive the rest of the trip math.',
           'br'
         );
         await eng.type(NEW_CITY + ' [data-field="name"]', 'Seville, Spain', { padding: 200 });
@@ -581,7 +581,7 @@
         await eng.narrate(
           'Arrival',
           'How you get into town.',
-          'Train, flight, car — your arrival becomes the start of the first full day. Nothing schedules before you actually get there.',
+          'Train, flight, car: your arrival becomes the start of the first full day. Nothing schedules before you actually get there.',
           'tr'
         );
         await eng.click(NEW_CITY + ' [data-tab="arrival"]', { travel: 700, padding: 160 });
@@ -609,14 +609,14 @@
         await eng.narrate(
           'Notes',
           'Tell it what you actually like.',
-          'The more honest, specific signals you give — tastes, dislikes, must-dos — the better your plan. A few clear bullet points beat a paragraph.',
+          'The more honest, specific signals you give (tastes, dislikes, must-dos), the better your plan. A few clear bullet points beat a paragraph.',
           'tr'
         );
         await eng.click(NEW_CITY + ' [data-tab="notes"]', { travel: 700, padding: 160 });
         await eng.wait(300);
         await eng.type(
           NEW_CITY + ' [data-field="notes"]',
-          '- I’ve heard a lot about flamenco shows and want to check one out\n- I don’t like paella or other seafood\n- Prefer slow mornings, lively nights\n- Reservation at Eslava — Apr 27, 21:00',
+          '- I’ve heard a lot about flamenco shows and want to check one out\n- I don’t like paella or other seafood\n- Prefer slow mornings, lively nights\n- Reservation at Eslava, Apr 27, 21:00',
           { padding: 240, speedMin: 18, speedMax: 40 }
         );
         await eng.wait(700);
@@ -661,7 +661,7 @@
         await eng.narrate(
           'Step 02 · Review',
           'Every suggestion is a card.',
-          'Real venues from Google Places — what it costs, why it fits you, the pitfalls, and booking advice. No fabricated top-10 filler.',
+          'Real venues from Google Places: what it costs, why it fits you, the pitfalls, and booking advice. No fabricated top-10 filler.',
           'tr'
         );
         await eng.wait(900);
@@ -670,7 +670,7 @@
         await eng.narrate(
           'Approve',
           'Keep the ones you love.',
-          'Approve adds it to your trip and the running budget. Tap again to un-approve — nothing is locked until you say so.',
+          'Approve adds it to your trip and the running budget. Tap again to un-approve. Nothing is locked until you say so.',
           'tr'
         );
         await focusCard('demo-alcazar-cor');
@@ -681,7 +681,7 @@
         await eng.narrate(
           'Decline',
           'Drop what doesn’t fit.',
-          'Decline dismisses a suggestion. If it was scheduled, it leaves your days too — so the plan always reflects what you actually want.',
+          'Decline dismisses a suggestion. If it was scheduled, it leaves your days too, so the plan always reflects what you actually want.',
           'tl'
         );
         await focusCard('demo-plaza-espana');
@@ -692,11 +692,11 @@
         await eng.narrate(
           'Notes',
           'Pin a reminder to any stop.',
-          'Reservation refs, who’s coming, a must-try dish — saved right on the card and folded into the plan.',
+          'Reservation refs, who’s coming, a must-try dish, saved right on the card and folded into the plan.',
           'tr'
         );
         await focusCard('demo-mezquita');
-        await eng.type(`#actNotes-demo-mezquita`, 'Book the 08:30 slot — quietest light for photos.', { padding: 200, scroll: false });
+        await eng.type(`#actNotes-demo-mezquita`, 'Book the 08:30 slot. Quietest light for photos.', { padding: 200, scroll: false });
         await eng.wait(250);
         await tap(inCard('demo-mezquita', '.save-activity-notes'), { travel: 650 });
         await eng.wait(1100);
@@ -706,7 +706,7 @@
         await eng.narrate(
           'Don’t love it? Swap it.',
           'Ask for something that fits better.',
-          'Say why in a line, and YunHai replaces it with a smarter match tuned to your taste — here, a calm evening over another courtyard walk.',
+          'Say why in a line, and YunHai replaces it with a smarter match tuned to your taste: here, a calm evening over another courtyard walk.',
           'bl'
         );
         await focusCard('demo-patios');
@@ -740,10 +740,10 @@
         await eng.wait(900);
 
         // Fields live in a centered overlay — no page scroll needed (scroll:false).
-        await eng.type('#addActivityName', 'Cooking class — Andalusian tapas', { scroll: false, padding: 0 });
+        await eng.type('#addActivityName', 'Cooking class: Andalusian tapas', { scroll: false, padding: 0 });
         await eng.wait(250);
         await eng.setValue('#addActivityCost', '55', { scroll: false, after: 250 });
-        await eng.type('#addActivityWhy', 'A hands-on evening making local tapas — fits the “lively nights, no seafood” notes from setup.', { scroll: false, padding: 0, speedMin: 22, speedMax: 44 });
+        await eng.type('#addActivityWhy', 'A hands-on evening making local tapas, fits the “lively nights, no seafood” notes from setup.', { scroll: false, padding: 0, speedMin: 22, speedMax: 44 });
         await eng.wait(900);
         await eng.cursorTo('#addActivitySubmit', { travel: 700, scroll: false });
         await eng.wait(1100);
@@ -773,7 +773,7 @@
         await eng.narrate(
           'Step 03 · Arrange',
           'Your days, laid out on a real clock.',
-          'Approved stops sit on a true hourly timeline — drag to move or resize, and overlaps become obvious at a glance.',
+          'Approved stops sit on a true hourly timeline. Drag to move or resize, and overlaps become obvious at a glance.',
           'br'
         );
         await eng.wait(1400);
@@ -816,7 +816,7 @@
         await eng.narrate(
           'No ticket needed?',
           'One tap files it away.',
-          'Free or walk-in stops don’t need a booking — tap the ticket to move them to “Booking Not Required.”',
+          'Free or walk-in stops don’t need a booking. Tap the ticket to move them to “Booking Not Required.”',
           'tr'
         );
         await focusRow('Judería');
@@ -827,7 +827,7 @@
         await eng.narrate(
           'Lock in a booking',
           'Time, confirmation, done.',
-          'Open a stop, set its time, drop in the confirmation number, and check it off — now it’s locked to your plan.',
+          'Open a stop, set its time, drop in the confirmation number, and check it off. Now it’s locked to your plan.',
           'tr'
         );
         await focusRow('Mezquita');
@@ -865,7 +865,7 @@
         await eng.narrate(
           'Scheduling preferences',
           'Set the rhythm once.',
-          'Day start and end, when you eat, and how much downtime between stops — YunHai schedules every day to match.',
+          'Day start and end, when you eat, and how much downtime between stops. YunHai schedules every day to match.',
           'br'
         );
         await eng.click('#schedulingWizardBtn', { travel: 1000, padding: 160, after: 800 });
@@ -893,7 +893,7 @@
         await eng.narrate(
           'Finalize',
           'Lock it in.',
-          'Already-booked stops stay pinned to their times; YunHai fits everything else around them — then drops in real drive times between stops.',
+          'Already-booked stops stay pinned to their times; YunHai fits everything else around them, then drops in real drive times between stops.',
           'tr'
         );
         await eng.click('#finalizeArrangeBtn', { travel: 1000, padding: 160, after: 800 });
@@ -902,7 +902,7 @@
         await eng.narrate(
           'You’re in control',
           'Lock the rest with a tap.',
-          'Some stops are already locked from your booking checklist — tick a couple more to pin them, or leave them flexible for YunHai to schedule.',
+          'Some stops are already locked from your booking checklist. Tick a couple more to pin them, or leave them flexible for YunHai to schedule.',
           'tr'
         );
         // Check off two of the currently-unchecked rows in the real finalize modal.
@@ -936,7 +936,7 @@
         await eng.narrate(
           'Done',
           'A day that actually holds up.',
-          'Every stop in order, real drive times between them, buffers baked in — no backtracking, no impossible jumps.',
+          'Every stop in order, real drive times between them, buffers baked in. No backtracking, no impossible jumps.',
           'br'
         );
         // Slowly pan down the packed day so the full timeline + transit pills are seen.
@@ -984,7 +984,7 @@
         await eng.narrate(
           'Step 04 · Finalize',
           'The whole trip, day by day.',
-          'Every approved stop, in order, with times and costs — the plan you’ll actually travel with.',
+          'Every approved stop, in order, with times and costs. The plan you’ll actually travel with.',
           'tr'
         );
         await eng.wait(1400);
@@ -1044,7 +1044,7 @@
   const iframe = document.createElement('iframe');
   iframe.className = 'reel__frame is-active';
   iframe.src = IFRAME_SRC;
-  iframe.title = 'YunHai — live product demo';
+  iframe.title = 'YunHai live product demo';
   iframe.setAttribute('tabindex', '-1');
   iframe.setAttribute('aria-hidden', 'true');
   iframe.setAttribute('loading', 'eager');
