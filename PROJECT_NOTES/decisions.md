@@ -1154,3 +1154,22 @@ text progress and progress bar, so it loses nothing load-bearing.
 swapping them for a static icon, which is more code for the same information.
 **Tradeoffs:** Two selectors now carry `!important` overrides that must be kept in mind if the
 spinner markup is ever renamed.
+
+## [2026-09-12] README rebranded to YunHai.io, internal package name left as-is
+**Decision:** Rewrote `README.md` around the public brand "YunHai.io" (matching the live title tag
+and `yunhai.io` domain already in production), replacing the old "TravelPlanner" heading and the
+personal-filesystem deploy paths it carried. `package.json`'s `name` field and internal module/file
+references (`travelplanner-staging` compose project name, `src/claude.js` filename, etc.) were left
+untouched.
+**Reasoning:** The ask was a recruiter-facing README, not a codebase rename — the audience for
+`README.md` is external, while the internal name is load-bearing in compose project names, Docker
+volumes, and file paths that a rename would need to touch carefully and verify against a live
+deploy. Scoping the change to the one file that's actually recruiter-facing keeps the diff reviewable
+as docs-only and avoids the pre-push review gate's code path for a task that touches no code.
+**Alternatives rejected:** A full rename of `package.json`, compose files, and internal paths to
+`yunhai` — rejected as materially larger and riskier than what was asked, and it would need a real
+deploy to verify nothing broke (compose project names in particular are already load-bearing per
+the deploy section this rewrite removed).
+**Tradeoffs:** The repo now reads as "YunHai.io" externally while `package.json` still says
+`"name": "travelplanner"` and deploy tooling still says `travelplanner-staging`/`travelplanner-prod`.
+Logged as an open item rather than silently left inconsistent.
