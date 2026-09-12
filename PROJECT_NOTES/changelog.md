@@ -2222,3 +2222,35 @@ follows it, that Places hours never reach it, and that a named venue still gets 
   `state.` references.
 - Corrected the scope of open_items [2026-08-18] (repeat-visit regeneration): leg identity is lost
   at the wire in both directions, so the previously recorded next action was insufficient.
+
+## [2026-09-12] Correction: the "11 pre-existing test failures" were an empty node_modules
+- The earlier entry today recorded the suite as "170 → 177 tests, 159 → 166 passing, the same 11
+  pre-existing missing-API-key load failures". That diagnosis was wrong. `node_modules/` was
+  entirely empty in this container — the failures were `Cannot find module '@anthropic-ai/sdk'`
+  and friends, not missing keys.
+- After `npm install`: **299 tests, 299 passing, 0 failures.** There is no pre-existing failing
+  test in this repo. Treat a red suite here as a real signal, not as expected background noise.
+
+## [2026-09-12] app.js: thermo-nuclear audit, surgical tier applied
+- **§2 (two of three defects):** the expanded-card overlay clones the grid card's markup and
+  re-implements its handlers; the copies had drifted. Approving from the overlay never refreshed
+  the budget tracker; declining never cleared the placement, so a declined activity stayed on its
+  day and returned pre-placed onto a slot Arrange may have refilled. Both now match the grid path.
+- **§2c NOT fixed, deliberately:** the expand-notes button inside the overlay is dead, and adding
+  the missing bind would not fix it — the clone duplicates `id="actNotes-${a.id}"` while the grid
+  card is still in the document, so `getElementById` resolves to the grid textarea. Structural;
+  belongs with removing the clone.
+- **§3:** deleted the duplicate 34-line item block in `renderChecklistContainer` (verified
+  byte-identical after whitespace normalization) — and it was computed unconditionally, then
+  discarded by the activity branch. `renderItemsBlock` now serves both branches.
+- **§7:** added `byScheduledTime` and `activitiesOnDay(dayId)`; nine longhand copies collapsed.
+  Four sites carrying an `actPreferredTime`/`typeToTime` fallback are a different concept, left as-is.
+- **§6:** `getAccommodationForDay(cityName, date)` discarded the date at all three call sites —
+  accommodation is per-city. Renamed `getAccommodationForCity`, dead parameter dropped. Also made
+  `trip.detail` escape at the template in both branches instead of being pre-escaped by one producer.
+- **§8:** `renderActivities` skipped `renderBudgetTracker()` when a filter matched nothing, freezing
+  the approved count and budget bar. Moved ahead of the early return.
+- Net: `public/app.js` 10,312 → 10,284 lines, 43 insertions / 71 deletions. No module extracted,
+  no renderer restructured.
+- Follow-up from the review of that commit: `getAccommodationLabel` carried the same dead `date`
+  parameter one level up from the function §6 fixed. Dropped it and the three arguments.

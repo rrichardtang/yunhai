@@ -5453,7 +5453,7 @@ function getLogisticsForDay(city, date) {
   return result;
 }
 
-function getAccommodationLabel(cityName, date) {
+function getAccommodationLabel(cityName) {
   const acc = getAccommodationForCity(cityName);
   const raw = String(acc?.address || '').trim();
   if (!raw) return 'Accommodation';
@@ -5620,7 +5620,7 @@ function logisticsAnchorsForCityDay(cityPlan, date) {
       kind: 'acc-arrival',
       start: arrStart + buf + transit,
       end: arrStart + buf + transit + HOTEL_CHECKIN_MIN,
-      name: getAccommodationLabel(cityName, date) || 'Accommodation check-in'
+      name: getAccommodationLabel(cityName) || 'Accommodation check-in'
     });
   }
 
@@ -5633,7 +5633,7 @@ function logisticsAnchorsForCityDay(cityPlan, date) {
       kind: 'acc-departure',
       start: accStart,
       end: accStart + HOTEL_CHECKIN_MIN,
-      name: getAccommodationLabel(cityName, date) || 'Accommodation checkout'
+      name: getAccommodationLabel(cityName) || 'Accommodation checkout'
     });
     anchors.push({
       kind: 'departure',
@@ -5793,7 +5793,7 @@ function renderArrange() {
 
     const cityObj = state.cities.find((c) => cityMatches(c.name, d.city));
     const dayLogistics = getLogisticsForDay(cityObj, d.date);
-    const accLabel = getAccommodationLabel(d.city, d.date);
+    const accLabel = getAccommodationLabel(d.city);
     const arrId = logisticsArrivalId(d.city);
     const depId = logisticsDepartureId(d.city);
     const arrAccId = logisticsAccommodationArrivalId(d.city);
