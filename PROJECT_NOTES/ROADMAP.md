@@ -1,46 +1,44 @@
 # ROADMAP
 
-## Now
-- Shipping **Map-first Step 2 review UX**:
-  - Quizlet-style card flip animation on activity cards.
-  - Back-face mini-map per activity using Leaflet + OpenStreetMap.
-  - Full-screen itinerary map overlay with all activities pinned.
-  - Selected activity highlighted with a star marker and pin-to-card cross-reference.
-- Shipping the **Robust Calendar & Sync Mode MVP** for low-noise calendar export.
-- Active build focus:
-  - Metadata toggle support (compact/full) in calendar export flow.
-  - ICS export metadata mode via `?metadata=compact|full`.
-  - Google Calendar one-way sync with OAuth endpoints and token persistence.
-  - Pre-sync conflict detection against existing Google events.
-  - Dedupe-safe sync mapping to prevent duplicate event creation per itinerary item fingerprint.
+> **This is a scratchpad of future ideas, not a status tracker.** Everything below is not yet
+> built. Current work lives in `current_state.md`; what's already shipped lives in
+> `changelog.md`. When an idea here gets built, delete it from this file — don't mark it done.
 
-## Next
-- Add refresh-token flow and graceful retry handling for expired Google access tokens.
-- Add selective sync scope controls (city/date filters).
-- Add per-item conflict resolution UI in sync flow.
-- Add tests for calendar item fingerprint stability and sync dedupe behavior.
-
-## Scalability
-
-- **Current:** Global semaphore caps total in-flight Anthropic calls at 10 across all users. Per-request concurrency of 3 cities in parallel. Sufficient for ~20–50 concurrent users.
-- **Later (100+ users):** Replace semaphore with a **job queue** (BullMQ + Redis). Requests enqueue a job per city; workers pull at a controlled rate; results stream back via polling or WebSockets. Decouples HTTP request handling from LLM throughput entirely and survives server restarts. Enables per-user queue priority and observable backlog metrics.
-
-## Hosting & Infrastructure
-- **Current:** Self-hosted VPS with Docker + Traefik, env vars via `.env` file.
-- **Next:** Migrate to Railway — deploys from GitHub, env vars in dashboard, persistent volume at `/app/data`, no PM2 needed. ~$5/mo. Render is fallback (free tier but spins down).
-- **Later:** Replace flat-file `data/` storage with a real DB. Options in order of effort:
-  1. **Turso** — SQLite over the network, closest to current flat JSON semantics, minimal code change. Fine if the goal is only single-user durability/scaling.
-  2. **Supabase** — Postgres with dashboard, more powerful, slightly more setup. **Preferred if collaboration is on the table** — Postgres gives row-level transactions for concurrent multi-user edits, plus `pgvector` (memory embeddings) and Realtime (presence) in one stack. See **Collaboration & Persistence Migration** for the phased plan.
-- **Eventually:** Custom domain behind Cloudflare (free SSL, CDN, DDoS protection). Move Google Calendar token storage into DB.
-
-## Auth
-- **Current:** Clerk (`@clerk/express`) with Google social sign-in via shared Clerk OAuth credentials.
-- **Later:** Switch to custom Google OAuth credentials in Clerk dashboard for production (create OAuth 2.0 Client ID in Google Cloud Console, set redirect URI to Clerk's callback URL).
-- Add token refresh flow for Google Calendar OAuth (expired tokens currently require full reconnect).
+## Frontend / Review UX
+- **Map-first Step 2 review UX** — Quizlet-style card flip animation on activity cards; a
+  back-face mini-map per activity using Leaflet + OpenStreetMap; a full-screen itinerary map
+  overlay with all activities pinned; the selected activity highlighted with a star marker and
+  pin-to-card cross-reference.
 
 ## Calendar Sync
-- **Current:** One-way sync, conflict pre-check (warns, doesn't block), dedupe-safe fingerprinting.
-- **Planned:** Token auto-refresh, selective sync by city/date, per-item conflict resolution UI.
+- Refresh-token flow and graceful retry handling for expired Google access tokens — today an
+  expired token requires a full reconnect.
+- Selective sync scope controls (city/date filters).
+- Per-item conflict resolution UI in the sync flow — today's precheck only warns and asks to
+  proceed or cancel for the whole batch.
+- Tests for calendar item fingerprint stability and sync dedupe behavior.
+- Custom Google OAuth credentials in the Clerk dashboard for production, instead of shared Clerk
+  OAuth credentials.
+- Move Google Calendar token storage from flat JSON into a DB, encrypted at rest.
+
+## Scalability
+- Replace the LLM semaphore with a **job queue** (BullMQ + Redis) once concurrency needs exceed
+  ~50 users: requests enqueue a job per city, workers pull at a controlled rate, results stream
+  back via polling or WebSockets. Decouples HTTP request handling from LLM throughput entirely
+  and survives server restarts. Enables per-user queue priority and observable backlog metrics.
+
+## Hosting & Infrastructure
+- Migrate off the self-hosted VPS to Railway — deploys from GitHub, env vars in dashboard,
+  persistent volume at `/app/data`, no PM2 needed. ~$5/mo. Render is fallback (free tier but
+  spins down).
+- Replace flat-file `data/` storage with a real DB. Options in order of effort:
+  1. **Turso** — SQLite over the network, closest to current flat JSON semantics, minimal code
+     change. Fine if the goal is only single-user durability/scaling.
+  2. **Supabase** — Postgres with dashboard, more powerful, slightly more setup. **Preferred if
+     collaboration is on the table** — Postgres gives row-level transactions for concurrent
+     multi-user edits, plus `pgvector` (memory embeddings) and Realtime (presence) in one stack.
+     See **Collaboration & Persistence Migration** for the phased plan.
+- CDN/DDoS protection via Cloudflare in front of the production domain.
 
 ## Collaboration & Persistence Migration
 
@@ -93,4 +91,3 @@ Per-itinerary websocket channel (who's online, section/activity soft-locks, live
 > **Other longer-term features**
 > - Mobile app — React Native or PWA promotion (service worker already in place)
 > - Richer booking ingest — improve heuristic email parser for edge-case confirmation formats
-> - Export to PDF — printable trip summary beyond ICS

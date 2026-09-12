@@ -2181,3 +2181,21 @@ follows it, that Places hours never reach it, and that a named venue still gets 
   (outline's immich-style suggestion): Clerk blocks the UI until a session exists and entitlement
   looks invite-gated (`src/entitlements.js`), so there's no frictionless anonymous path to describe
   truthfully.
+
+## [2026-09-12] ROADMAP.md rewritten as a pure future-ideas scratchpad
+- Added a top-of-file note stating the file's actual purpose (not-yet-built ideas only, not a
+  status tracker) and pointing to `current_state.md`/`changelog.md` for what's in progress/shipped.
+- Removed every already-implemented piece: the "Robust Calendar & Sync Mode MVP" build-focus list
+  (shipped — see `architecture.md`'s Calendar & Sync feature contract and `calendarSync.js`), all
+  "Current:" status lines (Scalability, Hosting, Auth, Calendar Sync — these duplicated
+  `current_state.md` and had already drifted stale, e.g. "caps in-flight Anthropic calls" after
+  the semaphore became provider-agnostic), and "Export to PDF" (shipped as
+  `public/js/pdfExport.js`).
+- Merged the old Now/Next/Auth/Calendar Sync sections' overlapping calendar-OAuth ideas (refresh
+  token, selective sync, conflict UI, tests, custom OAuth credentials, token-storage migration)
+  into one Calendar Sync section — they were the same handful of ideas duplicated three ways.
+- Trimmed "Eventually: Custom domain behind Cloudflare" to just the Cloudflare CDN/DDoS part —
+  the custom domain itself (yunhai.io) already shipped.
+- Kept in full: the Map-first Step 2 review UX idea (verified unimplemented — no Leaflet
+  anywhere in the codebase) and the entire Collaboration & Persistence Migration plan (verified
+  unimplemented — flat JSON is still the current architecture).
