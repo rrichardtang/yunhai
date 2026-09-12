@@ -128,9 +128,25 @@ per-city diff already covers — so editing the *first* city's arrival escalates
 scope. Dropping the term is not behavior-preserving (`hydrateLoadedItinerary` sets `state.travels`
 from `itinerary.travels` independently, so the two can legitimately diverge), which is why it was
 left alone.
-**Next action:** Give activities a city id (or resolve `regenSet` to ids at selection time) so
-`renderPhase1` and `planTrip` can distinguish two legs of the same city. Extend
-`src/cityChanges.test.js` with a regeneration-side case once they can.
+**Scope correction [2026-09-12]:** "resolve `regenSet` to ids at selection time" is not sufficient
+on its own — leg identity is lost at the wire, in both directions. `cityPlanningInputs`
+(`shared/cityChanges.js`) deliberately omits `id` from the request payload, and the server replies
+`sendEvent({ type: 'city', city: city.name, ... })` (`src/routes/activities.js:716`), which the
+client matches back with `state.cities.findIndex((c) => cityMatches(c.name, evt.city))`
+(`public/app.js:8449`) — always the *first* leg of a duplicated name. So incoming activities cannot
+currently be attributed to a leg at all.
+**Do not fix the UI half alone.** Correcting only `renderPhase1`'s pre-check makes it worse: the
+dialog would promise "only leg 2" while `planTrip` still deletes every `a.city === 'Tokyo'`
+activity. Today's over-checking at least matches the blast radius it is about to cause.
+**Next action:** Three pieces, in order. (1) Attribute incoming activities to a leg — either echo
+the city `id` through the plan request and the `city` SSE event, or match same-name legs in request
+order client-side (the request only contains the legs actually being regenerated, so it is
+unambiguous whenever fewer than all legs of a name are in scope). (2) Stamp `cityId` on activities
+at creation (`public/app.js:8460`, plus the replace/add/logistics creation sites), with a
+name-based fallback for already-stored activities that have none — no migration. (3) Switch the
+regeneration path off name keys: `planTrip`'s `regenSet` filter, `renderPhase1`'s pre-check,
+`lockedByCity`, and `state.arrangedSignatures` are all keyed by city name today. Extend
+`src/cityChanges.test.js` with a regeneration-side case once (1) lands.
 
 ## [2026-08-17] City deletion leaks its activities into budget and saved itineraries
 **Status:** Deferred
