@@ -165,7 +165,8 @@
     formatCitySuggestion
   };
 
-  if (root) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else if (root) {
     root.TravelPlannerCityPlanner = api;
     Object.assign(root, api);
   }

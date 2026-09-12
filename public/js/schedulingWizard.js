@@ -164,7 +164,8 @@
     openSchedulingWizard
   };
 
-  if (root) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else if (root) {
     root.TravelPlannerSchedulingWizard = api;
     Object.assign(root, api);
   }

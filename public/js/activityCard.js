@@ -136,7 +136,8 @@
     renderActivityCostCell
   };
 
-  if (root) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else if (root) {
     root.TravelPlannerActivityCard = api;
     Object.assign(root, api);
   }

@@ -128,7 +128,8 @@
     getActiveProfile
   };
 
-  if (root) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else if (root) {
     root.TravelPlannerProfileWizard = api;
     Object.assign(root, api);
   }
