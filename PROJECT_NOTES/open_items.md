@@ -267,3 +267,17 @@ photo media) and the cache is keyed on the model's prose, so it almost never hit
 **Next action:** Phase 1A (mechanical, self-contained), then Phase 1B step 0 — a free measurement
 over the 300+ saved venue names that decides whether the normalise and alias layers are worth
 building — then Phase 2.
+
+## [2026-09-12] Public brand is "YunHai.io", internal package/deploy naming still says "travelplanner"
+**Status:** Deferred
+**Description:** `README.md` now presents the product as "YunHai.io" (matching the live title tag and
+domain), but `package.json`'s `"name": "travelplanner"`, the Docker Compose project names
+(`travelplanner-staging`, `travelplanner-prod`), and internal file names (`src/claude.js`, kept for
+history per its own doc comment) all still say "travelplanner". Not touched by the README rewrite —
+see decisions [2026-09-12].
+**Context:** Renaming compose project names is deploy-risk-bearing (would need re-verification on a
+live host) and out of scope for a docs-only change.
+**Next action:** Decide whether to fully rename internal package/deploy naming to `yunhai`, or leave
+the public/internal name split permanently (not unusual — plenty of products' repos keep a legacy
+internal codename). If renaming, do it as its own branch with a real deploy verification, not
+bundled into an unrelated change.

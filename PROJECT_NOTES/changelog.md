@@ -2149,3 +2149,15 @@ follows it, that Places hours never reach it, and that a named venue still gets 
   Spinners exempted. See decisions above for why duration and not `animation: none`.
 - Scope: `public/styles.css` only, which is loaded only by `planner.html`. The landing page and
   `src/` are untouched.
+
+## [2026-09-12] README overhaul: recruiter-facing, rebranded YunHai.io
+- Rewrote `README.md` from a bare "TravelPlanner" setup blurb into a recruiter-facing tour of the
+  engineering: multi-LLM orchestration (4 models behind one global semaphore), the hybrid
+  deterministic/LLM auto-arrange scheduler, the agent-memory layer, Trip Health, and the real
+  third-party integrations (Calendar, email ingest, Brave, Places/Unsplash).
+- Renamed the README's product name from "TravelPlanner" to "YunHai.io", matching the tagline
+  already live in `public/index.html`'s `<title>` and the production domain.
+- Removed personal-filesystem deploy paths and internal staging hostnames from the old Deployment
+  section; added a Mermaid architecture diagram, a deliberate-tradeoffs table, and verified every
+  file path cited against the actual source tree.
+- No code changed; `src/`, `public/`, and `package.json` are untouched.
