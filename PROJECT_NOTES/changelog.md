@@ -2170,3 +2170,14 @@ follows it, that Places hours never reach it, and that a named venue still gets 
   tagline (immich/ollama pattern) and a new "What it does" section describing the product from a
   user's perspective before the engineering deep-dive (n8n/directus pattern — don't make the
   reader infer the product from the architecture section).
+
+## [2026-09-12] README: closed remaining gaps against the research outline
+- Added two tradeoffs table rows the outline called for but the first pass omitted: the
+  intentionally monolithic `public/app.js` (no framework/module split), and one-way-only
+  integrations (Calendar export, email ingest) as a privacy tradeoff — both already documented as
+  decisions in `CLAUDE.md`/`PROJECT_NOTES`, just not yet in the README.
+- Reordered Tech stack to sit before Getting Started/Testing, matching the outline's section order.
+- Deliberately did not add a "what a visitor can do without signing up" line to the live-demo link
+  (outline's immich-style suggestion): Clerk blocks the UI until a session exists and entitlement
+  looks invite-gated (`src/entitlements.js`), so there's no frictionless anonymous path to describe
+  truthfully.

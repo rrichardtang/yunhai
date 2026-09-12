@@ -57,6 +57,15 @@ Every one of these was a choice, not a default.
 | LLM decides *which day*, code decides *when* | A heuristic scheduler kept breaking on edge cases; handing all scheduling to the LLM made violations merely rare instead of impossible. Splitting the two got both benefits. |
 | One semaphore across every provider | A single global concurrency cap, not a per-provider one, so cost and rate limits are governed by total in-flight calls — the actual constraint — not by which model happens to be busy. |
 | Swappable memory store behind one interface | `MemoryStore` is the only file a real database migration touches; every read/write site goes through `recall()`/`observe()`. |
+| One monolithic frontend file, on purpose | `public/app.js` stays a single file by policy — only clear boundary concerns (API calls, overlay lifecycle, localStorage) were ever pulled out into their own modules. A framework or a module split buys nothing a small team doesn't already have without it. |
+| Integrations are one-way | Calendar export is YunHai → Google only; email forwarding is ingest-only. Neither reads or scans an external account — a deliberate privacy tradeoff over a "sync everything" integration. |
+
+## Tech stack
+
+**Backend:** Express.js · Clerk (auth) · Anthropic + OpenAI SDKs · flat-file JSON persistence
+**Frontend:** Vanilla JS, no framework · Server-Sent Events for live plan progress
+**Integrations:** Google Calendar OAuth · Google Places · Unsplash · Brave Search · Resend (email)
+**Deploy:** Docker Compose behind Traefik, separate staging/production environments
 
 ## Getting started
 
@@ -77,13 +86,6 @@ npm test   # node --test "src/**/*.test.js" — no API keys required for the det
 ```
 
 Coverage is concentrated where correctness actually matters without a live model in the loop: the auto-arrange scheduler, trip-health/overlap detection, Brave query routing, and city-name validation.
-
-## Tech stack
-
-**Backend:** Express.js · Clerk (auth) · Anthropic + OpenAI SDKs · flat-file JSON persistence
-**Frontend:** Vanilla JS, no framework · Server-Sent Events for live plan progress
-**Integrations:** Google Calendar OAuth · Google Places · Unsplash · Brave Search · Resend (email)
-**Deploy:** Docker Compose behind Traefik, separate staging/production environments
 
 ## Project structure
 
