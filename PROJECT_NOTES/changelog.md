@@ -2208,3 +2208,17 @@ follows it, that Places hours never reach it, and that a named venue still gets 
 - Removed `js/apiService.js` from the Frontend module list and from the "Minimal frontend split"
   decision bullet — the file was deleted (per `PROJECT_NOTES/cleanup_plan.md`'s already-executed
   Phase 1.1) but CLAUDE.md still listed it as existing.
+
+## [2026-09-12] Extracted frontend modules made testable; first tests written
+- Added the guarded `module.exports` footer to `public/js/{cityPlanner,arrangeView,activityCard,
+  bookingChecklist,profileWizard,schedulingWizard}.js` — 83 functions/constants that were
+  browser-only are now requirable by Node. Browser path verified unchanged in a `vm` sandbox.
+- Added `src/cityPlanner.test.js` and `src/activityCard.test.js`, aimed at the two accessors with a
+  documented production bug behind them (unset coordinates normalizing to 0,0; the $90-vs-$180
+  finalize mismatch from two cost shapes coexisting). Suite: 170 → 177 tests, 159 → 166 passing,
+  the same 11 pre-existing missing-API-key load failures.
+- Audited the "keep `app.js` monolithic" rule against the codebase rather than taking it as given;
+  see decisions [2026-09-12]. `app.js` measured at 10,312 lines / 412KB / 334 functions / 737
+  `state.` references.
+- Corrected the scope of open_items [2026-08-18] (repeat-visit regeneration): leg identity is lost
+  at the wire in both directions, so the previously recorded next action was insufficient.

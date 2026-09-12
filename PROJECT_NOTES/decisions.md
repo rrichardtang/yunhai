@@ -1197,3 +1197,34 @@ to delete.
 **Tradeoffs:** None identified — `felix-the-fixer` reviewed the deletion commit specifically for
 dangling references (grepped `src/`, `public/`, `scripts/`, `deployment/`, `package.json`, and
 every doc) and found none.
+
+## [2026-09-12] The "keep app.js monolithic" rule is half retired: pure logic may leave, orchestration stays
+**Decision:** Added the guarded `module.exports` footer `shared/*.js` already used to all six domain
+modules under `public/js/` (`cityPlanner`, `arrangeView`, `activityCard`, `bookingChecklist`,
+`profileWizard`, `schedulingWizard`), making ~1,000 already-extracted lines requirable by Node, and
+wrote the first tests against two of them. The working criterion for future extraction changes from
+"is it a boundary concern?" to "is it pure, and does it carry the footer?" — orchestration and the
+shared `state` object stay in `app.js`.
+**Reasoning:** The standing rule in CLAUDE.md ("Do not extract modules from it beyond clear boundary
+concerns") is a hardening of decisions [2026-04-15], which said the opposite of a permanent ban: it
+isolates high-churn boundaries "first", left `app.js` large "by design for now", called itself
+"revertible", and explicitly rejected "no split at all" *because* it "preserves the same fragility
+pattern". Practice has since outrun the written rule anyway — the six modules above are domain
+logic, not boundary concerns, and extracting them caused no trouble. What the rule was actually
+costing is testability: `shared/*` (5 modules, all with the footer) has 4 test files; `public/js/*`
+(12 modules, none with the footer) had zero. Same `<script src>` loading path, nine characters of
+difference, and it perfectly predicted whether tests existed. That matters because the top
+documented risk is precisely that frontend state logic ships bugs a clean `npm test` cannot catch —
+five review rounds on one branch surfaced four such defects. `app.js` also grew 8,738 → 10,312 lines
+(+18%) between 2026-04-23 and now, so "for now" has been running five months against a growing file.
+**Alternatives rejected:** Splitting `app.js` itself — rejected, and the rule is right about this:
+737 references to one mutable `state` object mean a naive file split produces cross-file state
+spaghetti, strictly worse than one file. Adding a framework or build step — separate decision, still
+correct as-is, and nothing here argues against it. Leaving the footers off and writing browser-only
+tests — rejected: it needs a harness the repo does not have, when nine characters reuse the runner
+it already uses.
+**Tradeoffs:** The footer means each of those six files now has two export paths to keep in mind.
+Browser behaviour is provably unchanged (verified in a `vm` sandbox with `window` and no `module`:
+namespace object and spread globals both still attach), and `felix-the-fixer` confirmed no bundler
+or `module` shim exists that could make the guard fire in the browser. The CLAUDE.md clause itself
+is left as-is pending the owner's call — the code now contradicts it, which is worth resolving.
