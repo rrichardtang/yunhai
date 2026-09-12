@@ -66,7 +66,6 @@ TravelPlannerAgent is a full-stack AI travel itinerary builder: an Express.js ba
 ### Frontend (`public/`)
 
 - **`app.js`** — Intentionally monolithic, and large enough that you should read the region you're changing rather than the whole file. Vanilla JS, no framework. Do not extract modules from it beyond clear boundary concerns. All `innerHTML` interpolation must go through the `esc()` helper; values read back from `dataset.*` come back entity-decoded, so re-escape them at read time.
-- **`js/apiService.js`** — HTTP layer wrapper.
 - **`js/overlayManager.js`** — Modal/overlay lifecycle.
 - **`js/statePersistence.js`** — localStorage helpers.
 
@@ -89,7 +88,7 @@ All persistence is flat JSON files — no database:
 
 - **Flat JSON only**: No database. Atomic writes with temp-file pattern. Sufficient to ~100 concurrent users; beyond that needs Redis + job queue.
 - **Hybrid scheduling for auto-arrange**: `/api/arrange` splits judgment from arithmetic. Claude (via the `assign_days` tool in `src/services/arrangePromptDirect.js` → `buildAssignPrompt`) outputs ONLY a per-day activity assignment — which day each activity goes on, no times, no order. `src/services/arrangeScheduler.js` (`schedule()`) then deterministically does everything else: cross-day meal redistribution, per-day commute-minimizing ordering (brute-force for ≤7 non-meals, nearest-neighbor above), meal anchoring into lunch/dinner by opening hours, and concrete time assignment respecting opening hours, commute gaps, day windows, and locks. It returns `{placements:{id:{date,time}}, unplaced, diagnostics}`. Because the LLM never emits a time, time-arithmetic violations are structurally impossible — there is **no** LLM repair loop or force-drop stage. `src/arrangeValidator.js` `validate()` runs once at the end as a self-check that populates `diagnostics` (normally empty). Locked activities bypass the LLM and are treated as fixed obstacles. The deterministic core is unit-tested without an API key (`src/arrangeScheduler.test.js`).
-- **Minimal frontend split**: Only boundary concerns (overlayManager, apiService, statePersistence) were extracted from `app.js`. Keep the rest in the monolith.
+- **Minimal frontend split**: Only boundary concerns (overlayManager, statePersistence) were extracted from `app.js`. Keep the rest in the monolith.
 - **Per-trip chat sessions**: Chat context is keyed by itinerary ID so state doesn't bleed between trips.
 - **AI summary regeneration**: Only regenerate `profileInstruction` on profile answer/aboutMe changes — not on manual edits to the summary textarea.
 - **One-way integrations**: Calendar export is TravelPlanner → Google only; email forwarding is ingest-only. Intentional privacy-first design.
@@ -149,14 +148,19 @@ If generated code violates any rule above, self-correct before presenting it. If
 
 `PROJECT_NOTES/` contains four living files with strict ownership — content lives in exactly one file:
 
-| File | Contains | Never contains |
-|---|---|---|
-| `current_state.md` | Present-tense snapshot: objective, active workstream, constraints, risks | History, rationale, completed items |
-| `decisions.md` | **Why** a choice was made: reasoning, tradeoffs, alternatives rejected. Append-only. | Implementation details, task tracking |
-| `open_items.md` | Deferred tasks, blockers, follow-ups that span sessions. Remove items when done. | Completed work, decisions |
-| `changelog.md` | **What** was completed and **when**. Factual log only. | Opinions, rationale, open work |
+| File | Contains | Never contains | Update rule |
+|---|---|---|---|
+| `current_state.md` | Present-tense snapshot: objective, active workstream, constraints, risks | History, rationale, completed items | Overwrite entirely each pass |
+| `decisions.md` | **Why** a choice was made: reasoning, tradeoffs, alternatives rejected | Implementation details, task tracking | Append-only — never edit or remove an entry |
+| `open_items.md` | Deferred tasks, blockers, follow-ups that span sessions | Completed work, decisions | Remove an item the moment it's resolved |
+| `changelog.md` | **What** was completed and **when**. Factual log only. | Opinions, rationale, open work | Append-only; keep full detail 30 days, summarize older entries |
 
 Other files (`architecture.md`, `ROADMAP.md`, etc.) are reference docs — update them when the feature contracts or roadmap change.
+
+Every maintenance pass evaluates all four files and captures only this session's **delta** — never
+rewrite history or duplicate a prior entry; if a file needs no change, confirm it's current rather
+than touching it. A **decision** exists when a technology, convention, design approach, or
+tradeoff was resolved and you can articulate the reasoning and alternatives considered.
 
 ### When to update
 
@@ -167,17 +171,6 @@ Update PROJECT_NOTES automatically (without waiting to be asked) when any of the
 - A new file is created or significant feature is added
 - A bug is fixed and verified
 - Context threshold is approaching
-
-### How to update
-
-- Capture only the **delta** from the current session — do not rewrite history or duplicate prior entries
-- `current_state.md`: Overwrite entirely. Remove anything that no longer describes the current objective or next actions.
-- `decisions.md`: Append only. Never edit or remove existing entries.
-- `open_items.md`: Remove completed items on every pass.
-- `changelog.md`: Keep detailed entries for the last 30 days; older entries can be summarized.
-- Every maintenance pass must evaluate all four files — if a file needs no change, confirm it is current.
-
-A **decision** exists when a technology, convention, design approach, or tradeoff was resolved and you can articulate the reasoning and alternatives considered.
 
 ### Scaffold templates
 

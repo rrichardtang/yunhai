@@ -2199,3 +2199,12 @@ follows it, that Places hours never reach it, and that a named venue still gets 
 - Kept in full: the Map-first Step 2 review UX idea (verified unimplemented — no Leaflet
   anywhere in the codebase) and the entire Collaboration & Persistence Migration plan (verified
   unimplemented — flat JSON is still the current architecture).
+
+## [2026-09-12] CLAUDE.md: deduped Project Notes Maintenance, fixed two stale facts
+- Folded the "How to update" bullet list into the ownership table as a 4th column — it was
+  restating three of the four rows verbatim ("Append only", "Remove items when done", etc.). Kept
+  the two genuinely distinct instructions (capture only the session's delta; evaluate all four
+  files every pass) as short prose below the table instead.
+- Removed `js/apiService.js` from the Frontend module list and from the "Minimal frontend split"
+  decision bullet — the file was deleted (per `PROJECT_NOTES/cleanup_plan.md`'s already-executed
+  Phase 1.1) but CLAUDE.md still listed it as existing.
