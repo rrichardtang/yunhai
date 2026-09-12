@@ -1173,3 +1173,27 @@ the deploy section this rewrite removed).
 **Tradeoffs:** The repo now reads as "YunHai.io" externally while `package.json` still says
 `"name": "travelplanner"` and deploy tooling still says `travelplanner-staging`/`travelplanner-prod`.
 Logged as an open item rather than silently left inconsistent.
+
+## [2026-09-12] Removed 5 stale/legacy files from the repo
+**Decision:** Deleted `.env.local`, `ecosystem.config.js`, `deployment/docker-compose.yml`,
+`PROJECT_NOTES/cleanup_plan.md`, and `PROJECT_NOTES/checklist.md` outright, rather than archiving
+or deprecating them in place.
+**Reasoning:** Each was verified dead/superseded before removal, not just suspected:
+`.env.local` held `NEXT_PUBLIC_INSFORGE_*` keys with no InsForge or Next.js anywhere else in the
+stack — leftover scaffold boilerplate. `ecosystem.config.js` (PM2) had zero references anywhere;
+the app deploys entirely via Docker Compose. `deployment/docker-compose.yml` was the
+pre-`yunhai.io` compose file — `deployment/promotion.sh`, the only sanctioned deploy path, reads
+only `docker-compose.prod.yml`/`docker-compose.staging.yml`. `cleanup_plan.md` was an explicit
+`Status: PROPOSAL` doc whose every concrete recommendation had already been carried out
+(`apiService.js` deleted, `overlayManager.js`/`statePersistence.js` wired, the `shared/`
+consolidation built as designed) — confirmed against the actual tree, not just assumed from the
+plan's own age. `checklist.md` was a pre-implementation, typo-heavy design spec for the booking
+checklist, superseded by the shipped feature (`src/tripHealth.js`, `bookingChecklist.js`,
+`architecture.md`'s Trip Health feature contract).
+**Alternatives rejected:** Leaving them in place with a "deprecated" marker — rejected because
+each one had a concrete, cited replacement or zero remaining references, so there was nothing
+left for a future reader to be pointed *toward*; a marker just adds a file to skip instead of one
+to delete.
+**Tradeoffs:** None identified — `felix-the-fixer` reviewed the deletion commit specifically for
+dangling references (grepped `src/`, `public/`, `scripts/`, `deployment/`, `package.json`, and
+every doc) and found none.
