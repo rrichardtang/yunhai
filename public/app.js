@@ -1682,43 +1682,6 @@ function renderChecklistContainer(group, collapsedState) {
     : group.type === 'accommodation' ? 'No accommodation booked yet'
     : 'No activities booked yet';
 
-  const itemsHtml = group.items.map((item) => {
-    const meta = collapsedRowText(item);
-    const checkedClass = item.verified ? ' cl-item--checked' : '';
-    return `
-      <div class="cl-item${checkedClass}" data-cl-item="${esc(item.id)}">
-        <div class="cl-item-collapsed" data-cl-collapse-row>
-          <button type="button" class="cl-checkbox ${item.verified ? 'checked' : ''}" data-cl-check aria-label="Mark as verified" aria-pressed="${item.verified}">
-            ${item.verified ? '<i class="ph-bold ph-check" aria-hidden="true"></i>' : ''}
-          </button>
-          ${item.type === 'activity' ? `
-            <button type="button" class="cl-ticket-toggle ${item.bookingNotRequired ? 'cl-ticket-toggle--off' : ''}" data-cl-booking-toggle aria-label="${item.bookingNotRequired ? 'Mark booking required' : 'Mark booking not required'}" aria-pressed="${item.bookingNotRequired}">
-              <i class="ph-bold ph-ticket" aria-hidden="true"></i>
-            </button>
-          ` : ''}
-          <div class="cl-item-text">
-            <span class="cl-item-name">${esc(item.name || '(unnamed)')}</span>
-            ${meta ? `<span class="cl-item-meta">${esc(meta)}</span>` : ''}
-          </div>
-          ${item.budgetUsd != null ? `<span class="cl-item-price">$${Math.round(item.budgetUsd).toLocaleString()}</span>` : ''}
-          <i class="ph-bold ${item.expanded ? 'ph-caret-up' : 'ph-caret-down'} cl-item-chevron" aria-hidden="true"></i>
-        </div>
-        ${item.expanded ? `
-          <div class="cl-item-expanded-wrap">
-            <div class="cl-expanded-header">
-              ${item.type !== 'activity' ? `
-                <button type="button" class="cl-delete-btn" data-cl-delete title="Delete item">
-                  <i class="ph-bold ph-trash" aria-hidden="true"></i>
-                </button>
-              ` : ''}
-            </div>
-            ${renderChecklistItemExpanded(item)}
-          </div>
-        ` : ''}
-      </div>
-    `;
-  }).join('');
-
   const renderItemsBlock = (items, emptyLabelOverride) => {
     if (!items.length) {
       return `
@@ -1813,12 +1776,7 @@ function renderChecklistContainer(group, collapsedState) {
       </button>
       ${isCollapsed ? '' : `
         <div class="cl-container-body">
-          ${count === 0 ? `
-            <div class="cl-empty-state">
-              <i class="ph-bold ${emptyIcon} cl-empty-icon" aria-hidden="true"></i>
-              <p class="cl-empty-label">${esc(emptyLabel)}</p>
-            </div>
-          ` : itemsHtml}
+          ${renderItemsBlock(group.items)}
           ${hasPrices ? `<p class="cl-subtotal">Total: $${containerSubtotal.toFixed(2)}</p>` : ''}
           <button type="button" class="cl-add-btn" data-cl-add="${esc(group.label)}" data-cl-add-type="${esc(group.type)}">
             <i class="ph-bold ph-plus" aria-hidden="true"></i> Add Item
@@ -4400,12 +4358,16 @@ function renderActivities() {
 
   const filteredActivities = getFilteredReviewActivities();
 
+  // Ahead of the empty-filter return: the tracker reads every approved activity and renders into
+  // #budgetTracker, so it has nothing to do with the review filter. Leaving it behind the return
+  // froze the approved count and budget bar whenever a filter matched nothing.
+  renderBudgetTracker();
+
   if (!filteredActivities.length) {
     els.activitiesGrid.innerHTML = '<div class="item"><strong>No activities match your filters.</strong><p>Try clearing search/filter settings.</p></div>';
     return;
   }
 
-  renderBudgetTracker();
   els.activitiesGrid.innerHTML = '';
 
   // Clean up previous observer
@@ -4721,6 +4683,7 @@ function renderActivities() {
         const next = current === true ? null : true;
         state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: next };
         syncExpand(next);
+        renderBudgetTracker();
       });
 
       const expandDeclineBtn = body.querySelector('.decline');
@@ -4733,7 +4696,11 @@ function renderActivities() {
         const current = state.reviewed[a.id]?.approved;
         const next = current === false ? null : false;
         state.reviewed[a.id] = { ...(state.reviewed[a.id] || {}), approved: next };
+        if (next === false && state.placements[a.id]?.dayId) {
+          state.placements[a.id] = { dayId: null, time: null };
+        }
         syncExpand(next);
+        renderBudgetTracker();
       });
 
       expandSaveActivityNotes?.addEventListener('click', () => {
@@ -5137,15 +5104,28 @@ function normalizeActivityMetadata(activity = {}) {
 
 // parseTimeTo24, minutesFromTime, timeFromMinutes provided by /shared/timeHelpers.js
 
+// The single most-used concept in the arrange/finalize/itinerary code: an activity's position in
+// its day is its placement time, and a day's contents are the approved activities placed on it.
+// Both were written out longhand at nine call sites, which is nine chances for the ?.time fallback
+// to drift.
+function byScheduledTime(a, b) {
+  return minutesFromTime(parseTimeTo24(state.placements[a.id]?.time))
+    - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time));
+}
+
+function activitiesOnDay(dayId) {
+  return state.activities
+    .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === dayId)
+    .sort(byScheduledTime);
+}
+
 function getIncomingCommuteForActivity(activityId) {
   const activity = state.activities.find((a) => a.id === activityId);
   if (!activity) return null;
   const placement = state.placements[activityId];
   if (!placement?.dayId) return null;
 
-  const activitiesInDay = state.activities
-    .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === placement.dayId)
-    .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+  const activitiesInDay = activitiesOnDay(placement.dayId);
 
   const index = activitiesInDay.findIndex((a) => a.id === activityId);
   if (index <= 0) return null;
@@ -5474,7 +5454,7 @@ function getLogisticsForDay(city, date) {
 }
 
 function getAccommodationLabel(cityName, date) {
-  const acc = getAccommodationForDay(cityName, date);
+  const acc = getAccommodationForCity(cityName);
   const raw = String(acc?.address || '').trim();
   if (!raw) return 'Accommodation';
   const short = raw.split(',')[0].trim();
@@ -5489,7 +5469,7 @@ function buildLogisticsPseudoActivities(cityObj, date, cityName) {
   const arrivalDate = String(logistics.arrival?.date || cityObj.startDate || '').slice(0, 10);
   const departureDate = String(logistics.departure?.date || cityObj.endDate || '').slice(0, 10);
   const dateStr = String(date || '').slice(0, 10);
-  const acc = getAccommodationForDay(cityName, date);
+  const acc = getAccommodationForCity(cityName);
   const accAddress = String(acc?.address || '').trim();
   const accLat = normalizeCoordinate(acc?.latitude);
   const accLng = normalizeCoordinate(acc?.longitude);
@@ -5742,9 +5722,7 @@ function bindCommuteInteractions() {
         const toPlacement = state.placements[toId] || {};
         const dayId = toPlacement.dayId;
         if (dayId) {
-          const orderedActivities = state.activities
-            .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === dayId)
-            .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+          const orderedActivities = activitiesOnDay(dayId);
           const pairIndex = orderedActivities.findIndex((a, index) => index > 0 && orderedActivities[index - 1].id === fromId && a.id === toId);
           recalculateDayFromIndex(dayId, pairIndex === -1 ? 1 : pairIndex);
         }
@@ -5811,7 +5789,7 @@ function renderArrange() {
     if (!schedule) return;
     const items = approved
       .filter((a) => state.placements[a.id]?.dayId === d.id && cityMatches(a.city, d.city))
-      .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+      .sort(byScheduledTime);
 
     const cityObj = state.cities.find((c) => cityMatches(c.name, d.city));
     const dayLogistics = getLogisticsForDay(cityObj, d.date);
@@ -6243,9 +6221,7 @@ function enforceDayTimeBoundaries(dayId) {
   const dayStartMinutes = getCityDayWindowStart(city, day.date);
   const dayEndMinutes = getCityDayWindowEnd(city, day.date);
 
-  const orderedActivities = state.activities
-    .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === dayId)
-    .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+  const orderedActivities = activitiesOnDay(dayId);
 
   orderedActivities.forEach((activity) => {
     const isDepartureActivity = /\b(depart|departure)\b/i.test(String(activity.name || ''));
@@ -6262,16 +6238,16 @@ function enforceDayTimeBoundaries(dayId) {
   });
 }
 
-function getAccommodationForDay(cityName) {
+// Accommodation is a property of the city, not of a day within it. This took a `date` argument at
+// every call site and discarded it, which documented a per-day model the code does not implement.
+function getAccommodationForCity(cityName) {
   const city = state.cities.find((c) => cityMatches(c.name, cityName));
   return city?.accommodation?.address ? city.accommodation : null;
 }
 
 function recalculateDayFromIndex(dayId, startIndex = 1) {
   if (!dayId) return;
-  const orderedActivities = state.activities
-    .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === dayId)
-    .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+  const orderedActivities = activitiesOnDay(dayId);
 
   for (let i = Math.max(1, startIndex); i < orderedActivities.length; i += 1) {
     const previous = orderedActivities[i - 1];
@@ -6295,11 +6271,9 @@ async function updateCommutesForCityDays(dayIds = []) {
   for (const dayId of dayIds) {
     const day = state.days.find((d) => d.id === dayId);
     if (!day) continue;
-    const accommodation = getAccommodationForDay(day.city, day.date);
+    const accommodation = getAccommodationForCity(day.city);
     const accommodationLocation = String(accommodation?.address || '').trim();
-    const orderedActivities = state.activities
-      .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === dayId)
-      .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+    const orderedActivities = activitiesOnDay(dayId);
 
     const cityObj = state.cities.find((c) => cityMatches(c.name, day.city));
     const { arrival, arrivalAccommodation, departure, departureAccommodation } = buildLogisticsPseudoActivities(cityObj, day.date, day.city);
@@ -7186,7 +7160,7 @@ function renderItineraryInsights(approvedActivities) {
   const cards = state.days.map((day) => {
     const items = approvedActivities
       .filter((a) => state.placements[a.id]?.dayId === day.id)
-      .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+      .sort(byScheduledTime);
 
     const activityHours = items.reduce((sum, item) => sum + actDurationHours(item), 0);
     let commuteMinutes = 0;
@@ -7411,7 +7385,7 @@ function renderFinalizeDayByDay() {
     citiesSet.add(day.city);
     const items = approved
       .filter((a) => state.placements[a.id]?.dayId === day.id)
-      .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)));
+      .sort(byScheduledTime);
     totalStops += items.length;
 
     const dt = parseYmdAsLocal(day.date);
@@ -8602,9 +8576,7 @@ function buildScheduledDays() {
   return state.days.map((d) => ({
     date: d.date,
     city: d.city,
-    activities: state.activities
-      .filter((a) => state.reviewed[a.id]?.approved && state.placements[a.id]?.dayId === d.id)
-      .sort((a, b) => minutesFromTime(parseTimeTo24(state.placements[a.id]?.time)) - minutesFromTime(parseTimeTo24(state.placements[b.id]?.time)))
+    activities: activitiesOnDay(d.id)
       .map((a) => ({ time: state.placements[a.id]?.time, ...buildActivityDigest(a) }))
   })).filter((d) => d.activities.length);
 }
@@ -9263,7 +9235,7 @@ function collectMyTrips() {
       type: 'saved',
       id: item.id,
       tripName: item.tripName || 'Untitled Trip',
-      detail: `${esc(generatedDate)} · ${Number(item.days || 0)} days · ${Number(item.activityCount || 0)} activities`
+      detail: `${generatedDate} · ${Number(item.days || 0)} days · ${Number(item.activityCount || 0)} activities`
     });
   });
 
@@ -9288,7 +9260,7 @@ function tripRowMarkup(trip) {
     <article class="saved-itinerary-item">
       <div>
         <h4>${esc(trip.tripName)}</h4>
-        <p>${trip.detail}</p>
+        <p>${esc(trip.detail)}</p>
       </div>
       <div class="saved-itinerary-actions">
         <button type="button" class="secondary" data-load-trip="${esc(trip.id)}">Open</button>
