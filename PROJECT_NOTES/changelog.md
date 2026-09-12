@@ -2161,3 +2161,12 @@ follows it, that Places hours never reach it, and that a named venue still gets 
   section; added a Mermaid architecture diagram, a deliberate-tradeoffs table, and verified every
   file path cited against the actual source tree.
 - No code changed; `src/`, `public/`, and `package.json` are untouched.
+
+## [2026-09-12] README refined against real-world examples; research notes captured
+- Added `PROJECT_NOTES/readme-research.md`: 8 primary-source READMEs (excalidraw, supabase,
+  tldraw, PostHog, ollama, n8n, immich, directus) fetched and analyzed for structure, plus a
+  verified aside on cal.com's closed-source pivot as a negative example.
+- Applied the findings to `README.md`: added a prominent "Try it live" link right under the
+  tagline (immich/ollama pattern) and a new "What it does" section describing the product from a
+  user's perspective before the engineering deep-dive (n8n/directus pattern — don't make the
+  reader infer the product from the architecture section).
