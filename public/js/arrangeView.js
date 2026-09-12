@@ -221,7 +221,8 @@
     logisticsAccommodationArrivalId, logisticsAccommodationDepartureId
   };
 
-  if (root) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else if (root) {
     root.TravelPlannerArrangeView = api;
     Object.assign(root, api);
   }
