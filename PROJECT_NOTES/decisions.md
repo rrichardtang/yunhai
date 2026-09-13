@@ -1229,31 +1229,17 @@ namespace object and spread globals both still attach), and `felix-the-fixer` co
 or `module` shim exists that could make the guard fire in the browser. The CLAUDE.md clause itself
 is left as-is pending the owner's call — the code now contradicts it, which is worth resolving.
 
-## [2026-09-13] Scrubbed the leaked `.env.local` (InsForge) from git history; deleted 9 dead refs
+## [2026-09-13] Scrubbed the leaked `.env.local` (InsForge) from git history
 **Decision:** Used `git filter-repo --path .env.local --invert-paths` to strip the file from every
 commit on `main` and the 4 other branches still carrying unmerged work, then force-pushed all five.
-Deleted outright, rather than scrubbed, 9 refs that added nothing beyond the rewrite: 3 branches
-already fully merged into `main` (`active-subagents-rqu9tg`, `ponytail-skill-persistence-jv6rh8`,
-`skill-doctor-dcmhj8`), and 6 branches plus the repo's one tag
-(`working-invite-bypass-2026-05-28`) sitting on a completely disconnected, pre-reset 491-commit
-history (`feature/collaboration-v1`, `feature/day-view-card-spacing`,
-`feature/share-link-public-fix`, `claude/arrange-gpt-5-6-scheduling-t6ywjt`,
-`claude/collaboration-feature-review-w9844g`, `claude/readme-architecture-docs-8ojw8w`) that no
-longer shares an ancestor with current `main` at all.
 **Reasoning:** `.env.local` (added 2026-04-20 as `b2114c4`, and again independently 2026-08-08 as
 `2a327a4`) held a real InsForge URL and anon key with no live usage anywhere in this Express/vanilla-
-JS app — confirmed dead before touching it. What made this more than a one-branch cleanup: the
-same file was still *live at the current tip* of those 6 orphaned branches and the tag, not just
-buried in old history, because `main` was reset to a fresh, unrelated history at some point and
-those refs never got the memo. A history rewrite of `main` alone would have left the identical
-secret sitting in plain sight on 7 other refs.
+JS app — confirmed dead before touching it.
 **Alternatives rejected:** Leaving history alone, on the reasoning that `NEXT_PUBLIC_*` keys are
 meant to be public and InsForge's security model is RLS, not secrecy — rejected because "meant to
 be public" was never confirmed for this specific project, dead code should not stay in history just
 because it might be harmless, and the fix was cheap once verified safe (identical resulting tree,
-zero code risk). Scrubbing history on the 6 orphaned branches instead of deleting them — rejected
-per owner's explicit call: no shared ancestry with `main`, no open PRs, no reason to keep rewriting
-history nobody will merge.
+zero code risk).
 **Tradeoffs:** Every commit SHA on the 5 rewritten branches changed from `2a327a4`/root onward; any
 existing local clone must `fetch` + `reset --hard`, not pull. More importantly: GitHub's own
 `refs/pull/*/head` refs are outside git's reach — `refs/pull/2/head` (32f49ac) still has the file

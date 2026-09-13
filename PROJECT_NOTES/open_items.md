@@ -4,8 +4,8 @@
 **Status:** Pending input (owner action)
 **Description:** `refs/pull/2/head` still has `.env.local` present at its tip; `refs/pull/3/head`
 still has the original leak commit in its ancestry. Both are GitHub-managed refs tied to PR history
-— not deletable by `git push`, unaffected by the `filter-repo` rewrite/force-push that cleaned every
-branch and the tag (changelog/decisions [2026-09-13]).
+— not deletable by `git push`, unaffected by the `filter-repo` rewrite/force-push that cleaned
+`main` and the other active branches (changelog/decisions [2026-09-13]).
 **Context:** `search_pull_requests` reports 0 PRs for this repo, but `git ls-remote origin` shows 3
 `refs/pull/*/head` entries regardless — old/closed PRs the search API doesn't surface still leave
 their head ref fetchable.
