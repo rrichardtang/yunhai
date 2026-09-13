@@ -1,5 +1,19 @@
 # Open Items
 
+## [2026-09-13] InsForge key is unreachable via git now, but still live on GitHub's own PR refs
+**Status:** Pending input (owner action)
+**Description:** `refs/pull/2/head` still has `.env.local` present at its tip; `refs/pull/3/head`
+still has the original leak commit in its ancestry. Both are GitHub-managed refs tied to PR history
+— not deletable by `git push`, unaffected by the `filter-repo` rewrite/force-push that cleaned every
+branch and the tag (changelog/decisions [2026-09-13]).
+**Context:** `search_pull_requests` reports 0 PRs for this repo, but `git ls-remote origin` shows 3
+`refs/pull/*/head` entries regardless — old/closed PRs the search API doesn't surface still leave
+their head ref fetchable.
+**Next action:** The key was already confirmed dead code (no InsForge/Next.js usage anywhere in this
+app), so the action that actually closes this regardless of where a copy sits is on InsForge's own
+dashboard: regenerate the anon key, or delete the project outright. Optionally, also file a GitHub
+Support request to purge the two PR refs if a git-level record of zero copies matters.
+
 ## [2026-09-09] `wayfinder` and `grill-with-docs` are local-only
 **Status:** Deferred (accepted)
 **Description:** Both are `disable-model-invocation`-gated, so the `/` menu is their only entry

@@ -2254,3 +2254,20 @@ follows it, that Places hours never reach it, and that a named venue still gets 
   no renderer restructured.
 - Follow-up from the review of that commit: `getAccommodationLabel` carried the same dead `date`
   parameter one level up from the function §6 fixed. Dropped it and the three arguments.
+
+## [2026-09-13] Scrubbed leaked InsForge credentials out of git history
+- `git filter-repo --path .env.local --invert-paths`, force-pushed to `main` (66b1196 → 9ce6d16)
+  and 4 other branches with unmerged work (`claude/caveman-skill-install-36rv9i`,
+  `claude/guide-me-setup-stuck-mszkyo`, `claude/refine-endpoint-duplicates-4gg4g3`,
+  `claude/yunhai-llm-judge-harness-xgl14a`).
+- Deleted 9 dead refs from `origin` outright: 3 branches already fully merged into `main`
+  (`active-subagents-rqu9tg`, `ponytail-skill-persistence-jv6rh8`, `skill-doctor-dcmhj8`) and 6
+  branches plus the repo's one tag (`working-invite-bypass-2026-05-28`) on a disconnected,
+  pre-reset 491-commit history unrelated to current `main` (`feature/collaboration-v1`,
+  `feature/day-view-card-spacing`, `feature/share-link-public-fix`,
+  `claude/arrange-gpt-5-6-scheduling-t6ywjt`, `claude/collaboration-feature-review-w9844g`,
+  `claude/readme-architecture-docs-8ojw8w`).
+- Verified via `git ls-remote origin` and a full-history grep across every remaining ref: the file
+  and the key string are gone from everything `git push` can reach. Found, and could not close from
+  git alone: GitHub's own `refs/pull/2/head` and `refs/pull/3/head` still carry a copy (server-side,
+  outside filter-repo/force-push's reach). See decisions/open_items [2026-09-13].
